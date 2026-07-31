@@ -31,6 +31,7 @@ RUN apt-get update \
         supervisor \
         sqlite3 \
         libsqlite3-dev \
+        libpq-dev \
         libicu-dev \
         ffmpeg \
         curl \
@@ -39,7 +40,7 @@ RUN apt-get update \
 # install-php-extensions (bundled in the FrankenPHP image) compiles for ZTS
 # automatically -- FrankenPHP's threaded worker model requires it, unlike the
 # non-ZTS php:8.5-cli-bookworm build this replaces.
-RUN install-php-extensions pdo_sqlite sockets intl \
+RUN install-php-extensions pdo_sqlite pdo_pgsql sockets intl \
     && php -m | grep -i '^uri$' >/dev/null \
     && php -r 'exit(extension_loaded("uri") ? 0 : 1);'
 

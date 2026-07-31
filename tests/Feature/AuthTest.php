@@ -51,6 +51,10 @@ test('setup is rejected when owner already exists', function (): void {
 });
 
 test('separate setup connections cannot create two owners after both observe an empty database', function (): void {
+    if (getenv('DB_CONNECTION') !== 'sqlite') {
+        $this->markTestSkipped('This test exercises SQLite file-lock behavior.');
+    }
+
     $path = $this->container->get(SQLiteConfig::class)->path;
     $firstConnection = new PDO('sqlite:' . $path);
     $secondConnection = new PDO('sqlite:' . $path);
@@ -291,7 +295,7 @@ test('login failures are throttled without changing the invalid-credential respo
         ]);
     }
 
-    $row = $this->container->get(Database::class)->fetchFirst(new Query('SELECT keyHash FROM login_attempts'));
+    $row = $this->container->get(Database::class)->fetchFirst(new Query('SELECT "keyHash" FROM login_attempts'));
     expect((string) $row['keyHash'])->not->toContain('owner')
         ->and((string) $row['keyHash'])->not->toContain('198.51.100.10');
 });
@@ -322,7 +326,7 @@ test('successful login resets failures and expired attempts recover', function (
         ])->assertStatus(Status::UNAUTHORIZED);
     }
 
-    $this->container->get(Database::class)->execute(new Query('UPDATE login_attempts SET expiresAt = CURRENT_TIMESTAMP'));
+    $this->container->get(Database::class)->execute(new Query("UPDATE login_attempts SET \"expiresAt\" = '1970-01-01 00:00:00'"));
 
     $this->http->post('/api/v1/auth/login', [
         'username' => 'owner',
@@ -380,7 +384,7 @@ test('api token scopes are stored as a typed value object', function (): void {
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     $record = ApiTokenRecord::select()
-        ->where('id = ?', $created->body['id'])
+        ->where('id', $created->body['id'])
         ->first();
 
     expect($record)->not->toBeNull()

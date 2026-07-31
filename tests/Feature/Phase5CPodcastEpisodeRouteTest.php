@@ -171,7 +171,7 @@ test('SponsorBlock podcast episode token returns an X-Accel-Redirect to its broa
 
     $feedXml = (string) file_get_contents(podcastEpisodeFeedPath($config, $broadcast->body['broadcast']['id']));
     $parts = podcastEpisodeUrlParts(podcastEpisodeEnclosureUrlFromFeed($feedXml));
-    $item = BroadcastItemRecord::select()->where('broadcastId = ?', $broadcast->body['broadcast']['id'])->first();
+    $item = BroadcastItemRecord::select()->where('broadcastId', $broadcast->body['broadcast']['id'])->first();
     $remux = $assets->findByBroadcastItemAndRole(BroadcastItemId::fromPrimaryKey($item->id), AssetRole::RemuxedVideo);
     $relative = substr((string) $remux?->path, strlen(rtrim($config->broadcastsPath(), '/') . '/'));
     $accelPath = '/broadcasts/' . implode('/', array_map(rawurlencode(...), explode('/', $relative)));
@@ -513,7 +513,7 @@ function podcastEpisodeReadyStash(\Tests\IntegrationTestCase $test, string $chan
 {
     [$headers, $stashId, $mediaItemId] = $test->bootstrapFakeDownloadStash($channel);
 
-    foreach (StashItemRecord::select()->where('stashId = ?', $stashId)->all() as $stashItem) {
+    foreach (StashItemRecord::select()->where('stashId', $stashId)->all() as $stashItem) {
         if ((string) $stashItem->mediaItemId === $mediaItemId) {
             continue;
         }

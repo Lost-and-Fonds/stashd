@@ -12,7 +12,7 @@ use App\Jobs\JobIntent;
 use App\Jobs\JobRepository;
 use App\System\Storage\StorageCapabilityChecker;
 use App\System\Storage\StorageRootService;
-use Tempest\Database\Config\SQLiteConfig;
+use Tempest\Database\Config\DatabaseConfig;
 
 final readonly class BootstrapService
 {
@@ -28,12 +28,12 @@ final readonly class BootstrapService
     }
 
     /** @return array{directories_created: list<string>, command_id: string, job_id: string} */
-    public function boot(SQLiteConfig $sqliteConfig): array
+    public function boot(DatabaseConfig $databaseConfig): array
     {
         $created = $this->storageRoots->ensureDirectories();
-        $this->sqlite->configure($sqliteConfig);
-        $this->sqlite->enableWriteAheadLogging();
-        $this->migrations->run($sqliteConfig);
+        $this->sqlite->configure($databaseConfig);
+        $this->sqlite->enableWriteAheadLogging($databaseConfig);
+        $this->migrations->run($databaseConfig);
         $this->podcastTokens->backfillMissingTokenDigests();
         $this->storageChecks->checkAll();
 

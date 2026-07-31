@@ -40,7 +40,7 @@ test('podcast broadcast resources expose only intended token fields', function (
         ->and($json)->not->toContain((string) $broadcast->tokenSecretId)
         ->and($json)->not->toContain((string) $secret?->encryptedValue);
 
-    $stashItem = StashItemRecord::select()->where('stashId = ?', $stashId)->first();
+    $stashItem = StashItemRecord::select()->where('stashId', $stashId)->first();
     $item = $this->container->get(BroadcastItemRepository::class)->create(
         broadcastId: BroadcastId::parse($create->body['broadcast']['id']),
         stashItemId: StashItemId::parse((string) $stashItem->id),

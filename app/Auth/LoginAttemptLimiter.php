@@ -26,7 +26,7 @@ final readonly class LoginAttemptLimiter
         $now = DateTime::now(Timezone::UTC);
         $this->prune($now);
         $row = $this->database->fetchFirst(new Query(
-            'SELECT attempts FROM login_attempts WHERE keyHash = ? AND expiresAt > ?',
+            'SELECT attempts FROM login_attempts WHERE "keyHash" = ? AND "expiresAt" > ?',
             [$this->key($username, $clientAddress), $this->sql($now)],
         ));
 
@@ -43,9 +43,9 @@ final readonly class LoginAttemptLimiter
         $now = DateTime::now(Timezone::UTC);
         $this->prune($now);
         $this->database->execute(new Query(
-            'INSERT INTO login_attempts (keyHash, attempts, expiresAt)
+            'INSERT INTO login_attempts ("keyHash", attempts, "expiresAt")
              VALUES (?, 1, ?)
-             ON CONFLICT(keyHash) DO UPDATE SET attempts = attempts + 1, expiresAt = excluded.expiresAt',
+             ON CONFLICT("keyHash") DO UPDATE SET attempts = login_attempts.attempts + 1, "expiresAt" = excluded."expiresAt"',
             [$this->key($username, $clientAddress), $this->sql($now->plusSeconds(self::WINDOW_SECONDS))],
         ));
     }
@@ -53,14 +53,14 @@ final readonly class LoginAttemptLimiter
     public function reset(string $username, string $clientAddress): void
     {
         $this->database->execute(new Query(
-            'DELETE FROM login_attempts WHERE keyHash = ?',
+            'DELETE FROM login_attempts WHERE "keyHash" = ?',
             [$this->key($username, $clientAddress)],
         ));
     }
 
     private function prune(DateTime $now): void
     {
-        $this->database->execute(new Query('DELETE FROM login_attempts WHERE expiresAt <= ?', [$this->sql($now)]));
+        $this->database->execute(new Query('DELETE FROM login_attempts WHERE "expiresAt" <= ?', [$this->sql($now)]));
     }
 
     private function key(string $username, string $clientAddress): string

@@ -48,7 +48,7 @@ test('preflight persists completed command and ready job after worker run', func
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     $command = \App\Commands\CommandRecord::select()
-        ->where('type = ?', CommandType::StashPreflight)
+        ->where('type', CommandType::StashPreflight)
         ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
         ->first();
 
@@ -62,7 +62,7 @@ test('preflight persists completed command and ready job after worker run', func
         ->and($command->result)->not->toBeNull();
 
     $job = \App\Jobs\JobRecord::select()
-        ->where('commandId = ?', (string) $command->id)
+        ->where('commandId', (string) $command->id)
         ->first();
 
     expect($job)->not->toBeNull()

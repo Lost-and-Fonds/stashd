@@ -10,7 +10,7 @@ use App\System\Boot\SqliteConfigurator;
 use Tempest\Console\ConsoleArgument;
 use Tempest\Console\ConsoleCommand;
 use Tempest\Console\HasConsole;
-use Tempest\Database\Config\SQLiteConfig;
+use Tempest\Database\Config\DatabaseConfig;
 
 final readonly class WorkerTickCommand
 {
@@ -24,7 +24,7 @@ final readonly class WorkerTickCommand
     public function __construct(
         private JobWorkerService $worker,
         private SqliteConfigurator $sqlite,
-        private SQLiteConfig $sqliteConfig,
+        private DatabaseConfig $databaseConfig,
     ) {
     }
 
@@ -51,7 +51,7 @@ final readonly class WorkerTickCommand
         // Fresh CLI process every tick (App\Console\StashdRuntimeCommand::runWorker
         // shells out every 2s) — its PDO connection never gets stashd:boot's
         // busy_timeout pragma, same gap as TempestPsr7Bridge::run().
-        $this->sqlite->configure($this->sqliteConfig);
+        $this->sqlite->configure($this->databaseConfig);
 
         $processed = $this->worker->processNextJob($jobLane);
 

@@ -367,36 +367,6 @@ parameters:
 			path: app/Commands/CommandRepository.php
 
 		-
-			message: '#^Parameter \#1 \$haystack of function str_starts_with expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Config/database.config.php
-
-		-
-			message: '#^Parameter \#1 \$path of closure expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Config/database.config.php
-
-		-
-			message: '#^Parameter \#1 \$string of function ltrim expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Config/database.config.php
-
-		-
-			message: '#^Parameter \$path of class Tempest\\Database\\Config\\SQLiteConfig constructor expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Config/database.config.php
-
-		-
-			message: '#^Parameter \$path of class Tempest\\Database\\Config\\SQLiteConfig constructor expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Config/database.testing.config.php
-
-		-
 			message: '#^Cannot cast mixed to int\.$#'
 			identifier: cast.int
 			count: 1
@@ -1221,7 +1191,7 @@ parameters:
 		-
 			message: '#^Result of && is always false\.$#'
 			identifier: booleanAnd.alwaysFalse
-			count: 3
+			count: 1
 			path: app/System/Storage/StorageCapabilityChecker.php
 
 		-

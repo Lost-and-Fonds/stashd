@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Broadcasts;
 
 use App\Support\PrefixedUlidGenerator;
+use Tempest\Database\Builder\WhereOperator;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -43,7 +44,8 @@ final class SponsorBlockRefreshRepository
     {
         $records = SponsorBlockRefreshRecord::select()
             ->whereNull('completedAt')
-            ->where('nextCheckAt <= ? AND expiresAt >= ?', $now, $now)
+            ->where('nextCheckAt', $now, WhereOperator::LESS_THAN_OR_EQUAL)
+            ->where('expiresAt', $now, WhereOperator::GREATER_THAN_OR_EQUAL)
             ->orderBy('nextCheckAt', Direction::ASC)
             ->all();
 

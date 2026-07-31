@@ -143,11 +143,11 @@ test('add-input persistence rolls back completely and retries cleanly after a tr
         ->and(StashItemRecord::count()->execute())->toBe(3)
         ->and(MediaItemSourceRecord::count()->execute())->toBe(3);
 
-    $downloadCommands = \App\Commands\CommandRecord::select()->where('type = ?', 'item.download')->all();
+    $downloadCommands = \App\Commands\CommandRecord::select()->where('type', 'item.download')->all();
 
     $service->commitInput($stashRecord, $preflightCommand);
 
-    expect(\App\Commands\CommandRecord::select()->where('type = ?', 'item.download')->all())
+    expect(\App\Commands\CommandRecord::select()->where('type', 'item.download')->all())
         ->toHaveCount(count($downloadCommands));
 });
 
@@ -234,7 +234,8 @@ test('add input persists discovered descriptions onto new media items', function
     $this->processAllJobs();
 
     $media = MediaItemRecord::select()
-        ->where('providerKey = ? AND providerItemId = ?', 'fake', 'with-descriptions-episode-1')
+        ->where('providerKey', 'fake')
+        ->where('providerItemId', 'with-descriptions-episode-1')
         ->first();
 
     expect($media)->not->toBeNull()
@@ -267,7 +268,8 @@ test('add input leaves existing media item description unchanged when reused', f
     $this->processAllJobs();
 
     $media = MediaItemRecord::select()
-        ->where('providerKey = ? AND providerItemId = ?', 'fake', 'dedupe-desc-episode-1')
+        ->where('providerKey', 'fake')
+        ->where('providerItemId', 'dedupe-desc-episode-1')
         ->first();
 
     expect($media->description)->toBe('Manually curated description.');
@@ -293,7 +295,7 @@ test('add input with video policy automatically downloads items without a manual
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $stashItems = StashItemRecord::select()->where('stashId = ?', $stashId)->all();
+    $stashItems = StashItemRecord::select()->where('stashId', $stashId)->all();
     expect($stashItems)->toHaveCount(3);
 
     $assets = $this->container->get(AssetRepository::class);
@@ -330,7 +332,7 @@ test('add input with metadata_only policy enqueues no downloads', function (): v
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $stashItems = StashItemRecord::select()->where('stashId = ?', $stashId)->all();
+    $stashItems = StashItemRecord::select()->where('stashId', $stashId)->all();
     expect($stashItems)->toHaveCount(3);
 
     foreach ($stashItems as $stashItem) {
@@ -338,7 +340,7 @@ test('add input with metadata_only policy enqueues no downloads', function (): v
         expect($media?->state)->toBe(MediaItemState::Discovered);
     }
 
-    expect(\App\Commands\CommandRecord::select()->where('type = ?', 'item.download')->all())->toHaveCount(0);
+    expect(\App\Commands\CommandRecord::select()->where('type', 'item.download')->all())->toHaveCount(0);
 });
 
 test('add input commits a second input from a different source into the same stash', function (): void {
@@ -370,7 +372,7 @@ test('add input commits a second input from a different source into the same sta
 
     expect($first['stash_input_id'])->not->toBe($second['stash_input_id'])
         ->and(StashInputRecord::count()->execute())->toBe(2)
-        ->and(StashItemRecord::select()->where('stashId = ?', $stashId)->all())->toHaveCount(3 + 20);
+        ->and(StashItemRecord::select()->where('stashId', $stashId)->all())->toHaveCount(3 + 20);
 });
 
 test('preflight review exposes discovered items for commit flow', function (): void {

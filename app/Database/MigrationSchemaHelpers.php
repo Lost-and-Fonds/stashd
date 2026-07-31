@@ -37,7 +37,7 @@ trait MigrationSchemaHelpers
         $statements = [];
 
         foreach ($tables as $table) {
-            $statements[] = $table;
+            $statements[] = new MigrationSqlStatement($table);
             array_push($statements, ...$table->trailingStatements);
         }
 

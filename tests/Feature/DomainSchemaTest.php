@@ -14,6 +14,9 @@ use App\Stashes\StashItemRecord;
 use App\Stashes\StashRecord;
 use App\Vault\MediaItemRecord;
 use Tempest\Database\Builder\QueryBuilders\BuildsQuery;
+use Tempest\Database\Builder\QueryBuilders\WhereGroupBuilder;
+use Tempest\Database\Builder\WhereOperator;
+use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Database;
 use Tempest\Database\Direction;
 use Tempest\Database\Query;
@@ -46,10 +49,8 @@ test('domain schema migration creates all v1 tables on a fresh database', functi
 
     expect(schemaTableExists($database, 'raw_metadata_snapshots'))->toBeFalse();
 
-    $jobsInfo = $database->fetch(new Query('PRAGMA table_info(jobs)'));
-    $jobColumns = array_column($jobsInfo ?? [], 'name');
-    $stashInfo = $database->fetch(new Query('PRAGMA table_info(stashes)'));
-    $stashColumns = array_column($stashInfo ?? [], 'name');
+    $jobColumns = schemaColumns($database, 'jobs');
+    $stashColumns = schemaColumns($database, 'stashes');
 
     expect($jobColumns)->toContain('progressRate')
         ->and($jobColumns)->toContain('progressEtaSeconds')
@@ -104,9 +105,8 @@ test('job requires a valid command foreign key', function (): void {
 
 test('job workload indexes support pending, stale, and history queries', function (): void {
     $database = $this->container->get(Database::class);
-    $indexes = array_column($database->fetch(new Query('PRAGMA index_list(jobs)')), 'name');
 
-    expect($indexes)->toContain(
+    expect(schemaIndexes($database, 'jobs'))->toContain(
         'jobs_pending_claim',
         'jobs_processing_heartbeat',
         'jobs_media_item_download_history',
@@ -114,12 +114,18 @@ test('job workload indexes support pending, stale, and history queries', functio
 
     $now = DateTime::now(Timezone::UTC);
     $pending = JobRecord::select()
-        ->where('state = ? AND (scheduledAt IS NULL OR scheduledAt <= ?)', JobState::Pending, $now)
+        ->where('state', JobState::Pending)
+        ->andWhereGroup(fn (WhereGroupBuilder $group) => $group
+            ->whereNull('scheduledAt')
+            ->orWhere('scheduledAt', $now, WhereOperator::LESS_THAN_OR_EQUAL))
         ->orderBy('priority', Direction::ASC)
         ->orderBy('createdAt', Direction::ASC)
         ->limit(5);
     $lane = JobRecord::select()
-        ->where('state = ? AND (scheduledAt IS NULL OR scheduledAt <= ?)', JobState::Pending, $now)
+        ->where('state', JobState::Pending)
+        ->andWhereGroup(fn (WhereGroupBuilder $group) => $group
+            ->whereNull('scheduledAt')
+            ->orWhere('scheduledAt', $now, WhereOperator::LESS_THAN_OR_EQUAL))
         ->orderBy('priority', Direction::ASC)
         ->orderBy('createdAt', Direction::ASC)
         ->limit(5)
@@ -128,21 +134,35 @@ test('job workload indexes support pending, stale, and history queries', functio
             JobLane::Bulk->intents(),
         ));
     $stale = JobRecord::select()
-        ->where('state = ? AND heartbeatAt IS NOT NULL AND heartbeatAt < ?', JobState::Processing, $now);
+        ->where('state', JobState::Processing)
+        ->whereNotNull('heartbeatAt')
+        ->where('heartbeatAt', $now, WhereOperator::LESS_THAN);
     $history = JobRecord::select()
-        ->where('entityType = ? AND intent = ?', 'media_item', JobIntent::Download)
+        ->where('entityType', 'media_item')
+        ->where('intent', JobIntent::Download)
         ->whereIn('entityId', ['media_01ARZ3NDEKTSV4RRFFQ69G5FAV'])
         ->orderBy('createdAt', Direction::DESC)
         ->orderBy('id', Direction::DESC);
 
-    expect(jobQueryPlan($database, $pending))->toContain('jobs_pending_claim')
-        ->not->toContain('SCAN jobs')
-        ->and(jobQueryPlan($database, $lane))->toContain('jobs_pending_claim')
-        ->not->toContain('SCAN jobs')
-        ->and(jobQueryPlan($database, $stale))->toContain('jobs_processing_heartbeat')
-        ->not->toContain('SCAN jobs')
-        ->and(jobQueryPlan($database, $history))->toContain('jobs_media_item_download_history')
-        ->not->toContain('SCAN jobs');
+    // Every query must be valid SQL on the active dialect, whichever it is.
+    foreach ([$pending, $lane, $stale, $history] as $builder) {
+        expect($builder->all())->toBeArray();
+    }
+
+    // Plan assertions are SQLite-only on purpose: PostgreSQL's planner picks a
+    // sequential scan on the empty test tables no matter which indexes exist,
+    // so asserting index usage here would prove nothing and flake. Index
+    // *existence* is asserted above on both dialects.
+    if ($database->dialect !== DatabaseDialect::POSTGRESQL) {
+        expect(jobQueryPlan($database, $pending))->toContain('jobs_pending_claim')
+            ->not->toContain('SCAN jobs')
+            ->and(jobQueryPlan($database, $lane))->toContain('jobs_pending_claim')
+            ->not->toContain('SCAN jobs')
+            ->and(jobQueryPlan($database, $stale))->toContain('jobs_processing_heartbeat')
+            ->not->toContain('SCAN jobs')
+            ->and(jobQueryPlan($database, $history))->toContain('jobs_media_item_download_history')
+            ->not->toContain('SCAN jobs');
+    }
 });
 
 test('broadcast belongs to stash via foreign key', function (): void {
@@ -216,16 +236,6 @@ test('repository smoke creates stash with input media item stash item and broadc
         ->and((string) $stashItem->stashId)->toBe((string) $stash->id)
         ->and((string) $broadcast->stashId)->toBe((string) $stash->id);
 });
-
-function schemaTableExists(Database $database, string $table): bool
-{
-    $row = $database->fetchFirst(new Query(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-        bindings: [$table],
-    ));
-
-    return $row !== null;
-}
 
 function jobQueryPlan(Database $database, BuildsQuery $builder): string
 {

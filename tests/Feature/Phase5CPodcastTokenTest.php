@@ -20,12 +20,11 @@ use App\System\Secret\SecretType;
 use App\Vault\MediaItemId;
 use Tempest\Database\Database;
 use Tempest\Database\PrimaryKey;
-use Tempest\Database\Query;
 use Tempest\Http\Status;
 
 test('podcast token migration adds broadcast item token columns', function (): void {
     $database = $this->container->get(Database::class);
-    $columns = array_column($database->fetch(new Query('PRAGMA table_info(broadcast_items)')) ?? [], 'name');
+    $columns = schemaColumns($database, 'broadcast_items');
 
     expect($columns)->toContain('tokenSecretId')
         ->and($columns)->toContain('tokenPreview');
@@ -33,8 +32,8 @@ test('podcast token migration adds broadcast item token columns', function (): v
 
 test('podcast token migration adds an indexed blind digest column', function (): void {
     $database = $this->container->get(Database::class);
-    $columns = array_column($database->fetch(new Query('PRAGMA table_info(secrets)')) ?? [], 'name');
-    $indexes = array_column($database->fetch(new Query('PRAGMA index_list(secrets)')) ?? [], 'name');
+    $columns = schemaColumns($database, 'secrets');
+    $indexes = schemaIndexes($database, 'secrets');
 
     expect($columns)->toContain('tokenDigest')
         ->and($indexes)->toContain('secrets_token_digest');
@@ -48,7 +47,7 @@ test('broadcast item record maps podcast token columns', function (): void {
         'slug' => 'audio-podcast-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $stashItem = StashItemRecord::select()->where('stashId = ?', $stashId)->first();
+    $stashItem = StashItemRecord::select()->where('stashId', $stashId)->first();
     $item = $this->container->get(BroadcastItemRepository::class)->create(
         broadcastId: BroadcastId::parse($broadcast->body['broadcast']['id']),
         stashItemId: StashItemId::parse((string) $stashItem->id),
@@ -129,7 +128,7 @@ test('podcast item token is generated and stored encrypted', function (): void {
         'slug' => 'item-token-podcast-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $stashItem = StashItemRecord::select()->where('stashId = ?', $stashId)->first();
+    $stashItem = StashItemRecord::select()->where('stashId', $stashId)->first();
     $item = $this->container->get(BroadcastItemRepository::class)->create(
         broadcastId: BroadcastId::parse($broadcast->body['broadcast']['id']),
         stashItemId: StashItemId::parse((string) $stashItem->id),
@@ -261,7 +260,7 @@ test('broadcast rotate token changes feed url and stores only safe command metad
         ->and($showCommand->body['command']['result']['token']['rotated'])->toBeTrue();
 
     $activity = ActivityEventRecord::select()
-        ->where('type = ?', 'broadcast.token_rotated')
+        ->where('type', 'broadcast.token_rotated')
         ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
         ->first();
 

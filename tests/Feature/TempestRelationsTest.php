@@ -57,7 +57,7 @@ test('HasMany loads on demand via load()', function (): void {
 test('BelongsTo eager-loads the owning stash from an item', function (): void {
     $item = StashItemRecord::select()
         ->with('stash')
-        ->where('stashId = ?', $this->stashId->toString())
+        ->where('stashId', $this->stashId->toString())
         ->first();
 
     expect($item)->not->toBeNull()
@@ -67,7 +67,7 @@ test('BelongsTo eager-loads the owning stash from an item', function (): void {
 
 test('whereHas filters stashes by related items', function (): void {
     $matching = StashRecord::select()
-        ->whereHas('items', fn ($query) => $query->where('stashId = ?', $this->stashId->toString()))
+        ->whereHas('items', fn ($query) => $query->where('stashId', $this->stashId->toString()))
         ->all();
 
     expect($matching)->toHaveCount(1)

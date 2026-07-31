@@ -98,7 +98,7 @@ final class StashItemRepository
             // correlated subquery via the query builder's raw-order escape
             // hatch rather than a second join.
             'size' => $query->orderByRaw(
-                '(SELECT COALESCE(SUM(sizeBytes), 0) FROM assets WHERE assets.mediaItemId = stash_items.mediaItemId) ' . $direction->value,
+                '(SELECT COALESCE(SUM("sizeBytes"), 0) FROM "assets" WHERE "assets"."mediaItemId" = "stash_items"."mediaItemId") ' . $direction->value,
             ),
             default => $query->orderBy('position', $direction),
         };
@@ -154,11 +154,11 @@ final class StashItemRepository
         // stays fully relation-based; this is the deliberate exception.
         /** @var list<array{state: string, count: int}> $rows */
         $rows = $this->database->fetch(new Query(
-            'SELECT media_items.state AS state, COUNT(*) AS count
-             FROM stash_items
-             JOIN media_items ON media_items.id = stash_items.mediaItemId
-             WHERE stash_items.stashId = ?
-             GROUP BY media_items.state',
+            'SELECT "media_items"."state" AS state, COUNT(*) AS count
+             FROM "stash_items"
+             JOIN "media_items" ON "media_items"."id" = "stash_items"."mediaItemId"
+             WHERE "stash_items"."stashId" = ?
+             GROUP BY "media_items"."state"',
             [$stashId->toString()],
         ));
 

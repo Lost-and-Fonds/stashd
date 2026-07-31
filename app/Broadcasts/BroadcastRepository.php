@@ -7,6 +7,7 @@ namespace App\Broadcasts;
 use App\Stashes\StashId;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
+use Tempest\Database\Builder\QueryBuilders\WhereGroupBuilder;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -133,7 +134,10 @@ final class BroadcastRepository
         $taken = array_map(
             static fn (BroadcastRecord $broadcast): string => $broadcast->slug,
             BroadcastRecord::select()
-                ->where('stashId = ? AND (slug = ? OR slug LIKE ?)', $stashId->toString(), $base, $base . '-%')
+                ->where('stashId', $stashId->toString())
+                ->andWhereGroup(fn (WhereGroupBuilder $group) => $group
+                    ->where('slug', $base)
+                    ->orWhereLike('slug', $base . '-%'))
                 ->all(),
         );
 

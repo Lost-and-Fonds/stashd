@@ -8,7 +8,6 @@ use Tempest\Database\MigratesUp;
 use Tempest\Database\QueryStatement;
 use Tempest\Database\QueryStatements\CompoundStatement;
 use Tempest\Database\QueryStatements\OnDelete;
-use Tempest\Database\QueryStatements\RawStatement;
 
 final class AddPodcastBroadcastItemTokens implements MigratesUp
 {
@@ -19,13 +18,13 @@ final class AddPodcastBroadcastItemTokens implements MigratesUp
     public function up(): QueryStatement
     {
         return new CompoundStatement(
-            new RawStatement(
+            new MigrationSqlStatement(
                 sprintf(
                     'ALTER TABLE `broadcast_items` ADD COLUMN %s',
                     $this->fkColumn('tokenSecretId', 40, 'secrets', OnDelete::SET_NULL, nullable: true),
                 ),
             ),
-            new RawStatement('ALTER TABLE `broadcast_items` ADD COLUMN `tokenPreview` VARCHAR(255) NULL'),
+            new MigrationSqlStatement('ALTER TABLE `broadcast_items` ADD COLUMN `tokenPreview` VARCHAR(255) NULL'),
         );
     }
 }

@@ -29,7 +29,7 @@ test('youtube credentials endpoint stores the key and never echoes it back', fun
     $show = $this->http->get('/api/v1/providers/youtube/credentials', headers: $headers)->assertOk();
     expect($show->body['configured'])->toBeTrue();
 
-    $secret = SecretRecord::select()->where('key = ?', 'youtube_data_api_key')->first();
+    $secret = SecretRecord::select()->where('key', 'youtube_data_api_key')->first();
     expect($secret)->not->toBeNull();
 });
 

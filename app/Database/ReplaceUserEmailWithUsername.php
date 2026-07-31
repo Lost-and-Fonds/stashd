@@ -7,7 +7,6 @@ namespace App\Database;
 use Tempest\Database\MigratesUp;
 use Tempest\Database\QueryStatement;
 use Tempest\Database\QueryStatements\CompoundStatement;
-use Tempest\Database\QueryStatements\RawStatement;
 
 /**
  * Stashd is single-owner in v1 -- collecting an email address never bought
@@ -22,11 +21,14 @@ final class ReplaceUserEmailWithUsername implements MigratesUp
     public function up(): QueryStatement
     {
         return new CompoundStatement(
-            new RawStatement('ALTER TABLE `users` ADD COLUMN `username` VARCHAR(255) NULL'),
-            new RawStatement("UPDATE `users` SET `username` = substr(`email`, 1, instr(`email`, '@') - 1) WHERE `username` IS NULL"),
-            new RawStatement('CREATE UNIQUE INDEX `users_username` ON `users` (`username`)'),
-            new RawStatement('DROP INDEX IF EXISTS `users_email`'),
-            new RawStatement('ALTER TABLE `users` DROP COLUMN `email`'),
+            new MigrationSqlStatement('ALTER TABLE `users` ADD COLUMN `username` VARCHAR(255) NULL'),
+            new MigrationSqlStatement(
+                "UPDATE `users` SET `username` = substr(`email`, 1, instr(`email`, '@') - 1) WHERE `username` IS NULL",
+                "UPDATE \"users\" SET \"username\" = split_part(\"email\", '@', 1) WHERE \"username\" IS NULL",
+            ),
+            new MigrationSqlStatement('CREATE UNIQUE INDEX `users_username` ON `users` (`username`)'),
+            new MigrationSqlStatement('DROP INDEX IF EXISTS `users_email`'),
+            new MigrationSqlStatement('ALTER TABLE `users` DROP COLUMN `email`'),
         );
     }
 }

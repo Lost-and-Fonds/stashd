@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\System\Boot\SqliteConfigurator;
-use Tempest\Database\Config\SQLiteConfig;
+use Tempest\Database\Config\DatabaseConfig;
 use Tempest\Http\Request;
 use Tempest\Http\Response;
 use Tempest\Router\HttpMiddleware;
@@ -27,13 +27,13 @@ final readonly class ConfigureSqliteMiddleware implements HttpMiddleware
 {
     public function __construct(
         private SqliteConfigurator $sqlite,
-        private SQLiteConfig $sqliteConfig,
+        private DatabaseConfig $databaseConfig,
     ) {
     }
 
     public function __invoke(Request $request, HttpMiddlewareCallable $next): Response
     {
-        $this->sqlite->configure($this->sqliteConfig);
+        $this->sqlite->configure($this->databaseConfig);
 
         return $next($request);
     }

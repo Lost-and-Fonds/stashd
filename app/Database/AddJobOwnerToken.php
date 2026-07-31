@@ -6,7 +6,6 @@ namespace App\Database;
 
 use Tempest\Database\MigratesUp;
 use Tempest\Database\QueryStatement;
-use Tempest\Database\QueryStatements\RawStatement;
 
 final class AddJobOwnerToken implements MigratesUp
 {
@@ -14,6 +13,6 @@ final class AddJobOwnerToken implements MigratesUp
 
     public function up(): QueryStatement
     {
-        return new RawStatement('ALTER TABLE `jobs` ADD COLUMN `ownerToken` TEXT NULL');
+        return new MigrationSqlStatement('ALTER TABLE `jobs` ADD COLUMN `ownerToken` TEXT NULL');
     }
 }

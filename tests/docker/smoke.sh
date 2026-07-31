@@ -10,6 +10,12 @@ IMAGE="${STASHD_SMOKE_IMAGE:-stashd:smoke}"
 SKIP_BUILD="${STASHD_SMOKE_SKIP_BUILD:-0}"
 TIMEOUT="${STASHD_SMOKE_TIMEOUT:-180}"
 NAME="stashd-smoke-$$"
+PG_NAME="stashd-smoke-pg-$$"
+NETWORK="stashd-smoke-net-$$"
+PG_IMAGE="${STASHD_SMOKE_PG_IMAGE:-docker.io/library/postgres:18-alpine}"
+PG_DB=stashd
+PG_USER=stashd
+PG_PASSWORD=stashd-smoke
 TMP="$(mktemp -d)"
 PUID="$(id -u)"
 PGID="$(id -g)"
@@ -41,6 +47,22 @@ media_host_path() {
     esac
 }
 
+# Stashd runs on PostgreSQL, so schema/state assertions go through psql in the
+# database container rather than a SQLite file on the host.
+db_query() {
+    $CONTAINER exec -e PGPASSWORD="$PG_PASSWORD" "$PG_NAME" \
+        psql -U "$PG_USER" -d "$PG_DB" -tAc "$1"
+}
+
+# Asserts the *application's* schema is present, not merely that PostgreSQL is
+# up: a bare "SELECT 1" would pass even if the app never connected or migrated.
+assert_schema_present() {
+    if ! db_query "SELECT tablename FROM pg_tables WHERE tablename = 'activity_events'" 2>/dev/null | grep -q activity_events; then
+        echo "smoke failed: $1" >&2
+        exit 1
+    fi
+}
+
 http_status() {
     curl -s -o /dev/null -w '%{http_code}' "$@"
 }
@@ -55,6 +77,8 @@ header_value() {
 
 cleanup() {
     $CONTAINER rm -f "$NAME" >/dev/null 2>&1 || true
+    $CONTAINER rm -f "$PG_NAME" >/dev/null 2>&1 || true
+    $CONTAINER network rm "$NETWORK" >/dev/null 2>&1 || true
     rm -f "/tmp/stashd-smoke-cookies-$$"
     rm -rf "$TMP"
 }
@@ -75,10 +99,37 @@ else
     echo "Skipping image build (STASHD_SMOKE_SKIP_BUILD=1); using ${IMAGE}"
 fi
 
+echo "Starting PostgreSQL..."
+$CONTAINER network create "$NETWORK" >/dev/null 2>&1 || true
+$CONTAINER run -d --name "$PG_NAME" --network "$NETWORK" --network-alias postgres \
+    -e POSTGRES_DB="$PG_DB" \
+    -e POSTGRES_USER="$PG_USER" \
+    -e POSTGRES_PASSWORD="$PG_PASSWORD" \
+    "$PG_IMAGE" >/dev/null
+
+pg_deadline=$(( $(date +%s) + TIMEOUT ))
+while :; do
+    if $CONTAINER exec "$PG_NAME" pg_isready -U "$PG_USER" -d "$PG_DB" >/dev/null 2>&1; then
+        break
+    fi
+    if [ "$(date +%s)" -ge "$pg_deadline" ]; then
+        echo "smoke failed: PostgreSQL not ready within ${TIMEOUT}s" >&2
+        $CONTAINER logs "$PG_NAME" 2>&1 || true
+        exit 1
+    fi
+    sleep 2
+done
+
 echo "Starting container..."
-$CONTAINER run -d --name "$NAME" \
+$CONTAINER run -d --name "$NAME" --network "$NETWORK" \
     -e STASHD_DATA_PATH=/data \
     -e STASHD_MEDIA_PATH=/media \
+    -e DB_CONNECTION=pgsql \
+    -e DB_HOST=postgres \
+    -e DB_PORT=5432 \
+    -e DB_DATABASE="$PG_DB" \
+    -e DB_USERNAME="$PG_USER" \
+    -e DB_PASSWORD="$PG_PASSWORD" \
     -e PUID="$PUID" \
     -e PGID="$PGID" \
     -v "$TMP/data:/data" \
@@ -140,10 +191,7 @@ case "$body" in
         ;;
 esac
 
-if [ ! -f "$TMP/data/stashd.sqlite" ]; then
-    echo "smoke failed: sqlite database not created" >&2
-    exit 1
-fi
+assert_schema_present "application schema missing after boot (migrations did not run)"
 
 if [ ! -f "$TMP/data/.env" ] || ! grep -q '^SIGNING_KEY=' "$TMP/data/.env"; then
     echo "smoke failed: SIGNING_KEY was not generated/persisted to /data/.env" >&2
@@ -159,7 +207,7 @@ for dir in vault broadcasts temp cache; do
 done
 
 echo "Checking schema: activity_events present, dropped SSE-transport tables gone..."
-if ! $CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite "SELECT name FROM sqlite_master WHERE type='table' AND name='activity_events';" | grep -q activity_events; then
+if ! db_query "SELECT tablename FROM pg_tables WHERE tablename = 'activity_events'" | grep -q activity_events; then
     echo "smoke failed: activity_events table missing (migrations did not run cleanly)" >&2
     exit 1
 fi
@@ -167,7 +215,7 @@ fi
 # event_notifications/sse_connections were pure SSE-poll transport, dropped by
 # DropSseAndEventNotificationTables once Mercure replaced the poll loop.
 for dropped_table in event_notifications sse_connections; do
-    if $CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite "SELECT name FROM sqlite_master WHERE type='table' AND name='${dropped_table}';" | grep -q "$dropped_table"; then
+    if db_query "SELECT tablename FROM pg_tables WHERE tablename = '${dropped_table}'" | grep -q "$dropped_table"; then
         echo "smoke failed: ${dropped_table} table still exists (drop migration did not run cleanly)" >&2
         exit 1
     fi
@@ -242,10 +290,7 @@ case "$body_after_restart" in
         ;;
 esac
 
-if [ ! -f "$TMP/data/stashd.sqlite" ]; then
-    echo "smoke failed: sqlite missing after restart" >&2
-    exit 1
-fi
+assert_schema_present "application schema missing after restart"
 
 if [ "$(grep '^SIGNING_KEY=' "$TMP/data/.env")" != "$signing_key_initial" ]; then
     echo "smoke failed: SIGNING_KEY changed after container restart" >&2
@@ -254,9 +299,15 @@ fi
 
 echo "Recreating container (not just restarting) to verify SIGNING_KEY survives a fresh container..."
 $CONTAINER rm -f "$NAME" >/dev/null
-$CONTAINER run -d --name "$NAME" \
+$CONTAINER run -d --name "$NAME" --network "$NETWORK" \
     -e STASHD_DATA_PATH=/data \
     -e STASHD_MEDIA_PATH=/media \
+    -e DB_CONNECTION=pgsql \
+    -e DB_HOST=postgres \
+    -e DB_PORT=5432 \
+    -e DB_DATABASE="$PG_DB" \
+    -e DB_USERNAME="$PG_USER" \
+    -e DB_PASSWORD="$PG_PASSWORD" \
     -e PUID="$PUID" \
     -e PGID="$PGID" \
     -v "$TMP/data:/data" \
@@ -280,10 +331,7 @@ case "$recreate_health" in
         ;;
 esac
 
-if [ ! -f "$TMP/data/stashd.sqlite" ]; then
-    echo "smoke failed: sqlite missing after container recreate" >&2
-    exit 1
-fi
+assert_schema_present "application schema missing after container recreate"
 
 echo "Running fake-provider preflight → create-from-preflight end-to-end check..."
 preflight_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/commands" \
@@ -374,8 +422,8 @@ case "$create_show" in
         exit 1
         ;;
 esac
-media_item_id="$($CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
-    "SELECT mediaItemId FROM stash_items WHERE stashId = '${stash_id}' ORDER BY position ASC LIMIT 1;")"
+media_item_id="$(db_query \
+    "SELECT \"mediaItemId\" FROM stash_items WHERE \"stashId\" = '${stash_id}' ORDER BY \"position\" ASC LIMIT 1")"
 
 if [ -z "$media_item_id" ]; then
     echo "smoke failed: could not resolve media item for stash ${stash_id}" >&2
@@ -409,8 +457,8 @@ if [ "$download_state" != "completed" ]; then
     exit 1
 fi
 
-provider_item_id="$($CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
-    "SELECT providerItemId FROM media_items WHERE id = '${media_item_id}';")"
+provider_item_id="$(db_query \
+    "SELECT \"providerItemId\" FROM media_items WHERE \"id\" = '${media_item_id}'")"
 vault_file="$TMP/media/vault/fake/items/${provider_item_id}/original.fake"
 
 if [ ! -f "$vault_file" ]; then
@@ -418,8 +466,8 @@ if [ ! -f "$vault_file" ]; then
     exit 1
 fi
 
-asset_state="$($CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
-    "SELECT state FROM assets WHERE mediaItemId = '${media_item_id}' AND role = 'vault_original' LIMIT 1;")"
+asset_state="$(db_query \
+    "SELECT \"state\" FROM assets WHERE \"mediaItemId\" = '${media_item_id}' AND \"role\" = 'vault_original' LIMIT 1")"
 
 if [ "$asset_state" != "ready" ]; then
     echo "smoke failed: vault_original asset not ready (state=${asset_state})" >&2
@@ -474,8 +522,8 @@ if [ "$rebuild_state" != "completed" ]; then
     exit 1
 fi
 
-published_path="$($CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
-    "SELECT publishedPath FROM broadcast_items WHERE broadcastId = '${broadcast_id}' LIMIT 1;")"
+published_path="$(db_query \
+    "SELECT \"publishedPath\" FROM broadcast_items WHERE \"broadcastId\" = '${broadcast_id}' LIMIT 1")"
 published_host_path="$(media_host_path "$published_path")"
 
 if [ -z "$published_path" ] || [ ! -f "$published_host_path" ]; then
@@ -576,8 +624,8 @@ if [ "$jellyfin_rebuild_state" != "completed" ]; then
     exit 1
 fi
 
-jellyfin_published_path="$($CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
-    "SELECT publishedPath FROM broadcast_items WHERE broadcastId = '${jellyfin_broadcast_id}' LIMIT 1;")"
+jellyfin_published_path="$(db_query \
+    "SELECT \"publishedPath\" FROM broadcast_items WHERE \"broadcastId\" = '${jellyfin_broadcast_id}' LIMIT 1")"
 jellyfin_published_host_path="$(media_host_path "$jellyfin_published_path")"
 
 if [ -z "$jellyfin_published_path" ] || [ ! -f "$jellyfin_published_host_path" ]; then
@@ -612,8 +660,8 @@ mkdir -p "$(dirname "$podcast_fixture_host_path")"
 printf '%s' "$podcast_fixture_content" > "$podcast_fixture_host_path"
 
 podcast_asset_id="asset_smoke_podcast_$$"
-$CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
-    "INSERT INTO assets (id, mediaItemId, role, kind, path, relativePath, mimeType, container, sizeBytes, state, createdAt, updatedAt) VALUES ('${podcast_asset_id}', '${media_item_id}', 'vault_original', 'audio', '${podcast_fixture_container_path}', 'podcast-smoke/${provider_item_id}/original.mp3', 'audio/mpeg', 'mp3', ${podcast_fixture_size}, 'ready', datetime('now'), datetime('now'));"
+db_query \
+    "INSERT INTO assets (\"id\", \"mediaItemId\", \"role\", \"kind\", \"path\", \"relativePath\", \"mimeType\", \"container\", \"sizeBytes\", \"state\", \"createdAt\", \"updatedAt\") VALUES ('${podcast_asset_id}', '${media_item_id}', 'vault_original', 'audio', '${podcast_fixture_container_path}', 'podcast-smoke/${provider_item_id}/original.mp3', 'audio/mpeg', 'mp3', ${podcast_fixture_size}, 'ready', NOW(), NOW())" >/dev/null
 
 echo "Creating podcast broadcast and running broadcast.rebuild..."
 podcast_broadcast_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/stashes/${stash_id}/broadcasts" \
@@ -758,11 +806,19 @@ override_name="stashd-smoke-override-$$"
 operator_key="$(head -c32 /dev/urandom | base64)"
 operator_mercure_secret="$(head -c32 /dev/urandom | base64)"
 
-$CONTAINER run -d --name "$override_name" \
+# Shares the smoke PostgreSQL instance: this check is only about secret
+# handling, and boot is idempotent against an already-migrated database.
+$CONTAINER run -d --name "$override_name" --network "$NETWORK" \
     -e STASHD_DATA_PATH=/data \
     -e STASHD_MEDIA_PATH=/media \
     -e PUID="$PUID" \
     -e PGID="$PGID" \
+    -e DB_CONNECTION=pgsql \
+    -e DB_HOST=postgres \
+    -e DB_PORT=5432 \
+    -e DB_DATABASE="$PG_DB" \
+    -e DB_USERNAME="$PG_USER" \
+    -e DB_PASSWORD="$PG_PASSWORD" \
     -e SIGNING_KEY="$operator_key" \
     -e MERCURE_JWT_SECRET="$operator_mercure_secret" \
     -v "$override_tmp/data:/data" \

@@ -6,7 +6,6 @@ namespace App\Database;
 
 use Tempest\Database\MigratesUp;
 use Tempest\Database\QueryStatement;
-use Tempest\Database\QueryStatements\RawStatement;
 
 /**
  * `raw_metadata_snapshots` was scaffolding for a provenance feature that
@@ -19,6 +18,6 @@ final class DropRawMetadataSnapshots implements MigratesUp
 
     public function up(): QueryStatement
     {
-        return new RawStatement('DROP TABLE IF EXISTS `raw_metadata_snapshots`');
+        return new MigrationSqlStatement('DROP TABLE IF EXISTS `raw_metadata_snapshots`');
     }
 }

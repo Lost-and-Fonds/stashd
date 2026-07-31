@@ -97,7 +97,7 @@ test('broadcast.rebuild honours per-input season mapping, falling back to season
 
     $expectedEpisodeNumbers = [];
 
-    foreach (StashItemRecord::select()->where('stashInputId = ?', $inputA)->all() as $stashItem) {
+    foreach (StashItemRecord::select()->where('stashInputId', $inputA)->all() as $stashItem) {
         $expectedEpisodeNumbers[(string) $stashItem->id] = $stashItem->position;
         $stashItem->position = 4 - $stashItem->position;
         $stashItem->save();
@@ -116,8 +116,8 @@ test('broadcast.rebuild honours per-input season mapping, falling back to season
     $itemsResponse = $this->http->get('/api/v1/broadcasts/' . $broadcastId . '/items', headers: $headers)->assertOk();
 
     $stashItemIdsByInput = [
-        $inputA => array_map(static fn ($item): string => (string) $item->id, StashItemRecord::select()->where('stashInputId = ?', $inputA)->all()),
-        $inputB => array_map(static fn ($item): string => (string) $item->id, StashItemRecord::select()->where('stashInputId = ?', $inputB)->all()),
+        $inputA => array_map(static fn ($item): string => (string) $item->id, StashItemRecord::select()->where('stashInputId', $inputA)->all()),
+        $inputB => array_map(static fn ($item): string => (string) $item->id, StashItemRecord::select()->where('stashInputId', $inputB)->all()),
     ];
 
     $pathsForA = [];

@@ -48,7 +48,6 @@ final class ApiTokenRepository
     public function findByHash(string $tokenHash): ?ApiTokenRecord
     {
         return ApiTokenRecord::select()
-            ->with('user')
             ->where('tokenHash', $tokenHash)
             ->whereNull('revokedAt')
             ->first();

@@ -34,7 +34,7 @@ Stashd is not a YouTube frontend, not a recommendation engine, and not a media p
 - PHP `^8.5`
 - Tempest Framework `^3.0`
 - FrankenPHP application server (classic mode)
-- SQLite for v1
+- PostgreSQL (SQLite only as the `stashd:import-sqlite` upgrade source)
 - Pest for tests
 - Laravel Pint with PSR-12 formatting
 - `hazel/ytdlphp` wrapping `yt-dlp`
@@ -66,7 +66,7 @@ app/Broadcasts     Generated views: podcasts, Jellyfin/Plex, triggers
 app/Commands       Command records, dispatch, command handlers
 app/Config         Runtime/application configuration
 app/Console        CLI/runtime entry points
-app/Database       SQLite migrations/database helpers
+app/Database       Migrations, dialect helpers, SQLite->PostgreSQL importer
 app/Downloads      Download orchestration and ytdlphp adapters
 app/Http           HTTP/API concerns, resources, middleware
 app/Jobs           Persistent job model and execution
@@ -147,7 +147,7 @@ Avoid:
 - Filesystem broadcasts are hardlink-first; do not silently copy when hardlinking is expected.
 - Trigger failures are separate from broadcast file validity.
 - ytdlphp is the only download/process boundary.
-- SQLite DB columns use camelCase to match Tempest record properties.
+- DB columns use camelCase to match Tempest record properties; PostgreSQL folds unquoted identifiers, so prefer the query builder over raw SQL.
 - Public API JSON uses snake_case.
 - Public/security-sensitive responses use explicit Resource DTOs/arrays; do not auto-serialize Tempest records directly.
 

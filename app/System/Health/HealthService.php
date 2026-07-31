@@ -7,6 +7,7 @@ namespace App\System\Health;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
 use App\System\Storage\StorageLocationState;
+use Tempest\Database\Config\DatabaseConfig;
 use Tempest\Database\Config\SQLiteConfig;
 
 final readonly class HealthReport
@@ -56,7 +57,7 @@ final readonly class HealthService
     private const string VERSION = '0.1.0-dev';
 
     public function __construct(
-        private SQLiteConfig $sqliteConfig,
+        private DatabaseConfig $databaseConfig,
         private StorageLocationRepository $storageLocations,
     ) {
     }
@@ -115,11 +116,11 @@ final readonly class HealthService
 
     private function databaseIsWritable(): bool
     {
-        if ($this->sqliteConfig->path === ':memory:') {
+        if (! $this->databaseConfig instanceof SQLiteConfig || $this->databaseConfig->path === ':memory:') {
             return true;
         }
 
-        $directory = dirname($this->sqliteConfig->path);
+        $directory = dirname($this->databaseConfig->path);
 
         return is_dir($directory) && is_writable($directory);
     }

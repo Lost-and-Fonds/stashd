@@ -83,19 +83,19 @@ test('DELETE stash returns 404 for an unknown stash', function (): void {
 test('DELETE stash cascades to stash items, inputs, and media item sources but leaves media items intact', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('delete-cascade');
 
-    expect(StashItemRecord::select()->where('stashId = ?', $stashId)->all())->not->toBeEmpty();
-    $input = StashInputRecord::select()->where('stashId = ?', $stashId)->first();
+    expect(StashItemRecord::select()->where('stashId', $stashId)->all())->not->toBeEmpty();
+    $input = StashInputRecord::select()->where('stashId', $stashId)->first();
     expect($input)->not->toBeNull();
-    expect(MediaItemSourceRecord::select()->where('stashInputId = ?', (string) $input->id)->all())->not->toBeEmpty();
+    expect(MediaItemSourceRecord::select()->where('stashInputId', (string) $input->id)->all())->not->toBeEmpty();
 
     $response = $this->http->delete('/api/v1/stashes/' . $stashId, headers: $headers);
     $response->assertOk();
     expect($response->body['deleted'])->toBeTrue();
 
     expect(StashRecord::findById(new PrimaryKey($stashId)))->toBeNull()
-        ->and(StashItemRecord::select()->where('stashId = ?', $stashId)->all())->toBeEmpty()
-        ->and(StashInputRecord::select()->where('stashId = ?', $stashId)->all())->toBeEmpty()
-        ->and(MediaItemSourceRecord::select()->where('stashInputId = ?', (string) $input->id)->all())->toBeEmpty();
+        ->and(StashItemRecord::select()->where('stashId', $stashId)->all())->toBeEmpty()
+        ->and(StashInputRecord::select()->where('stashId', $stashId)->all())->toBeEmpty()
+        ->and(MediaItemSourceRecord::select()->where('stashInputId', (string) $input->id)->all())->toBeEmpty();
 
     expect(\App\Vault\MediaItemRecord::findById(new PrimaryKey($mediaItemId)))->not->toBeNull();
 });
@@ -103,7 +103,7 @@ test('DELETE stash cascades to stash items, inputs, and media item sources but l
 test('DELETE stash rolls back cleanly instead of partially deleting when the transaction fails', function (): void {
     [$headers, $stashId] = $this->bootstrapFakeDownloadStash('delete-rollback');
 
-    $itemCountBefore = count(StashItemRecord::select()->where('stashId = ?', $stashId)->all());
+    $itemCountBefore = count(StashItemRecord::select()->where('stashId', $stashId)->all());
     expect($itemCountBefore)->toBeGreaterThan(0);
 
     $realDatabase = $this->container->get(Database::class);
@@ -157,7 +157,7 @@ test('DELETE stash rolls back cleanly instead of partially deleting when the tra
     expect($response->body['error']['code'])->toBe('delete_failed');
 
     expect(StashRecord::findById(new PrimaryKey($stashId)))->not->toBeNull()
-        ->and(count(StashItemRecord::select()->where('stashId = ?', $stashId)->all()))->toBe($itemCountBefore);
+        ->and(count(StashItemRecord::select()->where('stashId', $stashId)->all()))->toBe($itemCountBefore);
 });
 
 test('delete-impact reports media items shared with other stashes', function (): void {

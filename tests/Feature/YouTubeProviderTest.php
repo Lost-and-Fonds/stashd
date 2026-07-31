@@ -65,7 +65,7 @@ test('youtube add input creates domain records without downloading', function ()
         ->and($command->body['command']['result']['media_items_created'])->toBe(3)
         ->and($command->body['command']['result']['stash_items_created'])->toBe(3);
 
-    $media = MediaItemRecord::select()->where('providerKey = ?', 'youtube')->all();
+    $media = MediaItemRecord::select()->where('providerKey', 'youtube')->all();
     expect($media)->toHaveCount(3)
         ->and($media[0]->thumbnailUri)->not->toBeNull();
 });

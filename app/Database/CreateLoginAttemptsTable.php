@@ -7,7 +7,6 @@ namespace App\Database;
 use Tempest\Database\MigratesUp;
 use Tempest\Database\QueryStatement;
 use Tempest\Database\QueryStatements\CompoundStatement;
-use Tempest\Database\QueryStatements\RawStatement;
 
 final class CreateLoginAttemptsTable implements MigratesUp
 {
@@ -16,8 +15,11 @@ final class CreateLoginAttemptsTable implements MigratesUp
     public function up(): QueryStatement
     {
         return new CompoundStatement(
-            new RawStatement('CREATE TABLE `login_attempts` (`keyHash` VARCHAR(64) NOT NULL PRIMARY KEY, `attempts` INTEGER NOT NULL, `expiresAt` DATETIME NOT NULL)'),
-            new RawStatement('CREATE INDEX `login_attempts_expires_at` ON `login_attempts` (`expiresAt`)'),
+            new MigrationSqlStatement(
+                'CREATE TABLE `login_attempts` (`keyHash` VARCHAR(64) NOT NULL PRIMARY KEY, `attempts` INTEGER NOT NULL, `expiresAt` DATETIME NOT NULL)',
+                'CREATE TABLE "login_attempts" ("keyHash" VARCHAR(64) NOT NULL PRIMARY KEY, "attempts" INTEGER NOT NULL, "expiresAt" TIMESTAMP NOT NULL)',
+            ),
+            new MigrationSqlStatement('CREATE INDEX `login_attempts_expires_at` ON `login_attempts` (`expiresAt`)'),
         );
     }
 }

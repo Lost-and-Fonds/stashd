@@ -488,7 +488,7 @@ test('scheduler creates preflight commands for due automatic stash inputs', func
     expect($scheduler->runDueChecks())->toBe(1);
 
     $command = \App\Commands\CommandRecord::select()
-        ->where('type = ?', CommandType::StashPreflight)
+        ->where('type', CommandType::StashPreflight)
         ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
         ->first();
 

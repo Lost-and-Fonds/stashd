@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\System\Boot;
 
 use RuntimeException;
+use Tempest\Database\Config\DatabaseConfig;
 use Tempest\Database\Config\SQLiteConfig;
 use Tempest\Database\Database;
 use Tempest\Database\Query;
@@ -26,10 +27,14 @@ final readonly class SqliteConfigurator
     ) {
     }
 
-    public function configure(SQLiteConfig $sqliteConfig): void
+    public function configure(DatabaseConfig $databaseConfig): void
     {
-        if ($sqliteConfig->path !== ':memory:') {
-            $directory = dirname($sqliteConfig->path);
+        if (! $databaseConfig instanceof SQLiteConfig) {
+            return;
+        }
+
+        if ($databaseConfig->path !== ':memory:') {
+            $directory = dirname($databaseConfig->path);
             try {
                 create_directory($directory, 0o775);
             } catch (FilesystemException) {
@@ -42,8 +47,12 @@ final readonly class SqliteConfigurator
     }
 
     /** WAL is a persistent database mode, not a per-connection setting. */
-    public function enableWriteAheadLogging(): void
+    public function enableWriteAheadLogging(DatabaseConfig $databaseConfig): void
     {
+        if (! $databaseConfig instanceof SQLiteConfig) {
+            return;
+        }
+
         $this->database->fetchFirst(new Query('PRAGMA journal_mode = WAL'));
     }
 

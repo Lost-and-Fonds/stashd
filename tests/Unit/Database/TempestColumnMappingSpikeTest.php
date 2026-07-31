@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Database;
 
+use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Database;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Query;
@@ -36,6 +37,15 @@ final class TempestColumnMappingSpikeTest extends IntegrationTestCase
 
         $this->useTestingDatabase();
         $this->db = $this->container->get(Database::class);
+
+        // SQLite-only on purpose: these assertions pin SQLite's own error text
+        // ("no such column") and its integer/boolean coercion, and the fixture
+        // DDL uses SQLite storage classes. PostgreSQL column mapping is proven
+        // separately by TempestPostgresCompatibilityTest.
+        if ($this->db->dialect === DatabaseDialect::POSTGRESQL) {
+            $this->markTestSkipped('SQLite-specific mapping spike; see TempestPostgresCompatibilityTest for PostgreSQL.');
+        }
+
         $this->createFixtureTables();
     }
 
@@ -67,7 +77,7 @@ final class TempestColumnMappingSpikeTest extends IntegrationTestCase
 
         try {
             TempestMappingTestRecord::select()
-                ->where('id = ?', 'map_model_1')
+                ->where('id', 'map_model_1')
                 ->first();
             $message = '';
         } catch (\Throwable $exception) {
@@ -104,7 +114,7 @@ final class TempestColumnMappingSpikeTest extends IntegrationTestCase
 
         try {
             TempestMappingTestRecordWithMapAttributes::select()
-                ->where('id = ?', 'map_attrs_1')
+                ->where('id', 'map_attrs_1')
                 ->first();
             $message = '';
         } catch (\Throwable $exception) {
@@ -155,7 +165,7 @@ final class TempestColumnMappingSpikeTest extends IntegrationTestCase
 
         try {
             TempestMappingTestRecordWithMapAttributes::select()
-                ->where('id = ?', 'map_array_1')
+                ->where('id', 'map_array_1')
                 ->first();
             $message = '';
         } catch (\Throwable $exception) {
@@ -179,7 +189,7 @@ final class TempestColumnMappingSpikeTest extends IntegrationTestCase
         query(TempestMappingSnakeCaseRecord::class)->insert($record)->execute();
 
         $loaded = TempestMappingSnakeCaseRecord::select()
-            ->where('id = ?', 'map_snake_1')
+            ->where('id', 'map_snake_1')
             ->first();
 
         expect($loaded)->not->toBeNull()
@@ -192,7 +202,7 @@ final class TempestColumnMappingSpikeTest extends IntegrationTestCase
         $loaded->save();
 
         $reloaded = TempestMappingSnakeCaseRecord::select()
-            ->where('id = ?', 'map_snake_1')
+            ->where('id', 'map_snake_1')
             ->first();
 
         expect($reloaded?->progress_percent)->toBe(88.0);
@@ -211,7 +221,7 @@ final class TempestColumnMappingSpikeTest extends IntegrationTestCase
         query(TempestMappingCamelCaseRecord::class)->insert($record)->execute();
 
         $loaded = TempestMappingCamelCaseRecord::select()
-            ->where('id = ?', 'map_camel_1')
+            ->where('id', 'map_camel_1')
             ->first();
 
         expect($loaded)->not->toBeNull()
@@ -223,7 +233,7 @@ final class TempestColumnMappingSpikeTest extends IntegrationTestCase
         $loaded->save();
 
         $reloaded = TempestMappingCamelCaseRecord::select()
-            ->where('id = ?', 'map_camel_1')
+            ->where('id', 'map_camel_1')
             ->first();
 
         expect($reloaded?->progressPercent)->toBe(91.0);
@@ -251,7 +261,7 @@ final class TempestColumnMappingSpikeTest extends IntegrationTestCase
             ->and($row['lastCheckedAt'])->toBe('2026-06-16 12:05:00');
 
         $loaded = TempestMappingCamelCaseDateTimeRecord::select()
-            ->where('id = ?', 'map_datetime_1')
+            ->where('id', 'map_datetime_1')
             ->first();
 
         expect($loaded)->not->toBeNull()
@@ -264,7 +274,7 @@ final class TempestColumnMappingSpikeTest extends IntegrationTestCase
         $loaded->save();
 
         $reloaded = TempestMappingCamelCaseDateTimeRecord::select()
-            ->where('id = ?', 'map_datetime_1')
+            ->where('id', 'map_datetime_1')
             ->first();
 
         expect($reloaded?->lastCheckedAt?->format(FormatPattern::SQL_DATE_TIME, Timezone::UTC))->toBe('2026-06-16 12:15:00');

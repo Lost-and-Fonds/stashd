@@ -8,7 +8,7 @@ use App\System\Boot\BootstrapService;
 use Tempest\Console\ConsoleCommand;
 use Tempest\Console\ExitCode;
 use Tempest\Console\HasConsole;
-use Tempest\Database\Config\SQLiteConfig;
+use Tempest\Database\Config\DatabaseConfig;
 
 final readonly class BootCommand
 {
@@ -16,17 +16,17 @@ final readonly class BootCommand
 
     public function __construct(
         private BootstrapService $bootstrap,
-        private SQLiteConfig $sqliteConfig,
+        private DatabaseConfig $databaseConfig,
     ) {
     }
 
     #[ConsoleCommand(
         name: 'stashd:boot',
-        description: 'Prepare storage roots, SQLite, migrations, and storage checks',
+        description: 'Prepare storage roots, database migrations, and storage checks',
     )]
     public function __invoke(): ExitCode
     {
-        $result = $this->bootstrap->boot($this->sqliteConfig);
+        $result = $this->bootstrap->boot($this->databaseConfig);
 
         $this->console->success('Stashd boot completed.');
         $this->console->keyValue('Directories created', (string) count($result['directories_created']));

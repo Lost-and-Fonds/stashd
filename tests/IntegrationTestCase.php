@@ -77,7 +77,7 @@ abstract class IntegrationTestCase extends IntegrationTest
         $this->processAllJobs();
 
         $stashItem = \App\Stashes\StashItemRecord::select()
-            ->where('stashId = ?', $stashId)
+            ->where('stashId', $stashId)
             ->orderBy('position', \Tempest\Database\Direction::ASC)
             ->first();
         $media = \App\Vault\MediaItemRecord::findById(new \Tempest\Database\PrimaryKey((string) $stashItem->mediaItemId));
@@ -111,7 +111,7 @@ abstract class IntegrationTestCase extends IntegrationTest
         $this->processAllJobs();
 
         $stashItem = \App\Stashes\StashItemRecord::select()
-            ->where('stashId = ?', $stashId)
+            ->where('stashId', $stashId)
             ->orderBy('position', \Tempest\Database\Direction::ASC)
             ->first();
         $media = \App\Vault\MediaItemRecord::findById(new \Tempest\Database\PrimaryKey((string) $stashItem->mediaItemId));

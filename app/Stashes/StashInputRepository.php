@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Stashes;
 
 use App\Support\PrefixedUlidGenerator;
+use Tempest\Database\Builder\QueryBuilders\WhereGroupBuilder;
+use Tempest\Database\Builder\WhereOperator;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -87,7 +89,11 @@ final class StashInputRepository
     public function listDueForAutomaticSync(DateTime $now): array
     {
         return StashInputRecord::select()
-            ->where('state = ? AND syncMode = ? AND (nextCheckAt IS NULL OR nextCheckAt <= ?)', StashInputState::Ready, SyncMode::Automatic, $now)
+            ->where('state', StashInputState::Ready)
+            ->where('syncMode', SyncMode::Automatic)
+            ->andWhereGroup(fn (WhereGroupBuilder $group) => $group
+                ->whereNull('nextCheckAt')
+                ->orWhere('nextCheckAt', $now, WhereOperator::LESS_THAN_OR_EQUAL))
             ->orderBy('nextCheckAt', Direction::ASC)
             ->all();
     }

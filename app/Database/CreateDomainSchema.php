@@ -30,6 +30,7 @@ use Tempest\Database\MigratesUp;
 use Tempest\Database\QueryStatement;
 use Tempest\Database\QueryStatements\CompoundStatement;
 use Tempest\Database\QueryStatements\CreateTableStatement;
+use Tempest\Database\QueryStatements\DatabaseIntegerSize;
 use Tempest\Database\QueryStatements\OnDelete;
 
 final class CreateDomainSchema implements MigratesUp
@@ -298,7 +299,10 @@ final class CreateDomainSchema implements MigratesUp
             ->string('videoCodec', nullable: true)
             ->string('audioCodec', nullable: true)
             ->string('language', nullable: true)
-            ->integer('sizeBytes', nullable: true)
+            // BIGINT: byte counts overflow PostgreSQL's 32-bit INTEGER.
+            // SQLite ignores the size and is already 64-bit, so its
+            // compiled SQL (and migration hash) is unchanged.
+            ->integer('sizeBytes', nullable: true, size: DatabaseIntegerSize::BIG)
             ->string('checksum', nullable: true)
             ->integer('durationSeconds', nullable: true)
             ->raw($this->fkColumn('derivedFromAssetId', 40, 'assets', OnDelete::SET_NULL, nullable: true))

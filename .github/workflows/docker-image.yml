@@ -22,10 +22,34 @@ jobs:
       - name: Build Lerd development image
         run: docker build --target dev -t stashd:ci .
 
+      # PostgreSQL is the default runtime, so the suite needs one. Run it as a
+      # plain container rather than a service so max_connections can be raised:
+      # the test harness holds roughly one connection per test until the worker
+      # exits, which exhausts the stock limit of 100.
+      - name: Start PostgreSQL
+        run: |
+          docker network create stashd-ci
+          docker run -d --name stashd-ci-postgres --network stashd-ci --network-alias postgres \
+            -e POSTGRES_DB=stashd \
+            -e POSTGRES_USER=stashd \
+            -e POSTGRES_PASSWORD=stashd-ci \
+            postgres:18-alpine -c max_connections=400
+          for i in $(seq 1 30); do
+            docker exec stashd-ci-postgres pg_isready -U stashd -d stashd && break
+            sleep 2
+          done
+
       - name: Run quality checks in Lerd
         run: |
-          docker run --rm --entrypoint sh \
+          docker run --rm --entrypoint sh --network stashd-ci \
             -e MERCURE_JWT_SECRET=ci-mercure-jwt-secret-for-tests-32-bytes \
+            -e DB_CONNECTION=pgsql \
+            -e DB_HOST=postgres \
+            -e DB_PORT=5432 \
+            -e DB_DATABASE=stashd \
+            -e DB_USERNAME=stashd \
+            -e DB_PASSWORD=stashd-ci \
+            -e DB_ADMIN_DATABASE=postgres \
             -v "$GITHUB_WORKSPACE:/var/www/html" \
             -w /var/www/html \
             stashd:ci -lc '
@@ -37,6 +61,7 @@ jobs:
               composer test:static
               npm run typecheck
               composer test:parallel
+              composer test:sqlite:parallel
             '
 
   smoke:
@@ -48,6 +73,9 @@ jobs:
 
       - name: Run container smoke test
         run: composer test:docker-smoke
+
+      - name: Run SQLite -> PostgreSQL upgrade smoke test
+        run: STASHD_SMOKE_SKIP_BUILD=1 composer test:docker-upgrade
 
   e2e:
     needs: quality

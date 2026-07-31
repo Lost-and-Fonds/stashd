@@ -8,7 +8,7 @@ Use `.claude/rules/` for topic/path-specific constraints and `.claude/skills/` f
 
 - Stashd is preservation infrastructure: `Stash → Vault → Broadcasts`.
 - Vault is canonical; Broadcasts are generated and disposable.
-- PHP `^8.5`, Tempest `^3.0`, FrankenPHP, SQLite, Pest, Pint, Docker-first.
+- PHP `^8.5`, Tempest `^3.0`, FrankenPHP, PostgreSQL, Pest, Pint, Docker-first.
 - Use existing feature-first `app/` patterns before inventing new structure.
 - Keep diffs small and tests honest.
 - Be token-efficient: targeted search, relevant files only, no broad repo scans unless requested.

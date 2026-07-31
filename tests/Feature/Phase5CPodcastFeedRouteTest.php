@@ -177,7 +177,7 @@ function podcastRouteReadyStash(\Tests\IntegrationTestCase $test, string $channe
 {
     [$headers, $stashId, $mediaItemId] = $test->bootstrapFakeDownloadStash($channel);
 
-    foreach (StashItemRecord::select()->where('stashId = ?', $stashId)->all() as $stashItem) {
+    foreach (StashItemRecord::select()->where('stashId', $stashId)->all() as $stashItem) {
         if ((string) $stashItem->mediaItemId === $mediaItemId) {
             continue;
         }

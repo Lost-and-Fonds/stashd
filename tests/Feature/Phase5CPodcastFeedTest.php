@@ -77,7 +77,7 @@ test('broadcast.rebuild writes deterministic audio podcast feed with tokenized e
     $podcast = $xml->channel->children('https://podcastindex.org/namespace/1.0');
 
     $item = BroadcastItemRecord::select()
-        ->where('broadcastId = ?', $broadcast->body['broadcast']['id'])
+        ->where('broadcastId', $broadcast->body['broadcast']['id'])
         ->first();
     $itemToken = podcastFeedTokenFromEpisodeUrl((string) $xml->channel->item->enclosure['url']);
 
@@ -187,7 +187,7 @@ test('SponsorBlock chapters create a podcast-local remux for the episode', funct
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $item = BroadcastItemRecord::select()->where('broadcastId = ?', $broadcast->body['broadcast']['id'])->first();
+    $item = BroadcastItemRecord::select()->where('broadcastId', $broadcast->body['broadcast']['id'])->first();
     $remux = $assets->findByBroadcastItemAndRole(BroadcastItemId::fromPrimaryKey($item->id), AssetRole::RemuxedVideo);
     $source = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::VaultOriginal);
 
@@ -255,7 +255,7 @@ test('audio podcast triggers a transcode fallback instead of failing for video o
     $worker->processNextJob();
 
     $item = BroadcastItemRecord::select()
-        ->where('broadcastId = ?', $broadcast->body['broadcast']['id'])
+        ->where('broadcastId', $broadcast->body['broadcast']['id'])
         ->first();
 
     // The episode is excluded and a transcode queued rather than the
@@ -322,7 +322,7 @@ test('a failed transcode surfaces on the broadcast item without a manual rebuild
     $this->processAllJobs();
 
     $item = BroadcastItemRecord::select()
-        ->where('broadcastId = ?', $broadcast->body['broadcast']['id'])
+        ->where('broadcastId', $broadcast->body['broadcast']['id'])
         ->first();
     $audioAsset = $this->container->get(AssetRepository::class)
         ->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::PodcastAudio);
@@ -393,7 +393,7 @@ test('a failed transcode is not retried immediately, but is retried once the coo
 
     $retried = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::PodcastAudio);
     $item = BroadcastItemRecord::select()
-        ->where('broadcastId = ?', $broadcast->body['broadcast']['id'])
+        ->where('broadcastId', $broadcast->body['broadcast']['id'])
         ->first();
 
     expect($gateway->transcodeCalls - $callsBefore)->toBe(2)
@@ -427,7 +427,7 @@ test('video podcast records stable error for unsuitable video asset', function (
     $this->processAllJobs();
     $command = $this->http->get('/api/v1/commands/' . $rebuild->body['command_id'], headers: $headers)->body['command'];
     $item = BroadcastItemRecord::select()
-        ->where('broadcastId = ?', $broadcast->body['broadcast']['id'])
+        ->where('broadcastId', $broadcast->body['broadcast']['id'])
         ->first();
 
     expect($command['result']['verify']['ok'])->toBeFalse()
@@ -577,7 +577,7 @@ test('funding link detection only scans descriptions of items included in the fe
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('podcast-funding-excluded');
     $config = $this->container->get(StashdConfig::class);
 
-    foreach (StashItemRecord::select()->where('stashId = ?', $stashId)->all() as $stashItem) {
+    foreach (StashItemRecord::select()->where('stashId', $stashId)->all() as $stashItem) {
         if ((string) $stashItem->mediaItemId === $mediaItemId) {
             continue;
         }
@@ -626,7 +626,7 @@ test('funding link detection only scans descriptions of items included in the fe
 function podcastFeedReadyStash(\Tests\IntegrationTestCase $test, string $channel): array
 {
     [$headers, $stashId, $mediaItemId] = $test->bootstrapFakeDownloadStash($channel);
-    foreach (StashItemRecord::select()->where('stashId = ?', $stashId)->all() as $stashItem) {
+    foreach (StashItemRecord::select()->where('stashId', $stashId)->all() as $stashItem) {
         if ((string) $stashItem->mediaItemId === $mediaItemId) {
             continue;
         }

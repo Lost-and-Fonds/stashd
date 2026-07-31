@@ -63,6 +63,7 @@ final class ActivityEventRepository
     {
         return ActivityEventRecord::select()
             ->orderBy('createdAt', Direction::DESC)
+            ->orderBy('id', Direction::DESC)
             ->limit($limit)
             ->all();
     }

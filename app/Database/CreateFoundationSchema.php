@@ -16,6 +16,7 @@ use Tempest\Database\MigratesUp;
 use Tempest\Database\QueryStatement;
 use Tempest\Database\QueryStatements\CompoundStatement;
 use Tempest\Database\QueryStatements\CreateTableStatement;
+use Tempest\Database\QueryStatements\DatabaseIntegerSize;
 use Tempest\Database\QueryStatements\OnDelete;
 
 final class CreateFoundationSchema implements MigratesUp
@@ -26,13 +27,13 @@ final class CreateFoundationSchema implements MigratesUp
 
     public function up(): QueryStatement
     {
-        return new CompoundStatement(
+        return new CompoundStatement(...$this->tablesWithIndexes(
             $this->storageLocations(),
             $this->storageChecks(),
             $this->commands(),
             $this->jobs(),
             $this->settings(),
-        );
+        ));
     }
 
     private function storageLocations(): CreateTableStatement
@@ -45,8 +46,11 @@ final class CreateFoundationSchema implements MigratesUp
             ->enum('state', StorageLocationState::class, default: StorageLocationState::Missing)
             ->boolean('readable', default: false)
             ->boolean('writable', default: false)
-            ->integer('freeBytes', nullable: true)
-            ->integer('totalBytes', nullable: true)
+            // BIGINT: byte counts overflow PostgreSQL's 32-bit INTEGER.
+            // SQLite ignores the size and is already 64-bit, so its
+            // compiled SQL (and migration hash) is unchanged.
+            ->integer('freeBytes', nullable: true, size: DatabaseIntegerSize::BIG)
+            ->integer('totalBytes', nullable: true, size: DatabaseIntegerSize::BIG)
             ->string('filesystemId', nullable: true)
             ->boolean('supportsHardlinks', default: false)
             ->boolean('supportsSymlinks', default: false)

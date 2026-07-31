@@ -52,7 +52,7 @@ test('a ready video original queues a transcode and creates a pending audio asse
     $code = $fallback->triggerIfNeeded(MediaItemId::parse($mediaItemId), PodcastMediaKind::Audio);
 
     $audioAsset = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::PodcastAudio);
-    $transcodeJobs = JobRecord::select()->where('intent = ?', JobIntent::TranscodePodcastAudio->value)->all();
+    $transcodeJobs = JobRecord::select()->where('intent', JobIntent::TranscodePodcastAudio->value)->all();
 
     expect($code)->toBe('podcast_audio_transcode_pending')
         ->and($audioAsset)->not->toBeNull()
@@ -73,7 +73,7 @@ test('an in-flight transcode is not duplicated on a second call', function (): v
     $first = $fallback->triggerIfNeeded(MediaItemId::parse($mediaItemId), PodcastMediaKind::Audio);
     $second = $fallback->triggerIfNeeded(MediaItemId::parse($mediaItemId), PodcastMediaKind::Audio);
 
-    $transcodeJobs = JobRecord::select()->where('intent = ?', JobIntent::TranscodePodcastAudio->value)->all();
+    $transcodeJobs = JobRecord::select()->where('intent', JobIntent::TranscodePodcastAudio->value)->all();
 
     expect($first)->toBe('podcast_audio_transcode_pending')
         ->and($second)->toBe('podcast_audio_transcode_pending')
@@ -99,7 +99,7 @@ test('a failed transcode is not automatically retried', function (): void {
     $fallback = $this->container->get(PodcastTranscodeFallback::class);
     $code = $fallback->triggerIfNeeded(MediaItemId::parse($mediaItemId), PodcastMediaKind::Audio);
 
-    $transcodeJobs = JobRecord::select()->where('intent = ?', JobIntent::TranscodePodcastAudio->value)->all();
+    $transcodeJobs = JobRecord::select()->where('intent', JobIntent::TranscodePodcastAudio->value)->all();
 
     expect($code)->toBe('podcast_audio_transcode_failed')
         ->and($transcodeJobs)->toHaveCount(0);

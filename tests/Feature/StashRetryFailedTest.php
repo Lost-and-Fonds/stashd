@@ -16,7 +16,7 @@ test('stash.retry_failed retries every failed item in the stash, ignores non-fai
     [$headersB, $stashIdB, $mediaItemIdB] = $this->bootstrapFakeDownloadStash('retry-all-b');
 
     $itemsA = StashItemRecord::select()
-        ->where('stashId = ?', $stashIdA)
+        ->where('stashId', $stashIdA)
         ->orderBy('position', Direction::ASC)
         ->all();
     expect($itemsA)->toHaveCount(3);

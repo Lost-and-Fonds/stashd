@@ -7,7 +7,6 @@ namespace App\Database;
 use Tempest\Database\MigratesUp;
 use Tempest\Database\QueryStatement;
 use Tempest\Database\QueryStatements\CompoundStatement;
-use Tempest\Database\QueryStatements\RawStatement;
 
 final class AddSecretTokenDigest implements MigratesUp
 {
@@ -16,8 +15,8 @@ final class AddSecretTokenDigest implements MigratesUp
     public function up(): QueryStatement
     {
         return new CompoundStatement(
-            new RawStatement('ALTER TABLE `secrets` ADD COLUMN `tokenDigest` VARCHAR(64) NULL'),
-            new RawStatement('CREATE UNIQUE INDEX `secrets_token_digest` ON `secrets` (`tokenDigest`)'),
+            new MigrationSqlStatement('ALTER TABLE `secrets` ADD COLUMN `tokenDigest` VARCHAR(64) NULL'),
+            new MigrationSqlStatement('CREATE UNIQUE INDEX `secrets_token_digest` ON `secrets` (`tokenDigest`)'),
         );
     }
 }

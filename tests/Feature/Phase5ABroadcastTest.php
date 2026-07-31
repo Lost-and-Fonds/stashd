@@ -820,7 +820,8 @@ test('broadcast hardlink assets are recorded with derived vault source', functio
     $this->processAllJobs();
 
     $hardlink = \App\Vault\AssetRecord::select()
-        ->where('broadcastId = ? AND role = ?', $broadcastId, AssetRole::Hardlink)
+        ->where('broadcastId', $broadcastId)
+        ->where('role', AssetRole::Hardlink)
         ->first();
 
     expect($hardlink)->not->toBeNull()

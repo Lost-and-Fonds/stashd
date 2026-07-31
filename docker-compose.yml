@@ -2,6 +2,9 @@ services:
   stashd:
     image: ghcr.io/hipsterjazzbo/stashd:latest
     container_name: stashd
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "8474:8474"
     environment:
@@ -9,6 +12,12 @@ services:
       STASHD_HTTP_PORT: "8474"
       STASHD_DATA_PATH: /data
       STASHD_MEDIA_PATH: /media
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: ${POSTGRES_DB:-stashd}
+      DB_USERNAME: ${POSTGRES_USER:-stashd}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-stashd}
       SIGNING_KEY: ${SIGNING_KEY:-}
       MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
       PUID: ${PUID:-1000}
@@ -24,3 +33,28 @@ services:
       timeout: 5s
       retries: 3
       start_period: 60s
+
+  # Postgres is reachable only on the compose network -- no published ports.
+  # Upgrading from a SQLite release? Bring this up, then run the importer once:
+  #   docker compose run --rm stashd import-sqlite /data/stashd.sqlite
+  postgres:
+    image: postgres:18-alpine
+    container_name: stashd-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-stashd}
+      POSTGRES_USER: ${POSTGRES_USER:-stashd}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stashd}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stashd} -d ${POSTGRES_DB:-stashd}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  # Back this up with pg_dump, not by copying files:
+  #   docker compose exec postgres pg_dump -U stashd stashd > stashd.sql
+  postgres-data:

@@ -12,7 +12,7 @@ use Tempest\Console\ExitCode;
 use Tempest\Console\HasConsole;
 use Tempest\Console\Schedule;
 use Tempest\Console\Scheduler\Every;
-use Tempest\Database\Config\SQLiteConfig;
+use Tempest\Database\Config\DatabaseConfig;
 
 final readonly class SchedulerTickCommand
 {
@@ -22,7 +22,7 @@ final readonly class SchedulerTickCommand
         private RoutineDiscoveryScheduler $scheduler,
         private SponsorBlockRefreshScheduler $sponsorBlock,
         private SqliteConfigurator $sqlite,
-        private SQLiteConfig $sqliteConfig,
+        private DatabaseConfig $databaseConfig,
     ) {
     }
 
@@ -36,7 +36,7 @@ final readonly class SchedulerTickCommand
         // Fresh CLI process every tick (schedule:run, invoked every 60s by
         // App\Console\StashdRuntimeCommand::runScheduler) — same missing
         // busy_timeout pragma as TempestPsr7Bridge::run().
-        $this->sqlite->configure($this->sqliteConfig);
+        $this->sqlite->configure($this->databaseConfig);
 
         $count = $this->scheduler->runDueChecks();
 

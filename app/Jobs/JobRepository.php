@@ -7,7 +7,11 @@ namespace App\Jobs;
 use App\Commands\CommandId;
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
+use Tempest\Database\Builder\QueryBuilders\WhereGroupBuilder;
+use Tempest\Database\Builder\WhereOperator;
+use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Connection\Connection;
+use Tempest\Database\Database;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -22,6 +26,7 @@ final class JobRepository
     public function __construct(
         private PrefixedUlidGenerator $ids,
         private Connection $connection,
+        private Database $database,
     ) {
     }
 
@@ -85,14 +90,8 @@ final class JobRepository
     }
 
     /**
-     * The Pending -> Processing flip happens as a single guarded UPDATE
-     * (`WHERE id = ? AND state = 'pending'`, rowCount checked) rather than
-     * through StateTransitionService's read-mutate-save: multiple worker
-     * lanes claim concurrently, and separate statements leave a race window
-     * where two claimers select the same pending job before either saves.
-     * Losing a guarded UPDATE (rowCount 0) means another lane won that job;
-     * the next candidate is tried. The transition itself stays valid by
-     * construction -- the WHERE clause only ever moves pending to processing.
+     * SQLite retries a guarded UPDATE after selecting candidates; PostgreSQL
+     * claims one locked candidate with SKIP LOCKED in a single statement.
      *
      * $ownerToken records which OS process claimed the job, so stale-job
      * recovery can verify the owner is actually dead before re-queuing (see
@@ -100,8 +99,15 @@ final class JobRepository
      */
     public function claimNextPending(?JobLane $lane = null, ?string $ownerToken = null): ?JobRecord
     {
+        if ($this->database->dialect === DatabaseDialect::POSTGRESQL) {
+            return $this->claimNextPendingPostgres($lane, $ownerToken);
+        }
+
         $query = JobRecord::select()
-            ->where('state = ? AND (scheduledAt IS NULL OR scheduledAt <= ?)', JobState::Pending, DateTime::now(Timezone::UTC))
+            ->where('state', JobState::Pending)
+            ->andWhereGroup(fn (WhereGroupBuilder $group) => $group
+                ->whereNull('scheduledAt')
+                ->orWhere('scheduledAt', DateTime::now(Timezone::UTC), WhereOperator::LESS_THAN_OR_EQUAL))
             ->orderBy('priority', Direction::ASC)
             ->orderBy('createdAt', Direction::ASC)
             ->limit(5);
@@ -114,19 +120,7 @@ final class JobRepository
         }
 
         foreach ($query->all() as $candidate) {
-            $statement = $this->connection->prepare(
-                'UPDATE jobs
-                 SET state = :processing, attempts = attempts + 1,
-                     startedAt = CURRENT_TIMESTAMP, heartbeatAt = CURRENT_TIMESTAMP,
-                     updatedAt = CURRENT_TIMESTAMP, lastError = NULL, ownerToken = :ownerToken
-                 WHERE id = :id AND state = :pending',
-            );
-            $statement->execute([
-                'processing' => JobState::Processing->value,
-                'ownerToken' => $ownerToken,
-                'id' => (string) $candidate->id,
-                'pending' => JobState::Pending->value,
-            ]);
+            $statement = $this->claimStatement((string) $candidate->id, $ownerToken);
 
             if ($statement->rowCount() !== 1) {
                 continue;
@@ -138,15 +132,76 @@ final class JobRepository
         return null;
     }
 
+    private function claimNextPendingPostgres(?JobLane $lane, ?string $ownerToken): ?JobRecord
+    {
+        $bindings = [
+            'pending' => JobState::Pending->value,
+            'now' => DateTime::now(Timezone::UTC)->format(FormatPattern::SQL_DATE_TIME, Timezone::UTC),
+        ];
+        $where = [
+            '"state" = :pending',
+            '("scheduledAt" IS NULL OR "scheduledAt" <= :now)',
+        ];
+
+        if ($lane !== null) {
+            $placeholders = [];
+            foreach ($lane->intents() as $index => $intent) {
+                $key = "intent_{$index}";
+                $placeholders[] = ":{$key}";
+                $bindings[$key] = $intent->value;
+            }
+            $where[] = '"intent" IN (' . implode(', ', $placeholders) . ')';
+        }
+
+        $statement = $this->connection->prepare(
+            'UPDATE "jobs"
+             SET "state" = :processing, "attempts" = "attempts" + 1,
+                 "startedAt" = CURRENT_TIMESTAMP, "heartbeatAt" = CURRENT_TIMESTAMP,
+                 "updatedAt" = CURRENT_TIMESTAMP, "lastError" = NULL, "ownerToken" = :ownerToken
+             WHERE "id" = (
+                SELECT "id" FROM "jobs" WHERE ' . implode(' AND ', $where)
+                . ' ORDER BY "priority" ASC, "createdAt" ASC LIMIT 1 FOR UPDATE SKIP LOCKED
+             )
+             RETURNING "id"',
+        );
+        $statement->execute([
+            ...$bindings,
+            'processing' => JobState::Processing->value,
+            'ownerToken' => $ownerToken,
+        ]);
+        $id = $statement->fetchColumn();
+
+        return is_string($id) ? JobRecord::findById(new PrimaryKey($id)) : null;
+    }
+
+    private function claimStatement(string $id, ?string $ownerToken): \PDOStatement
+    {
+        $statement = $this->connection->prepare(
+            'UPDATE "jobs"
+             SET "state" = :processing, "attempts" = "attempts" + 1,
+                 "startedAt" = CURRENT_TIMESTAMP, "heartbeatAt" = CURRENT_TIMESTAMP,
+                 "updatedAt" = CURRENT_TIMESTAMP, "lastError" = NULL, "ownerToken" = :ownerToken
+             WHERE "id" = :id AND "state" = :pending',
+        );
+        $statement->execute([
+            'processing' => JobState::Processing->value,
+            'ownerToken' => $ownerToken,
+            'id' => $id,
+            'pending' => JobState::Pending->value,
+        ]);
+
+        return $statement;
+    }
+
     public function parkForRetry(JobRecord $job, string $lastError, DateTime $scheduledAt): bool
     {
         $updatedAt = DateTime::now(Timezone::UTC);
         $statement = $this->connection->prepare(
-            'UPDATE jobs
-             SET state = :pending, startedAt = NULL, heartbeatAt = NULL,
-                 ownerToken = NULL, lastError = :lastError,
-                 scheduledAt = :scheduledAt, updatedAt = :updatedAt
-             WHERE id = :id AND state = :processing',
+            'UPDATE "jobs"
+             SET "state" = :pending, "startedAt" = NULL, "heartbeatAt" = NULL,
+                 "ownerToken" = NULL, "lastError" = :lastError,
+                 "scheduledAt" = :scheduledAt, "updatedAt" = :updatedAt
+             WHERE "id" = :id AND "state" = :processing',
         );
         $statement->execute([
             'pending' => JobState::Pending->value,

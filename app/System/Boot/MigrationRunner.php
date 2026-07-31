@@ -6,6 +6,7 @@ namespace App\System\Boot;
 
 use App\Config\StashdConfig;
 use RuntimeException;
+use Tempest\Database\Config\DatabaseConfig;
 use Tempest\Database\Config\SQLiteConfig;
 use Tempest\Database\Database;
 use Tempest\Database\Exceptions\QueryWasInvalid;
@@ -27,10 +28,10 @@ final readonly class MigrationRunner
     ) {
     }
 
-    public function run(SQLiteConfig $sqliteConfig): void
+    public function run(DatabaseConfig $databaseConfig): void
     {
-        if ($sqliteConfig->path !== ':memory:' && $this->hasPendingMigrations()) {
-            $this->backupIfExists($sqliteConfig->path);
+        if ($databaseConfig instanceof SQLiteConfig && $databaseConfig->path !== ':memory:' && $this->hasPendingMigrations()) {
+            $this->backupIfExists($databaseConfig->path);
         }
 
         $this->migrations->up();

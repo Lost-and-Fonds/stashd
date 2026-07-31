@@ -8,7 +8,6 @@ use Tempest\Database\MigratesUp;
 use Tempest\Database\QueryStatement;
 use Tempest\Database\QueryStatements\CompoundStatement;
 use Tempest\Database\QueryStatements\CreateTableStatement;
-use Tempest\Database\QueryStatements\RawStatement;
 
 final class CreatePhase2ExecutionSchema implements MigratesUp
 {
@@ -19,7 +18,7 @@ final class CreatePhase2ExecutionSchema implements MigratesUp
     public function up(): QueryStatement
     {
         return new CompoundStatement(
-            new RawStatement('ALTER TABLE `commands` ADD COLUMN `resultJson` TEXT NULL'),
+            new MigrationSqlStatement('ALTER TABLE `commands` ADD COLUMN `resultJson` TEXT NULL'),
             ...$this->tablesWithIndexes(
                 $this->activityEvents(),
                 $this->eventNotifications(),

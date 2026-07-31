@@ -68,11 +68,18 @@ ensure_writable() {
     # Dotenv at application boot -- so an explicit OS env var (matching
     # Dotenv's immutable/already-set precedence) is preferred if present,
     # falling back to reading .env directly.
+    db_connection="${DB_CONNECTION:-}"
+    if [ -z "$db_connection" ] && [ -f "$APP_DIR/.env" ]; then
+        db_connection=$(grep -m1 '^DB_CONNECTION=' "$APP_DIR/.env" | cut -d= -f2-)
+    fi
+
     db_database="${DB_DATABASE:-}"
     if [ -z "$db_database" ] && [ -f "$APP_DIR/.env" ]; then
         db_database=$(grep -m1 '^DB_DATABASE=' "$APP_DIR/.env" | cut -d= -f2-)
     fi
-    if [ -n "$db_database" ] && [ "$db_database" != ':memory:' ]; then
+    # On PostgreSQL, DB_DATABASE is a database name rather than a path, so there
+    # is no directory to pre-create.
+    if [ "${db_connection:-pgsql}" = 'sqlite' ] && [ -n "$db_database" ] && [ "$db_database" != ':memory:' ]; then
         case "$db_database" in
             /*) db_path="$db_database" ;;
             *) db_path="${DATA_DIR}/${db_database}" ;;
@@ -169,7 +176,9 @@ ensure_mercure_secret() {
     export MERCURE_JWT_SECRET
 }
 
-prepare_runtime() {
+# Everything stashd:boot needs, without running it -- the import role wants the
+# schema in place but no rows yet.
+prepare_runtime_env() {
     cd "$APP_DIR"
     git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
     ensure_writable
@@ -178,6 +187,10 @@ prepare_runtime() {
     export STASHD_DATA_PATH="$DATA_DIR"
     export STASHD_MEDIA_PATH="$MEDIA_DIR"
     export TEMPEST_INTERNAL_STORAGE="${DATA_DIR}/.tempest"
+}
+
+prepare_runtime() {
+    prepare_runtime_env
     run_app php tempest stashd:boot
 }
 
@@ -223,6 +236,19 @@ case "$ROLE" in
         ;;
     boot)
         prepare_runtime
+        ;;
+    import-sqlite)
+        # One-shot upgrade from a SQLite release.
+        if [ -z "${2:-}" ]; then
+            log "import-sqlite requires a path, e.g. import-sqlite /data/stashd.sqlite" >&2
+            exit 1
+        fi
+        prepare_runtime_env
+        # Migrations only. stashd:boot would create storage locations plus a boot
+        # command and job, and the importer then (correctly) refuses to merge
+        # into a database that already holds rows. Normal startup boots after.
+        run_app php tempest migrate:up
+        run_app php tempest stashd:import-sqlite "$2" ${3:+"$3"}
         ;;
     *)
         log "unknown role: ${ROLE}" >&2

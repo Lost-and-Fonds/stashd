@@ -278,7 +278,7 @@ test('broadcast trigger scan success records trigger run without failing broadca
         ->and($runs[0]->state->value)->toBe('ready');
 
     $triggerRecord = BroadcastTriggerRecord::select()
-        ->where('broadcastId = ?', $broadcastId)
+        ->where('broadcastId', $broadcastId)
         ->first();
 
     expect($triggerRecord)->not->toBeNull()
