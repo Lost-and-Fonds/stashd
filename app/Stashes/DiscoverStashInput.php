@@ -52,11 +52,13 @@ final readonly class DiscoverStashInput
         // Preflight must prefer the same strategy as the later commit
         // (InitialBackfill) -- otherwise the items previewed here can differ
         // from what actually gets persisted once a stronger strategy (e.g.
-        // the YouTube Data API) is available. Strategies still gate their own
-        // availability (e.g. no key configured), so this is a no-op when
-        // only the cheap strategy is available.
+        // the YouTube Data API) is available. SyncInput belongs here for the
+        // same reason: falling back to the cheap strategy would shrink a
+        // channel to its most recent handful of items on every sync.
+        // Strategies still gate their own availability (e.g. no key
+        // configured), so this is a no-op when only the cheap one exists.
         $selectionOptions = match ($intent) {
-            JobIntent::Preflight, JobIntent::InitialBackfill => new StrategySelectionOptions(preferHighestCapability: true),
+            JobIntent::Preflight, JobIntent::InitialBackfill, JobIntent::SyncInput => new StrategySelectionOptions(preferHighestCapability: true),
             default => null,
         };
         $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);

@@ -469,7 +469,7 @@ test('api token uses stashd_pat prefix and supports lookup and revoke', function
     $this->http->get('/api/v1/auth/me', headers: $headers)->assertStatus(Status::UNAUTHORIZED);
 });
 
-test('scheduler creates preflight commands for due automatic stash inputs', function (): void {
+test('scheduler creates sync commands for due automatic stash inputs', function (): void {
     $stashRepo = $this->container->get(\App\Stashes\StashRepository::class);
     $inputRepo = $this->container->get(\App\Stashes\StashInputRepository::class);
     $scheduler = $this->container->get(\App\System\Scheduler\RoutineDiscoveryScheduler::class);
@@ -488,9 +488,10 @@ test('scheduler creates preflight commands for due automatic stash inputs', func
     expect($scheduler->runDueChecks())->toBe(1);
 
     $command = \App\Commands\CommandRecord::select()
-        ->where('type', CommandType::StashPreflight)
+        ->where('type', CommandType::StashSyncInput)
         ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
         ->first();
 
-    expect($command)->not->toBeNull();
+    expect($command)->not->toBeNull()
+        ->and($command->options['stash_input_id'] ?? null)->toBeString();
 });

@@ -19,6 +19,7 @@ use App\MediaServers\MediaServerConnectionRepository;
 use App\Stashes\StashAddInputCommandHandler;
 use App\Stashes\StashPreflightCommandHandler;
 use App\Stashes\StashRetryFailedCommandHandler;
+use App\Stashes\StashSyncInputCommandHandler;
 use App\System\SystemStorageCheckCommandHandler;
 use App\Transcoding\AssetTranscodePodcastAudioCommandHandler;
 use App\Vault\AssetVerifyCommandHandler;
@@ -39,6 +40,7 @@ final class CommandHandlerRegistryInitializer implements Initializer
         return new CommandHandlerRegistry([
             $container->get(StashPreflightCommandHandler::class),
             $container->get(StashAddInputCommandHandler::class),
+            $container->get(StashSyncInputCommandHandler::class),
             $container->get(StashRetryFailedCommandHandler::class),
             $container->get(ItemDownloadCommandHandler::class),
             $container->get(AssetDownloadCaptionsCommandHandler::class),

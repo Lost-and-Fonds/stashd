@@ -799,27 +799,9 @@ parameters:
 			path: app/Providers/YouTube/YouTubeUriResolver.php
 
 		-
-			message: '#^Call to function is_array\(\) with array\<string, mixed\> will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: app/Stashes/CreateStashFromDiscovery.php
-
-		-
-			message: '#^Cannot cast mixed to int\.$#'
-			identifier: cast.int
-			count: 1
-			path: app/Stashes/CreateStashFromDiscovery.php
-
-		-
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
-			count: 5
-			path: app/Stashes/CreateStashFromDiscovery.php
-
-		-
-			message: '#^Parameter \#1 \$array \(list\<array\<string, mixed\>\>\) of array_values is already a list, call has no effect\.$#'
-			identifier: arrayValues.list
-			count: 1
+			count: 2
 			path: app/Stashes/CreateStashFromDiscovery.php
 
 		-
@@ -827,6 +809,30 @@ parameters:
 			identifier: cast.string
 			count: 2
 			path: app/Stashes/DiscoverStashInput.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<string, mixed\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Stashes/DiscoveredItemCommitter.php
+
+		-
+			message: '#^Cannot cast mixed to int\.$#'
+			identifier: cast.int
+			count: 1
+			path: app/Stashes/DiscoveredItemCommitter.php
+
+		-
+			message: '#^Cannot cast mixed to string\.$#'
+			identifier: cast.string
+			count: 3
+			path: app/Stashes/DiscoveredItemCommitter.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<array\<string, mixed\>\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Stashes/DiscoveredItemCommitter.php
 
 		-
 			message: '#^Cannot cast mixed to string\.$#'
@@ -1327,13 +1333,13 @@ parameters:
 			path: app/Vault/AssetRepository.php
 
 		-
-			message: '#^Method App\\Vault\\AssetRepository\:\:listForMediaItem\(\) should return list\<App\\Vault\\AssetRecord\> but returns array\<mixed\>\.$#'
+			message: '#^Method App\\Vault\\AssetRepository\:\:listByBroadcastAndRole\(\) should return list\<App\\Vault\\AssetRecord\> but returns array\<mixed\>\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Vault/AssetRepository.php
 
 		-
-			message: '#^Method App\\Vault\\AssetRepository\:\:listByBroadcastAndRole\(\) should return list\<App\\Vault\\AssetRecord\> but returns array\<mixed\>\.$#'
+			message: '#^Method App\\Vault\\AssetRepository\:\:listForMediaItem\(\) should return list\<App\\Vault\\AssetRecord\> but returns array\<mixed\>\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Vault/AssetRepository.php

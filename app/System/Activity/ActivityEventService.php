@@ -152,6 +152,30 @@ final readonly class ActivityEventService
         );
     }
 
+    public function stashInputSynced(
+        CommandRecord                     $command,
+        JobRecord                         $job,
+        \App\Stashes\StashInputRecord     $input,
+        \App\Stashes\StashInputSyncResult $result,
+    ): ActivityEventRecord {
+        $label = $input->title ?? $input->sourceUri;
+
+        return $this->emit(
+            level: ActivityLevel::Success,
+            type: 'stash.input_synced',
+            message: $result->stashItemsCreated > 0
+                ? sprintf('Found %d new item(s) in %s.', $result->stashItemsCreated, $label)
+                : sprintf('No new items in %s.', $label),
+            entityType: 'stash',
+            entityId: $result->stashId,
+            stashId: $result->stashId,
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: $result->toArray(),
+        );
+    }
+
     public function retriedFailedDownloads(
         CommandRecord $command,
         JobRecord $job,

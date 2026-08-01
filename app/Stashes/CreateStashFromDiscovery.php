@@ -13,11 +13,6 @@ use App\Commands\CommandState;
 use App\Commands\CommandType;
 use App\Downloads\DownloadPolicyEvaluator;
 use App\Jobs\JobIntent;
-use App\Providers\ProviderDates;
-use App\Providers\StashdUri;
-use App\Vault\MediaItemId;
-use App\Vault\MediaItemRepository;
-use App\Vault\MediaItemSourceRepository;
 use InvalidArgumentException;
 use RuntimeException;
 use Tempest\Database\Database;
@@ -39,12 +34,9 @@ final readonly class CreateStashFromDiscovery
         private CommandRepository $commands,
         private StashRepository $stashes,
         private StashInputRepository $stashInputs,
-        private MediaItemRepository $mediaItems,
-        private MediaItemSourceRepository $mediaItemSources,
-        private StashItemRepository $stashItems,
+        private DiscoveredItemCommitter $committer,
         private CommandDispatchService $commandDispatch,
         private DownloadPolicyEvaluator $downloadPolicy,
-        private StashInputFilter $inputFilter,
         private DiscoverStashInput $discovery,
         private BroadcastRepository $broadcasts,
         private Database $database,
@@ -84,13 +76,7 @@ final readonly class CreateStashFromDiscovery
         $syncMode = SyncMode::tryFrom((string) ($options['sync_mode'] ?? SyncMode::Automatic->value)) ?? SyncMode::Automatic;
 
         $stashInput = null;
-        $mediaItemsCreated = 0;
-        $mediaItemsReused = 0;
-        $stashItemsCreated = 0;
-        $stashItemsReused = 0;
-
-        /** @var list<string> $downloadableMediaItemIds */
-        $downloadableMediaItemIds = [];
+        $counts = new DiscoveredItemCommitCounts();
 
         $committed = $this->database->withinTransaction(function () use (
             $stash,
@@ -102,11 +88,7 @@ final readonly class CreateStashFromDiscovery
             $declaredInputOptions,
             $discoveredItems,
             &$stashInput,
-            &$mediaItemsCreated,
-            &$mediaItemsReused,
-            &$stashItemsCreated,
-            &$stashItemsReused,
-            &$downloadableMediaItemIds,
+            &$counts,
         ): void {
             $isFirstInput = $this->stashInputs->listForStash($stashId) === [];
             $stashInput = $this->stashInputs->findByStashAndProviderInput(
@@ -132,82 +114,14 @@ final readonly class CreateStashFromDiscovery
                 $this->stashes->update($stash, name: $resolved->sourceTitle);
             }
 
-            $stashInputId = StashInputId::fromPrimaryKey($stashInput->id);
-
-            foreach (array_values($discoveredItems) as $index => $item) {
-                if (! is_array($item)) {
-                    continue;
-                }
-
-                $providerItemId = str((string) ($item['provider_item_id'] ?? ''))->trim()->toString();
-                $canonicalUriRaw = str((string) ($item['canonical_uri'] ?? ''))->trim()->toString();
-                $title = str((string) ($item['title'] ?? 'Untitled'))->trim()->toString();
-                $description = is_string($item['description'] ?? null) && str($item['description'])->trim()->isNotEmpty()
-                    ? str($item['description'])->trim()->toString()
-                    : null;
-
-                if ($providerItemId === '' || $canonicalUriRaw === '') {
-                    continue;
-                }
-
-                $canonicalUri = StashdUri::parse($canonicalUriRaw);
-
-                $existingMedia = $this->mediaItems->findByProviderIdentity($resolved->providerKey, $providerItemId);
-
-                if ($existingMedia === null) {
-                    $mediaItem = $this->mediaItems->create(
-                        providerKey: $resolved->providerKey,
-                        providerItemId: $providerItemId,
-                        canonicalUri: $canonicalUri,
-                        title: $title,
-                        description: $description,
-                        durationSeconds: isset($item['duration_seconds']) ? (int) $item['duration_seconds'] : null,
-                        publishedAt: ProviderDates::tryParse(is_string($item['published_at'] ?? null) ? $item['published_at'] : null),
-                        thumbnailUri: is_string($item['thumbnail_uri'] ?? null) && str($item['thumbnail_uri'])->trim()->isNotEmpty()
-                        ? StashdUri::parse(str($item['thumbnail_uri'])->trim()->toString())
-                        : null,
-                        contentType: is_string($item['content_type'] ?? null) ? $item['content_type'] : null,
-                    );
-                    $mediaItemsCreated++;
-                } else {
-                    $mediaItem = $existingMedia;
-                    $mediaItemsReused++;
-                }
-
-                $mediaItemId = MediaItemId::fromPrimaryKey($mediaItem->id);
-
-                if ($this->mediaItemSources->findForMediaItemAndInput($mediaItemId, $stashInputId) === null) {
-                    $this->mediaItemSources->create(
-                        mediaItemId: $mediaItemId,
-                        providerKey: $resolved->providerKey,
-                        providerInputId: $resolved->providerInputId,
-                        discoveredUri: $canonicalUri->toString(),
-                        stashInputId: $stashInputId,
-                        position: $index + 1,
-                    );
-                }
-
-                if ($this->stashItems->findByStashAndMediaItem($stashId, $mediaItemId) === null) {
-                    $contentType = is_string($item['content_type'] ?? null) ? $item['content_type'] : null;
-                    $ignoredReason = $this->inputFilter->ignoredReason($title, $contentType, $inputOptions, $declaredInputOptions);
-
-                    $stashItem = $this->stashItems->create(
-                        stashId: $stashId,
-                        mediaItemId: $mediaItemId,
-                        stashInputId: $stashInputId,
-                        position: $index + 1,
-                        ignoredReason: $ignoredReason,
-                        state: $ignoredReason !== null ? StashItemState::Ignored : StashItemState::Active,
-                    );
-                    $stashItemsCreated++;
-
-                    if ($stashItem->state !== StashItemState::Ignored) {
-                        $downloadableMediaItemIds[] = $mediaItemId->toString();
-                    }
-                } else {
-                    $stashItemsReused++;
-                }
-            }
+            $counts = $this->committer->commit(
+                stashId: $stashId,
+                stashInputId: StashInputId::fromPrimaryKey($stashInput->id),
+                resolved: $resolved,
+                discoveredItems: $discoveredItems,
+                inputOptions: $inputOptions,
+                declaredInputOptions: $declaredInputOptions,
+            );
         });
 
         if (! $committed || $stashInput === null) {
@@ -215,7 +129,7 @@ final readonly class CreateStashFromDiscovery
         }
 
         if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
-            foreach ($downloadableMediaItemIds as $downloadableMediaItemId) {
+            foreach ($counts->downloadableMediaItemIds as $downloadableMediaItemId) {
                 $this->commandDispatch->dispatch(CommandType::ItemDownload, [
                     'mediaItemId' => $downloadableMediaItemId,
                     'stashId' => $stashId->toString(),
@@ -232,10 +146,10 @@ final readonly class CreateStashFromDiscovery
         return new StashInputCommitResult(
             stashId: (string) $stash->id,
             stashInputId: (string) $stashInput->id,
-            mediaItemsCreated: $mediaItemsCreated,
-            mediaItemsReused: $mediaItemsReused,
-            stashItemsCreated: $stashItemsCreated,
-            stashItemsReused: $stashItemsReused,
+            mediaItemsCreated: $counts->mediaItemsCreated,
+            mediaItemsReused: $counts->mediaItemsReused,
+            stashItemsCreated: $counts->stashItemsCreated,
+            stashItemsReused: $counts->stashItemsReused,
             preflightCommandId: (string) $preflight->id,
         );
     }

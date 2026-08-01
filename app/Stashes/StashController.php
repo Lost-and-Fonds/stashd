@@ -248,6 +248,37 @@ final readonly class StashController
         return new Json(ApiJson::encode($result->toArray()), Status::CREATED);
     }
 
+    /** Checks every input of the stash for new items, on demand. */
+    #[Post('/api/v1/stashes/{id}/sync')]
+    public function sync(string $id): Json
+    {
+        $stash = $this->findStash($id);
+
+        if ($stash === null) {
+            return $this->notFound('Stash not found.');
+        }
+
+        $commandIds = [];
+
+        foreach ($this->stashInputs->listForStash(StashId::fromPrimaryKey($stash->id)) as $input) {
+            try {
+                $result = $this->dispatch->dispatch(
+                    CommandType::StashSyncInput,
+                    ['stash_input_id' => (string) $input->id],
+                    $this->context->user(),
+                );
+            } catch (InvalidCommandPayload $exception) {
+                return $this->validationError($exception->getMessage());
+            }
+
+            $commandIds[] = $result->toArray()['command_id'] ?? null;
+        }
+
+        return new Json(ApiJson::encode([
+            'command_ids' => array_values(array_filter($commandIds, is_string(...))),
+        ]), Status::ACCEPTED);
+    }
+
     #[Patch('/api/v1/stashes/{id}/inputs/{inputId}')]
     public function updateInput(string $id, string $inputId, Request $request): Json
     {

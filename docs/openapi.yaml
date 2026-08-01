@@ -485,6 +485,32 @@ paths:
         "400": { $ref: "#/components/responses/ValidationError" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/stashes/{id}/sync:
+    post:
+      operationId: syncStash
+      tags: [StashInputs]
+      summary: >
+        Check every input of this stash for new items now, rather than
+        waiting for the hourly scheduled check. Dispatches one
+        stash.sync_input command per input. Items already held are left
+        untouched; anything new is committed and then downloaded according
+        to the stash's download policy.
+      parameters:
+        - $ref: "#/components/parameters/StashId"
+      responses:
+        "202":
+          description: Checks accepted (asynchronous; poll GET /commands/{id})
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  command_ids:
+                    type: array
+                    items: { type: string }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/v1/stashes/{id}/inputs/{inputId}:
     patch:
       operationId: updateStashInput

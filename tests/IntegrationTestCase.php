@@ -54,6 +54,29 @@ abstract class IntegrationTestCase extends IntegrationTest
         }
     }
 
+    /** Adds a stash holding one fake channel input, via the real add-input flow. */
+    public function bootstrapFakeChannelStash(string $channel): string
+    {
+        $headers = $this->authHeaders();
+
+        $stash = $this->http->post('/api/v1/stashes', ['name' => 'Stash ' . $channel], headers: $headers)
+            ->assertStatus(\Tempest\Http\Status::CREATED);
+        $stashId = $stash->body['stash']['id'];
+
+        $preflight = $this->http->post('/api/v1/commands', [
+            'type' => 'stash.preflight',
+            'options' => ['source_uri' => 'fake://channel/' . $channel],
+        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        $this->processAllJobs();
+
+        $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+            'preflight_command_id' => $preflight->body['command_id'],
+        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        $this->processAllJobs();
+
+        return $stashId;
+    }
+
     /** @return array{0: array{Authorization: string}, 1: string, 2: string} */
     public function bootstrapFakeDownloadStash(string $channel = 'download-demo'): array
     {

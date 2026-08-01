@@ -1954,6 +1954,30 @@ function stashDetailComponent(stashId: string) {
 			}
 		},
 
+		async checkForNewItems() {
+			this.actionPending = 'check-new'
+			this.actionFeedback = null
+			try {
+				const response = await apiFetch(`/api/v1/stashes/${stashId}/sync`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({}),
+				})
+				if (!response.ok) {
+					this.error = await describeFailedResponse(response)
+					return
+				}
+				this.error = null
+				this.actionFeedback = 'Checking for new items…'
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not check for new items.'
+			} finally {
+				this.actionPending = null
+			}
+		},
+
 		startEditInputFilters(input: StashInputSummary) {
 			this.editingInputFiltersId = input.id
 			this.editInputTitleRegexInclude = input.options?.title_regex_include ?? ''

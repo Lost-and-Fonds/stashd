@@ -425,6 +425,12 @@
 								</span>
 							</template>
 							<button type="button" class="ml-1 rounded border border-line px-2 py-0.5 text-muted transition-colors hover:text-cream disabled:opacity-50"
+								x-bind:disabled="actionPending === 'check-new'"
+								x-on:click="checkForNewItems()">
+								<span x-show="actionPending !== 'check-new'">check for new items</span>
+								<span x-show="actionPending === 'check-new'">checking…</span>
+							</button>
+							<button type="button" class="ml-1 rounded border border-line px-2 py-0.5 text-muted transition-colors hover:text-cream disabled:opacity-50"
 								x-bind:disabled="actionPending === 'retry-all'"
 								x-on:click="retryAllFailed()">
 								<span x-show="actionPending !== 'retry-all'">retry all failed</span>

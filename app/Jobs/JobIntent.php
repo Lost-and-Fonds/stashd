@@ -17,6 +17,7 @@ enum JobIntent: string
     case SponsorBlockRefresh = 'sponsorblock_refresh';
     case Preflight = 'preflight';
     case AddInput = 'add_input';
+    case SyncInput = 'sync_input';
     case RetryFailedDownloads = 'retry_failed_downloads';
     case Boot = 'boot';
     case VerifyVault = 'verify_vault';
@@ -28,7 +29,7 @@ enum JobIntent: string
     {
         return match ($this) {
             self::Download, self::Broadcast, self::TranscodePodcastAudio, self::DownloadCaptions, self::SponsorBlockRefresh => JobLane::Bulk,
-            self::InitialBackfill => JobLane::Discovery,
+            self::InitialBackfill, self::SyncInput => JobLane::Discovery,
             default => JobLane::Interactive,
         };
     }
