@@ -45,7 +45,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-stashd}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stashd}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # PostgreSQL 18 images set PGDATA to /var/lib/postgresql/18/docker and
+      # declare their volume at /var/lib/postgresql. Mounting the old
+      # .../data path makes the container refuse to start.
+      - postgres-data:/var/lib/postgresql
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stashd} -d ${POSTGRES_DB:-stashd}"]

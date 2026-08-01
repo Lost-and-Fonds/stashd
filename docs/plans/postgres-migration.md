@@ -77,6 +77,13 @@ database.
 
 The Dockerfile already carried both `pdo_sqlite` and `pdo_pgsql`.
 
+The postgres volume mounts at `/var/lib/postgresql`, **not**
+`/var/lib/postgresql/data`: PostgreSQL 18 images set `PGDATA` to
+`/var/lib/postgresql/18/docker` and declare their volume one level up.
+Mounting the older `.../data` path makes the container refuse to start.
+The bind-mounted directory must also be owned by the image's `postgres`
+user (uid 70 on Alpine), or initdb cannot create its version directory.
+
 ## Upgrading an existing SQLite install
 
 ```bash
