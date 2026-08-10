@@ -1,0 +1,126 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+/*
+ * Self-hosted IBM Plex — no external font requests, matches the
+ * self-hosted/private posture of the rest of the app.
+ */
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+
+/*
+ * Stashd visual language.
+ * Colour is a direct port of the legacy production palette (repo root
+ * src/main.entrypoint.css — espresso/panel/panel-raised/line/cream/muted/
+ * amber/amber-dim/success/warn/error), converted to oklch so it plugs into
+ * Nuxt UI's semantic surface/text/color-ramp variables. UI-v2 keeps its own
+ * structure, components, density and typography (IBM Plex) — only the
+ * colour character comes from the old UI. See planning/DECISIONS.md for the
+ * hex → token mapping.
+ * Two-voice type: IBM Plex Mono for anything whose identity comes from an
+ * Input/source (titles, names, IDs, paths); IBM Plex Sans for Stashd-authored
+ * prose.
+ */
+
+@theme {
+  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+  /* Corner radii shifted down one step app-wide (mechanical/appliance feel
+     over soft SaaS rounding): rounded-md — the size nearly everything in
+     ui-v2 is built with — now renders at Tailwind's default rounded-sm size. */
+  --radius-md: 0.25rem;
+}
+
+:root {
+  /* Nuxt UI's own component radius (buttons, dropdowns, form controls),
+     shifted down to match the --radius-md reduction above. */
+  --ui-radius: 0.25rem;
+}
+
+:root.dark {
+  /* Surfaces — legacy's four real tones (espresso/panel/panel-raised/line),
+     mapped directly rather than derived from a neutral 50-950 ramp. Legacy
+     only distinguishes four lightness steps; `line` (its one border/divider
+     tone) doubles as both the border colour and the 4th "accented" surface
+     step, since that's the role Nuxt UI already uses bg-accented for. */
+  --ui-bg: oklch(20.95% 0.0099 52.92); /* espresso #1c1714 */
+  --ui-bg-muted: oklch(24.80% 0.0157 71.30); /* panel #262019 */
+  --ui-bg-elevated: oklch(27.79% 0.0176 70.73); /* panel-raised #2e271f */
+  --ui-bg-accented: oklch(31.72% 0.0212 63.94); /* line #3a3027 */
+  --ui-border: oklch(31.72% 0.0212 63.94); /* line #3a3027 */
+  --ui-border-muted: oklch(31.72% 0.0212 63.94);
+  --ui-border-accented: oklch(31.72% 0.0212 63.94);
+
+  /* Text — legacy uses exactly two tones (cream for primary content, muted
+     for secondary). `toned`/`dimmed` are interpolated between the two real
+     anchors so intermediate emphasis still reads, not invented from scratch. */
+  --ui-text-highlighted: oklch(91.89% 0.0223 80.68); /* cream #ece3d4 */
+  --ui-text: oklch(91.89% 0.0223 80.68);
+  --ui-text-toned: oklch(80.4% 0.0315 81);
+  --ui-text-muted: oklch(68.90% 0.0406 81.40); /* muted #a8997f */
+  --ui-text-dimmed: oklch(55% 0.028 76);
+
+  /* Primary — legacy amber (#d99a4e) is the exact dark-mode accent shade
+     (primary-400, the shade --ui-primary aliases to); amber-dim (#a8743a)
+     is the exact pressed/emphasis shade (primary-600). Everything else
+     interpolates/extrapolates between those two real anchors. */
+  --ui-color-primary-50: oklch(97% 0.02 75);
+  --ui-color-primary-100: oklch(94% 0.04 73);
+  --ui-color-primary-200: oklch(88% 0.07 71);
+  --ui-color-primary-300: oklch(81% 0.10 70);
+  --ui-color-primary-400: oklch(73.28% 0.1193 69.11); /* amber #d99a4e */
+  --ui-color-primary-500: oklch(67% 0.11 68);
+  --ui-color-primary-600: oklch(60.09% 0.0991 66.85); /* amber-dim #a8743a */
+  --ui-color-primary-700: oklch(51% 0.085 65);
+  --ui-color-primary-800: oklch(42% 0.07 63);
+  --ui-color-primary-900: oklch(34% 0.055 61);
+  --ui-color-primary-950: oklch(25% 0.04 58);
+
+  /* Success — legacy's one earthy green (#7c9a6b) anchors 400. */
+  --ui-color-success-50: oklch(96% 0.02 139);
+  --ui-color-success-100: oklch(90% 0.035 138);
+  --ui-color-success-200: oklch(83% 0.05 137);
+  --ui-color-success-300: oklch(74% 0.065 136);
+  --ui-color-success-400: oklch(65.09% 0.0754 134.57); /* success #7c9a6b */
+  --ui-color-success-500: oklch(57% 0.075 134);
+  --ui-color-success-600: oklch(49% 0.07 133);
+  --ui-color-success-700: oklch(41% 0.06 132);
+  --ui-color-success-800: oklch(34% 0.05 131);
+  --ui-color-success-900: oklch(28% 0.04 130);
+  --ui-color-success-950: oklch(20% 0.03 129);
+
+  /* Warning — legacy documents this as a distinct token from amber
+     (#c8822f) — more saturated and slightly cooler than the brand accent,
+     not a reuse of primary. Anchors 400. */
+  --ui-color-warning-50: oklch(96% 0.025 75);
+  --ui-color-warning-100: oklch(90% 0.055 72);
+  --ui-color-warning-200: oklch(83% 0.09 70);
+  --ui-color-warning-300: oklch(74% 0.115 68);
+  --ui-color-warning-400: oklch(66.51% 0.1282 66.27); /* warn #c8822f */
+  --ui-color-warning-500: oklch(59% 0.125 64);
+  --ui-color-warning-600: oklch(51% 0.115 62);
+  --ui-color-warning-700: oklch(43% 0.10 60);
+  --ui-color-warning-800: oklch(35% 0.085 58);
+  --ui-color-warning-900: oklch(28% 0.065 56);
+  --ui-color-warning-950: oklch(20% 0.048 54);
+
+  /* Error — legacy's restrained brick red (#a8503e), not a stop-sign red.
+     Anchors 400. */
+  --ui-color-error-50: oklch(94% 0.025 41);
+  --ui-color-error-100: oklch(85% 0.055 39);
+  --ui-color-error-200: oklch(73% 0.09 37);
+  --ui-color-error-300: oklch(62% 0.11 35);
+  --ui-color-error-400: oklch(53.74% 0.1201 32.99); /* error #a8503e */
+  --ui-color-error-500: oklch(47% 0.115 31);
+  --ui-color-error-600: oklch(40% 0.105 29);
+  --ui-color-error-700: oklch(33% 0.09 27);
+  --ui-color-error-800: oklch(27% 0.075 25);
+  --ui-color-error-900: oklch(22% 0.06 23);
+  --ui-color-error-950: oklch(16% 0.045 21);
+}
