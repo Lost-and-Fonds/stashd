@@ -1,0 +1,67 @@
+package stashd:plugin@0.1.0;
+
+interface host {
+    record progress {
+        fraction: f32,
+        stage: string,
+    }
+
+    enum operation {
+        copy,
+        typed-failure,
+        trap,
+    }
+
+    record staged-output {
+        id: string,
+        bytes: u64,
+    }
+
+    variant asset-error {
+        out-of-bounds,
+        read-failed(string),
+    }
+
+    variant staging-error {
+        write-failed(string),
+        already-finished,
+    }
+
+    resource vault-asset {
+        size: func() -> u64;
+        read: func(offset: u64, maximum: u32) -> result<list<u8>, asset-error>;
+    }
+
+    resource staging-output {
+        write: func(bytes: list<u8>) -> result<_, staging-error>;
+        finish: func() -> result<staged-output, staging-error>;
+    }
+
+    report-progress: func(progress: progress);
+    log: func(message: string);
+}
+
+interface plugin {
+    use host.{vault-asset, staging-output, operation};
+    record run-result {
+        output-id: string,
+        output-bytes: u64,
+        source-bytes: u64,
+    }
+
+    variant plugin-error {
+        rejected(string),
+        host-failure(string),
+    }
+
+    run: func(
+        asset: borrow<vault-asset>,
+        staging: borrow<staging-output>,
+        operation: operation,
+    ) -> result<run-result, plugin-error>;
+}
+
+world plugin-world {
+    import host;
+    export plugin;
+}

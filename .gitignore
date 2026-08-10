@@ -13,6 +13,7 @@ composer.phar
 .aider*
 CLAUDE.local.md
 /test-results/
+/target/
 /playwright-report/
 /.env.lerd_override
 .claude/settings.local.json
