@@ -6,6 +6,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Plugins\PluginCredentialGrant;
 use App\Plugins\PluginHostClient;
+use App\Plugins\PluginHttpGrant;
 use App\Providers\Http\FixtureProviderHttpClient;
 use App\Providers\ResolvedInput;
 use App\Providers\StashdUri;
@@ -25,7 +26,14 @@ try {
         'UCStashdDemoCh0012345678',
         $fixtureDirectory,
         'complete',
-        new PluginCredentialGrant('youtube-data-api', $secret),
+        httpGrant: new PluginHttpGrant(
+            [
+                'https://www.googleapis.com/youtube/v3/channels?',
+                'https://www.googleapis.com/youtube/v3/playlistItems?',
+                'https://www.googleapis.com/youtube/v3/videos?',
+            ],
+            new PluginCredentialGrant('youtube-data-api', $secret),
+        ),
     );
 
     $map = json_decode((string) file_get_contents($fixtureDirectory . '/map.json'), true, flags: JSON_THROW_ON_ERROR);

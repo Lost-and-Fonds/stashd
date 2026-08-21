@@ -1,5 +1,5 @@
 wit_bindgen::generate!({
-    path: "../../plugin-api/wit",
+    path: "../../plugin-api/spike-wit",
     world: "plugin-world",
 });
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Plugins\PluginHostClient;
+use App\Plugins\PluginHttpGrant;
 use App\Providers\Http\FixtureProviderHttpClient;
 use App\Providers\StashdUri;
 use App\Providers\YouTube\YouTubeChannelIdResolver;
@@ -20,12 +21,19 @@ if ($socket === null || $component === null || $fixtureDirectory === null || $so
 
 try {
     $client = new PluginHostClient($socket);
-    $resolved = $client->resolveInput($component, $source, $fixtureDirectory);
+    $httpGrant = new PluginHttpGrant([
+        'https://www.youtube.com/@',
+        'https://www.youtube.com/c/',
+        'https://www.youtube.com/user/',
+        'https://www.youtube.com/channel/',
+        'https://www.youtube.com/feeds/videos.xml?channel_id=',
+    ]);
+    $resolved = $client->resolveInput($component, $source, $fixtureDirectory, $httpGrant);
     $inputId = $resolved->resolved['id'] ?? null;
     if (! is_string($inputId)) {
         throw new RuntimeException('plugin returned no input ID');
     }
-    $discovered = $client->discoverInput($component, $inputId, $fixtureDirectory);
+    $discovered = $client->discoverInput($component, $inputId, $fixtureDirectory, httpGrant: $httpGrant);
 
     $map = json_decode((string) file_get_contents($fixtureDirectory . '/map.json'), true, flags: JSON_THROW_ON_ERROR);
     $http = new FixtureProviderHttpClient($fixtureDirectory, $map);

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
+use App\Plugins\PluginCredentialGrant;
 use App\Plugins\PluginHostClient;
+use App\Plugins\PluginHttpGrant;
 
 [$script, $socket, $component, $fixtureDirectory, $operation, $value, $expected, $intent, $credentialName, $credentialValue] = array_pad($argv, 10, null);
 
@@ -15,17 +17,29 @@ if (! is_string($socket) || ! is_string($component) || ! is_string($fixtureDirec
 
 try {
     $client = new PluginHostClient($socket);
+    $prefixes = $operation === 'resolve'
+        ? ['https://www.youtube.com/']
+        : [
+            'https://www.youtube.com/feeds/videos.xml?channel_id=',
+            'https://www.googleapis.com/youtube/v3/channels?',
+            'https://www.googleapis.com/youtube/v3/playlistItems?',
+            'https://www.googleapis.com/youtube/v3/videos?',
+        ];
+    $httpGrant = new PluginHttpGrant(
+        $prefixes,
+        is_string($credentialName) && is_string($credentialValue)
+            ? new PluginCredentialGrant($credentialName, $credentialValue)
+            : null,
+    );
     if ($operation === 'resolve') {
-        $client->resolveInput($component, $value, $fixtureDirectory);
+        $client->resolveInput($component, $value, $fixtureDirectory, $httpGrant);
     } else {
         $client->discoverInput(
             $component,
             $value,
             $fixtureDirectory,
             is_string($intent) ? $intent : 'refresh',
-            is_string($credentialName) && is_string($credentialValue)
-                ? new App\Plugins\PluginCredentialGrant($credentialName, $credentialValue)
-                : null,
+            httpGrant: $httpGrant,
         );
     }
     fwrite(STDERR, "expected plugin error was not returned\n");

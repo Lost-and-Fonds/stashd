@@ -11,7 +11,7 @@ use wasmtime::{Config, Engine, Store};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
 wasmtime::component::bindgen!({
-    path: "../plugin-api/wit",
+    path: "../plugin-api/spike-wit",
     world: "plugin-world",
     with: {
         "stashd:plugin/host/vault-asset": VaultAssetResource,
@@ -26,7 +26,7 @@ use stashd::plugin::host::{self, Host, HostStagingOutput, HostVaultAsset};
 pub struct HttpClientResource;
 pub struct StagingAreaResource;
 
-mod youtube_input_world {
+mod input_world {
     wasmtime::component::bindgen!({
         path: "../plugin-api/wit",
         world: "input-world",
@@ -37,12 +37,12 @@ mod youtube_input_world {
     });
 }
 
-use youtube_input_world::InputWorld;
-use youtube_input_world::exports::stashd::plugin::input_plugin::{
+use input_world::InputWorld;
+use input_world::exports::stashd::plugin::input_plugin::{
     AcquisitionOptions, AcquisitionResult, DiscoveredItem, DiscoveryIntent, MediaKind,
     ResolvedInput,
 };
-use youtube_input_world::stashd::plugin::input_host::{
+use input_world::stashd::plugin::input_host::{
     self as input_host, ArtifactRole, HelperError, HelperResult, Host as InputHost, HostHttpClient,
     HostStagingArea, StagedArtifact, StagingError,
 };
@@ -70,7 +70,7 @@ struct InputState {
     progress: Vec<input_host::Progress>,
     logs: Vec<String>,
     fixture_dir: Option<PathBuf>,
-    credential: Option<CredentialGrant>,
+    http_grants: Vec<HttpGrant>,
     staging_dir: Option<PathBuf>,
     helper: Option<HelperGrant>,
 }
@@ -78,6 +78,11 @@ struct InputState {
 struct CredentialGrant {
     name: String,
     value: String,
+}
+
+struct HttpGrant {
+    allowed_prefixes: Vec<String>,
+    credential: Option<CredentialGrant>,
 }
 
 struct HelperGrant {
@@ -115,8 +120,7 @@ struct Request {
     input_id: Option<String>,
     fixture_dir: Option<PathBuf>,
     intent: Option<String>,
-    credential_name: Option<String>,
-    credential_value: Option<String>,
+    http_grants: Option<Vec<HttpGrantRequest>>,
     staging_dir: Option<PathBuf>,
     helper_name: Option<String>,
     helper_executable: Option<PathBuf>,
@@ -124,6 +128,13 @@ struct Request {
     media_kind: Option<String>,
     include_captions: Option<bool>,
     caption_languages: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct HttpGrantRequest {
+    allowed_prefixes: Vec<String>,
+    credential_name: Option<String>,
+    credential_value: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -298,7 +309,7 @@ impl HostHttpClient for InputState {
         let url = authenticated_url(
             &request.url,
             request.credential.as_deref(),
-            self.credential.as_ref(),
+            &self.http_grants,
         )?;
 
         if let Some(directory) = &self.fixture_dir {
@@ -308,7 +319,7 @@ impl HostHttpClient for InputState {
                     .map_err(|error| input_host::HttpError::Failed(error.to_string()))?,
             )
             .map_err(|error| input_host::HttpError::Failed(error.to_string()))?;
-            let fixture_url = fixture_lookup_url(&url, self.credential.as_ref());
+            let fixture_url = fixture_lookup_url(&url, &self.http_grants);
             let filename = map
                 .get(&fixture_url)
                 .or_else(|| {
@@ -453,59 +464,68 @@ fn fixture_status(filename: &str) -> u16 {
     }
 }
 
-fn fixture_lookup_url(url: &str, grant: Option<&CredentialGrant>) -> String {
-    grant.map_or_else(
-        || url.to_owned(),
-        |grant| url.replace(&format!("&key={}", grant.value), "&key=test-api-key"),
-    )
+fn fixture_lookup_url(url: &str, grants: &[HttpGrant]) -> String {
+    grants.iter().fold(url.to_owned(), |url, grant| {
+        grant.credential.as_ref().map_or(url.clone(), |credential| {
+            url.replace(&format!("&key={}", credential.value), "&key=test-api-key")
+        })
+    })
 }
 
 fn authenticated_url(
     url: &str,
     requested_credential: Option<&str>,
-    grant: Option<&CredentialGrant>,
+    grants: &[HttpGrant],
 ) -> Result<String, input_host::HttpError> {
-    if allowed_youtube_url(url) {
-        if requested_credential.is_some() {
-            return Err(input_host::HttpError::Denied);
-        }
-        return Ok(url.to_owned());
+    if !url.starts_with("https://") {
+        return Err(input_host::HttpError::Denied);
     }
-
-    if !allowed_data_api_url(url) {
+    let prefix_allowed = grants.iter().any(|grant| {
+        grant
+            .allowed_prefixes
+            .iter()
+            .any(|prefix| url.starts_with(prefix))
+    });
+    if !prefix_allowed {
         return Err(input_host::HttpError::Denied);
     }
 
-    let requested = requested_credential.ok_or(input_host::HttpError::CredentialUnavailable)?;
-    let grant = grant.ok_or(input_host::HttpError::CredentialUnavailable)?;
-    if requested != grant.name || grant.name != "youtube-data-api" || grant.value.is_empty() {
-        return Err(input_host::HttpError::CredentialUnavailable);
+    if let Some(requested) = requested_credential {
+        let grant = grants.iter().find_map(|grant| {
+            let credential = grant.credential.as_ref()?;
+            (grant
+                .allowed_prefixes
+                .iter()
+                .any(|prefix| url.starts_with(prefix))
+                && credential.name == requested
+                && !credential.value.is_empty())
+            .then_some(credential)
+        });
+        let grant = grant.ok_or(input_host::HttpError::CredentialUnavailable)?;
+        let mut parsed = url::Url::parse(url)
+            .map_err(|_| input_host::HttpError::Failed("invalid approved URL".to_owned()))?;
+        parsed.query_pairs_mut().append_pair("key", &grant.value);
+        return Ok(parsed.to_string());
     }
 
-    let mut parsed = url::Url::parse(url)
-        .map_err(|_| input_host::HttpError::Failed("invalid approved API URL".to_owned()))?;
-    parsed.query_pairs_mut().append_pair("key", &grant.value);
-    Ok(parsed.to_string())
+    if grants.iter().any(|grant| grant.credential.is_none()) {
+        return Ok(url.to_owned());
+    }
+    Err(input_host::HttpError::CredentialUnavailable)
 }
 
-fn allowed_youtube_url(url: &str) -> bool {
-    let Some(path) = url.strip_prefix("https://www.youtube.com") else {
-        return false;
-    };
-    path.starts_with("/@")
-        || path.starts_with("/c/")
-        || path.starts_with("/user/")
-        || path.starts_with("/channel/")
-        || path.starts_with("/feeds/videos.xml?channel_id=")
-}
-
-fn allowed_data_api_url(url: &str) -> bool {
-    let Some(path) = url.strip_prefix("https://www.googleapis.com/youtube/v3/") else {
-        return false;
-    };
-    path.starts_with("channels?")
-        || path.starts_with("playlistItems?")
-        || path.starts_with("videos?")
+fn into_http_grants(requests: Option<Vec<HttpGrantRequest>>) -> Vec<HttpGrant> {
+    requests
+        .unwrap_or_default()
+        .into_iter()
+        .map(|request| HttpGrant {
+            allowed_prefixes: request.allowed_prefixes,
+            credential: request
+                .credential_name
+                .zip(request.credential_value)
+                .map(|(name, value)| CredentialGrant { name, value }),
+        })
+        .collect()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -516,8 +536,7 @@ fn invoke_input(
     source: Option<&str>,
     input_id: Option<&str>,
     intent: Option<&str>,
-    credential_name: Option<String>,
-    credential_value: Option<String>,
+    http_grant_requests: Option<Vec<HttpGrantRequest>>,
 ) -> Result<(
     Option<ResolvedInput>,
     Option<Vec<DiscoveredItem>>,
@@ -531,9 +550,7 @@ fn invoke_input(
             progress: Vec::new(),
             logs: Vec::new(),
             fixture_dir,
-            credential: credential_name
-                .zip(credential_value)
-                .map(|(name, value)| CredentialGrant { name, value }),
+            http_grants: into_http_grants(http_grant_requests),
             staging_dir: None,
             helper: None,
         },
@@ -592,7 +609,7 @@ fn invoke_acquire(
             progress: Vec::new(),
             logs: Vec::new(),
             fixture_dir: None,
-            credential: None,
+            http_grants: Vec::new(),
             staging_dir,
             helper: helper_name
                 .zip(helper_executable)
@@ -902,8 +919,7 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                     .then_some(request.input_id.as_deref())
                     .flatten(),
                 request.intent.as_deref(),
-                request.credential_name,
-                request.credential_value,
+                request.http_grants,
             );
             let (resolved, items, state) = match result {
                 Ok(result) => result,
@@ -1060,65 +1076,83 @@ fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CredentialGrant, allowed_youtube_url, authenticated_url, input_host};
+    use super::{CredentialGrant, HttpGrant, authenticated_url, input_host};
 
     #[test]
-    fn input_http_capability_allows_only_youtube_channel_requests() {
-        assert!(allowed_youtube_url("https://www.youtube.com/@StashdDemo"));
-        assert!(allowed_youtube_url(
-            "https://www.youtube.com/feeds/videos.xml?channel_id=UCStashdDemoCh0012345678"
+    fn input_http_capability_uses_invocation_supplied_prefix_grants() {
+        let grants = [HttpGrant {
+            allowed_prefixes: vec!["https://source.invalid/feed".to_owned()],
+            credential: None,
+        }];
+        assert!(authenticated_url("https://source.invalid/feed/items", None, &grants).is_ok());
+        assert!(matches!(
+            authenticated_url("https://source.invalid/private", None, &grants),
+            Err(input_host::HttpError::Denied)
         ));
-        assert!(!allowed_youtube_url(
-            "https://www.youtube.com/watch?v=demoVideo01"
+        assert!(matches!(
+            authenticated_url("http://source.invalid/feed", None, &grants),
+            Err(input_host::HttpError::Denied)
         ));
-        assert!(!allowed_youtube_url("https://example.com/anything"));
-        assert!(!allowed_youtube_url("http://www.youtube.com/@StashdDemo"));
     }
 
     #[test]
-    fn credential_use_is_bound_to_the_approved_api_origin_and_grant() {
-        let grant = CredentialGrant {
-            name: "youtube-data-api".to_owned(),
-            value: "fixture-secret-do-not-cross-wasm".to_owned(),
-        };
+    fn credential_use_is_bound_to_the_invocation_grant_and_prefix() {
+        let grants = [HttpGrant {
+            allowed_prefixes: vec!["https://api.invalid/v1/".to_owned()],
+            credential: Some(CredentialGrant {
+                name: "provider-key".to_owned(),
+                value: "fixture-secret".to_owned(),
+            }),
+        }];
         let url = authenticated_url(
-            "https://www.googleapis.com/youtube/v3/videos?id=demoVideo01&part=snippet",
-            Some("youtube-data-api"),
-            Some(&grant),
+            "https://api.invalid/v1/items?id=demo",
+            Some("provider-key"),
+            &grants,
         )
         .expect("approved credential use should succeed");
-        assert!(url.contains("key=fixture-secret-do-not-cross-wasm"));
+        assert!(url.contains("key=fixture-secret"));
         assert!(matches!(
-            authenticated_url(
-                "https://www.googleapis.com/youtube/v3/videos?id=x",
-                None,
-                Some(&grant)
-            ),
+            authenticated_url("https://api.invalid/v1/items?id=x", None, &grants),
             Err(input_host::HttpError::CredentialUnavailable)
         ));
         assert!(matches!(
             authenticated_url(
-                "https://example.com/redirect",
-                Some("youtube-data-api"),
-                Some(&grant)
+                "https://other.invalid/v1/items?id=x",
+                Some("provider-key"),
+                &grants
             ),
             Err(input_host::HttpError::Denied)
         ));
         assert!(matches!(
             authenticated_url(
-                "http://www.googleapis.com/youtube/v3/videos?id=x",
-                Some("youtube-data-api"),
-                Some(&grant)
+                "http://api.invalid/v1/items?id=x",
+                Some("provider-key"),
+                &grants
             ),
             Err(input_host::HttpError::Denied)
         ));
         assert!(matches!(
             authenticated_url(
-                "https://www.youtube.com/@StashdDemo",
-                Some("youtube-data-api"),
-                Some(&grant)
+                "https://api.invalid/v1/items?id=x",
+                Some("other-key"),
+                &grants
             ),
-            Err(input_host::HttpError::Denied)
+            Err(input_host::HttpError::CredentialUnavailable)
+        ));
+    }
+
+    #[test]
+    fn credential_grant_does_not_authorize_a_public_request() {
+        let grants = [HttpGrant {
+            allowed_prefixes: vec!["https://api.invalid/v1/".to_owned()],
+            credential: Some(CredentialGrant {
+                name: "provider-key".to_owned(),
+                value: "fixture-secret".to_owned(),
+            }),
+        }];
+        assert!(matches!(
+            authenticated_url("https://api.invalid/v1/items?id=x", None, &grants),
+            Err(input_host::HttpError::CredentialUnavailable)
         ));
     }
 }

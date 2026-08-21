@@ -4,6 +4,11 @@ Status: EXPERIMENTAL
 
 This is an architectural spike, not the final Stashd Plugin API.
 
+The original Broadcast-shaped spike contract is quarantined under
+`plugin-api/spike-wit/`. It remains only for the trap/failure containment
+regression script and must not be extended or treated as the active semantic
+contract. Active experimental Input WIT lives under `plugin-api/wit/`.
+
 The purpose is to prove or disprove the proposed PHP / Rust / WebAssembly Component Model architecture before designing the stable Plugin API.
 
 Do not prematurely generalize the spike into a complete plugin framework.

@@ -1,3 +1,4 @@
+// Quarantined architecture-spike contract. This is not an active plugin API.
 package stashd:plugin@0.1.0;
 
 interface host {

@@ -103,9 +103,13 @@ final class PluginHostClient
         throw new RuntimeException('Plugin host closed the IPC connection without a result.');
     }
 
-    public function resolveInput(string $componentPath, string $source, ?string $fixtureDirectory = null): PluginInputResult
-    {
-        return $this->invokeInput('input-resolve', $componentPath, $source, null, $fixtureDirectory);
+    public function resolveInput(
+        string $componentPath,
+        string $source,
+        ?string $fixtureDirectory = null,
+        ?PluginHttpGrant $httpGrant = null,
+    ): PluginInputResult {
+        return $this->invokeInput('input-resolve', $componentPath, $source, null, $fixtureDirectory, httpGrant: $httpGrant);
     }
 
     public function discoverInput(
@@ -113,9 +117,9 @@ final class PluginHostClient
         string $inputId,
         ?string $fixtureDirectory = null,
         string $intent = 'refresh',
-        ?PluginCredentialGrant $credential = null,
+        ?PluginHttpGrant $httpGrant = null,
     ): PluginInputResult {
-        return $this->invokeInput('input-discover', $componentPath, null, $inputId, $fixtureDirectory, $intent, $credential);
+        return $this->invokeInput('input-discover', $componentPath, null, $inputId, $fixtureDirectory, $intent, httpGrant: $httpGrant);
     }
 
     /** @param array<string, mixed> $item */
@@ -153,7 +157,7 @@ final class PluginHostClient
         ?string $inputId,
         ?string $fixtureDirectory,
         string $intent = 'refresh',
-        ?PluginCredentialGrant $credential = null,
+        ?PluginHttpGrant $httpGrant = null,
         ?string $stagingDirectory = null,
         ?PluginHelperGrant $helper = null,
         ?array $item = null,
@@ -176,8 +180,11 @@ final class PluginHostClient
             'input_id' => $inputId,
             'fixture_dir' => $fixtureDirectory,
             'intent' => $intent,
-            'credential_name' => $credential?->name,
-            'credential_value' => $credential?->value,
+            'http_grants' => $httpGrant === null ? null : [[
+                'allowed_prefixes' => $httpGrant->allowedPrefixes,
+                'credential_name' => $httpGrant->credential?->name,
+                'credential_value' => $httpGrant->credential?->value,
+            ]],
             'staging_dir' => $stagingDirectory,
             'helper_name' => $helper?->name,
             'helper_executable' => $helper?->executable,
