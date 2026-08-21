@@ -63,7 +63,8 @@ final readonly class DiscoverStashInput
             default => null,
         };
         $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);
-        $discovered = $provider->discover($resolved, $strategy);
+        /** @var list<DiscoveredItem> $discovered */
+        $discovered = $provider->discover($resolved, $strategy, self::providerOptions($payload['provider_options'] ?? null));
 
         if ($sourceTitle === null && $resolved->inputType === 'playlist') {
             $inputTitle = $this->playlistTitle($discovered);
@@ -115,5 +116,22 @@ final readonly class DiscoverStashInput
         }
 
         return null;
+    }
+
+    /** @return array<string, bool|string> */
+    private static function providerOptions(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $options = [];
+        foreach ($value as $key => $option) {
+            if (is_string($key) && (is_bool($option) || is_string($option))) {
+                $options[$key] = $option;
+            }
+        }
+
+        return $options;
     }
 }

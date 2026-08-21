@@ -7,6 +7,7 @@ namespace App\Downloads;
 use App\Config\StashdConfig;
 use App\Providers\StashdUri;
 use App\Stashes\StashId;
+use App\Stashes\StashInputRepository;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashRepository;
 use App\Support\DurationSeconds;
@@ -41,6 +42,7 @@ final readonly class DownloadMediaItem
         private MediaItemRepository $mediaItems,
         private StashRepository $stashes,
         private StashItemRepository $stashItems,
+        private StashInputRepository $stashInputs,
         private AssetRepository $assets,
         private StorageLocationRepository $storageLocations,
         private StorageRootService $storageRoots,
@@ -76,9 +78,15 @@ final readonly class DownloadMediaItem
         $stash = $this->stashes->find($stashId)
             ?? throw DownloadException::withCode('stash_not_found', 'Stash not found.');
 
-        if ($this->stashItems->findByStashAndMediaItem($stashId, $mediaItemId) === null) {
+        $stashItem = $this->stashItems->findByStashAndMediaItem($stashId, $mediaItemId);
+        if ($stashItem === null) {
             throw DownloadException::withCode('stash_item_not_found', 'Media item is not part of the requested stash.');
         }
+
+        $stashInput = $stashItem->stashInputId !== null ? $this->stashInputs->find($stashItem->stashInputId) : null;
+        $providerOptions = $stashInput === null || $stashInput->options === null
+            ? []
+            : $stashInput->options->provider;
 
         $warnings = $this->policy->warningsForExplicitDownload($stash->downloadPolicy);
         $this->policy->assertExplicitDownloadAllowed($stash->downloadPolicy);
@@ -118,6 +126,7 @@ final readonly class DownloadMediaItem
                 thumbnailUri: $mediaItem->thumbnailUri !== null ? StashdUri::parse($mediaItem->thumbnailUri) : null,
                 title: $mediaItem->title,
                 publishedAt: $mediaItem->publishedAt,
+                providerOptions: $providerOptions,
             );
 
             $download = $this->downloader->download($request, $onProgress);

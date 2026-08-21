@@ -21,6 +21,23 @@ test('external operation availability is declared by the plugin manifest', funct
         ->and($definition->operationRequiresHelper('acquire'))->toBeFalse();
 });
 
+test('manifest-declared input options remain generic metadata', function (): void {
+    $definition = ExternalInputPluginDefinition::fromManifest([
+        'id' => 'example-component',
+        'provider_key' => 'example',
+        'component' => 'plugin.wasm',
+        'input_options' => [
+            ['key' => 'include_archived', 'label' => 'Include archived', 'type' => 'bool', 'default' => false],
+            ['key' => 'language', 'label' => 'Language', 'type' => 'text', 'default' => 'en', 'required' => true],
+        ],
+    ], '/tmp/plugins', '/tmp/plugin-host.sock');
+
+    expect($definition->providerKey)->toBe('example')
+        ->and($definition->declaredInputOptions())->toHaveCount(2)
+        ->and($definition->declaredInputOptions()[1]->required)->toBeTrue()
+        ->and($definition->declaredInputOptions()[1]->toArray()['type'])->toBe('text');
+});
+
 test('manifest capabilities are the only declared runtime requirements', function (): void {
     $definition = ExternalInputPluginDefinition::fromManifest([
         'id' => 'capability-backed',

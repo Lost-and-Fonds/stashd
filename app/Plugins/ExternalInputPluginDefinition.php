@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
+use App\Providers\InputOption;
+use App\Providers\InputOptionType;
 use App\System\Secret\SecretsService;
 use RuntimeException;
 
@@ -13,9 +15,11 @@ final readonly class ExternalInputPluginDefinition
      * @param list<string> $sourcePrefixes
      * @param list<array<string, mixed>> $httpGrants
      * @param array<string, list<string>> $operations
+     * @param list<InputOption> $inputOptions
      */
     public function __construct(
         public string $id,
+        public string $providerKey,
         public string $name,
         public string $version,
         public string $componentPath,
@@ -23,6 +27,7 @@ final readonly class ExternalInputPluginDefinition
         public array $sourcePrefixes,
         public array $httpGrants,
         public array $operations,
+        public array $inputOptions,
         public ?string $helperName,
         public ?string $helperExecutable,
     ) {
@@ -38,10 +43,13 @@ final readonly class ExternalInputPluginDefinition
         };
 
         $id = $string($manifest, 'id');
-        $component = self::environmentOverride($manifest, 'component') ?? $string($manifest, 'component');
+        $componentEnvironment = $string($manifest, 'component_environment');
+        $component = $componentEnvironment !== ''
+            ? self::environmentValue($componentEnvironment)
+            : $string($manifest, 'component');
 
-        if ($id === '' || $component === '') {
-            throw new RuntimeException('External Input plugin manifest requires id and component.');
+        if ($id === '') {
+            throw new RuntimeException('External Input plugin manifest requires id.');
         }
 
         $sourcePrefixes = array_values(array_filter(
@@ -54,13 +62,15 @@ final readonly class ExternalInputPluginDefinition
 
         return new self(
             id: $id,
+            providerKey: $string($manifest, 'provider_key', $id),
             name: $string($manifest, 'name', $id),
             version: $string($manifest, 'version', '0.0.0'),
-            componentPath: self::resolvePath($root, $component),
+            componentPath: $component === '' ? '' : self::resolvePath($root, $component),
             socketPath: $socketPath,
             sourcePrefixes: $sourcePrefixes,
             httpGrants: $httpGrants,
             operations: $operations,
+            inputOptions: self::inputOptions($manifest['input_options'] ?? []),
             helperName: $helper !== null ? $string($helper, 'name') : null,
             helperExecutable: $helper !== null
                 ? self::environmentOverride($helper, 'executable')
@@ -169,6 +179,12 @@ final readonly class ExternalInputPluginDefinition
             : null;
     }
 
+    /** @return list<InputOption> */
+    public function declaredInputOptions(): array
+    {
+        return $this->inputOptions;
+    }
+
     private function hasRequirement(string $operation, string $prefix): bool
     {
         foreach ($this->operations[$operation] ?? [] as $requirement) {
@@ -199,6 +215,60 @@ final readonly class ExternalInputPluginDefinition
         $value = self::stringValue($values, $key);
 
         return $value !== '' ? $value : null;
+    }
+
+    private static function environmentValue(string $name): string
+    {
+        $value = getenv($name);
+
+        return is_string($value) ? trim($value) : '';
+    }
+
+    /** @return list<InputOption> */
+    private static function inputOptions(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $options = [];
+        foreach ($value as $raw) {
+            if (! is_array($raw) || ! is_string($raw['key'] ?? null) || ! is_string($raw['label'] ?? null)) {
+                continue;
+            }
+
+            $type = InputOptionType::tryFrom(is_string($raw['type'] ?? null) ? $raw['type'] : '');
+            $default = $raw['default'] ?? null;
+            if ($type === null || ! is_bool($default) && ! is_string($default)) {
+                continue;
+            }
+            if ($type === InputOptionType::Bool && ! is_bool($default)) {
+                continue;
+            }
+            if ($type !== InputOptionType::Bool && ! is_string($default)) {
+                continue;
+            }
+
+            $choices = is_array($raw['choices'] ?? null)
+                ? array_values(array_filter($raw['choices'], static fn (mixed $choice): bool => is_string($choice)))
+                : null;
+            $applicable = is_array($raw['applicable_input_types'] ?? null)
+                ? array_values(array_filter($raw['applicable_input_types'], static fn (mixed $kind): bool => is_string($kind)))
+                : [];
+
+            $options[] = new InputOption(
+                key: $raw['key'],
+                label: $raw['label'],
+                type: $type,
+                default: $default,
+                choices: $choices,
+                applicableInputTypes: $applicable,
+                description: is_string($raw['description'] ?? null) ? $raw['description'] : null,
+                required: ($raw['required'] ?? false) === true,
+            );
+        }
+
+        return $options;
     }
 
     /** @param array<string, mixed> $values */

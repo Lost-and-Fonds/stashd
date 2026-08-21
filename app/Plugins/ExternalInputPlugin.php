@@ -40,7 +40,7 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
 
     public function key(): string
     {
-        return $this->definition->id;
+        return $this->definition->providerKey;
     }
 
     public function name(): string
@@ -50,7 +50,7 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
 
     public function supportsUri(StashdUri $uri): bool
     {
-        if (! is_file($this->definition->componentPath)) {
+        if (! $this->isRuntimeAvailable()) {
             return false;
         }
 
@@ -106,7 +106,11 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
         return [new ProviderStrategy(self::ACQUIRE, StrategyPurpose::Download, StrategyCost::Medium, priority: 10)];
     }
 
-    public function discover(ResolvedInput $input, ProviderStrategy $strategy): array
+    /**
+     * @param array<string, bool|string> $options
+     * @return list<DiscoveredItem>
+     */
+    public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = []): array
     {
         $intent = match ($strategy->key) {
             self::REFRESH => 'refresh',
@@ -119,6 +123,7 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
             $this->fixtureDirectory(),
             $intent,
             $this->definition->httpGrants($this->secrets, $intent),
+            $options,
         );
 
         return array_map(fn (array $item): DiscoveredItem => $this->mapItem($item), $result->items ?? []);
@@ -126,7 +131,7 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
 
     public function isStrategyAvailable(ProviderStrategy $strategy): bool
     {
-        if (! is_file($this->definition->componentPath)) {
+        if (! $this->isRuntimeAvailable()) {
             return false;
         }
 
@@ -140,12 +145,15 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
 
     public function inputOptions(ResolvedInput $input): array
     {
-        return [];
+        return array_values(array_filter(
+            $this->definition->declaredInputOptions(),
+            static fn ($option): bool => $option->applicableInputTypes === [] || in_array($input->inputType, $option->applicableInputTypes, true),
+        ));
     }
 
     public function implementationName(): string
     {
-        return 'plugin:' . $this->key();
+        return 'plugin:' . $this->definition->id;
     }
 
     public function implementationVersion(): string
@@ -156,7 +164,7 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
     public function probe(): DownloadProbeResult
     {
         return new DownloadProbeResult(
-            available: is_file($this->definition->componentPath) && $this->definition->operationAvailable($this->secrets, 'acquire'),
+            available: $this->isRuntimeAvailable() && $this->definition->operationAvailable($this->secrets, 'acquire'),
             implementation: $this->implementationName(),
             implementationVersion: $this->implementationVersion(),
         );
@@ -184,6 +192,7 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
                 ? new PluginHelperGrant($this->definition->helperName ?? $helper, $helper)
                 : null,
             $request->downloadPolicy->value === 'audio_only' ? 'audio' : 'video',
+            $request->providerOptions,
         );
         $artifacts = $result->acquisition['artifacts'] ?? [];
         if (! is_array($artifacts)) {
@@ -214,10 +223,16 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
             sourceUri: $request->canonicalUri,
             attemptedAt: DateTime::now(Timezone::UTC),
             provenance: [
-                'plugin_id' => $this->key(),
+                'plugin_id' => $this->definition->id,
+                'provider_key' => $this->key(),
                 'plugin_version' => $this->definition->version,
             ],
         );
+    }
+
+    public function isRuntimeAvailable(): bool
+    {
+        return $this->definition->componentPath !== '' && is_file($this->definition->componentPath);
     }
 
     /** @param array<string, mixed> $item */

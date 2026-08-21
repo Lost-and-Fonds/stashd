@@ -63,6 +63,7 @@ final readonly class CreateStashFromDiscovery
             'source_uri' => $sourceUri,
             'source_title' => $sourceTitle,
             'origin' => $origin,
+            'provider_options' => is_array($options['provider'] ?? null) ? $options['provider'] : [],
         ], JobIntent::InitialBackfill);
 
         $resolved = $discovered->resolvedInput;

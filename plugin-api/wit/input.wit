@@ -77,6 +77,16 @@ interface input-host {
 interface input-plugin {
     use input-host.{staged-artifact};
 
+    variant option-value {
+        boolean(bool),
+        text(string),
+    }
+
+    record input-option {
+        key: string,
+        value: option-value,
+    }
+
     enum discovery-intent {
         refresh,
         complete,
@@ -89,8 +99,7 @@ interface input-plugin {
 
     record acquisition-options {
         media-kind: media-kind,
-        include-captions: bool,
-        caption-languages: option<string>,
+        options: list<input-option>,
     }
 
     record acquisition-result {
@@ -133,7 +142,7 @@ interface input-plugin {
     }
 
     resolve: func(source: string) -> result<resolved-input, plugin-error>;
-    discover: func(input-id: string, intent: discovery-intent) -> result<list<discovered-item>, plugin-error>;
+    discover: func(input-id: string, intent: discovery-intent, options: list<input-option>) -> result<list<discovered-item>, plugin-error>;
     acquire: func(item: discovered-item, options: acquisition-options) -> result<acquisition-result, plugin-error>;
 }
 

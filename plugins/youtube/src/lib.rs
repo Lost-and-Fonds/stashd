@@ -5,7 +5,7 @@ wit_bindgen::generate!({
 
 use exports::stashd::plugin::input_plugin::{
     AcquisitionOptions, AcquisitionResult, DiscoveredItem, DiscoveryIntent, Error, Guest,
-    MediaKind, PluginError, ResolvedInput,
+    InputOption, MediaKind, OptionValue, PluginError, ResolvedInput,
 };
 use serde_json::Value;
 use stashd::plugin::input_host::{self, ArtifactRole};
@@ -96,10 +96,14 @@ impl Guest for YouTubeInput {
     fn discover(
         input_id: String,
         intent: DiscoveryIntent,
+        options: Vec<InputOption>,
     ) -> Result<Vec<DiscoveredItem>, PluginError> {
         if matches!(intent, DiscoveryIntent::Complete) {
             let client = input_host::open_http_client();
-            return discover_data_api(&client, &input_id);
+            return Ok(filter_items(
+                discover_data_api(&client, &input_id)?,
+                &options,
+            ));
         }
         input_host::report_progress(&input_host::Progress {
             stage: "fetching feed".to_owned(),
@@ -125,7 +129,7 @@ impl Guest for YouTubeInput {
         input_host::report_progress(&input_host::Progress {
             stage: "complete".to_owned(),
         });
-        Ok(items)
+        Ok(filter_items(items, &options))
     }
 
     fn acquire(
@@ -160,13 +164,14 @@ impl Guest for YouTubeInput {
                 "128K".to_owned(),
             ]),
         }
-        if options.include_captions {
+        if option_bool(&options.options, "include_captions") {
             args.extend([
                 "--write-subs".to_owned(),
                 "--sub-format".to_owned(),
                 "vtt".to_owned(),
                 "--sub-langs".to_owned(),
-                options.caption_languages.unwrap_or_else(|| "en".to_owned()),
+                option_text(&options.options, "caption_languages")
+                    .unwrap_or_else(|| "en".to_owned()),
             ]);
         }
         args.push(item.reference.clone());
@@ -215,6 +220,43 @@ impl Guest for YouTubeInput {
         });
         Ok(AcquisitionResult { artifacts })
     }
+}
+
+fn option_bool(options: &[InputOption], key: &str) -> bool {
+    options
+        .iter()
+        .find_map(|option| {
+            if option.key != key {
+                return None;
+            }
+            match &option.value {
+                OptionValue::Boolean(value) => Some(*value),
+                OptionValue::Text(_) => Some(false),
+            }
+        })
+        .unwrap_or(false)
+}
+
+fn option_text(options: &[InputOption], key: &str) -> Option<String> {
+    options.iter().find_map(|option| {
+        if option.key == key
+            && let OptionValue::Text(value) = &option.value
+        {
+            return Some(value.clone());
+        }
+        None
+    })
+}
+
+fn filter_items(mut items: Vec<DiscoveredItem>, options: &[InputOption]) -> Vec<DiscoveredItem> {
+    let include_shorts = option_bool(options, "include_shorts");
+    let include_live = option_bool(options, "include_live");
+    items.retain(|item| match item.kind.as_deref() {
+        Some("short") => include_shorts,
+        Some("live" | "premiere") => include_live,
+        _ => true,
+    });
+    items
 }
 
 fn artifact_kind(file: &str) -> Option<(ArtifactRole, &'static str)> {
@@ -434,6 +476,51 @@ fn discover_data_api(
     });
     input_host::log("YouTube Data API discovery complete");
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn item(kind: Option<&str>) -> DiscoveredItem {
+        DiscoveredItem {
+            id: "item".to_owned(),
+            reference: "https://example.test/item".to_owned(),
+            title: "Item".to_owned(),
+            description: None,
+            published_at: None,
+            artwork_reference: None,
+            duration_seconds: None,
+            kind: kind.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn provider_content_options_filter_classified_items() {
+        let items = vec![
+            item(Some("regular")),
+            item(Some("short")),
+            item(Some("live")),
+            item(Some("premiere")),
+        ];
+        let filtered = filter_items(items.clone(), &[]);
+        assert_eq!(filtered.len(), 1);
+
+        let included = filter_items(
+            items,
+            &[
+                InputOption {
+                    key: "include_shorts".to_owned(),
+                    value: OptionValue::Boolean(true),
+                },
+                InputOption {
+                    key: "include_live".to_owned(),
+                    value: OptionValue::Boolean(true),
+                },
+            ],
+        );
+        assert_eq!(included.len(), 4);
+    }
 }
 
 struct PlaylistEntry {

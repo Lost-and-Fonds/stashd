@@ -21,11 +21,11 @@ final class ProviderRegistry
         YouTubeProvider $youtubeProvider,
         ?ExternalInputPluginRegistry $externalPlugins = null,
     ) {
+        $this->register($fakeProvider);
+        $this->register($youtubeProvider);
         foreach ($externalPlugins?->providers() ?? [] as $plugin) {
             $this->register($plugin);
         }
-        $this->register($fakeProvider);
-        $this->register($youtubeProvider);
     }
 
     public function register(Provider $provider): void

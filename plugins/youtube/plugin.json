@@ -1,5 +1,6 @@
 {
   "id": "youtube-component",
+  "provider_key": "youtube",
   "name": "YouTube Component Input",
   "version": "0.1.0",
   "component": "plugins/youtube/target/wasm32-wasip2/release/stashd_youtube_plugin.wasm",
@@ -46,5 +47,11 @@
     "name": "yt-dlp",
     "executable_environment": "STASHD_PLUGIN_HELPER_EXECUTABLE",
     "executable": "/usr/local/bin/yt-dlp"
-  }
+  },
+  "input_options": [
+    {"key": "include_shorts", "label": "Include Shorts", "type": "bool", "default": false, "applicable_input_types": ["channel"]},
+    {"key": "include_live", "label": "Include live broadcasts and premieres", "type": "bool", "default": false, "applicable_input_types": ["channel"]},
+    {"key": "include_captions", "label": "Include captions", "type": "bool", "default": false},
+    {"key": "caption_languages", "label": "Caption languages", "type": "text", "default": "en"}
+  ]
 }

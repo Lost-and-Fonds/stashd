@@ -25,6 +25,8 @@ final readonly class DownloadRequest
         public ?StashdUri $thumbnailUri = null,
         public ?string $title = null,
         public ?DateTime $publishedAt = null,
+        /** @var array<string, bool|string> */
+        public array $providerOptions = [],
     ) {
     }
 }

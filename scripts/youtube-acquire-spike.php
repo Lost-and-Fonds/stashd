@@ -32,7 +32,7 @@ try {
         $item,
         $staging,
         new PluginHelperGrant('yt-dlp', $helper),
-        includeCaptions: true,
+        options: ['include_captions' => true, 'caption_languages' => 'en'],
     );
     $artifacts = $result->acquisition['artifacts'] ?? [];
     $roles = array_column($artifacts, 'role');

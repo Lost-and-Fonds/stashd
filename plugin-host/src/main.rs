@@ -127,8 +127,22 @@ struct Request {
     helper_executable: Option<PathBuf>,
     item: Option<AcquireItemRequest>,
     media_kind: Option<String>,
-    include_captions: Option<bool>,
-    caption_languages: Option<String>,
+    options: Option<Vec<InputOptionRequest>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct InputOptionRequest {
+    key: String,
+    value: InputOptionValueRequest,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", content = "value")]
+enum InputOptionValueRequest {
+    #[serde(rename = "boolean")]
+    Boolean(bool),
+    #[serde(rename = "text")]
+    Text(String),
 }
 
 #[derive(Debug, Deserialize)]
@@ -550,6 +564,7 @@ fn invoke_input(
     input_id: Option<&str>,
     intent: Option<&str>,
     http_grant_requests: Option<Vec<HttpGrantRequest>>,
+    options: Option<Vec<InputOptionRequest>>,
 ) -> Result<(
     Option<ResolvedInput>,
     Option<Vec<DiscoveredItem>>,
@@ -589,12 +604,13 @@ fn invoke_input(
             "complete" => DiscoveryIntent::Complete,
             other => anyhow::bail!("unsupported discovery intent: {other}"),
         };
+        let options = into_input_options(options.unwrap_or_default());
         (
             None,
             Some(
                 plugin
                     .stashd_plugin_input_plugin()
-                    .call_discover(&mut store, input_id, intent)?
+                    .call_discover(&mut store, input_id, intent, &options)?
                     .map_err(|error| anyhow::anyhow!("plugin input error: {error:?}"))?,
             ),
         )
@@ -611,8 +627,7 @@ fn invoke_acquire(
     helper_executable: Option<PathBuf>,
     item: AcquireItemRequest,
     media_kind: &str,
-    include_captions: bool,
-    caption_languages: Option<String>,
+    options: Vec<InputOptionRequest>,
 ) -> Result<(AcquisitionResult, InputState)> {
     let mut store = Store::new(
         engine,
@@ -655,12 +670,34 @@ fn invoke_acquire(
             &item,
             &AcquisitionOptions {
                 media_kind,
-                include_captions,
-                caption_languages,
+                options: into_input_options(options),
             },
         )?
         .map_err(|error| anyhow::anyhow!("plugin input error: {error:?}"))?;
     Ok((result, store.into_data()))
+}
+
+fn into_input_options(
+    requests: Vec<InputOptionRequest>,
+) -> Vec<input_world::exports::stashd::plugin::input_plugin::InputOption> {
+    requests
+        .into_iter()
+        .map(
+            |request| input_world::exports::stashd::plugin::input_plugin::InputOption {
+                key: request.key,
+                value: match request.value {
+                    InputOptionValueRequest::Boolean(value) => {
+                        input_world::exports::stashd::plugin::input_plugin::OptionValue::Boolean(
+                            value,
+                        )
+                    }
+                    InputOptionValueRequest::Text(value) => {
+                        input_world::exports::stashd::plugin::input_plugin::OptionValue::Text(value)
+                    }
+                },
+            },
+        )
+        .collect()
 }
 
 fn resolved_json(value: &ResolvedInput) -> serde_json::Value {
@@ -868,8 +905,7 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                 request.helper_executable,
                 request.item.context("input acquisition requires item")?,
                 request.media_kind.as_deref().unwrap_or("video"),
-                request.include_captions.unwrap_or(false),
-                request.caption_languages,
+                request.options.unwrap_or_default(),
             ) {
                 Ok(result) => result,
                 Err(error) => {
@@ -933,6 +969,7 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                     .flatten(),
                 request.intent.as_deref(),
                 request.http_grants,
+                request.options,
             );
             let (resolved, items, state) = match result {
                 Ok(result) => result,

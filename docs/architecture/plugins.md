@@ -470,6 +470,13 @@ The experimental semantic contract is intentionally small:
 - `acquire(item, options)` returns generic staged artifact facts for core to
   validate and preserve.
 
+The experimental boundary transports declared Input option values as a small
+generic boolean/text list. Stashd persists and forwards those values without
+interpreting provider-owned keys; the plugin decides what they mean. A
+manifest may declare the option metadata used by the API/UI, while the
+implementation package identity remains separate from the durable logical
+provider identity.
+
 The generic WIT world is named `input-world`; provider identity belongs to the
 plugin package, not the world name.
 

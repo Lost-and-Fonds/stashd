@@ -50,6 +50,7 @@ final readonly class SyncStashInput
             $discovered = $this->discovery->execute([
                 'source_uri' => $input->sourceUri,
                 'source_title' => $input->title,
+                'provider_options' => $input->options === null ? [] : $input->options->provider,
             ], JobIntent::SyncInput);
 
             $counts = new DiscoveredItemCommitCounts();

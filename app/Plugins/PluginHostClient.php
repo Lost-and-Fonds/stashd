@@ -113,26 +113,30 @@ final class PluginHostClient
         return $this->invokeInput('input-resolve', $componentPath, $source, null, $fixtureDirectory, httpGrants: $httpGrants);
     }
 
-    /** @param list<PluginHttpGrant>|null $httpGrants */
+    /** @param list<PluginHttpGrant>|null $httpGrants
+     * @param array<string, bool|string> $options
+     */
     public function discoverInput(
         string $componentPath,
         string $inputId,
         ?string $fixtureDirectory = null,
         string $intent = 'refresh',
         ?array $httpGrants = null,
+        array $options = [],
     ): PluginInputResult {
-        return $this->invokeInput('input-discover', $componentPath, null, $inputId, $fixtureDirectory, $intent, httpGrants: $httpGrants);
+        return $this->invokeInput('input-discover', $componentPath, null, $inputId, $fixtureDirectory, $intent, httpGrants: $httpGrants, options: $this->encodeOptions($options));
     }
 
-    /** @param array<string, mixed> $item */
+    /** @param array<string, mixed> $item
+     * @param array<string, bool|string> $options
+     */
     public function acquireInput(
         string $componentPath,
         array $item,
         string $stagingDirectory,
         ?PluginHelperGrant $helper,
         string $mediaKind = 'video',
-        bool $includeCaptions = false,
-        ?string $captionLanguages = null,
+        array $options = [],
     ): PluginInputResult {
         return $this->invokeInput(
             'input-acquire',
@@ -146,14 +150,14 @@ final class PluginHostClient
             $helper,
             $item,
             $mediaKind,
-            $includeCaptions,
-            $captionLanguages,
+            $this->encodeOptions($options),
         );
     }
 
     /**
      * @param array<string, mixed>|null $item
      * @param list<PluginHttpGrant>|null $httpGrants
+     * @param list<array{key:string,value:array{kind:string,value:bool|string}}>|null $options
      */
     private function invokeInput(
         string $operation,
@@ -167,8 +171,7 @@ final class PluginHostClient
         ?PluginHelperGrant $helper = null,
         ?array $item = null,
         ?string $mediaKind = null,
-        ?bool $includeCaptions = null,
-        ?string $captionLanguages = null,
+        ?array $options = null,
     ): PluginInputResult {
         $error = null;
         $socket = stream_socket_client('unix://' . $this->socketPath, $errorNumber, $error, 5);
@@ -199,8 +202,7 @@ final class PluginHostClient
             'helper_executable' => $helper?->executable,
             'item' => $item,
             'media_kind' => $mediaKind,
-            'include_captions' => $includeCaptions,
-            'caption_languages' => $captionLanguages,
+            'options' => $options,
         ], static fn (mixed $value): bool => $value !== null);
         /** @var list<array{fraction: float, stage: string}> $progress */
         $progress = [];
@@ -254,6 +256,27 @@ final class PluginHostClient
             throw new RuntimeException('Plugin host returned invalid input progress.');
         }
         return ['fraction' => (float) $fraction, 'stage' => $stage];
+    }
+
+    /** @param array<string, mixed> $options
+     * @return list<array{key:string,value:array{kind:string,value:bool|string}}>
+     */
+    private function encodeOptions(array $options): array
+    {
+        $encoded = [];
+        foreach ($options as $key => $value) {
+            if (! is_bool($value) && ! is_string($value)) {
+                continue;
+            }
+            $encoded[] = [
+                'key' => $key,
+                'value' => is_bool($value)
+                    ? ['kind' => 'boolean', 'value' => $value]
+                    : ['kind' => 'text', 'value' => $value],
+            ];
+        }
+
+        return $encoded;
     }
 
     private function inputString(mixed $value, string $field): string

@@ -23,10 +23,10 @@ feature belongs in the Input contract.
 | Upstream failure fallback | Provider strategy selection/fallback varies by failure | Plugin reports the failure; no generic retry/fallback orchestration | Gap to decide from production use |
 | Core deduplication/order/filtering | Existing Stashd machinery | Same existing machinery | Parity proven in lifecycle test |
 | Titles/descriptions/timestamps/duration/artwork | Returned by RSS/Data API and enrichment | Returned as generic discovered-item facts | Parity for fixture fields |
-| Content classification | Includes regular, Shorts, live/premiere classification | Data API classification is returned as generic `kind` | Facts exist; Input options are not yet exposed by the adapter |
+| Content classification | Includes regular, Shorts, live/premiere classification | Data API classification is returned as generic `kind`; declared options are applied inside the Component | Parity for the demonstrated channel options |
 | Video acquisition | ytdlphp/yt-dlp, metadata/source sidecars | Component invokes granted yt-dlp and returns primary, metadata, artwork, captions | Primary path proven; sidecar shape differs |
 | Audio-only acquisition | Format policy and MP3 output | Component owns audio format selection | Fixture path proven |
-| Captions/language selection | Existing downloader/provider options | Component supports caption options, but the application adapter does not yet persist/map YouTube Input options | Gap |
+| Captions/language selection | Existing downloader/provider options | Generic persisted option values are passed opaquely to the Component, which owns yt-dlp flags | Parity for the demonstrated caption path |
 | Provider-specific retry classification | Bot check, rate limit, transient unavailable, timeout | Typed plugin/helper/runtime failures, with less detailed provider classification | Gap |
 | SponsorBlock | Core behavior is keyed to `providerKey === 'youtube'` | Component items currently use `youtube-component` | Transitional coupling remains |
 
@@ -45,12 +45,11 @@ feature belongs in the Input contract.
 
 ## SponsorBlock disposition
 
-`SponsorBlockProviderEligibility` currently accepts only persisted media items
-whose `providerKey` is `youtube`. The external lifecycle uses
-`youtube-component`, so it does not accidentally enter the existing
-SponsorBlock path. Removing the built-in implementation would therefore
-require either a migration/alias for logical YouTube identity or a small
-provider-capability identity change. A full enrichment plugin API is deferred.
+`SponsorBlockProviderEligibility` accepts persisted media items whose logical
+`providerKey` is `youtube`. The external manifest declares that same logical
+key, while retaining `youtube-component` only as implementation provenance.
+Existing SponsorBlock behavior therefore remains unchanged. A full
+enrichment plugin API is deferred.
 
 ## Progress disposition
 
@@ -63,11 +62,15 @@ in WIT. The existing host event capture remains useful for the proof.
 
 ## Identity and source constraint
 
-The experimental manifest currently uses `youtube-component` so the built-in
-`youtube` provider and the external Component can coexist for parity. This is
-an implementation identity, not a settled durable provider identity. Before
-removal, existing `providerKey = youtube` Inputs need an explicit alias or
-migration to the installed Component without creating duplicate MediaItems.
+The manifest uses `provider_key: youtube` for durable routing and `id:
+youtube-component` for implementation provenance. The registry registers the
+built-in provider first and overlays an active external implementation with
+the same logical key. If the component is unavailable, the built-in provider
+remains the fallback; no durable rows are rewritten.
+
+Input options are declared as generic manifest metadata and persisted under
+the existing opaque provider-options map. The generic adapter transports
+boolean/text values; the Component decides what provider-specific keys mean.
 
 The WIT intentionally accepts a plain `source: string`; the application still
 uses `StashdUri` while all current Inputs are URI-shaped. Do not push the WIT
@@ -76,7 +79,7 @@ back toward a URI-only type before a non-URI Input supplies evidence.
 ## Decision
 
 The built-in implementation cannot be removed yet. The external Component is
-the normal implementation for the proven channel lifecycle, but playlists,
-video/Shorts Inputs, provider Input options, richer acquisition parity,
-failure classification, SponsorBlock identity compatibility, and persisted
-identity migration remain unresolved.
+the normal implementation for the proven channel lifecycle and now serves
+logical provider `youtube`, but playlists, video/Shorts Inputs, richer
+acquisition parity, and failure classification remain unresolved. Existing
+`providerKey = youtube` rows do not need migration for the channel path.

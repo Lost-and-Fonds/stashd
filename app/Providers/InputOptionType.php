@@ -8,4 +8,5 @@ enum InputOptionType: string
 {
     case Bool = 'bool';
     case Enum = 'enum';
+    case Text = 'text';
 }

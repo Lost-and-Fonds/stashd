@@ -112,7 +112,8 @@ final class FakeProvider implements Provider
         ];
     }
 
-    public function discover(ResolvedInput $input, ProviderStrategy $strategy): array
+    /** @return list<DiscoveredItem> */
+    public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = []): array
     {
         if ($strategy->key !== 'fake.feed') {
             throw new InvalidArgumentException("Unsupported fake discovery strategy: {$strategy->key}");

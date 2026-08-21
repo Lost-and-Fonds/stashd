@@ -125,7 +125,8 @@ final readonly class YouTubeProvider implements Provider
         ];
     }
 
-    public function discover(ResolvedInput $input, ProviderStrategy $strategy): array
+    /** @return list<DiscoveredItem> */
+    public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = []): array
     {
         return match ($strategy->key) {
             YouTubeRssDiscoveryStrategy::STRATEGY_KEY => $this->rssDiscovery->discover($input),

@@ -26,7 +26,10 @@ interface Provider
     public function downloadStrategies(): array;
 
     /** @return list<DiscoveredItem> */
-    public function discover(ResolvedInput $input, ProviderStrategy $strategy): array;
+    /** @param array<string, bool|string> $options
+     * @return list<DiscoveredItem>
+     */
+    public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = []): array;
 
     public function isStrategyAvailable(ProviderStrategy $strategy): bool;
 

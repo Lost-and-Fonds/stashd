@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Providers;
 
 /**
- * A provider-declared, per-input filter toggle (e.g. YouTube's "include
- * Shorts"). Surfaced through preflight so the review card can render it
- * dynamically — generic UI code never needs to know a provider's option keys.
+ * Generic metadata for a provider-declared per-input option. Surfaced through
+ * preflight so UI code can render it without knowing provider option keys.
  */
 final readonly class InputOption
 {
@@ -27,6 +26,8 @@ final readonly class InputOption
         public ?array $choices = null,
         public array $applicableInputTypes = [],
         public array $excludesContentTypes = [],
+        public ?string $description = null,
+        public bool $required = false,
     ) {
     }
 
@@ -40,6 +41,8 @@ final readonly class InputOption
             'default' => $this->default,
             'choices' => $this->choices,
             'applicable_input_types' => $this->applicableInputTypes,
+            'description' => $this->description,
+            'required' => $this->required,
         ];
     }
 }

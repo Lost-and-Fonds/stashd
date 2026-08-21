@@ -34,6 +34,7 @@ try {
             ],
             new PluginCredentialGrant('youtube-data-api', $secret, 'key'),
         )],
+        options: ['include_shorts' => true, 'include_live' => true],
     );
 
     $map = json_decode((string) file_get_contents($fixtureDirectory . '/map.json'), true, flags: JSON_THROW_ON_ERROR);

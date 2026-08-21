@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
-use App\Providers\Provider;
 use InvalidArgumentException;
 use Tempest\Container\Singleton;
 
@@ -29,7 +28,7 @@ final class ExternalInputPluginRegistry
 
     public function find(string $id): ?ExternalInputPlugin
     {
-        foreach ($this->plugins as $plugin) {
+        foreach ($this->providers() as $plugin) {
             if ($plugin->key() === $id) {
                 return $plugin;
             }
@@ -38,9 +37,12 @@ final class ExternalInputPluginRegistry
         return null;
     }
 
-    /** @return list<Provider> */
+    /** @return list<ExternalInputPlugin> */
     public function providers(): array
     {
-        return $this->plugins;
+        return array_values(array_filter(
+            $this->plugins,
+            static fn (ExternalInputPlugin $plugin): bool => $plugin->isRuntimeAvailable(),
+        ));
     }
 }
