@@ -93,6 +93,7 @@ struct BroadcastState {
     progress: Vec<String>,
     logs: Vec<String>,
     staging_dir: PathBuf,
+    helper: Option<HelperGrant>,
 }
 
 struct CredentialGrant {
@@ -109,6 +110,7 @@ struct HttpGrant {
 struct HelperGrant {
     name: String,
     executable: PathBuf,
+    package_root: Option<PathBuf>,
 }
 
 impl WasiView for HostState {
@@ -154,6 +156,7 @@ struct Request {
     staging_dir: Option<PathBuf>,
     helper_name: Option<String>,
     helper_executable: Option<PathBuf>,
+    helper_package_root: Option<PathBuf>,
     item: Option<AcquireItemRequest>,
     media_kind: Option<String>,
     options: Option<Vec<InputOptionRequest>>,
@@ -258,6 +261,11 @@ enum Response {
     BroadcastPublished {
         id: String,
         publication: serde_json::Value,
+    },
+    #[serde(rename = "broadcast_prepared")]
+    BroadcastPrepared {
+        id: String,
+        preparation: serde_json::Value,
     },
     #[serde(rename = "error")]
     Error {
@@ -368,6 +376,70 @@ impl broadcast_world::stashd::plugin::broadcast_host::Host for BroadcastState {
 }
 
 impl broadcast_world::stashd::plugin::broadcast_host::HostStagingArea for BroadcastState {
+    fn run_helper(
+        &mut self,
+        area: Resource<BroadcastStagingAreaResource>,
+        name: String,
+        args: Vec<String>,
+    ) -> Result<
+        broadcast_world::stashd::plugin::broadcast_host::HelperResult,
+        broadcast_world::stashd::plugin::broadcast_host::HelperError,
+    > {
+        let _ = self.table.get(&area).map_err(|_| {
+            broadcast_world::stashd::plugin::broadcast_host::HelperError::Failed(
+                "staging capability expired".to_owned(),
+            )
+        })?;
+        let helper = self
+            .helper
+            .as_ref()
+            .ok_or(broadcast_world::stashd::plugin::broadcast_host::HelperError::Denied)?;
+        if helper.name != name {
+            return Err(broadcast_world::stashd::plugin::broadcast_host::HelperError::Denied);
+        }
+        let executable = helper.executable.canonicalize().map_err(|error| {
+            broadcast_world::stashd::plugin::broadcast_host::HelperError::Unavailable(
+                error.to_string(),
+            )
+        })?;
+        if let Some(root) = &helper.package_root {
+            let root = root.canonicalize().map_err(|error| {
+                broadcast_world::stashd::plugin::broadcast_host::HelperError::Unavailable(
+                    error.to_string(),
+                )
+            })?;
+            if !executable.starts_with(&root) {
+                return Err(broadcast_world::stashd::plugin::broadcast_host::HelperError::Denied);
+            }
+        }
+        if args.iter().any(|arg| unsafe_helper_argument(arg)) {
+            return Err(broadcast_world::stashd::plugin::broadcast_host::HelperError::Denied);
+        }
+        let before = workspace_files(&self.staging_dir)
+            .map_err(broadcast_world::stashd::plugin::broadcast_host::HelperError::Failed)?;
+        let output = Command::new(executable)
+            .args(args)
+            .current_dir(&self.staging_dir)
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .output()
+            .map_err(|error| {
+                broadcast_world::stashd::plugin::broadcast_host::HelperError::Unavailable(
+                    error.to_string(),
+                )
+            })?;
+        let after = workspace_files(&self.staging_dir)
+            .map_err(broadcast_world::stashd::plugin::broadcast_host::HelperError::Failed)?;
+        Ok(
+            broadcast_world::stashd::plugin::broadcast_host::HelperResult {
+                exit_code: output.status.code().unwrap_or(-1),
+                stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+                files: after.difference(&before).cloned().collect(),
+            },
+        )
+    }
+
     fn write(
         &mut self,
         area: Resource<BroadcastStagingAreaResource>,
@@ -405,9 +477,48 @@ impl broadcast_world::stashd::plugin::broadcast_host::HostStagingArea for Broadc
         )
     }
 
+    fn stage(
+        &mut self,
+        area: Resource<BroadcastStagingAreaResource>,
+        relative_path: String,
+        media_type: Option<String>,
+    ) -> Result<
+        broadcast_world::stashd::plugin::broadcast_host::StagedArtifact,
+        broadcast_world::stashd::plugin::broadcast_host::StagingError,
+    > {
+        let _ = self.table.get(&area).map_err(|_| {
+            broadcast_world::stashd::plugin::broadcast_host::StagingError::Failed(
+                "staging capability expired".to_owned(),
+            )
+        })?;
+        let path = safe_staging_path(&self.staging_dir, &relative_path).ok_or(
+            broadcast_world::stashd::plugin::broadcast_host::StagingError::InvalidReference,
+        )?;
+        let metadata = fs::metadata(&path)
+            .map_err(|_| broadcast_world::stashd::plugin::broadcast_host::StagingError::Missing)?;
+        if !metadata.is_file() {
+            return Err(broadcast_world::stashd::plugin::broadcast_host::StagingError::Missing);
+        }
+        Ok(
+            broadcast_world::stashd::plugin::broadcast_host::StagedArtifact {
+                reference: relative_path,
+                media_type,
+                size_bytes: metadata.len(),
+            },
+        )
+    }
+
     fn drop(&mut self, area: Resource<BroadcastStagingAreaResource>) -> wasmtime::Result<()> {
         Ok(self.table.delete(area).map(|_| ())?)
     }
+}
+
+fn unsafe_helper_argument(argument: &str) -> bool {
+    let path = Path::new(argument);
+    path.is_absolute()
+        || path
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
 }
 
 impl InputHost for InputState {
@@ -578,14 +689,30 @@ fn safe_staging_path(root: &Path, relative: &str) -> Option<PathBuf> {
 
 fn workspace_files(root: &Path) -> Result<std::collections::BTreeSet<String>, String> {
     let mut files = std::collections::BTreeSet::new();
-    for entry in fs::read_dir(root).map_err(|error| error.to_string())? {
-        let entry = entry.map_err(|error| error.to_string())?;
-        if entry
-            .file_type()
-            .map_err(|error| error.to_string())?
-            .is_file()
-        {
-            files.insert(entry.file_name().to_string_lossy().into_owned());
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(&directory).map_err(|error| error.to_string())? {
+            let entry = entry.map_err(|error| error.to_string())?;
+            let path = entry.path();
+            if entry
+                .file_type()
+                .map_err(|error| error.to_string())?
+                .is_dir()
+            {
+                pending.push(path);
+            } else if entry
+                .file_type()
+                .map_err(|error| error.to_string())?
+                .is_file()
+            {
+                files.insert(
+                    path.strip_prefix(root)
+                        .map_err(|error| error.to_string())?
+                        .to_string_lossy()
+                        .trim_start_matches('/')
+                        .to_owned(),
+                );
+            }
         }
     }
     Ok(files)
@@ -761,7 +888,11 @@ fn invoke_acquire(
             staging_dir,
             helper: helper_name
                 .zip(helper_executable)
-                .map(|(name, executable)| HelperGrant { name, executable }),
+                .map(|(name, executable)| HelperGrant {
+                    name,
+                    executable,
+                    package_root: None,
+                }),
         },
     );
     let mut linker = Linker::new(engine);
@@ -892,15 +1023,17 @@ fn broadcast_option(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn invoke_broadcast(
     engine: &Engine,
     component: &Component,
     staging_dir: PathBuf,
     request: BroadcastPublishRequest,
-) -> Result<(
-    broadcast_world::exports::stashd::plugin::broadcast_plugin::Publication,
-    BroadcastState,
-)> {
+    operation: &str,
+    helper_name: Option<String>,
+    helper_executable: Option<PathBuf>,
+    helper_package_root: Option<PathBuf>,
+) -> Result<(serde_json::Value, BroadcastState)> {
     let mut store = Store::new(
         engine,
         BroadcastState {
@@ -909,6 +1042,13 @@ fn invoke_broadcast(
             progress: Vec::new(),
             logs: Vec::new(),
             staging_dir,
+            helper: helper_name
+                .zip(helper_executable)
+                .map(|(name, executable)| HelperGrant {
+                    name,
+                    executable,
+                    package_root: helper_package_root,
+                }),
         },
     );
     let mut linker = Linker::new(engine);
@@ -942,10 +1082,40 @@ fn invoke_broadcast(
                 })
                 .collect(),
         };
-    let result = plugin
-        .stashd_plugin_broadcast_plugin()
-        .call_publish(&mut store, &request)?
-        .map_err(|error| anyhow::anyhow!("broadcast plugin error: {error:?}"))?;
+    let component = plugin.stashd_plugin_broadcast_plugin();
+    let result = if operation == "prepare" {
+        let result = component
+            .call_prepare(&mut store, &request)?
+            .map_err(|error| anyhow::anyhow!("broadcast plugin error: {error:?}"))?;
+        serde_json::json!({
+            "artifacts": result.artifacts.iter().map(|artifact| serde_json::json!({
+                "item_id": artifact.item_id,
+                "reference": artifact.reference,
+                "derived_from_reference": artifact.derived_from_reference,
+                "kind": artifact.kind,
+                "media_type": artifact.media_type,
+                "size_bytes": artifact.size_bytes,
+            })).collect::<Vec<_>>(),
+        })
+    } else {
+        let result = component
+            .call_publish(&mut store, &request)?
+            .map_err(|error| anyhow::anyhow!("broadcast plugin error: {error:?}"))?;
+        serde_json::json!({
+            "artifact": {
+                "reference": result.artifact.reference,
+                "media_type": result.artifact.media_type,
+                "size_bytes": result.artifact.size_bytes,
+            },
+            "published_metadata": result.published_metadata.iter().map(|setting| serde_json::json!({
+                "key": setting.key,
+                "value": match &setting.value {
+                    broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Boolean(value) => serde_json::json!(value),
+                    broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Text(value) => serde_json::json!(value),
+                },
+            })).collect::<Vec<_>>(),
+        })
+    };
     Ok((result, store.into_data()))
 }
 
@@ -1218,7 +1388,7 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                 )?;
             }
         }
-        "broadcast-publish" => {
+        "broadcast-prepare" | "broadcast-publish" => {
             let component_path = request
                 .component_path
                 .as_deref()
@@ -1234,6 +1404,14 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                 &component,
                 staging_dir,
                 request.broadcast.context("broadcast request is required")?,
+                if request.op == "broadcast-prepare" {
+                    "prepare"
+                } else {
+                    "publish"
+                },
+                request.helper_name,
+                request.helper_executable,
+                request.helper_package_root,
             ) {
                 Ok(result) => result,
                 Err(error) => {
@@ -1268,28 +1446,23 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                     },
                 )?;
             }
-            send(
-                stream,
-                Response::BroadcastPublished {
-                    id: request.id,
-                    publication: serde_json::json!({
-                        "artifact": {
-                            "reference": publication.artifact.reference,
-                            "media_type": publication.artifact.media_type,
-                            "size_bytes": publication.artifact.size_bytes,
-                        },
-                        "published_metadata": publication.published_metadata.iter().map(|setting| {
-                            serde_json::json!({
-                                "key": setting.key,
-                                "value": match &setting.value {
-                                    broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Boolean(value) => serde_json::json!(value),
-                                    broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Text(value) => serde_json::json!(value),
-                                },
-                            })
-                        }).collect::<Vec<_>>(),
-                    }),
-                },
-            )?;
+            if request.op == "broadcast-prepare" {
+                send(
+                    stream,
+                    Response::BroadcastPrepared {
+                        id: request.id,
+                        preparation: publication,
+                    },
+                )?;
+            } else {
+                send(
+                    stream,
+                    Response::BroadcastPublished {
+                        id: request.id,
+                        publication,
+                    },
+                )?;
+            }
         }
         "cancel" => send(
             stream,

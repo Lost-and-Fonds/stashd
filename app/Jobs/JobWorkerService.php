@@ -21,7 +21,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
      * An owner that is still alive but hasn't heartbeated for this long is
      * assumed wedged on something no in-process timeout covers (e.g. a dead
      * network mount) and gets killed so its job can be recovered. Every
-     * subprocess boundary (plugin helper, ffmpeg, HTTP) has its own shorter timeout,
+     * subprocess boundary (plugin helper, HTTP) has its own shorter timeout,
      * so a healthy handler can't legitimately go silent this long.
      */
     private const int HARD_STALL_SECONDS = 1800;

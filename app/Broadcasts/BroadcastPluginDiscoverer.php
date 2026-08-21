@@ -6,6 +6,9 @@ namespace App\Broadcasts;
 
 use App\Plugins\ExternalBroadcastPlugin;
 use App\Plugins\ExternalBroadcastPluginRegistry;
+use App\Vault\AssetRepository;
+use App\Vault\MoveFileIntoVault;
+use App\Vault\VaultPathBuilder;
 use Psr\Container\ContainerInterface;
 use Tempest\Discovery\Discovery;
 use Tempest\Discovery\DiscoveryItems;
@@ -64,6 +67,12 @@ final class BroadcastPluginDiscoverer implements Discovery
                 $publications = $this->container->get(PublishedResourceService::class);
                 /** @var PublishedResourceRepository $publicationRecords */
                 $publicationRecords = $this->container->get(PublishedResourceRepository::class);
+                /** @var AssetRepository $assets */
+                $assets = $this->container->get(AssetRepository::class);
+                /** @var MoveFileIntoVault $mover */
+                $mover = $this->container->get(MoveFileIntoVault::class);
+                /** @var VaultPathBuilder $vaultPaths */
+                $vaultPaths = $this->container->get(VaultPathBuilder::class);
                 $instance = new ExternalBroadcastPlugin(
                     definition: $definition,
                     host: $host,
@@ -73,6 +82,9 @@ final class BroadcastPluginDiscoverer implements Discovery
                     transitions: $transitions,
                     publications: $publications,
                     publicationRecords: $publicationRecords,
+                    assets: $assets,
+                    mover: $mover,
+                    vaultPaths: $vaultPaths,
                 );
             } catch (\Throwable $e) {
                 error_log("[stashd] BroadcastPluginDiscoverer: failed to resolve external {$definition->id}: {$e->getMessage()}");

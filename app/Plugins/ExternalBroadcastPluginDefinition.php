@@ -12,6 +12,7 @@ final readonly class ExternalBroadcastPluginDefinition
     /** @param array<int, array<string, mixed>> $uiOptions
      *  @param array<int, array<string, mixed>> $actions
      *  @param array<int, string> $supportedFileKinds
+     *  @param array<string, string> $helpers
      */
     public function __construct(
         public string $id,
@@ -27,10 +28,13 @@ final readonly class ExternalBroadcastPluginDefinition
         public string $outputMediaType,
         public bool $supportsItemRebuild,
         public bool $prunesAfterPublish,
+        public array $helpers,
+        public string $packageRoot,
+        public ?string $prepareHelper,
     ) {
     }
 
-    public static function fromManifest(mixed $raw, string $root, string $socketPath): ?self
+    public static function fromManifest(mixed $raw, string $root, string $socketPath, ?string $manifestDirectory = null): ?self
     {
         if (! is_array($raw) || ! is_string($raw['broadcast_key'] ?? null)) {
             return null;
@@ -64,12 +68,47 @@ final readonly class ExternalBroadcastPluginDefinition
             ? array_values(array_filter($raw['supported_file_kinds'], 'is_string'))
             : ['audio', 'video'];
 
+        $packageRoot = $manifestDirectory !== null ? rtrim($manifestDirectory, '/') : rtrim($root, '/') . '/plugins/' . $required('id');
+        $runtimePackageRoot = $packageRoot;
+        $componentPath = str_starts_with($component, '/') ? $component : rtrim($root, '/') . '/' . ltrim($component, '/');
+        $helpers = [];
+        if (is_array($raw['helpers'] ?? null)) {
+            foreach ($raw['helpers'] as $name => $helper) {
+                if (! is_string($name) || ! is_array($helper) || ! is_string($helper['executable'] ?? null)) {
+                    continue;
+                }
+
+                $relative = trim($helper['executable']);
+                if ($relative === '' || str_starts_with($relative, '/') || str_contains($relative, '..')) {
+                    throw new RuntimeException('External Broadcast plugin helper paths must be package-relative.');
+                }
+
+                $candidate = $packageRoot . '/' . ltrim($relative, '/');
+                if (! is_file($candidate)) {
+                    $componentPackageRoot = dirname($componentPath);
+                    $packageName = basename($packageRoot);
+                    while ($componentPackageRoot !== dirname($componentPackageRoot)) {
+                        if (basename($componentPackageRoot) === $packageName) {
+                            $runtimePackageRoot = $componentPackageRoot;
+                            break;
+                        }
+                        $componentPackageRoot = dirname($componentPackageRoot);
+                    }
+                    if ($runtimePackageRoot === $packageRoot) {
+                        $runtimePackageRoot = rtrim(dirname($componentPath), '/') . '/' . $packageName;
+                    }
+                    $candidate = $runtimePackageRoot . '/' . ltrim($relative, '/');
+                }
+                $helpers[$name] = $candidate;
+            }
+        }
+
         return new self(
             id: $required('id'),
             logicalKey: trim($raw['broadcast_key']),
             name: is_string($raw['name'] ?? null) && trim($raw['name']) !== '' ? trim($raw['name']) : $required('id'),
             version: is_string($raw['version'] ?? null) && trim($raw['version']) !== '' ? trim($raw['version']) : '0.0.0',
-            componentPath: str_starts_with($component, '/') ? $component : rtrim($root, '/') . '/' . ltrim($component, '/'),
+            componentPath: $componentPath,
             socketPath: $socketPath,
             uiOptions: $uiOptions,
             actions: $actions,
@@ -78,11 +117,23 @@ final readonly class ExternalBroadcastPluginDefinition
             outputMediaType: is_string($raw['output_media_type'] ?? null) && trim($raw['output_media_type']) !== '' ? trim($raw['output_media_type']) : 'application/octet-stream',
             supportsItemRebuild: ($raw['supports_item_rebuild'] ?? false) === true,
             prunesAfterPublish: ($raw['prunes_after_publish'] ?? false) === true,
+            helpers: $helpers,
+            packageRoot: $runtimePackageRoot,
+            prepareHelper: is_string($raw['prepare_helper'] ?? null) && trim($raw['prepare_helper']) !== '' ? trim($raw['prepare_helper']) : null,
         );
     }
 
     public function available(): bool
     {
         return is_file($this->componentPath) && file_exists($this->socketPath);
+    }
+
+    public function helperGrant(string $name): ?PluginHelperGrant
+    {
+        $executable = $this->helpers[$name] ?? null;
+
+        return $executable !== null && is_file($executable)
+            ? new PluginHelperGrant($name, $executable, $this->packageRoot)
+            : null;
     }
 }

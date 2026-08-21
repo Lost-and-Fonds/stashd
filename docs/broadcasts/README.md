@@ -1,5 +1,10 @@
 # Broadcasts (Phase 5A + 5B + 5C)
 
+> Current architecture note (2026-08-22): Podcast is now an external
+> Component under `plugins/podcast`. The older route/token/transcode details
+> below are historical Phase 5C notes; current publication uses generic
+> `PublishedResource`, and Podcast's FFmpeg helper is plugin-local.
+
 Broadcasts are **disposable, regeneratable views** of a stash. They do not own canonical media — the Vault remains the source of truth.
 
 Deleting a broadcast is asynchronous. It removes only its marker-owned generated output directory and its broadcast records; the source stash and Vault media remain intact. Stashd refuses deletion when the destination directory is not marked as owned by that broadcast.
@@ -77,39 +82,27 @@ GET /b/{broadcastToken}/items/{itemToken}/episode.{ext}      (public, unauthenti
   - A read failure after the file was already validated as readable (e.g. the file changed mid-request) falls back to the same non-revealing 404 as a missing asset.
 - Covered by `tests/Feature/Phase5CPodcastEpisodeRouteTest.php`.
 
-Video remux/transcode at request time remain future work, a v1 non-goal — this route only ever serves an already-selected, already-ready Vault asset, never generating or converting media itself. Audio extraction is handled asynchronously, ahead of any request — see "Audio transcode fallback" below.
+Video remux/transcode at request time remain future work, a v1 non-goal — this route only ever serves an already-selected, already-ready Vault asset, never generating or converting media itself. Audio derivation is performed by the external Podcast Component before publication.
 
-### Audio transcode fallback
+### Audio derived assets
 
-A podcast configured for audio needs a ready audio Vault asset to publish an episode. If the only Vault original for a media item is video (e.g. the owning stash's download policy is `video`, not `audio_only`), `PodcastBroadcastFormat` no longer fails the item outright — `PodcastTranscodeFallback` automatically queues an ffmpeg-generated MP3 audio asset instead:
+A podcast configured for audio can request an audio representation when only a video Vault asset is available. The external Podcast Component owns the media policy and invokes its package-local native helper through the generic Broadcast staging capability. The host returns a staged artifact; Stashd validates, hashes, and promotes it as a generic derived Asset before the feed is published. The core runtime does not install, configure, or invoke FFmpeg.
 
 ```text
-publish()/verify() find no audio asset
-  -> PodcastTranscodeFallback::triggerIfNeeded($mediaItemId, $kind)
-       - kind = video -> null (no pathway exists yet, a v1 non-goal; see below)
-       - kind = audio:
-           - existing Pending/Processing PodcastAudio asset -> no-op, 'podcast_audio_transcode_pending'
-           - existing Failed PodcastAudio asset -> no auto-retry, 'podcast_audio_transcode_failed'
-           - no ready video VaultOriginal -> null (falls through to the generic unavailable code)
-           - else: create a Pending PodcastAudio asset, dispatch CommandType::AssetTranscodePodcastAudio,
-             return 'podcast_audio_transcode_pending'
-  -> broadcast item marked Failed with that code; episode excluded from this rebuild
+publish() supplies the available generic resources to the Component
+  -> the Component runs its declared helper in the controlled staging area
+  -> core promotes the returned staged artifact as a derived Asset
+  -> the feed uses the resulting published resource
 ```
 
-- The trigger is generic over media kind by design (`PodcastBroadcastFormat`'s call site never special-cases audio vs. video) — `PodcastTranscodeFallback` is the single place that knows which kinds currently have a working pathway, so a future video pathway (if one is ever built) is a new private method there, not a second mechanism elsewhere.
-- The generated asset uses the existing `AssetRole::PodcastAudio` role and `AssetState` machine (`Pending` → `Processing` → `Ready`/`Failed`) — no new state was needed. `derivedFromAssetId` points at the source video asset, so `AssetRegenerationGuidance` already classifies it correctly as generated/regenerable/safe-to-delete with no changes.
-- `TranscodePodcastAudioAsset` (`app/Transcoding/`) does the actual work: probes ffmpeg availability, transcodes to MP3 (128kbps stereo, the engineering spec's stated v1 default — hardcoded, no profile selection), then follows the same temp-stage → checksum → atomic-move-into-Vault → `AssetRecord` finalize sequence every other Vault write uses. `app/Transcoding/Ffmpeg/FfmpegGateway` is Stashd's only boundary to ffmpeg, mirroring the existing `YtdlpGateway` pattern — built directly on `Tempest\Process`, since ffmpeg has no equivalent of the `ytdlphp` wrapper library.
-- Dispatched as a real command (`CommandType::AssetTranscodePodcastAudio`, visible under `/api/v1/commands`), not a bare job — matching the scheduler's own precedent for system-triggered background work.
-- Progress is true live percentage (parsed from ffmpeg's own `-progress` output), not the discrete-checkpoint style every other job uses — `JobProgressUpdate::ofPercent()` carries an ETA, surfaced on both the SSE `job.progress` event and `GET /api/v1/jobs` as `progress_eta_seconds`.
-- On success, broadcasts referencing that media item with `media_kind: audio` are automatically re-rebuilt (`CommandType::BroadcastRebuild`) — the episode reappears without a manual rebuild.
-- Idempotency is asset-state-keyed, not job-table-keyed: a `Pending`/`Processing` `PodcastAudio` row already means "in flight," so a second rebuild attempt while a transcode is running is a no-op rather than a duplicate dispatch.
-- Covered by `tests/Feature/PodcastTranscodeFallbackTest.php`, `tests/Feature/TranscodePodcastAudioAssetTest.php`, and the fallback scenario in `tests/Feature/Phase5CPodcastFeedTest.php`. Opt-in live ffmpeg test: `STASHD_LIVE_FFMPEG_TESTS=1` (`tests/Feature/LiveFfmpegTranscodeTest.php`).
+- The generated asset uses the generic `AssetRole::Derived` role and records its source Asset for provenance and rebuild deduplication. The MP3 profile and helper arguments live in the Podcast Component, not in PHP/core.
+- The helper path is package-relative and host-granted; no request can select an arbitrary executable or Vault path.
 
 ### Funding link detection
 
 Podcast feeds emit iTunes, Atom, `content`, and Podcasting 2.0 namespaces. Descriptions retain line breaks and safely linkify plain HTTP(S) URLs in `content:encoded`; provider HTML is escaped, never trusted. Private feeds emit `<itunes:block>yes</itunes:block>` and `<itunes:duration>` when canonical media duration is known, and a plugin-owned `podcast_guid` is persisted in broadcast settings so `<podcast:guid>` survives feed-token rotation.
 
-Podcast feed metadata supports a `<podcast:funding url="...">` tag. The funding URL is resolved in `PodcastBroadcastPlugin::metadata()`:
+Podcast feed metadata supports a `<podcast:funding url="...">` tag. The external Podcast Component resolves the funding URL from its declared settings and item facts:
 
 1. Manual `settings['funding_url']` on the broadcast, if non-blank — always wins.
 2. Otherwise, `PodcastFundingLinkDetector` scans the descriptions of media items actually included in that rebuild (active stash items with a successfully selected Vault asset) for a recognizable funding link.

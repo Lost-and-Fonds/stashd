@@ -5,6 +5,10 @@
   "version": "0.1.0",
   "component": "plugins/podcast/target/wasm32-wasip2/release/stashd_podcast_plugin.wasm",
   "component_environment": "STASHD_BROADCAST_PLUGIN_COMPONENT",
+  "helpers": {
+    "ffmpeg": {"executable": "helpers/ffmpeg"}
+  },
+  "prepare_helper": "ffmpeg",
   "output_path": "feed.xml",
   "output_media_type": "application/rss+xml",
   "supports_item_rebuild": true,

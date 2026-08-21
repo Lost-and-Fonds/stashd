@@ -335,18 +335,6 @@ parameters:
 		-
 			message: '#^Cannot cast mixed to int\.$#'
 			identifier: cast.int
-			count: 1
-			path: app/Config/ffmpeg.config.php
-
-		-
-			message: '#^Parameter \$binary of class App\\Config\\FfmpegConfig constructor expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Config/ffmpeg.config.php
-
-		-
-			message: '#^Cannot cast mixed to int\.$#'
-			identifier: cast.int
 			count: 2
 			path: app/Config/stashd.config.php
 

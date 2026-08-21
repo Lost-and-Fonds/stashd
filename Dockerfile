@@ -19,6 +19,22 @@ RUN rustup target add wasm32-wasip2 \
 FROM rust AS plugin-runtime
 WORKDIR /plugin-build
 ENV CARGO_BUILD_JOBS=1
+ARG TARGETARCH
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl xz-utils \
+    && rm -rf /var/lib/apt/lists/* \
+    && case "${TARGETARCH}" in \
+        amd64) ffmpegAsset="ffmpeg-release-amd64-static.tar.xz" ;; \
+        arm64) ffmpegAsset="ffmpeg-release-arm64-static.tar.xz" ;; \
+        *) echo "Unsupported architecture for FFmpeg: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -L "https://johnvansickle.com/ffmpeg/releases/${ffmpegAsset}" -o /tmp/ffmpeg.tar.xz \
+    && mkdir -p /tmp/ffmpeg \
+    && tar -xJf /tmp/ffmpeg.tar.xz --strip-components=1 -C /tmp/ffmpeg \
+    && mkdir -p /plugin-output/podcast/helpers \
+    && cp /tmp/ffmpeg/ffmpeg /plugin-output/podcast/helpers/ffmpeg \
+    && chmod a+rx /plugin-output/podcast/helpers/ffmpeg \
+    && rm -rf /tmp/ffmpeg /tmp/ffmpeg.tar.xz
 COPY Cargo.toml Cargo.lock ./
 COPY plugin-api ./plugin-api
 COPY plugin-host ./plugin-host
@@ -62,7 +78,6 @@ RUN apt-get update \
         libsqlite3-dev \
         libpq-dev \
         libicu-dev \
-        ffmpeg \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -115,7 +130,6 @@ COPY docker/entrypoint.sh /usr/local/bin/stashd-entrypoint
 RUN chmod +x /usr/local/bin/stashd-entrypoint
 
 ENV STASHD_HTTP_PORT=8474 \
-    STASHD_FFMPEG_BINARY=ffmpeg \
     STASHD_DATA_PATH=/data \
     STASHD_MEDIA_PATH=/media \
     STASHD_PUBLIC_URL=http://localhost:8474 \

@@ -33,52 +33,93 @@ if [[ -z "$php_bin" && -x /usr/bin/php ]]; then
     php_bin=/usr/bin/php
 fi
 php_bin="${php_bin:-php}"
-"$php_bin" /dev/stdin "$socket" "$root/target/wasm32-wasip2/release/stashd_podcast_plugin.wasm" "$stage_dir" <<'PHP'
+"$php_bin" /dev/stdin "$socket" "$root/target/wasm32-wasip2/release/stashd_podcast_plugin.wasm" "$stage_dir" "$root/tests/fixtures/podcast/fake-ffmpeg.sh" "$root/tests/fixtures/podcast" <<'PHP'
 <?php
 
 $socket = $argv[1] ?? '';
 $component = $argv[2] ?? '';
 $stage = $argv[3] ?? '';
+$helper = $argv[4] ?? '';
+$packageRoot = $argv[5] ?? '';
 $stream = stream_socket_client('unix://' . $socket, $errno, $error, 5);
 if (! is_resource($stream)) {
     throw new RuntimeException($error ?: 'Could not connect to plugin host.');
 }
 
-$request = [
-    'id' => 'podcast-spike',
-    'op' => 'broadcast-publish',
-    'component_path' => $component,
-    'staging_dir' => $stage,
-    'broadcast' => [
-        'reference' => 'broadcast-fixture',
-        'settings' => [
-            ['key' => 'title', 'value' => ['kind' => 'text', 'value' => 'Fixture Podcast']],
-        ],
-        'items' => [[
-            'id' => 'episode-fixture',
-            'title' => 'Fixture Episode',
-            'description' => 'A deterministic fixture episode.',
-            'published_at' => 'Wed, 01 Jan 2025 00:00:00 +0000',
-            'duration_seconds' => 42,
-            'resources' => [[
-                'reference' => 'episode.mp3',
-                'kind' => 'audio',
-                'url' => 'https://stashd.test/published/publication-fixture/access/fixture-credential',
-                'media_type' => 'audio/mpeg',
-                'size_bytes' => 123,
-            ]],
-        ]],
+file_put_contents($stage . '/source-video.mp4', 'fixture-video');
+
+$broadcast = [
+    'reference' => 'broadcast-fixture',
+    'settings' => [
+        ['key' => 'title', 'value' => ['kind' => 'text', 'value' => 'Fixture Podcast']],
+        ['key' => 'media_kind', 'value' => ['kind' => 'text', 'value' => 'audio']],
     ],
+    'items' => [[
+        'id' => 'episode-fixture',
+        'title' => 'Fixture Episode',
+        'description' => 'A deterministic fixture episode.',
+        'published_at' => 'Wed, 01 Jan 2025 00:00:00 +0000',
+        'duration_seconds' => 42,
+        'resources' => [[
+            'reference' => 'source-video.mp4',
+            'kind' => 'video',
+            'url' => 'https://stashd.test/published/source/access/video',
+            'media_type' => 'video/mp4',
+            'size_bytes' => 123,
+        ]],
+    ]],
 ];
 
-fwrite($stream, json_encode($request, JSON_THROW_ON_ERROR) . "\n");
+$prepare = [
+    'id' => 'podcast-prepare-spike',
+    'op' => 'broadcast-prepare',
+    'component_path' => $component,
+    'staging_dir' => $stage,
+    'helper_name' => 'ffmpeg',
+    'helper_executable' => $helper,
+    'helper_package_root' => $packageRoot,
+    'broadcast' => $broadcast,
+];
+
+fwrite($stream, json_encode($prepare, JSON_THROW_ON_ERROR) . "\n");
 $events = [];
 while (($line = fgets($stream)) !== false) {
     $events[] = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
 }
 fclose($stream);
 
-$publication = array_values(array_filter($events, static fn (array $event): bool => ($event['event'] ?? null) === 'broadcast_published'))[0]['publication'] ?? null;
+$preparation = array_values(array_filter($events, static fn (array $event): bool => ($event['event'] ?? null) === 'broadcast_prepared'))[0]['preparation'] ?? null;
+$derived = $preparation['artifacts'][0]['reference'] ?? null;
+if (! is_string($derived) || ! is_file($stage . '/' . $derived)) {
+    throw new RuntimeException('Podcast Component did not return a staged audio artifact.');
+}
+
+$publishStream = stream_socket_client('unix://' . $socket, $errno, $error, 5);
+if (! is_resource($publishStream)) {
+    throw new RuntimeException($error ?: 'Could not reconnect to plugin host.');
+}
+$publish = [
+    'id' => 'podcast-publish-spike',
+    'op' => 'broadcast-publish',
+    'component_path' => $component,
+    'staging_dir' => $stage,
+    'broadcast' => $broadcast,
+];
+$publish['broadcast']['items'][0]['resources'] = [[
+    'reference' => $derived,
+    'kind' => 'audio',
+    'url' => 'https://stashd.test/published/publication-fixture/access/fixture-credential',
+    'media_type' => 'audio/mpeg',
+    'size_bytes' => filesize($stage . '/' . $derived),
+]];
+fwrite($publishStream, json_encode($publish, JSON_THROW_ON_ERROR) . "\n");
+$publishEvents = [];
+while (($line = fgets($publishStream)) !== false) {
+    $publishEvents[] = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+}
+fclose($publishStream);
+
+$publication = array_values(array_filter($publishEvents, static fn (array $event): bool => ($event['event'] ?? null) === 'broadcast_published'))[0]['publication'] ?? null;
 $reference = $publication['artifact']['reference'] ?? null;
 if (! is_string($reference) || ! is_file($stage . '/' . $reference)) {
     throw new RuntimeException('Podcast Component did not return a staged feed.');

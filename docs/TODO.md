@@ -137,7 +137,7 @@
 - [x] Phase 4A pipeline unchanged: temp → batch ingest → checksum → Vault → sidecars
 - [x] Tests: `tests/Unit/Services/Download/YtdlpDownloaderTest.php`, `tests/Feature/YtdlpDownloadTest.php`
 - [x] Opt-in live probe test: `STASHD_LIVE_DOWNLOAD_TESTS=1` (`tests/Feature/LiveYtdlpDownloadTest.php`)
-- [x] Docker: yt-dlp + ffmpeg + PHP `uri` extension; smoke still uses fake provider
+- [x] Docker: yt-dlp + PHP `uri` extension; the bundled Podcast plugin packages its own FFmpeg helper
 - [x] Docker build: PHP 8.5 bundled `uri` extension verified without `docker-php-ext-install uri`
 - [x] Docs updated (`docs/providers/README.md`, `docs/storage/README.md`)
 
@@ -172,7 +172,7 @@
 - [x] Docs: `docs/broadcasts/README.md`, `docs/media-servers/README.md`
 - [ ] Optional live media-server tests: `STASHD_LIVE_MEDIA_SERVER_TESTS=1`
 
-### Phase 5C — Private podcast broadcasts (complete — transcode/remux deferred)
+### Phase 5C — Private podcast broadcasts (historical; replaced by external Component)
 
 - [x] Podcast feed and item token foundation with encrypted storage
 - [x] Authenticated podcast feed URL exposure
@@ -209,9 +209,7 @@
   - Covered by `tests/Unit/Broadcasts/Podcasts/PodcastFundingLinkDetectorTest.php` and `tests/Feature/Phase5CPodcastFeedTest.php`
   - Deferred: channel/about-page scraping, YouTube membership, Nebula, creator-website, merch-store, and Substack/Open Collective detection, and the "first plausible link" fallback from the engineering spec's full priority list
 - [x] Unified `audio_podcast`/`video_podcast` into a single `BroadcastType::Podcast` with a per-broadcast `settings.media_kind` (`audio`|`video`, defaults to audio) — `AudioPodcastBroadcast`/`VideoPodcastBroadcast` (two ~25-line subclasses differing only in which selector method/error code they used) deleted; `PodcastBroadcastFormat` is now the sole concrete implementation. Every downstream `in_array($type, [AudioPodcast, VideoPodcast])`/`type = ? OR type = ?` collapsed to one check. No DB migration — no existing users/data.
-- [x] Audio transcode fallback: a podcast configured for audio with only a ready video Vault original (e.g. a `video`-policy stash) no longer fails outright — `PodcastTranscodeFallback` automatically queues an ffmpeg-generated MP3 audio asset (`AssetRole::PodcastAudio`, 128kbps stereo, the spec's stated v1 default) and the affected broadcast auto-rebuilds once it's ready. New `app/Transcoding/` domain + `FfmpegGateway` boundary (mirrors `YtdlpGateway`, built directly on `Tempest\Process` since ffmpeg has no `ytdlphp`-equivalent wrapper). Dispatched as a real command (`CommandType::AssetTranscodePodcastAudio`), not a bare job, matching the scheduler's own precedent. See `docs/broadcasts/README.md`'s "Audio transcode fallback" section for the full design.
-  - Finished wiring `progressRate`/`progressEtaSeconds` — `JobRecord` columns that existed but were never set by `JobWorkerService::progress()` nor serialized by `EventPublisher::jobProgress()`/`JobResource`. New `JobProgressUpdate` value object (`ofSteps()`/`ofPercent()`) replaces the old `progress(current, total, label)` signature everywhere (7 handler files migrated); this is the first job needing true percent+ETA progress rather than discrete steps.
-  - Covered by `tests/Feature/PodcastTranscodeFallbackTest.php`, `tests/Feature/TranscodePodcastAudioAssetTest.php`, the fallback scenario in `tests/Feature/Phase5CPodcastFeedTest.php`, and `tests/Unit/Domain/Jobs/JobProgressUpdateTest.php`. Opt-in live test: `STASHD_LIVE_FFMPEG_TESTS=1` (`tests/Feature/LiveFfmpegTranscodeTest.php`) — confirmed ffmpeg is present in the runtime container, but live-toggling this specific opt-in flag wasn't exercised end-to-end in the session that built this.
+- [x] Audio derived assets are owned by the external Podcast Component. The Component requests a package-local native helper and returns a staged artifact; core validates and promotes the result as a generic derived Asset. The old PHP transcoder/fallback was intentionally removed.
 - [ ] Video transcode/remux broadcast policies (still deferred — separate future initiative, a v1 non-goal; requires explicit sign-off per `AGENTS.md`'s "ask before enabling copies/transcoding by default")
   - `stashes.videoQualityProfileId`/`audioQualityProfileId` columns exist but are unused — only meaningful once this work exists
   - `BroadcastPlan::estimatedCopyBytes` stays hardcoded at `0` until generated-media (podcast audio/video) work exists; `0` is already correct for hardlink-only broadcast types in the meantime

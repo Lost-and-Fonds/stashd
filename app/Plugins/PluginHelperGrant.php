@@ -9,6 +9,7 @@ final readonly class PluginHelperGrant
     public function __construct(
         public string $name,
         public string $executable,
+        public ?string $packageRoot = null,
     ) {
     }
 }

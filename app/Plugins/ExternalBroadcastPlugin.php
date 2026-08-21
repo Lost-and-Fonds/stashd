@@ -28,9 +28,16 @@ use App\Broadcasts\UiControl;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\StashItemId;
 use App\System\State\StateTransitionService;
+use App\Vault\AssetId;
+use App\Vault\AssetKind;
 use App\Vault\AssetRecord;
+use App\Vault\AssetRepository;
+use App\Vault\AssetRole;
 use App\Vault\AssetState;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
+use App\Vault\MoveFileIntoVault;
+use App\Vault\VaultPathBuilder;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
@@ -50,6 +57,9 @@ final readonly class ExternalBroadcastPlugin implements
         private StateTransitionService $transitions,
         private PublishedResourceService $publications,
         private PublishedResourceRepository $publicationRecords,
+        private AssetRepository $assets,
+        private MoveFileIntoVault $mover,
+        private VaultPathBuilder $vaultPaths,
     ) {
     }
 
@@ -105,6 +115,11 @@ final readonly class ExternalBroadcastPlugin implements
     public function publish(BroadcastContext $context, BroadcastPlan $plan): BroadcastPublishResult
     {
         $this->paths->claimRoot($context->broadcast);
+        $stage = sys_get_temp_dir() . '/stashd-broadcast-plugin-' . bin2hex(random_bytes(8));
+        if (! mkdir($stage, 0o775, true) && ! is_dir($stage)) {
+            throw BroadcastException::withCode('broadcast_plugin_staging_failed', 'Broadcast plugin staging could not be created.');
+        }
+
         $output = $this->publications->publishFile(
             $context->broadcast,
             $this->definition->outputPath,
@@ -114,6 +129,7 @@ final readonly class ExternalBroadcastPlugin implements
         $settings = $this->settings($context);
         $settings[] = ['key' => 'publication_url', 'value' => ['kind' => 'text', 'value' => $this->publications->url($output)]];
         $items = [];
+        $stagedAssets = [];
         $failed = [];
 
         foreach ($this->contexts->publishableStashItems($context) as $stashItem) {
@@ -129,7 +145,7 @@ final readonly class ExternalBroadcastPlugin implements
                 continue;
             }
 
-            $resources = $this->resources($context->broadcast, $media);
+            $resources = $this->resources($context->broadcast, $media, $stage, $stagedAssets);
             if ($resources === []) {
                 $this->failItem($item, 'resource_unavailable');
                 $failed[] = (string) $stashItem->id;
@@ -147,12 +163,52 @@ final readonly class ExternalBroadcastPlugin implements
             ];
         }
 
-        $stage = sys_get_temp_dir() . '/stashd-broadcast-plugin-' . bin2hex(random_bytes(8));
-        if (! mkdir($stage, 0o775, true) && ! is_dir($stage)) {
-            throw BroadcastException::withCode('broadcast_plugin_staging_failed', 'Broadcast plugin staging could not be created.');
-        }
-
         try {
+            $request = [
+                'reference' => (string) $context->broadcast->id,
+                'settings' => $settings,
+                'items' => $items,
+            ];
+            $prepared = $this->host->prepareBroadcast(
+                $this->definition->componentPath,
+                $stage,
+                $request,
+                $this->definition->prepareHelper === null ? null : $this->definition->helperGrant($this->definition->prepareHelper),
+            );
+            $artifacts = $prepared->publication['artifacts'] ?? [];
+            if (! is_array($artifacts)) {
+                throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned invalid preparation data.');
+            }
+            $validArtifacts = [];
+            foreach ($artifacts as $artifact) {
+                if (is_array($artifact)) {
+                    /** @var array<string, mixed> $artifact */
+                    $validArtifacts[] = $artifact;
+                }
+            }
+            /** @var list<array<string, mixed>> $validArtifacts */
+            $this->promoteDerivedArtifacts($context, $stage, $validArtifacts, $stagedAssets);
+
+            $items = [];
+            foreach ($this->contexts->publishableStashItems($context) as $stashItem) {
+                $media = $context->mediaItems[(string) $stashItem->mediaItemId] ?? null;
+                if (! $media instanceof MediaItemRecord) {
+                    continue;
+                }
+                $item = $this->items->findByBroadcastAndStashItem(BroadcastId::fromPrimaryKey($context->broadcast->id), StashItemId::fromPrimaryKey($stashItem->id));
+                if (! $item instanceof BroadcastItemRecord || $item->state !== BroadcastItemState::Ready) {
+                    continue;
+                }
+                $items[] = [
+                    'id' => (string) $item->id,
+                    'title' => $media->title ?? $stashItem->displayTitle ?? 'Untitled',
+                    'description' => $media->description ?? $stashItem->displayDescription,
+                    'published_at' => ($media->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
+                    'duration_seconds' => null,
+                    'resources' => $this->resources($context->broadcast, $media),
+                ];
+            }
+
             $result = $this->host->publishBroadcast($this->definition->componentPath, $stage, [
                 'reference' => (string) $context->broadcast->id,
                 'settings' => $settings,
@@ -171,10 +227,7 @@ final readonly class ExternalBroadcastPlugin implements
         } catch (\Throwable $exception) {
             throw BroadcastException::withCode('broadcast_plugin_unavailable', 'External Broadcast plugin execution failed.', $exception);
         } finally {
-            foreach (glob($stage . '/*') ?: [] as $path) {
-                @unlink($path);
-            }
-            @rmdir($stage);
+            $this->removeStage($stage);
         }
 
         return new BroadcastPublishResult(1, count($failed), [$this->paths->broadcastFile($context->broadcast, ...explode('/', $this->definition->outputPath))], $failed);
@@ -273,8 +326,10 @@ final readonly class ExternalBroadcastPlugin implements
         throw BroadcastException::withCode('broadcast_action_unsupported', 'Broadcast action is unsupported.');
     }
 
-    /** @return list<array{reference: string, kind: string, url: string, media_type: ?string, size_bytes: int}> */
-    private function resources(BroadcastRecord $broadcast, MediaItemRecord $media): array
+    /** @param array<string, AssetRecord> $stagedAssets
+     *  @return list<array{reference: string, kind: string, url: string, media_type: ?string, size_bytes: int}>
+     */
+    private function resources(BroadcastRecord $broadcast, MediaItemRecord $media, ?string $stage = null, array &$stagedAssets = []): array
     {
         $resources = [];
         foreach (AssetRecord::select()->where('mediaItemId', (string) $media->id)->all() as $asset) {
@@ -282,8 +337,21 @@ final readonly class ExternalBroadcastPlugin implements
                 continue;
             }
             $publication = $this->publications->publishAsset($broadcast, $asset, $asset->mimeType ?? 'application/octet-stream', 'credential');
+            $reference = (string) $asset->id;
+            if ($stage !== null) {
+                $extension = pathinfo($asset->path, PATHINFO_EXTENSION) ?: 'bin';
+                $reference = 'resources/' . (string) $asset->id . '.' . $extension;
+                $destination = $stage . '/' . $reference;
+                if (! is_dir(dirname($destination))) {
+                    mkdir(dirname($destination), 0o775, true);
+                }
+                if (! copy($asset->path, $destination)) {
+                    throw BroadcastException::withCode('broadcast_plugin_staging_failed', 'Broadcast asset could not be staged.');
+                }
+                $stagedAssets[$reference] = $asset;
+            }
             $resources[] = [
-                'reference' => (string) $asset->id,
+                'reference' => $reference,
                 'kind' => $asset->kind->value,
                 'url' => $this->publications->url($publication),
                 'media_type' => $asset->mimeType,
@@ -291,6 +359,76 @@ final readonly class ExternalBroadcastPlugin implements
             ];
         }
         return $resources;
+    }
+
+    /** @param list<array<string, mixed>> $artifacts
+     *  @param array<string, AssetRecord> $stagedAssets
+     */
+    private function promoteDerivedArtifacts(BroadcastContext $context, string $stage, array $artifacts, array $stagedAssets): void
+    {
+        foreach ($artifacts as $artifact) {
+            $reference = $artifact['reference'] ?? null;
+            $itemId = $artifact['item_id'] ?? null;
+            $sourceReference = $artifact['derived_from_reference'] ?? null;
+            $kind = $artifact['kind'] ?? null;
+            if (! is_string($reference) || ! is_string($itemId) || ! is_string($sourceReference) || ! is_string($kind)) {
+                throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an invalid derived artifact.');
+            }
+            $source = $stagedAssets[$sourceReference] ?? null;
+            $sourceId = $source?->id;
+            $stagePath = $stage . '/' . $reference;
+            if (! $source instanceof AssetRecord || $sourceId === null || ! is_file($stagePath)) {
+                throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an unavailable derived artifact.');
+            }
+            $media = $context->mediaItems[$this->itemMediaId($context, $itemId)] ?? null;
+            if (! $media instanceof MediaItemRecord) {
+                throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an artifact for an unknown item.');
+            }
+            $assetKind = AssetKind::tryFrom($kind) ?? AssetKind::Other;
+            $extension = pathinfo($reference, PATHINFO_EXTENSION) ?: 'bin';
+            $destination = $this->vaultPaths->vaultFile((string) $media->providerKey, (string) $media->providerItemId, 'derived-' . $extension);
+            $existing = AssetRecord::select()->where('mediaItemId', (string) $media->id)->where('role', AssetRole::Derived)->where('kind', $assetKind)->first();
+            if ($existing instanceof AssetRecord && $existing->state === AssetState::Ready && $existing->path !== null && is_file($existing->path)) {
+                continue;
+            }
+            if ($existing instanceof AssetRecord && $existing->path !== null && is_file($existing->path)) {
+                @unlink($existing->path);
+            }
+            $this->mover->moveIntoPlace($stagePath, $destination);
+            if ($existing instanceof AssetRecord) {
+                $existing->path = $destination;
+                $existing->relativePath = $this->vaultPaths->relativeFile((string) $media->providerKey, (string) $media->providerItemId, basename($destination));
+                $existing->mimeType = is_string($artifact['media_type'] ?? null) ? $artifact['media_type'] : null;
+                $existing->sizeBytes = filesize($destination) ?: null;
+                $existing->checksum = hash_file('sha256', $destination) ?: null;
+                $existing->derivedFromAssetId = AssetId::fromPrimaryKey($sourceId);
+                $existing->state = AssetState::Ready;
+                $this->assets->save($existing);
+                continue;
+            }
+            $asset = $this->assets->create(MediaItemId::fromPrimaryKey($media->id), AssetRole::Derived, $assetKind, AssetState::Ready, $destination, $this->vaultPaths->relativeFile((string) $media->providerKey, (string) $media->providerItemId, basename($destination)), is_string($artifact['media_type'] ?? null) ? $artifact['media_type'] : null, $extension, filesize($destination) ?: null, hash_file('sha256', $destination) ?: null);
+            $asset->derivedFromAssetId = AssetId::fromPrimaryKey($sourceId);
+            $this->assets->save($asset);
+        }
+    }
+
+    private function itemMediaId(BroadcastContext $context, string $broadcastItemId): string
+    {
+        foreach ($this->contexts->publishableStashItems($context) as $stashItem) {
+            $item = $this->items->findByBroadcastAndStashItem(BroadcastId::fromPrimaryKey($context->broadcast->id), StashItemId::fromPrimaryKey($stashItem->id));
+            if ((string) $item?->id === $broadcastItemId) {
+                return (string) $stashItem->mediaItemId;
+            }
+        }
+        return '';
+    }
+
+    private function removeStage(string $stage): void
+    {
+        foreach (glob($stage . '/*') ?: [] as $path) {
+            is_dir($path) ? $this->removeStage($path) : @unlink($path);
+        }
+        @rmdir($stage);
     }
 
     /** @return list<array{key: string, value: array{kind: string, value: bool|string}}> */

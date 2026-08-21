@@ -25,7 +25,7 @@ final class ExternalBroadcastPluginRegistryInitializer implements Initializer
                 throw new RuntimeException("Invalid external plugin manifest: {$manifestPath}");
             }
 
-            $definition = ExternalBroadcastPluginDefinition::fromManifest($manifest, $root, $socket);
+            $definition = ExternalBroadcastPluginDefinition::fromManifest($manifest, $root, $socket, dirname($manifestPath));
             if ($definition !== null) {
                 $plugins[] = $definition;
             }

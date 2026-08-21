@@ -14,4 +14,5 @@ enum AssetRole: string
     case Hardlink = 'hardlink';
     case MetadataJson = 'metadata_json';
     case SourceJson = 'source_json';
+    case Derived = 'derived';
 }

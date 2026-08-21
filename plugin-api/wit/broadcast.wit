@@ -1,6 +1,19 @@
 package stashd:plugin@0.1.0;
 
 interface broadcast-host {
+    record helper-result {
+        exit-code: s32,
+        stdout: string,
+        stderr: string,
+        files: list<string>,
+    }
+
+    variant helper-error {
+        denied,
+        unavailable(string),
+        failed(string),
+    }
+
     record staged-artifact {
         reference: string,
         media-type: option<string>,
@@ -9,11 +22,14 @@ interface broadcast-host {
 
     variant staging-error {
         invalid-reference,
+        missing,
         failed(string),
     }
 
     resource staging-area {
+        run-helper: func(name: string, args: list<string>) -> result<helper-result, helper-error>;
         write: func(relative-path: string, content: list<u8>, media-type: option<string>) -> result<staged-artifact, staging-error>;
+        stage: func(relative-path: string, media-type: option<string>) -> result<staged-artifact, staging-error>;
     }
 
     open-staging-area: func() -> staging-area;
@@ -66,6 +82,19 @@ interface broadcast-plugin {
         published-metadata: list<setting>,
     }
 
+    record derived-artifact {
+        item-id: string,
+        reference: string,
+        derived-from-reference: string,
+        kind: string,
+        media-type: option<string>,
+        size-bytes: u64,
+    }
+
+    record preparation {
+        artifacts: list<derived-artifact>,
+    }
+
     record error {
         message: string,
         retryable: bool,
@@ -79,6 +108,7 @@ interface broadcast-plugin {
         failed(error),
     }
 
+    prepare: func(request: publish-request) -> result<preparation, plugin-error>;
     publish: func(request: publish-request) -> result<publication, plugin-error>;
 }
 

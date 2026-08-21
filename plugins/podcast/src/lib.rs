@@ -4,13 +4,79 @@ wit_bindgen::generate!({
 });
 
 use exports::stashd::plugin::broadcast_plugin::{
-    Artifact, Error, Guest, Item, OptionValue, PluginError, Publication, PublishRequest, Setting,
+    Artifact, DerivedArtifact, Error, Guest, Item, OptionValue, PluginError, Preparation,
+    Publication, PublishRequest, Setting,
 };
 use stashd::plugin::broadcast_host;
 
 struct PodcastBroadcast;
 
 impl Guest for PodcastBroadcast {
+    fn prepare(request: PublishRequest) -> Result<Preparation, PluginError> {
+        let media_kind =
+            setting_text(&request.settings, "media_kind").unwrap_or_else(|| "audio".to_owned());
+        if media_kind != "audio" {
+            return Ok(Preparation { artifacts: vec![] });
+        }
+
+        let staging = broadcast_host::open_staging_area();
+        let mut artifacts = Vec::new();
+        for item in &request.items {
+            if item
+                .resources
+                .iter()
+                .any(|resource| resource.kind == "audio")
+            {
+                continue;
+            }
+            let Some(video) = item
+                .resources
+                .iter()
+                .find(|resource| resource.kind == "video")
+            else {
+                continue;
+            };
+            let output = format!("derived-{}.mp3", item.id);
+            broadcast_host::report_progress("deriving audio");
+            let arguments = vec![
+                "-nostdin".to_owned(),
+                "-y".to_owned(),
+                "-i".to_owned(),
+                video.reference.clone(),
+                "-vn".to_owned(),
+                "-map_metadata".to_owned(),
+                "0".to_owned(),
+                "-map_chapters".to_owned(),
+                "0".to_owned(),
+                "-codec:a".to_owned(),
+                "libmp3lame".to_owned(),
+                "-b:a".to_owned(),
+                "128k".to_owned(),
+                "-ac".to_owned(),
+                "2".to_owned(),
+                "-ar".to_owned(),
+                "44100".to_owned(),
+                output.clone(),
+            ];
+            let helper = broadcast_host::StagingArea::run_helper(&staging, "ffmpeg", &arguments)
+                .map_err(|error| failed(&format!("audio helper unavailable: {error:?}"), true))?;
+            if helper.exit_code != 0 {
+                return Err(failed("audio helper failed", true));
+            }
+            let staged = broadcast_host::StagingArea::stage(&staging, &output, Some("audio/mpeg"))
+                .map_err(|error| failed(&format!("audio output unavailable: {error:?}"), true))?;
+            artifacts.push(DerivedArtifact {
+                item_id: item.id.clone(),
+                reference: staged.reference,
+                derived_from_reference: video.reference.clone(),
+                kind: "audio".to_owned(),
+                media_type: staged.media_type,
+                size_bytes: staged.size_bytes,
+            });
+        }
+        Ok(Preparation { artifacts })
+    }
+
     fn publish(request: PublishRequest) -> Result<Publication, PluginError> {
         broadcast_host::report_progress("publishing");
         let feed_url = setting_text(&request.settings, "publication_url")
@@ -28,6 +94,7 @@ impl Guest for PodcastBroadcast {
             broadcast_host::StagingError::InvalidReference => {
                 failed("invalid output reference", false)
             }
+            broadcast_host::StagingError::Missing => failed("staged output is missing", true),
             broadcast_host::StagingError::Failed(message) => failed(&message, true),
         })?;
         broadcast_host::log("Podcast feed published by external component");

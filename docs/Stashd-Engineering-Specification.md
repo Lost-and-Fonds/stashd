@@ -570,7 +570,7 @@ Deep verification can be user-triggered:
 
 ```text
 checksum
-ffprobe validation
+plugin-provided media validation where required
 full Vault scan
 ```
 
@@ -1351,7 +1351,9 @@ No universal H.265 default. H.265/HEVC can be an advanced preference.
 
 ## Audio Podcast
 
-Audio podcast broadcasts may generate derived audio files with FFmpeg.
+Audio podcast broadcasts may generate derived audio files through a
+Podcast-plugin-owned native helper. The helper and its media profile are not
+part of Stashd core.
 
 Default v1 podcast audio profile:
 
@@ -2056,7 +2058,7 @@ storage roots ready
 workers alive
 scheduler running
 yt-dlp available
-ffmpeg available
+bundled plugin helper availability
 provider credential status
 media-server connection status
 disk warnings
@@ -2536,8 +2538,6 @@ Tempest app
 FrankenPHP/Caddy
 SQLite extension
 yt-dlp
-FFmpeg
-ffprobe
 ytdlphp
 ca-certificates
 tzdata

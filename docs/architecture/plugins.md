@@ -582,6 +582,14 @@ serving. The historical `Broadcast-Plugin-Architecture-Plan.md` remains a
 design record and may describe the superseded in-tree PHP implementation; use
 the current code and this section for the runtime model.
 
+Optional native dependencies follow the same boundary: a plugin manifest may
+declare package-relative helpers, and the host executes only those helpers in
+the invocation staging workspace. The bundled Podcast package owns its static
+FFmpeg helper; Stashd core does not install, configure, or invoke FFmpeg.
+Plugins remain in this repository while Podcast, Jellyfin, and Plex are
+converted. Package/repository separation and OCI distribution remain future
+work.
+
 Plugins may describe UI, but they do not ship arbitrary frontend code. The
 Stashd frontend remains first-party and renders plugin declarations with its
 own components.

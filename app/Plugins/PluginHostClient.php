@@ -161,6 +161,29 @@ final class PluginHostClient
         string $componentPath,
         string $stagingDirectory,
         array $broadcast,
+        ?PluginHelperGrant $helper = null,
+    ): PluginBroadcastResult {
+        return $this->invokeBroadcast('broadcast-publish', 'broadcast_published', $componentPath, $stagingDirectory, $broadcast, $helper);
+    }
+
+    /** @param array<string, mixed> $broadcast */
+    public function prepareBroadcast(
+        string $componentPath,
+        string $stagingDirectory,
+        array $broadcast,
+        ?PluginHelperGrant $helper = null,
+    ): PluginBroadcastResult {
+        return $this->invokeBroadcast('broadcast-prepare', 'broadcast_prepared', $componentPath, $stagingDirectory, $broadcast, $helper);
+    }
+
+    /** @param array<string, mixed> $broadcast */
+    private function invokeBroadcast(
+        string $operation,
+        string $eventName,
+        string $componentPath,
+        string $stagingDirectory,
+        array $broadcast,
+        ?PluginHelperGrant $helper,
     ): PluginBroadcastResult {
         $error = null;
         $socket = stream_socket_client('unix://' . $this->socketPath, $errorNumber, $error, 5);
@@ -171,11 +194,15 @@ final class PluginHostClient
         $requestId = bin2hex(random_bytes(8));
         $request = [
             'id' => $requestId,
-            'op' => 'broadcast-publish',
+            'op' => $operation,
             'component_path' => $componentPath,
             'staging_dir' => $stagingDirectory,
+            'helper_name' => $helper?->name,
+            'helper_executable' => $helper?->executable,
+            'helper_package_root' => $helper?->packageRoot,
             'broadcast' => $broadcast,
         ];
+        $request = array_filter($request, static fn (mixed $value): bool => $value !== null);
         $progress = [];
         $logs = [];
 
@@ -199,14 +226,14 @@ final class PluginHostClient
                 if (($event['event'] ?? null) === 'error') {
                     $this->throwExecutionError($event);
                 }
-                if (($event['event'] ?? null) !== 'broadcast_published') {
+                if (($event['event'] ?? null) !== $eventName) {
                     throw new RuntimeException('Plugin host returned an unknown broadcast event.');
                 }
 
                 return new PluginBroadcastResult(
                     progress: $progress,
                     logs: $logs,
-                    publication: $this->inputObject($event['publication'] ?? null, 'publication'),
+                    publication: $this->inputObject($event[$eventName === 'broadcast_prepared' ? 'preparation' : 'publication'] ?? null, $eventName),
                 );
             }
         } catch (JsonException $exception) {

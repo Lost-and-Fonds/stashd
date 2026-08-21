@@ -27,13 +27,9 @@
 		subscriber_jwt {$MERCURE_JWT_SECRET}
 	}
 
-	# X-Accel-Redirect for podcast episodes: PodcastEpisodeController does
-	# token auth + asset selection, then returns a bodyless response with
-	# this header instead of streaming the file itself. Caddy rewrites the
-	# request to the header's value and serves it with file_server, which
-	# handles Range/HEAD/If-Range natively -- no PHP memory/CPU spent on
-	# multi-hundred-MB episode bodies. The controller emits only /vault/... or
-	# /broadcasts/... paths after token validation; both remain under media.
+	# Generic internal file serving for handlers that have already validated a
+	# managed media path. The handler emits only /vault/... or /broadcasts/...
+	# paths; both remain under the configured media root.
 	intercept {
 		@accel header X-Accel-Redirect *
 		handle_response @accel {
