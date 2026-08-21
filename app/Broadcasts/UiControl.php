@@ -20,6 +20,8 @@ final readonly class UiControl
         public mixed $default = null,
         /** Options for select-type controls. */
         public array $options = [],
+        public ?string $description = null,
+        public bool $required = false,
     ) {
     }
 }

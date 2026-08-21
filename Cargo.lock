@@ -1507,6 +1507,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "stashd-podcast-plugin"
+version = "0.1.0"
+dependencies = [
+ "wit-bindgen",
+]
+
+[[package]]
 name = "stashd-youtube-plugin"
 version = "0.1.0"
 dependencies = [

@@ -492,6 +492,8 @@ final readonly class BroadcastController
                     'type' => $control->type,
                     'default' => $control->default,
                     'options' => $control->options,
+                    'description' => $control->description,
+                    'required' => $control->required,
                 ],
                 $discovered->plugin->uiControls(),
             ),

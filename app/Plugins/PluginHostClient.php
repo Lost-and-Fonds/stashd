@@ -155,6 +155,70 @@ final class PluginHostClient
     }
 
     /**
+     * @param array<string, mixed> $broadcast
+     */
+    public function publishBroadcast(
+        string $componentPath,
+        string $stagingDirectory,
+        array $broadcast,
+    ): PluginBroadcastResult {
+        $error = null;
+        $socket = stream_socket_client('unix://' . $this->socketPath, $errorNumber, $error, 5);
+        if (! is_resource($socket)) {
+            throw new RuntimeException('Unable to connect to stashd-plugin-host: ' . ($error ?: 'unknown error'));
+        }
+
+        $requestId = bin2hex(random_bytes(8));
+        $request = [
+            'id' => $requestId,
+            'op' => 'broadcast-publish',
+            'component_path' => $componentPath,
+            'staging_dir' => $stagingDirectory,
+            'broadcast' => $broadcast,
+        ];
+        $progress = [];
+        $logs = [];
+
+        try {
+            fwrite($socket, json_encode($request, JSON_THROW_ON_ERROR) . "\n");
+            while (($line = fgets($socket)) !== false) {
+                $event = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+                if (! is_array($event) || ($event['id'] ?? null) !== $requestId) {
+                    throw new RuntimeException('Plugin host returned an invalid broadcast event.');
+                }
+
+                /** @var array<string, mixed> $event */
+                if (($event['event'] ?? null) === 'progress') {
+                    $progress[] = $this->inputProgress($event);
+                    continue;
+                }
+                if (($event['event'] ?? null) === 'log') {
+                    $logs[] = $this->inputString($event['message'] ?? null, 'message');
+                    continue;
+                }
+                if (($event['event'] ?? null) === 'error') {
+                    $this->throwExecutionError($event);
+                }
+                if (($event['event'] ?? null) !== 'broadcast_published') {
+                    throw new RuntimeException('Plugin host returned an unknown broadcast event.');
+                }
+
+                return new PluginBroadcastResult(
+                    progress: $progress,
+                    logs: $logs,
+                    publication: $this->inputObject($event['publication'] ?? null, 'publication'),
+                );
+            }
+        } catch (JsonException $exception) {
+            throw new RuntimeException('Plugin host returned malformed JSON.', previous: $exception);
+        } finally {
+            fclose($socket);
+        }
+
+        throw new RuntimeException('Plugin host closed the IPC connection without a broadcast result.');
+    }
+
+    /**
      * @param array<string, mixed>|null $item
      * @param list<PluginHttpGrant>|null $httpGrants
      * @param list<array{key:string,value:array{kind:string,value:bool|string}}>|null $options

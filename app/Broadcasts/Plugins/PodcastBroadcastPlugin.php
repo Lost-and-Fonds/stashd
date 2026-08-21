@@ -31,6 +31,8 @@ use App\Broadcasts\StashdBroadcast;
 use App\Broadcasts\UiControl;
 use App\Commands\CommandDispatchService;
 use App\Commands\CommandType;
+use App\Config\StashdConfig;
+use App\Plugins\PluginHostClient;
 use App\Stashes\StashItemId;
 use App\Stashes\StashItemState;
 use App\Support\DurationSeconds;
@@ -67,6 +69,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         private \App\Broadcasts\Podcasts\PodcastTranscodeFallback $transcodeFallback,
         private CommandDispatchService $dispatch,
         private TimelineMetadataRenderer $timeline,
+        private StashdConfig $config,
     ) {
     }
 
@@ -87,18 +90,34 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
 
     public function uiControls(): array
     {
-        return [
-            new UiControl('title', 'Podcast Title', 'text'),
-            new UiControl('description', 'Podcast Description', 'text'),
-            new UiControl('author', 'Author', 'text'),
-            new UiControl('language', 'Language', 'text', 'en'),
-            new UiControl('explicit', 'Explicit', 'select', 'false', ['false', 'true']),
-            new UiControl('complete', 'Complete', 'select', 'false', ['false', 'true']),
-            new UiControl('captions', 'Captions', 'select', 'off', ['off', 'creator_only', 'creator_or_auto']),
-            new UiControl('caption_languages', 'Caption languages', 'text', 'en'),
-            new UiControl('funding_url', 'Funding URL', 'text'),
-            new UiControl('media_kind', 'Media Kind', 'select', null, ['audio', 'video']),
-        ];
+        $path = dirname(__DIR__, 3) . '/plugins/podcast/plugin.json';
+        $manifest = is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
+        $options = is_array($manifest) && is_array($manifest['ui_options'] ?? null)
+            ? $manifest['ui_options']
+            : [];
+
+        return array_values(array_filter(array_map(
+            static function (mixed $option): ?UiControl {
+                if (! is_array($option) || ! is_string($option['key'] ?? null) || ! is_string($option['label'] ?? null)) {
+                    return null;
+                }
+
+                $choices = is_array($option['choices'] ?? null)
+                    ? array_values(array_filter($option['choices'], 'is_string'))
+                    : [];
+
+                return new UiControl(
+                    name: $option['key'],
+                    label: $option['label'],
+                    type: is_string($option['type'] ?? null) ? $option['type'] : 'text',
+                    default: $option['default'] ?? null,
+                    options: $choices,
+                    description: is_string($option['description'] ?? null) ? $option['description'] : null,
+                    required: ($option['required'] ?? false) === true,
+                );
+            },
+            $options,
+        )));
     }
 
     public function plan(BroadcastContext $context): BroadcastPlan
@@ -184,7 +203,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         }
 
         $feedPath = $this->feedPath($context);
-        $this->writeFeed($feedPath, $this->feedBuilder->build($this->metadata($context, $broadcastToken, $includedDescriptions), $episodes));
+        $this->writeFeed($feedPath, $this->feedContent($context, $broadcastToken, $episodes, $includedDescriptions));
 
         return new BroadcastPublishResult(
             publishedCount: 1,
@@ -364,7 +383,86 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             chapterUrl: $this->timeline->hasEntries($item->mediaItemId)
                 ? $this->urls->chapterUrl($broadcastToken, $itemToken)
                 : null,
+            publicationToken: $itemToken,
         );
+    }
+
+    /** @param list<PodcastEpisode> $episodes */
+    private function feedContent(BroadcastContext $context, string $broadcastToken, array $episodes, array $includedDescriptions): string
+    {
+        $component = getenv('STASHD_BROADCAST_PLUGIN_COMPONENT');
+        $component = is_string($component) && trim($component) !== ''
+            ? trim($component)
+            : dirname(__DIR__, 3) . '/target/wasm32-wasip2/release/stashd_podcast_plugin.wasm';
+
+        if (! is_file($component)) {
+            return $this->feedBuilder->build($this->metadata($context, $broadcastToken, $includedDescriptions), $episodes);
+        }
+
+        $stage = sys_get_temp_dir() . '/stashd-broadcast-plugin-' . bin2hex(random_bytes(8));
+        if (! mkdir($stage, 0o775, true) && ! is_dir($stage)) {
+            throw BroadcastException::withCode('podcast_feed_write_failed', 'Podcast feed staging could not be created.');
+        }
+
+        try {
+            $settings = $this->settings($context);
+            $request = [
+                'broadcast_id' => (string) $context->broadcast->id,
+                'settings' => array_values(array_map(
+                    static fn (string $key, mixed $value): array => [
+                        'key' => $key,
+                        'value' => is_bool($value)
+                            ? ['kind' => 'boolean', 'value' => $value]
+                            : ['kind' => 'text', 'value' => is_scalar($value) ? (string) $value : ''],
+                    ],
+                    array_keys($settings),
+                    $settings,
+                )),
+                'public_base_url' => rtrim($this->config->publicUrl, '/'),
+                'broadcast_token' => $broadcastToken,
+                'episodes' => array_values(array_map(
+                    static fn (PodcastEpisode $episode): array => [
+                        'id' => $episode->guid,
+                        'publication_token' => $episode->publicationToken ?? '',
+                        'title' => $episode->title,
+                        'description' => $episode->description,
+                        'published_at' => $episode->publishedAt->toNativeDateTime()->format(DATE_RSS),
+                        'duration_seconds' => $episode->durationSeconds,
+                        // The component owns the public URL shape.  Core only
+                        // supplies the artifact's presentation extension.
+                        'media_reference' => pathinfo(
+                            (string) parse_url($episode->enclosureUrl, PHP_URL_PATH),
+                            PATHINFO_EXTENSION,
+                        ) ?: 'mp3',
+                        'media_type' => $episode->enclosureMimeType,
+                        'media_size_bytes' => $episode->enclosureLength,
+                        'artwork_reference' => $episode->imageUrl === null ? null : 'available',
+                        'transcript_reference' => $episode->transcriptUrl === null ? null : 'available',
+                        'chapter_reference' => $episode->chapterUrl === null ? null : 'available',
+                    ],
+                    $episodes,
+                )),
+            ];
+            $socket = getenv('STASHD_PLUGIN_HOST_SOCKET');
+            $socket = is_string($socket) && trim($socket) !== '' ? trim($socket) : '/tmp/stashd-plugin-host.sock';
+            $result = (new PluginHostClient($socket))->publishBroadcast($component, $stage, $request);
+            $reference = $result->publication['artifact']['reference'] ?? null;
+            if (! is_string($reference) || $reference === '') {
+                throw BroadcastException::withCode('podcast_feed_write_failed', 'Podcast plugin returned no feed artifact.');
+            }
+            $staged = $stage . '/' . $reference;
+            $xml = @file_get_contents($staged);
+            if ($xml === false) {
+                throw BroadcastException::withCode('podcast_feed_write_failed', 'Podcast plugin feed artifact could not be read.');
+            }
+
+            return $xml;
+        } finally {
+            foreach (glob($stage . '/*') ?: [] as $path) {
+                @unlink($path);
+            }
+            @rmdir($stage);
+        }
     }
 
     /** @param list<string|null> $includedDescriptions */

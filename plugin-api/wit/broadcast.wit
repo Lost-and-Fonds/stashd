@@ -1,0 +1,88 @@
+package stashd:plugin@0.1.0;
+
+interface broadcast-host {
+    record staged-artifact {
+        reference: string,
+        media-type: option<string>,
+        size-bytes: u64,
+    }
+
+    variant staging-error {
+        invalid-reference,
+        failed(string),
+    }
+
+    resource staging-area {
+        write: func(relative-path: string, content: list<u8>, media-type: option<string>) -> result<staged-artifact, staging-error>;
+    }
+
+    open-staging-area: func() -> staging-area;
+    report-progress: func(stage: string);
+    log: func(message: string);
+}
+
+interface broadcast-plugin {
+    variant option-value {
+        boolean(bool),
+        text(string),
+    }
+
+    record setting {
+        key: string,
+        value: option-value,
+    }
+
+    record episode {
+        id: string,
+        publication-token: string,
+        title: string,
+        description: option<string>,
+        published-at: option<string>,
+        duration-seconds: option<u32>,
+        media-reference: string,
+        media-type: option<string>,
+        media-size-bytes: u64,
+        artwork-reference: option<string>,
+        transcript-reference: option<string>,
+        chapter-reference: option<string>,
+    }
+
+    record publish-request {
+        broadcast-id: string,
+        settings: list<setting>,
+        public-base-url: string,
+        broadcast-token: string,
+        episodes: list<episode>,
+    }
+
+    record artifact {
+        reference: string,
+        media-type: option<string>,
+        size-bytes: u64,
+    }
+
+    record publication {
+        artifact: artifact,
+        published-metadata: list<setting>,
+    }
+
+    record error {
+        message: string,
+        retryable: bool,
+    }
+
+    variant plugin-error {
+        unsupported(error),
+        not-found(error),
+        unavailable(error),
+        invalid-data(error),
+        failed(error),
+    }
+
+    publish: func(request: publish-request) -> result<publication, plugin-error>;
+}
+
+world broadcast-world {
+    import broadcast-host;
+    export broadcast-plugin;
+}

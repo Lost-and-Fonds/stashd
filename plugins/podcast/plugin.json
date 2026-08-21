@@ -1,0 +1,22 @@
+{
+  "id": "podcast-component",
+  "broadcast_key": "podcast",
+  "name": "Podcast Broadcast",
+  "version": "0.1.0",
+  "component": "plugins/podcast/target/wasm32-wasip2/release/stashd_podcast_plugin.wasm",
+  "component_environment": "STASHD_BROADCAST_PLUGIN_COMPONENT",
+  "ui_options": [
+    {"key": "title", "label": "Podcast Title", "type": "text"},
+    {"key": "description", "label": "Podcast Description", "type": "textarea"},
+    {"key": "author", "label": "Author", "type": "text"},
+    {"key": "language", "label": "Language", "type": "text", "default": "en"},
+    {"key": "explicit", "label": "Explicit", "type": "boolean", "default": false},
+    {"key": "complete", "label": "Complete", "type": "boolean", "default": false},
+    {"key": "captions", "label": "Captions", "type": "select", "default": "off", "choices": ["off", "creator_only", "creator_or_auto"]},
+    {"key": "caption_languages", "label": "Caption languages", "type": "text", "default": "en"},
+    {"key": "funding_url", "label": "Funding URL", "type": "url"},
+    {"key": "media_kind", "label": "Media Kind", "type": "select", "default": "audio", "choices": ["audio", "video"]},
+    {"key": "link_url", "label": "Link", "type": "url"},
+    {"key": "image_url", "label": "Artwork", "type": "url"}
+  ]
+}

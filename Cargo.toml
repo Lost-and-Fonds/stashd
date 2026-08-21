@@ -1,3 +1,3 @@
 [workspace]
-members = ["plugin-host", "plugins/example", "plugins/youtube"]
+members = ["plugin-host", "plugins/example", "plugins/youtube", "plugins/podcast"]
 resolver = "2"

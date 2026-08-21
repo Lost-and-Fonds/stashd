@@ -37,6 +37,16 @@ mod input_world {
     });
 }
 
+mod broadcast_world {
+    wasmtime::component::bindgen!({
+        path: "../plugin-api/wit/broadcast.wit",
+        world: "broadcast-world",
+        with: {
+            "stashd:plugin/broadcast-host/staging-area": super::BroadcastStagingAreaResource,
+        },
+    });
+}
+
 use input_world::InputWorld;
 use input_world::exports::stashd::plugin::input_plugin::{
     AcquisitionOptions, AcquisitionResult, DiscoveredItem, DiscoveryIntent, MediaKind,
@@ -57,6 +67,8 @@ pub struct StagingOutputResource {
     finished: bool,
 }
 
+pub struct BroadcastStagingAreaResource;
+
 struct HostState {
     table: ResourceTable,
     wasi: WasiCtx,
@@ -73,6 +85,14 @@ struct InputState {
     http_grants: Vec<HttpGrant>,
     staging_dir: Option<PathBuf>,
     helper: Option<HelperGrant>,
+}
+
+struct BroadcastState {
+    table: ResourceTable,
+    wasi: WasiCtx,
+    progress: Vec<String>,
+    logs: Vec<String>,
+    staging_dir: PathBuf,
 }
 
 struct CredentialGrant {
@@ -109,6 +129,15 @@ impl WasiView for InputState {
     }
 }
 
+impl WasiView for BroadcastState {
+    fn ctx(&mut self) -> WasiCtxView<'_> {
+        WasiCtxView {
+            ctx: &mut self.wasi,
+            table: &mut self.table,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct Request {
     id: String,
@@ -128,6 +157,7 @@ struct Request {
     item: Option<AcquireItemRequest>,
     media_kind: Option<String>,
     options: Option<Vec<InputOptionRequest>>,
+    broadcast: Option<BroadcastPublishRequest>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -165,6 +195,31 @@ struct AcquireItemRequest {
     kind: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct BroadcastPublishRequest {
+    broadcast_id: String,
+    settings: Vec<InputOptionRequest>,
+    public_base_url: String,
+    broadcast_token: String,
+    episodes: Vec<BroadcastEpisodeRequest>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BroadcastEpisodeRequest {
+    id: String,
+    publication_token: String,
+    title: String,
+    description: Option<String>,
+    published_at: Option<String>,
+    duration_seconds: Option<u32>,
+    media_reference: String,
+    media_type: Option<String>,
+    media_size_bytes: u64,
+    artwork_reference: Option<String>,
+    transcript_reference: Option<String>,
+    chapter_reference: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(tag = "event")]
 enum Response {
@@ -197,6 +252,11 @@ enum Response {
     InputAcquired {
         id: String,
         acquisition: serde_json::Value,
+    },
+    #[serde(rename = "broadcast_published")]
+    BroadcastPublished {
+        id: String,
+        publication: serde_json::Value,
     },
     #[serde(rename = "error")]
     Error {
@@ -287,6 +347,65 @@ impl HostStagingOutput for HostState {
 
     fn drop(&mut self, output: Resource<StagingOutputResource>) -> wasmtime::Result<()> {
         Ok(self.table.delete(output).map(|_| ())?)
+    }
+}
+
+impl broadcast_world::stashd::plugin::broadcast_host::Host for BroadcastState {
+    fn open_staging_area(&mut self) -> Resource<BroadcastStagingAreaResource> {
+        self.table
+            .push(BroadcastStagingAreaResource)
+            .expect("resource table is available")
+    }
+
+    fn report_progress(&mut self, stage: String) {
+        self.progress.push(stage);
+    }
+
+    fn log(&mut self, message: String) {
+        self.logs.push(message);
+    }
+}
+
+impl broadcast_world::stashd::plugin::broadcast_host::HostStagingArea for BroadcastState {
+    fn write(
+        &mut self,
+        area: Resource<BroadcastStagingAreaResource>,
+        relative_path: String,
+        content: Vec<u8>,
+        media_type: Option<String>,
+    ) -> Result<
+        broadcast_world::stashd::plugin::broadcast_host::StagedArtifact,
+        broadcast_world::stashd::plugin::broadcast_host::StagingError,
+    > {
+        let _ = self.table.get(&area).map_err(|_| {
+            broadcast_world::stashd::plugin::broadcast_host::StagingError::Failed(
+                "staging capability expired".to_owned(),
+            )
+        })?;
+        let path = safe_staging_path(&self.staging_dir, &relative_path).ok_or(
+            broadcast_world::stashd::plugin::broadcast_host::StagingError::InvalidReference,
+        )?;
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|error| {
+                broadcast_world::stashd::plugin::broadcast_host::StagingError::Failed(
+                    error.to_string(),
+                )
+            })?;
+        }
+        fs::write(&path, &content).map_err(|error| {
+            broadcast_world::stashd::plugin::broadcast_host::StagingError::Failed(error.to_string())
+        })?;
+        Ok(
+            broadcast_world::stashd::plugin::broadcast_host::StagedArtifact {
+                reference: relative_path,
+                media_type,
+                size_bytes: content.len() as u64,
+            },
+        )
+    }
+
+    fn drop(&mut self, area: Resource<BroadcastStagingAreaResource>) -> wasmtime::Result<()> {
+        Ok(self.table.delete(area).map(|_| ())?)
     }
 }
 
@@ -754,6 +873,80 @@ fn plugin_error_code(message: &str) -> &'static str {
     .unwrap_or("plugin_error")
 }
 
+fn broadcast_option(
+    request: InputOptionRequest,
+) -> broadcast_world::exports::stashd::plugin::broadcast_plugin::Setting {
+    broadcast_world::exports::stashd::plugin::broadcast_plugin::Setting {
+        key: request.key,
+        value: match request.value {
+            InputOptionValueRequest::Boolean(value) => {
+                broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Boolean(
+                    value,
+                )
+            }
+            InputOptionValueRequest::Text(value) => {
+                broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Text(value)
+            }
+        },
+    }
+}
+
+fn invoke_broadcast(
+    engine: &Engine,
+    component: &Component,
+    staging_dir: PathBuf,
+    request: BroadcastPublishRequest,
+) -> Result<(
+    broadcast_world::exports::stashd::plugin::broadcast_plugin::Publication,
+    BroadcastState,
+)> {
+    let mut store = Store::new(
+        engine,
+        BroadcastState {
+            table: ResourceTable::new(),
+            wasi: WasiCtxBuilder::new().build(),
+            progress: Vec::new(),
+            logs: Vec::new(),
+            staging_dir,
+        },
+    );
+    let mut linker = Linker::new(engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
+    broadcast_world::BroadcastWorld::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state)?;
+    let plugin = broadcast_world::BroadcastWorld::instantiate(&mut store, component, &linker)?;
+    let request = broadcast_world::exports::stashd::plugin::broadcast_plugin::PublishRequest {
+        broadcast_id: request.broadcast_id,
+        settings: request.settings.into_iter().map(broadcast_option).collect(),
+        public_base_url: request.public_base_url,
+        broadcast_token: request.broadcast_token,
+        episodes: request
+            .episodes
+            .into_iter()
+            .map(
+                |episode| broadcast_world::exports::stashd::plugin::broadcast_plugin::Episode {
+                    id: episode.id,
+                    publication_token: episode.publication_token,
+                    title: episode.title,
+                    description: episode.description,
+                    published_at: episode.published_at,
+                    duration_seconds: episode.duration_seconds,
+                    media_reference: episode.media_reference,
+                    media_type: episode.media_type,
+                    media_size_bytes: episode.media_size_bytes,
+                    artwork_reference: episode.artwork_reference,
+                    transcript_reference: episode.transcript_reference,
+                    chapter_reference: episode.chapter_reference,
+                },
+            )
+            .collect(),
+    };
+    let result = plugin
+        .stashd_plugin_broadcast_plugin()
+        .call_publish(&mut store, &request)?
+        .map_err(|error| anyhow::anyhow!("broadcast plugin error: {error:?}"))?;
+    Ok((result, store.into_data()))
+}
+
 fn invoke(
     engine: &Engine,
     component: Component,
@@ -1022,6 +1215,79 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                     },
                 )?;
             }
+        }
+        "broadcast-publish" => {
+            let component_path = request
+                .component_path
+                .as_deref()
+                .context("broadcast invocation requires component_path")?;
+            let staging_dir = request
+                .staging_dir
+                .clone()
+                .context("broadcast invocation requires staging_dir")?;
+            let component = Component::from_file(engine, component_path)
+                .with_context(|| format!("loading component {}", component_path.display()))?;
+            let (publication, state) = match invoke_broadcast(
+                engine,
+                &component,
+                staging_dir,
+                request.broadcast.context("broadcast request is required")?,
+            ) {
+                Ok(result) => result,
+                Err(error) => {
+                    let message = error.to_string();
+                    send(
+                        stream,
+                        Response::Error {
+                            id: request.id,
+                            code: plugin_error_code(&message).to_owned(),
+                            message,
+                        },
+                    )?;
+                    return Ok(());
+                }
+            };
+            for stage in state.progress {
+                send(
+                    stream,
+                    Response::Progress {
+                        id: request.id.clone(),
+                        fraction: 0.0,
+                        stage,
+                    },
+                )?;
+            }
+            for message in state.logs {
+                send(
+                    stream,
+                    Response::Log {
+                        id: request.id.clone(),
+                        message,
+                    },
+                )?;
+            }
+            send(
+                stream,
+                Response::BroadcastPublished {
+                    id: request.id,
+                    publication: serde_json::json!({
+                        "artifact": {
+                            "reference": publication.artifact.reference,
+                            "media_type": publication.artifact.media_type,
+                            "size_bytes": publication.artifact.size_bytes,
+                        },
+                        "published_metadata": publication.published_metadata.iter().map(|setting| {
+                            serde_json::json!({
+                                "key": setting.key,
+                                "value": match &setting.value {
+                                    broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Boolean(value) => serde_json::json!(value),
+                                    broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Text(value) => serde_json::json!(value),
+                                },
+                            })
+                        }).collect::<Vec<_>>(),
+                    }),
+                },
+            )?;
         }
         "cancel" => send(
             stream,
