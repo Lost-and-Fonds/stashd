@@ -36,6 +36,7 @@ final class AssetRepository
         ?string $checksum = null,
         ?int $durationSeconds = null,
         ?string $language = null,
+        ?string $derivationKey = null,
     ): AssetRecord {
         $id = $this->ids->generate('asset')->toString();
         $record = new AssetRecord(
@@ -51,6 +52,7 @@ final class AssetRepository
             checksum: $checksum,
             durationSeconds: DurationSeconds::toDuration($durationSeconds),
             language: $language,
+            derivationKey: $derivationKey,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);
@@ -88,6 +90,18 @@ final class AssetRepository
         $asset = AssetRecord::select()
             ->where('broadcastItemId', $broadcastItemId->toString())
             ->where('role', $role)
+            ->first();
+
+        return $asset instanceof AssetRecord ? $asset : null;
+    }
+
+    public function findDerived(MediaItemId $mediaItemId, AssetKind $kind, string $derivationKey): ?AssetRecord
+    {
+        $asset = AssetRecord::select()
+            ->where('mediaItemId', $mediaItemId->toString())
+            ->where('role', AssetRole::Derived)
+            ->where('kind', $kind)
+            ->where('derivationKey', $derivationKey)
             ->first();
 
         return $asset instanceof AssetRecord ? $asset : null;

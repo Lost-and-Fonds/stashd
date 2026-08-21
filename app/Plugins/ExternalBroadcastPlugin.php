@@ -38,6 +38,7 @@ use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use App\Vault\MoveFileIntoVault;
 use App\Vault\VaultPathBuilder;
+use Tempest\Database\PrimaryKey;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
@@ -129,6 +130,7 @@ final readonly class ExternalBroadcastPlugin implements
         $settings = $this->settings($context);
         $settings[] = ['key' => 'publication_url', 'value' => ['kind' => 'text', 'value' => $this->publications->url($output)]];
         $items = [];
+        $itemStashItemIds = [];
         $stagedAssets = [];
         $failed = [];
 
@@ -152,7 +154,6 @@ final readonly class ExternalBroadcastPlugin implements
                 continue;
             }
 
-            $this->readyItem($item);
             $items[] = [
                 'id' => (string) $item->id,
                 'title' => $media->title ?? $stashItem->displayTitle ?? 'Untitled',
@@ -161,6 +162,7 @@ final readonly class ExternalBroadcastPlugin implements
                 'duration_seconds' => null,
                 'resources' => $resources,
             ];
+            $itemStashItemIds[(string) $item->id] = (string) $stashItem->id;
         }
 
         try {
@@ -188,6 +190,16 @@ final readonly class ExternalBroadcastPlugin implements
             }
             /** @var list<array<string, mixed>> $validArtifacts */
             $this->promoteDerivedArtifacts($context, $stage, $validArtifacts, $stagedAssets);
+
+            foreach ($items as $itemData) {
+                $item = $this->items->findByBroadcastAndStashItem(
+                    BroadcastId::fromPrimaryKey($context->broadcast->id),
+                    StashItemId::fromPrimaryKey(new PrimaryKey($itemStashItemIds[(string) $itemData['id']])),
+                );
+                if ($item instanceof BroadcastItemRecord) {
+                    $this->readyItem($item);
+                }
+            }
 
             $items = [];
             foreach ($this->contexts->publishableStashItems($context) as $stashItem) {
@@ -327,7 +339,7 @@ final readonly class ExternalBroadcastPlugin implements
     }
 
     /** @param array<string, AssetRecord> $stagedAssets
-     *  @return list<array{reference: string, kind: string, url: string, media_type: ?string, size_bytes: int}>
+     *  @return list<array{reference: string, kind: string, derivation_key: ?string, url: string, media_type: ?string, size_bytes: int}>
      */
     private function resources(BroadcastRecord $broadcast, MediaItemRecord $media, ?string $stage = null, array &$stagedAssets = []): array
     {
@@ -353,6 +365,7 @@ final readonly class ExternalBroadcastPlugin implements
             $resources[] = [
                 'reference' => $reference,
                 'kind' => $asset->kind->value,
+                'derivation_key' => $asset->derivationKey,
                 'url' => $this->publications->url($publication),
                 'media_type' => $asset->mimeType,
                 'size_bytes' => (int) ($asset->sizeBytes ?? 0),
@@ -370,8 +383,9 @@ final readonly class ExternalBroadcastPlugin implements
             $reference = $artifact['reference'] ?? null;
             $itemId = $artifact['item_id'] ?? null;
             $sourceReference = $artifact['derived_from_reference'] ?? null;
+            $derivationKey = $artifact['derivation_key'] ?? null;
             $kind = $artifact['kind'] ?? null;
-            if (! is_string($reference) || ! is_string($itemId) || ! is_string($sourceReference) || ! is_string($kind)) {
+            if (! is_string($reference) || ! is_string($itemId) || ! is_string($sourceReference) || ! is_string($derivationKey) || $derivationKey === '' || ! is_string($kind)) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an invalid derived artifact.');
             }
             $source = $stagedAssets[$sourceReference] ?? null;
@@ -386,9 +400,14 @@ final readonly class ExternalBroadcastPlugin implements
             }
             $assetKind = AssetKind::tryFrom($kind) ?? AssetKind::Other;
             $extension = pathinfo($reference, PATHINFO_EXTENSION) ?: 'bin';
-            $destination = $this->vaultPaths->vaultFile((string) $media->providerKey, (string) $media->providerItemId, 'derived-' . $extension);
-            $existing = AssetRecord::select()->where('mediaItemId', (string) $media->id)->where('role', AssetRole::Derived)->where('kind', $assetKind)->first();
-            if ($existing instanceof AssetRecord && $existing->state === AssetState::Ready && $existing->path !== null && is_file($existing->path)) {
+            $derivationDigest = substr(hash('sha256', $derivationKey), 0, 16);
+            $destination = $this->vaultPaths->vaultFile((string) $media->providerKey, (string) $media->providerItemId, 'derived-' . $derivationDigest . '.' . $extension);
+            $existing = $this->assets->findDerived(MediaItemId::fromPrimaryKey($media->id), $assetKind, $derivationKey);
+            if ($existing instanceof AssetRecord
+                && $existing->state === AssetState::Ready
+                && $existing->path !== null
+                && is_file($existing->path)
+                && (string) $existing->derivedFromAssetId === (string) $sourceId) {
                 continue;
             }
             if ($existing instanceof AssetRecord && $existing->path !== null && is_file($existing->path)) {
@@ -402,11 +421,24 @@ final readonly class ExternalBroadcastPlugin implements
                 $existing->sizeBytes = filesize($destination) ?: null;
                 $existing->checksum = hash_file('sha256', $destination) ?: null;
                 $existing->derivedFromAssetId = AssetId::fromPrimaryKey($sourceId);
+                $existing->derivationKey = $derivationKey;
                 $existing->state = AssetState::Ready;
                 $this->assets->save($existing);
                 continue;
             }
-            $asset = $this->assets->create(MediaItemId::fromPrimaryKey($media->id), AssetRole::Derived, $assetKind, AssetState::Ready, $destination, $this->vaultPaths->relativeFile((string) $media->providerKey, (string) $media->providerItemId, basename($destination)), is_string($artifact['media_type'] ?? null) ? $artifact['media_type'] : null, $extension, filesize($destination) ?: null, hash_file('sha256', $destination) ?: null);
+            $asset = $this->assets->create(
+                mediaItemId: MediaItemId::fromPrimaryKey($media->id),
+                role: AssetRole::Derived,
+                kind: $assetKind,
+                state: AssetState::Ready,
+                path: $destination,
+                relativePath: $this->vaultPaths->relativeFile((string) $media->providerKey, (string) $media->providerItemId, basename($destination)),
+                mimeType: is_string($artifact['media_type'] ?? null) ? $artifact['media_type'] : null,
+                container: $extension,
+                sizeBytes: filesize($destination) ?: null,
+                checksum: hash_file('sha256', $destination) ?: null,
+                derivationKey: $derivationKey,
+            );
             $asset->derivedFromAssetId = AssetId::fromPrimaryKey($sourceId);
             $this->assets->save($asset);
         }

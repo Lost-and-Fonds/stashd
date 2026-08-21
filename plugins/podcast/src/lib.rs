@@ -11,6 +11,8 @@ use stashd::plugin::broadcast_host;
 
 struct PodcastBroadcast;
 
+const PODCAST_AUDIO_DERIVATION_KEY: &str = "podcast-audio-v1";
+
 impl Guest for PodcastBroadcast {
     fn prepare(request: PublishRequest) -> Result<Preparation, PluginError> {
         let media_kind =
@@ -22,11 +24,7 @@ impl Guest for PodcastBroadcast {
         let staging = broadcast_host::open_staging_area();
         let mut artifacts = Vec::new();
         for item in &request.items {
-            if item
-                .resources
-                .iter()
-                .any(|resource| resource.kind == "audio")
-            {
+            if preferred_audio(item).is_some() {
                 continue;
             }
             let Some(video) = item
@@ -69,6 +67,7 @@ impl Guest for PodcastBroadcast {
                 item_id: item.id.clone(),
                 reference: staged.reference,
                 derived_from_reference: video.reference.clone(),
+                derivation_key: PODCAST_AUDIO_DERIVATION_KEY.to_owned(),
                 kind: "audio".to_owned(),
                 media_type: staged.media_type,
                 size_bytes: staged.size_bytes,
@@ -201,13 +200,17 @@ fn item_xml(xml: &mut String, item: &Item, metadata: &Metadata) {
         .resources
         .iter()
         .find(|resource| {
-            (metadata.media_kind.as_deref() == Some("video") && resource.kind == "video")
-                || (metadata.media_kind.as_deref() != Some("video") && resource.kind == "audio")
+            metadata.media_kind.as_deref() == Some("video") && resource.kind == "video"
+        })
+        .or_else(|| {
+            (metadata.media_kind.as_deref() != Some("video"))
+                .then(|| preferred_audio(item))
+                .flatten()
         })
         .or_else(|| {
             item.resources
                 .iter()
-                .find(|resource| resource.kind == "audio" || resource.kind == "video")
+                .find(|resource| resource.kind == "video")
         });
     let Some(media) = media else {
         return;
@@ -254,6 +257,20 @@ fn item_xml(xml: &mut String, item: &Item, metadata: &Metadata) {
         xml.push_str("\" type=\"text/vtt\"/>");
     }
     xml.push_str("</item>");
+}
+
+fn preferred_audio(
+    item: &Item,
+) -> Option<&exports::stashd::plugin::broadcast_plugin::ItemResource> {
+    item.resources
+        .iter()
+        .find(|resource| resource.kind == "audio" && resource.derivation_key.is_none())
+        .or_else(|| {
+            item.resources.iter().find(|resource| {
+                resource.kind == "audio"
+                    && resource.derivation_key.as_deref() == Some(PODCAST_AUDIO_DERIVATION_KEY)
+            })
+        })
 }
 
 fn tag(xml: &mut String, name: &str, value: &str) {

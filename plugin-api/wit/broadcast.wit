@@ -51,6 +51,7 @@ interface broadcast-plugin {
     record item-resource {
         reference: string,
         kind: string,
+        derivation-key: option<string>,
         url: option<string>,
         media-type: option<string>,
         size-bytes: u64,
@@ -86,6 +87,7 @@ interface broadcast-plugin {
         item-id: string,
         reference: string,
         derived-from-reference: string,
+        derivation-key: string,
         kind: string,
         media-type: option<string>,
         size-bytes: u64,

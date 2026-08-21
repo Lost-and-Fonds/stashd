@@ -46,6 +46,7 @@ final class AssetRecord
         public ?DateTime $lastVerifiedAt = null,
         public ?DateTime $missingAt = null,
         public ?string $missingReason = null,
+        public ?string $derivationKey = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
     ) {

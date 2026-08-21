@@ -209,6 +209,7 @@ struct BroadcastPublishRequest {
 struct BroadcastResourceRequest {
     reference: String,
     kind: String,
+    derivation_key: Option<String>,
     url: Option<String>,
     media_type: Option<String>,
     size_bytes: u64,
@@ -1073,6 +1074,7 @@ fn invoke_broadcast(
                         broadcast_world::exports::stashd::plugin::broadcast_plugin::ItemResource {
                             reference: resource.reference,
                             kind: resource.kind,
+                            derivation_key: resource.derivation_key,
                             url: resource.url,
                             media_type: resource.media_type,
                             size_bytes: resource.size_bytes,
@@ -1092,6 +1094,7 @@ fn invoke_broadcast(
                 "item_id": artifact.item_id,
                 "reference": artifact.reference,
                 "derived_from_reference": artifact.derived_from_reference,
+                "derivation_key": artifact.derivation_key,
                 "kind": artifact.kind,
                 "media_type": artifact.media_type,
                 "size_bytes": artifact.size_bytes,

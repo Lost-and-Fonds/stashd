@@ -24,15 +24,16 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl xz-utils \
     && rm -rf /var/lib/apt/lists/* \
     && case "${TARGETARCH}" in \
-        amd64) ffmpegAsset="ffmpeg-release-amd64-static.tar.xz" ;; \
-        arm64) ffmpegAsset="ffmpeg-release-arm64-static.tar.xz" ;; \
+        amd64) ffmpegAsset="ffmpeg-N-126239-g88ae625e69-linux64-gpl.tar.xz"; ffmpegSha="b2ad9015c296a61c1f6127c4aa3ce8614a9bd8d7519987b6e0d151edaa7f39fb" ;; \
+        arm64) ffmpegAsset="ffmpeg-N-126239-g88ae625e69-linuxarm64-gpl.tar.xz"; ffmpegSha="59f9c4258284fa750b025939b210aa51a9cb8b6411d4a417f332facc2d0d2df2" ;; \
         *) echo "Unsupported architecture for FFmpeg: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
-    && curl -L "https://johnvansickle.com/ffmpeg/releases/${ffmpegAsset}" -o /tmp/ffmpeg.tar.xz \
+    && curl -fL "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-21-13-40/${ffmpegAsset}" -o /tmp/ffmpeg.tar.xz \
+    && printf '%s  %s\n' "${ffmpegSha}" /tmp/ffmpeg.tar.xz | sha256sum -c - \
     && mkdir -p /tmp/ffmpeg \
     && tar -xJf /tmp/ffmpeg.tar.xz --strip-components=1 -C /tmp/ffmpeg \
     && mkdir -p /plugin-output/podcast/helpers \
-    && cp /tmp/ffmpeg/ffmpeg /plugin-output/podcast/helpers/ffmpeg \
+    && cp /tmp/ffmpeg/bin/ffmpeg /plugin-output/podcast/helpers/ffmpeg \
     && chmod a+rx /plugin-output/podcast/helpers/ffmpeg \
     && rm -rf /tmp/ffmpeg /tmp/ffmpeg.tar.xz
 COPY Cargo.toml Cargo.lock ./
