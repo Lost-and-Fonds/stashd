@@ -17,7 +17,6 @@ use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
 use App\System\Storage\StorageLocationState;
 use App\System\Storage\StorageRootService;
-use App\Timeline\YtdlpChapterCapture;
 use App\Vault\AssetRecord;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
@@ -51,13 +50,10 @@ final readonly class DownloadMediaItem
         private MoveFileIntoVault $fileMover,
         private StateTransitionService $transitions,
         private StashdConfig $config,
-        private YtdlpChapterCapture $chapters,
     ) {
     }
 
-    /**
-     * @param ?callable(\Ytdlphp\DownloadProgress): void $onProgress
-     */
+    /** @param ?callable $onProgress */
     public function execute(
         MediaItemId $mediaItemId,
         StashId $stashId,
@@ -137,8 +133,6 @@ final readonly class DownloadMediaItem
             }
 
             $ingested = $this->ingestAllFiles($mediaItem, $download, $pendingAssets);
-            $this->chapters->capture($mediaItemId);
-
             $this->transitions->transitionMediaItem($mediaItem, MediaItemState::Ready);
             $this->tempStaging->cleanupSuccess($tempDirectory);
 

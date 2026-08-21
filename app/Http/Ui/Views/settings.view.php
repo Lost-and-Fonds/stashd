@@ -130,42 +130,6 @@
 				</section>
 
 				<section class="rounded-lg border border-line bg-panel/60 p-4">
-					<h2 class="text-sm font-semibold text-cream">Providers</h2>
-
-					<div class="mt-3 flex items-center justify-between gap-3">
-						<div>
-							<p class="text-[13px] font-semibold text-cream">YouTube Data API key</p>
-							<p class="mt-0.5 text-[12px] text-muted">
-								<span x-show="youtubeApiKey.configured">Configured — full-channel discovery with video types is available.</span>
-								<span x-show="!youtubeApiKey.configured">Not configured — falls back to RSS discovery only.</span>
-							</p>
-						</div>
-						<span class="h-1.5 w-1.5 shrink-0 rounded-full" x-bind:class="youtubeApiKey.configured ? 'bg-success' : 'bg-muted'"></span>
-					</div>
-
-					<div class="mt-3" x-show="!editingYoutubeApiKey">
-						<button type="button" x-on:click="editingYoutubeApiKey = true"
-							class="rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream">
-							<span x-text="youtubeApiKey.configured ? 'Replace key' : 'Add key'"></span>
-						</button>
-					</div>
-
-					<div class="mt-3 flex gap-2" x-show="editingYoutubeApiKey">
-						<input type="password" x-model="newYoutubeApiKey" placeholder="Data API key"
-							class="flex-1 rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
-						<button type="button" x-on:click="saveYoutubeApiKey()"
-							x-bind:disabled="savingYoutubeApiKey || newYoutubeApiKey.trim() === ''"
-							class="rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">
-							Save
-						</button>
-						<button type="button" x-on:click="editingYoutubeApiKey = false; newYoutubeApiKey = ''"
-							class="rounded border border-line px-3 py-2 text-[13px] text-muted transition-colors hover:text-cream">
-							Cancel
-						</button>
-					</div>
-				</section>
-
-				<section class="rounded-lg border border-line bg-panel/60 p-4">
 					<h2 class="text-sm font-semibold text-cream">System</h2>
 					<p class="mt-1 text-[13px] text-muted">
 						Version <span class="text-cream" x-text="health?.version"></span> ·

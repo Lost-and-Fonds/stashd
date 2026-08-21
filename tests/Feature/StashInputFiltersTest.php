@@ -26,6 +26,7 @@ test('preflight review exposes the universal title-regex filters for every provi
 });
 
 test('preflight review exposes shorts and live toggles for a youtube channel only', function (): void {
+    requireExternalInputPluginRuntime($this);
     $headers = $this->authHeaders();
 
     $channel = $this->http->post('/api/v1/stashes/preflight', [
@@ -135,6 +136,7 @@ test('add input rejects a malformed title-regex pattern', function (): void {
 });
 
 test('add input excludes shorts and live items from a youtube channel when toggled off', function (): void {
+    requireExternalInputPluginRuntime($this);
     $headers = $this->authHeaders();
 
     $this->http->put('/api/v1/providers/youtube/credentials', [
@@ -299,6 +301,7 @@ test('PATCH stash input re-filters already-committed items', function (): void {
 });
 
 test('PATCH stash input reactivates filtered YouTube items and queues their downloads', function (): void {
+    requireExternalInputPluginRuntime($this);
     $headers = $this->authHeaders();
     $this->http->put('/api/v1/providers/youtube/credentials', ['api_key' => 'test-api-key'], headers: $headers)->assertOk();
 

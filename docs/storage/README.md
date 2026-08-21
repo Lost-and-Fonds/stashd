@@ -2,7 +2,7 @@
 
 Stashd separates **canonical Vault archives** from **Broadcast presentation assets**.
 
-Phase 4A/4B implement the download → temp → Vault pipeline. **Fake downloader** is used for tests, dev, and Docker smoke. **ytdlphp** (`hazel/ytdlphp`) handles real YouTube downloads when `STASHD_REAL_DOWNLOADS_ENABLED=1`.
+The download → temp → Vault pipeline is provider-neutral. **Fake downloader** is used for tests, dev, and Docker smoke. Bundled external plugins may use helper software such as `yt-dlp`; core only validates and preserves their staged artifacts.
 
 ## Layout
 
@@ -27,7 +27,7 @@ POST item.download (async command)
        2. Storage root checks (vault + temp writable — DB state and filesystem)
        3. Idempotency: skip when ready Vault original exists on disk (force=false)
        4. TempStagingService creates /media/temp/downloads/{jobId} (cleans stale dirs)
-       5. Downloader writes to temp only (`FakeDownloader` or `YtdlpDownloader` via ytdlphp)
+       5. Downloader/plugin writes to temp only (`FakeDownloader` or an external plugin adapter)
        6. Verify all temp outputs exist before any Vault write
        7. SHA-256 checksum (`sha256:{hex}`) + AtomicFileMover into Vault (no overwrite)
        8. Mark all assets ready only after full batch ingest; rollback partial Vault files on failure
@@ -41,10 +41,10 @@ POST item.download (async command)
 |---|---|
 | `DownloaderInterface` | Service boundary for all downloads |
 | `FakeDownloader` | Phase 4A implementation (tests/dev/CI/smoke) |
-| `YtdlpDownloader` | Phase 4B ytdlphp-backed downloads (`hazel/ytdlphp`) |
-| `RoutingDownloader` | Routes fake provider → fake; others → ytdlphp when enabled |
+| External plugin adapter | Provider-specific acquisition and staged artifacts |
+| `DelegatingDownloader` | Routes fake provider → fake; other logical providers → registered plugin |
 
-**All yt-dlp interaction must go through [hazel/ytdlphp](https://github.com/hipsterjazzbo/ytdlphp) via `YtdlpGateway`.** Stashd must not call shell/process APIs directly. Real downloads require `STASHD_REAL_DOWNLOADS_ENABLED=1`.
+Core must not call provider helpers directly. A plugin may receive a generic helper grant and is responsible for its own helper invocation and interpretation. The core process only validates staged output before Vault ingest.
 
 ## Vault sidecars
 

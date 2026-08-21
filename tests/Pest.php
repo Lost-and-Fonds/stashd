@@ -31,6 +31,16 @@ function useSessionCookieFrom(TestResponseHelper $response): void
     throw new RuntimeException('Response did not set a ' . AuthService::SESSION_COOKIE . ' cookie.');
 }
 
+function requireExternalInputPluginRuntime(object $test): void
+{
+    $socket = getenv('STASHD_PLUGIN_HOST_SOCKET');
+    $component = getenv('STASHD_PLUGIN_COMPONENT');
+
+    if (! is_string($socket) || trim($socket) === '' || ! is_string($component) || ! is_file($component)) {
+        $test->markTestSkipped('External Input plugin runtime is provided by the plugin lifecycle script.');
+    }
+}
+
 // Schema introspection has no portable form: SQLite exposes PRAGMA/sqlite_master,
 // PostgreSQL exposes information_schema/pg_*. Defined here (global namespace),
 // like useSessionCookieFrom above, so every --parallel worker loads them

@@ -23,8 +23,8 @@ use function Tempest\Support\str;
  * Commits a completed preflight into a stash input on an existing stash.
  *
  * Preflight only resolves identity and takes a cheap sample; this class re-runs
- * full discovery (the best available strategy, e.g. the YouTube Data API once
- * keyed) rather than replaying preflight's frozen sample, then persists the
+ * full discovery (the best available plugin capability) rather than replaying
+ * preflight's frozen sample, then persists the
  * stash input, media items, sources, and stash items, deduplicating against
  * whatever the stash (and the wider Vault) already has.
  */

@@ -60,9 +60,9 @@ final readonly class WorkerProcessProbe
     /**
      * SIGKILL, not SIGTERM: this is only called on an owner that has gone
      * silent past the hard stall cap (e.g. blocked on a dead network mount),
-     * where a catchable signal may never be processed. A yt-dlp child of the
-     * killed tick is orphaned rather than killed; it exits on its own within
-     * its ytdlphp timeout and only writes to staging temp (see docs/TODO.md).
+     * where a catchable signal may never be processed. A plugin helper child
+     * of the killed tick is orphaned rather than killed; it exits on its own
+     * within its helper timeout and only writes to staging temp.
      */
     public function kill(string $token): void
     {

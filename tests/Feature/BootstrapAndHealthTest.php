@@ -72,6 +72,7 @@ test('provider registry resolves fake uris', function (): void {
 });
 
 test('provider registry resolves youtube uris', function (): void {
+    requireExternalInputPluginRuntime($this);
     $registry = $this->container->get(\App\Providers\ProviderRegistry::class);
     $provider = $registry->resolveForUri(\App\Providers\StashdUri::parse('https://www.youtube.com/watch?v=demoVideo01'));
 

@@ -62,13 +62,13 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
             throw InvalidCommandPayload::withErrors(['Media item is not part of the requested stash.']);
         }
 
-        // The item was already excluded at commit time (title-regex filter,
-        // include_shorts/include_live content-type filter, etc. -- see
+        // The item was already excluded at commit time (for example, by a
+        // title filter or a provider-declared content filter -- see
         // CreateStashFromDiscovery::ignoredReason()) -- an ignored item is
         // never downloadable through any path, dispatched explicitly or not,
         // regardless of why it was ignored. Without this, item.download can
         // be dispatched directly against an ignored item and creates a job
-        // that's doomed to fail (e.g. yt-dlp refusing an unaired premiere)
+        // that is doomed to fail before it reaches the downloader
         // instead of failing fast with the reason the app already knows.
         if ($stashItem->state === StashItemState::Ignored) {
             $reason = $stashItem->ignoredReason ?? 'unknown reason';

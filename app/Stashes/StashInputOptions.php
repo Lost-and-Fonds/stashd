@@ -11,7 +11,7 @@ use Tempest\Mapper\SerializeAs;
  * Per-input filter choices captured at add-input time: the universal
  * title-regex tier plus whatever provider-declared options (App\Providers\InputOption)
  * the user toggled. `provider` keys are opaque provider option keys (e.g.
- * 'include_shorts'), not DTO field names — kept out of the snake/camel API
+ * provider-declared keys), not DTO field names — kept out of the snake/camel API
  * boundary transform deliberately (see StashController::addInput()).
  */
 #[SerializeAs('stash_input_options')]

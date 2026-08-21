@@ -7,10 +7,8 @@ namespace App\Jobs\Handlers;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
-use App\Config\YtdlpConfig;
 use App\Downloads\DownloadException;
 use App\Downloads\DownloadMediaItem;
-use App\Downloads\DownloadProgressSmoother;
 use App\Jobs\JobHandler;
 use App\Jobs\JobHandlerContext;
 use App\Jobs\JobIntent;
@@ -27,7 +25,6 @@ use App\Vault\MediaItemId;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Duration;
 use Tempest\DateTime\Timezone;
-use Ytdlphp\DownloadProgress;
 
 final readonly class DownloadJobHandler implements JobHandler
 {
@@ -38,7 +35,6 @@ final readonly class DownloadJobHandler implements JobHandler
         private StateTransitionService $transitions,
         private ActivityEventService $activity,
         private EventPublisher $publisher,
-        private YtdlpConfig $ytdlpConfig,
     ) {
     }
 
@@ -61,42 +57,11 @@ final readonly class DownloadJobHandler implements JobHandler
         $force = (bool) ($payload['force'] ?? false);
 
         try {
-            // Downloads still run strictly one at a time (a single worker
-            // tick claims and fully runs one job before the next tick
-            // starts), so a queue of several items finishes sequentially,
-            // not in parallel -- this only reports progress within whichever
-            // download is currently running.
-            $context->progress($job, JobProgressUpdate::ofPercent(0.0, 'Downloading via yt-dlp'));
-
-            // Paces consecutive downloads (e.g. a large channel backfill) so
-            // they don't hit YouTube back-to-back -- zero in testing via
-            // YtdlpConfig defaults.
-            $maxDelay = max($this->ytdlpConfig->minDelaySeconds, $this->ytdlpConfig->maxDelaySeconds);
-
-            if ($maxDelay > 0) {
-                sleep(random_int($this->ytdlpConfig->minDelaySeconds, $maxDelay));
-            }
-
-            $lastForwardedAt = microtime(true);
-            $progressSmoother = new DownloadProgressSmoother();
-
             $result = $this->executor->execute(
                 mediaItemId: $mediaItemId,
                 stashId: $stashId,
                 jobId: PrefixedUlid::parse((string) $job->id),
                 force: $force,
-                onProgress: function (DownloadProgress $progress) use ($job, $context, &$lastForwardedAt, $progressSmoother): void {
-                    $isFinal = ($progress->percent ?? 0.0) >= 100.0;
-                    $now = microtime(true);
-
-                    if (! $isFinal && $now - $lastForwardedAt < 0.25) {
-                        return;
-                    }
-
-                    $lastForwardedAt = $now;
-                    $context->heartbeat($job);
-                    $context->progress($job, $progressSmoother->update($progress));
-                },
             );
 
             $command->result = $result->toArray();

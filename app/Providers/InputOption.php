@@ -12,11 +12,10 @@ final readonly class InputOption
 {
     /**
      * @param list<string>|null $choices required and meaningful only for `InputOptionType::Enum`
-     * @param list<string> $applicableInputTypes generic input-type strings (e.g. 'channel'), not a YouTube-specific enum
+     * @param list<string> $applicableInputTypes plugin-defined input-kind strings
      * @param list<string> $excludesContentTypes `DiscoveredItem::$contentType` values this option
-     *   excludes when set to `false` (bool options only) — e.g. YouTube's `include_shorts` excludes
-     *   `'short'`. Lets the generic commit-time filter stay provider-agnostic: it never needs to know
-     *   which content-type strings a given provider uses.
+     *   excludes when set to `false` (bool options only). This lets the
+     *   generic commit-time filter remain provider-agnostic.
      */
     public function __construct(
         public string $key,

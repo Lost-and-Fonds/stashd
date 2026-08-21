@@ -45,48 +45,97 @@ fn failed(message: &str, retryable: bool) -> PluginError {
 
 impl Guest for YouTubeInput {
     fn resolve(source: String) -> Result<ResolvedInput, PluginError> {
-        let path = source
-            .strip_prefix("https://www.youtube.com")
-            .ok_or_else(|| unsupported("YouTube channel reference required"))?;
-        let direct_id = if let Some(id) = path.strip_prefix("/channel/") {
-            let id = id.split('/').next().unwrap_or_default();
-            Some(id.to_owned())
-        } else if path.starts_with("/@") || path.starts_with("/c/") || path.starts_with("/user/") {
-            None
-        } else {
-            return Err(unsupported("channel reference required"));
-        };
-
-        let (channel_id, title, avatar) = if let Some(id) = direct_id {
-            (id, None, None)
-        } else {
-            input_host::report_progress(&input_host::Progress {
-                stage: "resolving channel".to_owned(),
-            });
-            let client = input_host::open_http_client();
-            let response = get(&client, &source)?;
-            if response.status == 404 {
-                return Err(not_found("channel page not found"));
-            }
-            if response.status < 200 || response.status >= 300 {
-                return Err(unavailable("channel page unavailable", true));
-            }
-            let html = String::from_utf8(response.body)
-                .map_err(|_| invalid_data("channel page was not text"))?;
-            let id = extract_channel_id(&html)
-                .ok_or_else(|| invalid_data("channel identity was not found"))?;
+        let (host, path, query) =
+            split_reference(&source).ok_or_else(|| unsupported("unsupported source reference"))?;
+        let reference = if let Some(id) = path.strip_prefix("/channel/") {
             (
-                id,
-                extract_meta(&html, "og:title"),
-                extract_meta(&html, "og:image"),
+                "channel",
+                id.split('/').next().unwrap_or_default().to_owned(),
             )
+        } else if path.starts_with("/@") || path.starts_with("/c/") || path.starts_with("/user/") {
+            ("channel-page", source.clone())
+        } else if host == "youtu.be" {
+            (
+                "video",
+                path.trim_matches('/')
+                    .split('/')
+                    .next()
+                    .unwrap_or_default()
+                    .to_owned(),
+            )
+        } else if path == "/watch" || path.starts_with("/watch/") {
+            ("video", query_value(&query, "v").unwrap_or_default())
+        } else if path.starts_with("/shorts/") {
+            (
+                "video",
+                path.trim_start_matches("/shorts/")
+                    .split('/')
+                    .next()
+                    .unwrap_or_default()
+                    .to_owned(),
+            )
+        } else if path == "/playlist" || path.starts_with("/playlist/") {
+            ("playlist", query_value(&query, "list").unwrap_or_default())
+        } else {
+            return Err(unsupported("unsupported source reference"));
         };
 
-        input_host::log("YouTube channel resolved");
+        let (id, kind, title, avatar, canonical) = match reference {
+            ("channel", id) => (
+                id.clone(),
+                "channel".to_owned(),
+                None,
+                None,
+                format!("https://www.youtube.com/channel/{id}"),
+            ),
+            ("video", id) => {
+                if id.is_empty() {
+                    return Err(unsupported("video reference is missing an item ID"));
+                }
+                (
+                    format!("video:{id}"),
+                    "video".to_owned(),
+                    Some(format!("YouTube Video {id}")),
+                    None,
+                    format!("https://www.youtube.com/watch?v={id}"),
+                )
+            }
+            ("playlist", id) => {
+                if id.is_empty() {
+                    return Err(unsupported("playlist reference is missing a list ID"));
+                }
+                (
+                    format!("playlist:{id}"),
+                    "playlist".to_owned(),
+                    Some(format!("YouTube Playlist {id}")),
+                    None,
+                    format!("https://www.youtube.com/playlist?list={id}"),
+                )
+            }
+            (_, source) => {
+                input_host::report_progress(&input_host::Progress {
+                    stage: "resolving input".to_owned(),
+                });
+                let response = resolve_page(&source)?;
+                let html = String::from_utf8(response.body)
+                    .map_err(|_| invalid_data("channel page was not text"))?;
+                let id = extract_channel_id(&html)
+                    .ok_or_else(|| invalid_data("channel identity was not found"))?;
+                (
+                    id.clone(),
+                    "channel".to_owned(),
+                    extract_meta(&html, "og:title"),
+                    extract_meta(&html, "og:image"),
+                    format!("https://www.youtube.com/channel/{id}"),
+                )
+            }
+        };
+
+        input_host::log("YouTube input resolved");
         Ok(ResolvedInput {
-            id: channel_id.clone(),
-            canonical_reference: Some(format!("https://www.youtube.com/channel/{channel_id}")),
-            kind: Some("channel".to_owned()),
+            id,
+            canonical_reference: Some(canonical),
+            kind: Some(kind),
             title,
             artwork_reference: avatar,
             estimated_item_count: None,
@@ -98,37 +147,23 @@ impl Guest for YouTubeInput {
         intent: DiscoveryIntent,
         options: Vec<InputOption>,
     ) -> Result<Vec<DiscoveredItem>, PluginError> {
-        if matches!(intent, DiscoveryIntent::Complete) {
-            let client = input_host::open_http_client();
-            return Ok(filter_items(
-                discover_data_api(&client, &input_id)?,
-                &options,
-            ));
-        }
-        input_host::report_progress(&input_host::Progress {
-            stage: "fetching feed".to_owned(),
-        });
         let client = input_host::open_http_client();
-        let response = get(
-            &client,
-            &format!("https://www.youtube.com/feeds/videos.xml?channel_id={input_id}"),
-        )?;
-        if response.status == 404 {
-            return Err(not_found("channel feed not found"));
-        }
-        if response.status < 200 || response.status >= 300 {
-            return Err(unavailable("channel feed unavailable", true));
-        }
-        input_host::report_progress(&input_host::Progress {
-            stage: "parsing feed".to_owned(),
-        });
-        let xml =
-            String::from_utf8(response.body).map_err(|_| invalid_data("feed was not text"))?;
-        let items = parse_feed(&xml)?;
-        input_host::log("YouTube RSS discovery complete");
-        input_host::report_progress(&input_host::Progress {
-            stage: "complete".to_owned(),
-        });
+        let (kind, id) = input_kind(&input_id);
+        let items = match kind {
+            "video" => discover_video(&client, &id)?,
+            "playlist" if matches!(intent, DiscoveryIntent::Complete) => {
+                discover_playlist_data_api(&client, &id)?
+            }
+            "playlist" => discover_feed(
+                &client,
+                &format!("https://www.youtube.com/feeds/videos.xml?playlist_id={id}"),
+            )?,
+            _ if matches!(intent, DiscoveryIntent::Complete) => discover_data_api(&client, &id)?,
+            _ => discover_feed(
+                &client,
+                &format!("https://www.youtube.com/feeds/videos.xml?channel_id={id}"),
+            )?,
+        };
         Ok(filter_items(items, &options))
     }
 
@@ -308,6 +343,199 @@ fn get(
             unavailable(&message, true)
         }
     })
+}
+
+fn resolve_page(source: &str) -> Result<input_host::HttpResponse, PluginError> {
+    let client = input_host::open_http_client();
+    let response = get(&client, source)?;
+    if response.status == 404 {
+        return Err(not_found("input page not found"));
+    }
+    if response.status < 200 || response.status >= 300 {
+        return Err(unavailable("input page unavailable", true));
+    }
+    Ok(response)
+}
+
+fn split_reference(source: &str) -> Option<(String, String, String)> {
+    let without_scheme = source.strip_prefix("https://")?;
+    let (host, remainder) = without_scheme.split_once('/')?;
+    let (path, query) = remainder.split_once('?').unwrap_or((remainder, ""));
+    Some((host.to_owned(), format!("/{path}"), query.to_owned()))
+}
+
+fn query_value(query: &str, key: &str) -> Option<String> {
+    query.split('&').find_map(|part| {
+        let (name, value) = part.split_once('=')?;
+        (name == key && !value.is_empty()).then(|| value.to_owned())
+    })
+}
+
+fn input_kind(input_id: &str) -> (&str, String) {
+    if let Some(id) = input_id.strip_prefix("video:") {
+        ("video", id.to_owned())
+    } else if let Some(id) = input_id.strip_prefix("playlist:") {
+        ("playlist", id.to_owned())
+    } else {
+        ("channel", input_id.to_owned())
+    }
+}
+
+fn discover_feed(
+    client: &input_host::HttpClient,
+    url: &str,
+) -> Result<Vec<DiscoveredItem>, PluginError> {
+    input_host::report_progress(&input_host::Progress {
+        stage: "fetching feed".to_owned(),
+    });
+    let response = get(client, url)?;
+    if response.status == 404 {
+        return Err(not_found("input feed not found"));
+    }
+    if response.status < 200 || response.status >= 300 {
+        return Err(unavailable("input feed unavailable", true));
+    }
+    input_host::report_progress(&input_host::Progress {
+        stage: "parsing feed".to_owned(),
+    });
+    let xml = String::from_utf8(response.body).map_err(|_| invalid_data("feed was not text"))?;
+    let items = parse_feed(&xml)?;
+    input_host::report_progress(&input_host::Progress {
+        stage: "complete".to_owned(),
+    });
+    Ok(items)
+}
+
+fn discover_video(
+    client: &input_host::HttpClient,
+    video_id: &str,
+) -> Result<Vec<DiscoveredItem>, PluginError> {
+    let reference = format!("https://www.youtube.com/watch?v={video_id}");
+    let url = format!(
+        "https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3D{video_id}"
+    );
+    let response = get(client, &url)?;
+    let (title, artwork) = if (200..300).contains(&response.status) {
+        let payload: Value = serde_json::from_slice(&response.body)
+            .map_err(|_| invalid_data("video metadata was invalid"))?;
+        (
+            string_field(Some(&payload), "title")
+                .unwrap_or_else(|| format!("YouTube Video {video_id}")),
+            string_field(Some(&payload), "thumbnail_url"),
+        )
+    } else if response.status == 404 {
+        return Err(not_found("video was not found"));
+    } else {
+        return Err(unavailable("video metadata unavailable", true));
+    };
+    Ok(vec![DiscoveredItem {
+        id: video_id.to_owned(),
+        reference,
+        title,
+        description: None,
+        published_at: None,
+        artwork_reference: artwork,
+        duration_seconds: None,
+        kind: None,
+    }])
+}
+
+fn discover_playlist_data_api(
+    client: &input_host::HttpClient,
+    playlist_id: &str,
+) -> Result<Vec<DiscoveredItem>, PluginError> {
+    input_host::report_progress(&input_host::Progress {
+        stage: "fetching playlist".to_owned(),
+    });
+    let mut entries = Vec::new();
+    let mut page_token: Option<String> = None;
+    loop {
+        let mut url = format!(
+            "https://www.googleapis.com/youtube/v3/playlistItems?playlistId={playlist_id}&part=snippet&maxResults=50"
+        );
+        if let Some(token) = &page_token {
+            url.push_str("&pageToken=");
+            url.push_str(token);
+        }
+        let payload = data_api_get(client, &url)?;
+        collect_playlist_entries(&payload, &mut entries);
+        page_token = payload
+            .get("nextPageToken")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        if page_token.is_none() {
+            break;
+        }
+    }
+    enrich_entries(client, &entries)
+}
+
+fn collect_playlist_entries(payload: &Value, entries: &mut Vec<PlaylistEntry>) {
+    if let Some(items) = payload.get("items").and_then(Value::as_array) {
+        for item in items {
+            let snippet = item.get("snippet");
+            let Some(video_id) = snippet
+                .and_then(|value| value.get("resourceId"))
+                .and_then(|value| value.get("videoId"))
+                .and_then(Value::as_str)
+                .filter(|id| !id.is_empty())
+            else {
+                continue;
+            };
+            entries.push(PlaylistEntry {
+                video_id: video_id.to_owned(),
+                title: string_field(snippet, "title").unwrap_or_else(|| video_id.to_owned()),
+                description: string_field(snippet, "description"),
+                published_at: string_field(snippet, "publishedAt"),
+                artwork_reference: best_thumbnail(
+                    snippet.and_then(|value| value.get("thumbnails")),
+                ),
+            });
+        }
+    }
+}
+
+fn enrich_entries(
+    client: &input_host::HttpClient,
+    entries: &[PlaylistEntry],
+) -> Result<Vec<DiscoveredItem>, PluginError> {
+    let mut output = Vec::new();
+    for batch in entries.chunks(50) {
+        let ids = batch
+            .iter()
+            .map(|entry| entry.video_id.as_str())
+            .collect::<Vec<_>>()
+            .join(",");
+        let payload = data_api_get(
+            client,
+            &format!(
+                "https://www.googleapis.com/youtube/v3/videos?id={ids}&part=snippet,contentDetails,liveStreamingDetails"
+            ),
+        )?;
+        let details = payload
+            .get("items")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        for entry in batch {
+            let detail = details.iter().find(|item| {
+                item.get("id").and_then(Value::as_str) == Some(entry.video_id.as_str())
+            });
+            let Some(detail) = detail else { continue };
+            let (duration_seconds, kind) = classify(detail);
+            output.push(DiscoveredItem {
+                id: entry.video_id.clone(),
+                reference: format!("https://www.youtube.com/watch?v={}", entry.video_id),
+                title: entry.title.clone(),
+                description: entry.description.clone(),
+                published_at: entry.published_at.clone(),
+                artwork_reference: entry.artwork_reference.clone(),
+                duration_seconds,
+                kind: Some(kind),
+            });
+        }
+    }
+    Ok(output)
 }
 
 fn data_api_get(client: &input_host::HttpClient, url: &str) -> Result<Value, PluginError> {

@@ -9,7 +9,7 @@ namespace App\Jobs;
  * from starving the short jobs a human is actively watching in the UI. Each
  * lane runs as its own serial loop; lane membership is a pure function of
  * JobIntent (see JobIntent::lane()), so no schema or queue changes are needed.
- * Bulk stays deliberately serial: parallel yt-dlp traffic multiplies
+ * Bulk stays deliberately serial: parallel provider traffic multiplies
  * bot-detection risk and thrashes NAS I/O.
  */
 enum JobLane: string

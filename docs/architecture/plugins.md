@@ -481,9 +481,10 @@ The generic WIT world is named `input-world`; provider identity belongs to the
 plugin package, not the world name.
 
 The first real plugin implementation lives under `plugins/youtube/`. It is a
-standalone Rust WebAssembly Component compiled for `wasm32-wasip2`; it does not
-call Stashd's PHP YouTube provider. The built-in provider remains a behavioral
-oracle in the fixture-backed parity harness.
+standalone Rust WebAssembly Component compiled for `wasm32-wasip2`; it does
+not call Stashd's PHP provider. It is now the implementation selected for
+logical provider `youtube`; the former built-in implementation has been
+removed.
 
 The Component exports `resolve`, `discover`, and `acquire`. It parses YouTube
 references and upstream responses inside Wasm, returning only semantic
@@ -514,7 +515,7 @@ does not contain a provider allowlist; the plugin registration supplies the
 provider-specific grant data. Redirects are disabled. This is an experimental
 capability model, not the final network permission system.
 
-For YouTube, `refresh` currently uses RSS while `complete` requests
+For the bundled YouTube plugin, `refresh` currently uses RSS while `complete` requests
 the channel uploads playlist, pages `playlistItems`, then batches `videos`
 details. These requests use the same HTTP resource with a named credential-use
 intent (`youtube-data-api`). PHP decides whether the invocation receives that

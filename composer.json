@@ -10,16 +10,9 @@
     "tempest/framework": "^3.0",
     "symfony/process": "^7.3",
     "symfony/uid": "^7.3",
-    "hazel/ytdlphp": "^1.0.2",
     "symfony/mercure": "^0.7.2",
     "lcobucci/jwt": "^5.6"
   },
-  "repositories": [
-    {
-      "type": "vcs",
-      "url": "https://github.com/hipsterjazzbo/ytdlphp.git"
-    }
-  ],
   "require-dev": {
     "pestphp/pest": "^4.0",
     "laravel/pint": "^1.29",

@@ -24,6 +24,7 @@ use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
 
 test('an external Input Component uses the normal Stash discovery and Vault lifecycle', function (): void {
+    requireExternalInputPluginRuntime($this);
     $headers = $this->authHeaders();
     $stash = $this->http->post('/api/v1/stashes', [
         'name' => 'External Component Input',
@@ -104,6 +105,7 @@ test('an external Input Component uses the normal Stash discovery and Vault life
 });
 
 test('an existing logical YouTube Input routes to the Component without duplicates', function (): void {
+    requireExternalInputPluginRuntime($this);
     $headers = $this->authHeaders();
     $stash = $this->http->post('/api/v1/stashes', [
         'name' => 'Existing YouTube Input',

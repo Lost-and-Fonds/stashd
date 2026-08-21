@@ -6,10 +6,17 @@
   "component": "plugins/youtube/target/wasm32-wasip2/release/stashd_youtube_plugin.wasm",
   "component_environment": "STASHD_PLUGIN_COMPONENT",
   "source_prefixes": [
+    "https://youtube.com/",
     "https://www.youtube.com/@",
     "https://www.youtube.com/c/",
     "https://www.youtube.com/user/",
-    "https://www.youtube.com/channel/"
+    "https://www.youtube.com/channel/",
+    "https://www.youtube.com/playlist",
+    "https://www.youtube.com/watch",
+    "https://www.youtube.com/shorts/",
+    "https://youtu.be/",
+    "https://m.youtube.com/",
+    "https://music.youtube.com/"
   ],
   "operations": {
     "resolve": [],
@@ -22,16 +29,22 @@
       "operations": ["resolve", "refresh"],
       "allowed_prefixes": [
         "https://www.youtube.com/@",
+        "https://youtube.com/",
         "https://www.youtube.com/c/",
         "https://www.youtube.com/user/",
         "https://www.youtube.com/channel/",
-        "https://www.youtube.com/feeds/videos.xml?channel_id="
+        "https://m.youtube.com/",
+        "https://music.youtube.com/",
+        "https://www.youtube.com/feeds/videos.xml?channel_id=",
+        "https://www.youtube.com/feeds/videos.xml?playlist_id=",
+        "https://www.youtube.com/oembed?format=json&url="
       ]
     },
     {
       "operations": ["complete"],
       "allowed_prefixes": [
         "https://www.googleapis.com/youtube/v3/channels?",
+        "https://www.googleapis.com/youtube/v3/playlists?",
         "https://www.googleapis.com/youtube/v3/playlistItems?",
         "https://www.googleapis.com/youtube/v3/videos?"
       ],

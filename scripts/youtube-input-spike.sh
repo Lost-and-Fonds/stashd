@@ -42,7 +42,14 @@ output=$(php "$root/scripts/youtube-input-parity.php" "$socket" "$component" "$f
 grep -q '"id":"UCStashdDemoCh0012345678"' <<<"$output"
 grep -q '"id":"demoVideo01"' <<<"$output"
 grep -q '"stage":"complete"' <<<"$output"
-grep -q '"first_title":"Demo Episode One"' <<<"$output"
+grep -q '"title":"Demo Episode One"' <<<"$output"
+
+php "$root/scripts/youtube-input-parity.php" "$socket" "$component" "$fixture_directory" "https://www.youtube.com/playlist?list=PLStashdDemoPlaylist01" >/dev/null
+php "$root/scripts/youtube-input-parity.php" "$socket" "$component" "$fixture_directory" "https://www.youtube.com/c/StashdDemo" >/dev/null
+php "$root/scripts/youtube-input-parity.php" "$socket" "$component" "$fixture_directory" "https://www.youtube.com/user/StashdDemo" >/dev/null
+php "$root/scripts/youtube-input-parity.php" "$socket" "$component" "$fixture_directory" "https://www.youtube.com/watch?v=demoVideo01" >/dev/null
+php "$root/scripts/youtube-input-parity.php" "$socket" "$component" "$fixture_directory" "https://youtu.be/demoVideo01" >/dev/null
+php "$root/scripts/youtube-input-parity.php" "$socket" "$component" "$fixture_directory" "https://www.youtube.com/shorts/demoVideo01" >/dev/null
 
 php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdBadFeed0123456789 invalid_data
 php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdPrivateCh12345678 not_found
@@ -58,10 +65,5 @@ php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_dire
 php "$root/scripts/youtube-acquire-spike.php" "$socket" "$component" "$helper"
 php "$root/scripts/youtube-acquire-parity.php" "$socket" "$component" "$helper"
 php "$root/scripts/plugin-acquire-error.php" "$socket" "$component" "$helper" "https://www.youtube.com/watch?v=fail-acquisition" failed
-
-if php "$root/scripts/youtube-input-parity.php" "$socket" "$component" "$fixture_directory" "https://www.youtube.com/watch?v=demoVideo01"; then
-    echo 'unsupported YouTube source unexpectedly succeeded' >&2
-    exit 1
-fi
 
 echo 'YouTube input plugin end-to-end and parity check passed'

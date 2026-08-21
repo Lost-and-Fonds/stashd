@@ -21,7 +21,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
      * An owner that is still alive but hasn't heartbeated for this long is
      * assumed wedged on something no in-process timeout covers (e.g. a dead
      * network mount) and gets killed so its job can be recovered. Every
-     * subprocess boundary (yt-dlp, ffmpeg, HTTP) has its own shorter timeout,
+     * subprocess boundary (plugin helper, ffmpeg, HTTP) has its own shorter timeout,
      * so a healthy handler can't legitimately go silent this long.
      */
     private const int HARD_STALL_SECONDS = 1800;
@@ -43,7 +43,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
     /**
      * A heartbeat-stale job is only re-queued once its owning process is
      * provably dead -- with concurrent worker lanes, a time-only rule would
-     * re-queue jobs whose handler is merely between heartbeats (yt-dlp
+     * re-queue jobs whose handler is merely between heartbeats (a helper
      * metadata calls can legitimately block for minutes) and run them twice.
      * Jobs claimed before ownerToken existed (NULL) recover on time alone,
      * matching the old behavior.

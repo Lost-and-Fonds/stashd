@@ -15,7 +15,7 @@
 
 				<label class="mt-3 block">
 					<span class="mb-1 block text-[12px] text-muted">Channel, playlist, or video URL</span>
-					<input type="text" x-model="sourceUri" placeholder="https://www.youtube.com/@channel"
+					<input type="text" x-model="sourceUri" placeholder="source reference"
 						x-bind:disabled="busy || createdStashId !== null"
 						class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber disabled:opacity-60"/>
 				</label>

@@ -6,7 +6,6 @@ namespace App\Providers;
 
 use App\Plugins\ExternalInputPluginRegistry;
 use App\Providers\Fake\FakeProvider;
-use App\Providers\YouTube\YouTubeProvider;
 use InvalidArgumentException;
 use Tempest\Container\Singleton;
 
@@ -18,11 +17,9 @@ final class ProviderRegistry
 
     public function __construct(
         FakeProvider $fakeProvider,
-        YouTubeProvider $youtubeProvider,
         ?ExternalInputPluginRegistry $externalPlugins = null,
     ) {
         $this->register($fakeProvider);
-        $this->register($youtubeProvider);
         foreach ($externalPlugins?->providers() ?? [] as $plugin) {
             $this->register($plugin);
         }

@@ -8,7 +8,7 @@ namespace App\Broadcasts\Podcasts;
  * Conservative v1 funding-link detector.
  *
  * Scans plain-text/Markdown description text for links to a small set of
- * well-known creator funding platforms. Channel/about-page scraping, YouTube
+ * well-known creator funding platforms. Channel/about-page scraping and
  * membership, Nebula, creator-site, and merch-store detection are deferred —
  * see docs/broadcasts/README.md.
  */

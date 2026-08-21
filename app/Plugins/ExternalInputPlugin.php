@@ -172,8 +172,6 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
 
     public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult
     {
-        $helper = $this->definition->helperExecutable();
-
         $item = [
             'id' => $request->providerItemId,
             'reference' => $request->canonicalUri->toString(),
@@ -184,15 +182,50 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
             'duration_seconds' => $request->durationSeconds,
             'kind' => null,
         ];
+        $files = $this->acquireArtifacts(
+            item: $item,
+            staging: $request->tempDirectory,
+            mediaKind: $request->downloadPolicy->value === 'audio_only' ? 'audio' : 'video',
+            options: $request->providerOptions,
+        );
+        if (! array_filter($files, static fn (DownloadedFile $file): bool => $file->role === AssetRole::VaultOriginal)) {
+            throw DownloadException::withCode('plugin_missing_primary', 'External Input plugin returned no primary artifact.');
+        }
+
+        return new DownloadResult(
+            files: $files,
+            implementation: $this->implementationName(),
+            implementationVersion: $this->implementationVersion(),
+            sourceUri: $request->canonicalUri,
+            attemptedAt: DateTime::now(Timezone::UTC),
+            provenance: [
+                'plugin_id' => $this->definition->id,
+                'provider_key' => $this->key(),
+                'plugin_version' => $this->definition->version,
+            ],
+        );
+    }
+
+    /**
+     * Acquire generic staged artifacts for auxiliary application workflows.
+     * The caller interprets only generic artifact roles; plugin options remain opaque.
+     *
+     * @param array<string, mixed> $item
+     * @param array<string, bool|string> $options
+     * @return list<DownloadedFile>
+     */
+    public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array
+    {
+        $helper = $this->definition->helperExecutable();
         $result = $this->host->acquireInput(
             $this->definition->componentPath,
             $item,
-            $request->tempDirectory,
+            $staging,
             $helper !== null
                 ? new PluginHelperGrant($this->definition->helperName ?? $helper, $helper)
                 : null,
-            $request->downloadPolicy->value === 'audio_only' ? 'audio' : 'video',
-            $request->providerOptions,
+            $mediaKind,
+            $options,
         );
         $artifacts = $result->acquisition['artifacts'] ?? [];
         if (! is_array($artifacts)) {
@@ -210,24 +243,10 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
                     $artifactMap[$key] = $value;
                 }
             }
-            $files[] = $this->mapArtifact($request->tempDirectory, $artifactMap);
-        }
-        if (! array_filter($files, static fn (DownloadedFile $file): bool => $file->role === AssetRole::VaultOriginal)) {
-            throw DownloadException::withCode('plugin_missing_primary', 'External Input plugin returned no primary artifact.');
+            $files[] = $this->mapArtifact($staging, $artifactMap);
         }
 
-        return new DownloadResult(
-            files: $files,
-            implementation: $this->implementationName(),
-            implementationVersion: $this->implementationVersion(),
-            sourceUri: $request->canonicalUri,
-            attemptedAt: DateTime::now(Timezone::UTC),
-            provenance: [
-                'plugin_id' => $this->definition->id,
-                'provider_key' => $this->key(),
-                'plugin_version' => $this->definition->version,
-            ],
-        );
+        return $files;
     }
 
     public function isRuntimeAvailable(): bool

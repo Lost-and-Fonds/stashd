@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Downloads;
 
-use App\Downloads\Ytdlp\YtdlpGateway;
-use App\Downloads\Ytdlp\YtdlpOptionsBuilder;
+use App\Plugins\ExternalInputPluginRegistry;
 use App\Providers\StashdUri;
 use App\Support\PrefixedUlid;
 use App\Vault\AssetKind;
@@ -23,7 +22,7 @@ use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemExceptio
 
 final readonly class DownloadCaptions
 {
-    public function __construct(private YtdlpGateway $gateway, private YtdlpOptionsBuilder $options, private MediaItemRepository $mediaItems, private AssetRepository $assets, private VaultPathBuilder $paths, private MoveFileIntoVault $mover)
+    public function __construct(private ExternalInputPluginRegistry $plugins, private MediaItemRepository $mediaItems, private AssetRepository $assets, private VaultPathBuilder $paths, private MoveFileIntoVault $mover)
     {
     }
 
@@ -37,21 +36,39 @@ final readonly class DownloadCaptions
             throw DownloadException::withCode('temp_not_writable', 'Could not create caption staging directory.');
         }
 
-        $this->gateway->download(StashdUri::parse($media->canonicalUri)->toString(), $temp, $this->options->captionOptions($languages, $includeAuto));
-        $files = glob($temp . '/stashd-caption.*.vtt') ?: [];
-        $source = $files[0] ?? null;
+        $plugin = $this->plugins->find($media->providerKey);
+        if ($plugin === null) {
+            throw DownloadException::withCode('captions_unavailable', 'No Input plugin is available for this media item.');
+        }
+
+        $files = $plugin->acquireArtifacts(
+            item: [
+                'id' => $media->providerItemId,
+                'reference' => StashdUri::parse($media->canonicalUri)->toString(),
+                'title' => $media->title,
+                'description' => $media->description,
+                'published_at' => $media->publishedAt?->toRfc3339(useZ: true),
+                'artwork_reference' => $media->thumbnailUri,
+                'duration_seconds' => $media->durationSeconds,
+                'kind' => $media->contentType,
+            ],
+            staging: $temp,
+            mediaKind: 'video',
+            options: ['include_captions' => true, 'caption_languages' => $languages, 'include_auto' => $includeAuto],
+        );
+        $source = array_values(array_filter($files, static fn ($file): bool => $file->role === AssetRole::Subtitle))[0] ?? null;
         if ($source === null) {
             throw DownloadException::withCode('captions_unavailable', 'No requested caption track is available.');
         }
 
-        $language = explode('.', basename($source))[1] ?? null;
+        $language = explode('.', $source->filename)[1] ?? null;
         $asset = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::Subtitle);
         if ($asset !== null && $asset->state === AssetState::Ready) {
             return;
         }
         $asset ??= $this->assets->create($mediaItemId, AssetRole::Subtitle, AssetKind::Subtitle, language: $language);
         $destination = $this->paths->vaultFile($media->providerKey, $media->providerItemId, 'captions.' . ($language ?? 'und') . '.vtt');
-        $this->mover->moveIntoPlace($source, $destination);
+        $this->mover->moveIntoPlace($source->tempPath, $destination);
         $asset->state = AssetState::Ready;
         $asset->path = $destination;
         $asset->relativePath = $this->paths->relativeFile($media->providerKey, $media->providerItemId, basename($destination));

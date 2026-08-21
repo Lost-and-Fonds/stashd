@@ -27,7 +27,7 @@ final readonly class StashInputResource
     public function toArray(): array
     {
         // options.provider is keyed by opaque provider option strings (e.g.
-        // 'include_shorts'), not DTO field names — ApiJson::encode()'s
+        // provider-declared keys), not DTO field names — ApiJson::encode()'s
         // snake/camel key transform must not touch them (it would corrupt any
         // future option key containing an uppercase letter), so it's pulled
         // out before encoding and reattached verbatim. See StashInputOptions

@@ -2,6 +2,13 @@
 
 Status: draft design evidence, 2026-08-11. No WIT interface in this document is frozen.
 
+Migration note, 2026-08-21: the experimental substrate is now exercised by a
+standalone YouTube Input Component through the normal Stashd lifecycle. The
+former in-tree PHP YouTube provider and its ytdlphp wiring have been removed.
+The older strategy names and implementation descriptions below are historical
+design evidence; current provider behavior belongs to `plugins/youtube` and
+generic core selects it by logical provider identity only.
+
 This document designs the semantic Stashd Plugin API from existing behaviour and four capability stress tests. It does not implement a plugin runtime, package format, WIT contract, permissions UI, or plugin conversion.
 
 ## 1. Scope and status

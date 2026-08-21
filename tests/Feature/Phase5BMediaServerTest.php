@@ -55,6 +55,7 @@ test('jellyfin_series broadcast plan includes SxxExxx filenames and nfo sidecars
 });
 
 test('plex_series broadcast rebuild publishes media captions and nfo sidecars', function (): void {
+    requireExternalInputPluginRuntime($this);
     [$headers, $stashId, $mediaItemId] = array_slice($this->bootstrapFakeDownloadStash('plex-rebuild'), 0, 3);
 
     $server = $this->http->post('/api/v1/media-servers', [

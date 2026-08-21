@@ -6,11 +6,6 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Plugins\PluginHostClient;
 use App\Plugins\PluginHttpGrant;
-use App\Providers\Http\FixtureProviderHttpClient;
-use App\Providers\StashdUri;
-use App\Providers\YouTube\YouTubeChannelIdResolver;
-use App\Providers\YouTube\YouTubeRssParser;
-use App\Providers\YouTube\YouTubeUriResolver;
 
 [$script, $socket, $component, $fixtureDirectory, $source] = array_pad($argv, 5, null);
 
@@ -27,6 +22,8 @@ try {
         'https://www.youtube.com/user/',
         'https://www.youtube.com/channel/',
         'https://www.youtube.com/feeds/videos.xml?channel_id=',
+        'https://www.youtube.com/feeds/videos.xml?playlist_id=',
+        'https://www.youtube.com/oembed?format=json&url=',
     ]);
     $resolved = $client->resolveInput($component, $source, $fixtureDirectory, [$httpGrant]);
     $inputId = $resolved->resolved['id'] ?? null;
@@ -35,35 +32,24 @@ try {
     }
     $discovered = $client->discoverInput($component, $inputId, $fixtureDirectory, httpGrants: [$httpGrant]);
 
-    $map = json_decode((string) file_get_contents($fixtureDirectory . '/map.json'), true, flags: JSON_THROW_ON_ERROR);
-    $http = new FixtureProviderHttpClient($fixtureDirectory, $map);
-    $oracleInput = YouTubeUriResolver::resolve(StashdUri::parse($source));
-    $oracleChannel = (new YouTubeChannelIdResolver($http))->resolve($oracleInput->providerInputId);
-    $oracleItems = (new YouTubeRssParser())->parse(
-        $http->get('https://www.youtube.com/feeds/videos.xml?channel_id=' . $oracleChannel->id)->body,
-        'channel',
-    );
-
-    if (($resolved->resolved['id'] ?? null) !== $oracleChannel->id
-        || count($discovered->items ?? []) !== count($oracleItems)
-        || ($discovered->items[0]['id'] ?? null) !== $oracleItems[0]->providerItemId
-        || ($discovered->items[0]['title'] ?? null) !== $oracleItems[0]->title
-        || ($discovered->items[0]['reference'] ?? null) !== $oracleItems[0]->canonicalUri->toString()) {
-        throw new RuntimeException('YouTube plugin parity check failed: ' . json_encode([
+    $items = $discovered->items ?? [];
+    $expectedKind = str_contains($source, 'playlist')
+        ? 'playlist'
+        : ((str_contains($source, 'watch') || str_contains($source, 'shorts') || str_contains($source, 'youtu.be')) ? 'video' : 'channel');
+    if (($resolved->resolved['kind'] ?? null) !== $expectedKind
+        || $items === []
+        || ($items[0]['id'] ?? null) === null
+        || ($items[0]['title'] ?? null) === null
+        || ($items[0]['reference'] ?? null) === null) {
+        throw new RuntimeException('YouTube plugin source/discovery check failed: ' . json_encode([
             'plugin_resolved' => $resolved->resolved,
-            'plugin_first_item' => $discovered->items[0] ?? null,
-            'plugin_count' => count($discovered->items ?? []),
-            'oracle_channel_id' => $oracleChannel->id,
-            'oracle_first_item' => $oracleItems[0]->providerItemId,
-            'oracle_first_title' => $oracleItems[0]->title,
-            'oracle_first_uri' => $oracleItems[0]->canonicalUri->toString(),
-            'oracle_count' => count($oracleItems),
+            'plugin_first_item' => $items[0] ?? null,
+            'plugin_count' => count($items),
         ], JSON_THROW_ON_ERROR));
     }
 
     echo json_encode([
-        'plugin' => ['resolved' => $resolved->resolved, 'items' => $discovered->items, 'progress' => [...$resolved->progress, ...$discovered->progress], 'logs' => [...$resolved->logs, ...$discovered->logs]],
-        'oracle' => ['channel_id' => $oracleChannel->id, 'item_count' => count($oracleItems), 'first_item_id' => $oracleItems[0]->providerItemId, 'first_title' => $oracleItems[0]->title, 'first_uri' => $oracleItems[0]->canonicalUri->toString()],
+        'plugin' => ['resolved' => $resolved->resolved, 'items' => $items, 'progress' => [...$resolved->progress, ...$discovered->progress], 'logs' => [...$resolved->logs, ...$discovered->logs]],
     ], JSON_THROW_ON_ERROR) . "\n";
 } catch (Throwable $exception) {
     fwrite(STDERR, $exception->getMessage() . "\n");

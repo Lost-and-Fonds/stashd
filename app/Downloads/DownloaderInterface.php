@@ -7,8 +7,8 @@ namespace App\Downloads;
 /**
  * Download service boundary — all media acquisition must go through this interface.
  *
- * Phase 4B ships {@see Ytdlp\YtdlpDownloader} via {@see DelegatingDownloader}.
- * Phase 4A fake implementation remains for the fake provider and smoke tests.
+ * The fake implementation remains for deterministic tests; real providers
+ * acquire through registered external Input plugins.
  */
 interface DownloaderInterface
 {
@@ -19,10 +19,8 @@ interface DownloaderInterface
     public function probe(): DownloadProbeResult;
 
     /**
-     * @param ?callable(\Ytdlphp\DownloadProgress): void $onProgress Invoked
-     *     with live progress where the implementation supports it. Not every
-     *     implementation reports progress (e.g. the fake downloader writes
-     *     its fixture instantly) — callers must not assume it will be called.
+     * @param ?callable $onProgress Invoked with implementation progress where
+     *     the implementation supports it.
      */
     public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult;
 }

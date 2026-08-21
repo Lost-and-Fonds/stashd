@@ -89,7 +89,6 @@ COPY docker/entrypoint.sh /usr/local/bin/stashd-entrypoint
 RUN chmod +x /usr/local/bin/stashd-entrypoint
 
 ENV STASHD_HTTP_PORT=8474 \
-    STASHD_YTDLP_BINARY=yt-dlp \
     STASHD_FFMPEG_BINARY=ffmpeg \
     STASHD_DATA_PATH=/data \
     STASHD_MEDIA_PATH=/media \

@@ -157,6 +157,7 @@ test('broadcast.rebuild writes video podcast feed for supported ready video asse
 });
 
 test('caption downloads complete before they queue a podcast rebuild', function (): void {
+    requireExternalInputPluginRuntime($this);
     [$headers, $stashId, $mediaItemId] = podcastFeedReadyStash($this, 'podcast-captions-complete');
     podcastFeedCreateAsset(
         $this->container->get(StashdConfig::class),

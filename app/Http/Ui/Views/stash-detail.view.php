@@ -638,7 +638,7 @@
 					<div class="mt-3">
 						<label class="block">
 							<span class="mb-1 block text-[12px] text-muted">Channel, playlist, or video URL</span>
-							<input type="text" x-model="addInputSourceUri" placeholder="https://www.youtube.com/@..."
+							<input type="text" x-model="addInputSourceUri" placeholder="source reference"
 								class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
 						</label>
 						<div class="mt-4 flex justify-end gap-2">

@@ -11,11 +11,11 @@ Stashd uses a **feature-first** layout under `app/`. Each top-level folder owns 
 | `Commands/` | Command types, dispatch, registry, generic command API | 10 |
 | `Console/` | CLI entrypoints (boot, worker tick, scheduler) | 4 |
 | `Database/` | Schema migrations | 4 |
-| `Downloads/` | Download boundary, ytdlp, fake downloader, policies | 18 |
+| `Downloads/` | Download boundary, external plugin adapter, fake downloader, policies | 18 |
 | `Http/` | Shared HTTP middleware, API helpers, routing decorators | 4 |
 | `Jobs/` | Job types, worker, handlers, jobs API | 18 |
 | `MediaServers/` | Jellyfin/Plex clients, connections, scan triggers | 20 |
-| `Providers/` | Provider registry, YouTube/fake, HTTP clients, `Core/DiscoveredItem` | 35 |
+| `Providers/` | Provider registry, fake provider, `Core/DiscoveredItem` | 35 |
 | `Stashes/` | Stash preflight, create-from-preflight, stash domain | 22 |
 | `System/` | Boot, health, storage, scheduler, activity, events, secrets, state, wiring | 42 |
 | `Support/` | Cross-cutting helpers (`PrefixedUlid`, `RecordTimestamps`) | 3 |
@@ -41,10 +41,8 @@ Repositories sit next to the records they persist (e.g. `App\Broadcasts\Broadcas
 |------|----------|
 | `Broadcasts/Formats/` | `BroadcastFormat` implementations (`filesystem_series`, `jellyfin_series`, `plex_series`) |
 | `Providers/Core/` | `DiscoveredItem` (+ static serialization helpers) |
-| `Providers/YouTube/` | YouTube provider strategies |
-| `Providers/Http/` | Fixture/curl HTTP clients for providers |
+| `Plugins/` | External Component registry and invocation adapters |
 | `MediaServers/Http/` | Fixture/curl HTTP clients for media servers |
-| `Downloads/Ytdlp/` | ytdlphp gateway boundary |
 | `System/Wiring/` | DI initializers (handler registries, downloader routing, HTTP clients) |
 | `Jobs/Handlers/` | Per-intent job handlers |
 
@@ -70,7 +68,6 @@ Several thin wrappers were merged during the refactor:
 | `MediaServerTokenResolver` | `MediaServerConnectionSecrets` |
 | `PreflightExecutor` | `DiscoverStashInput` |
 | `StashFromPreflightService` | `CreateStashFromDiscovery` |
-| `YtdlphpDownloadAdapter` | `YouTubeYtdlpDownloadStrategy` |
 | `DownloadExecutor` | `DownloadMediaItem` |
 | `TempStagingService` | `StageDownloadFiles` |
 | `AtomicFileMover` | `MoveFileIntoVault` |
@@ -99,7 +96,7 @@ Former `app/Bootstrap/*` initializers live in `System/Wiring/`:
 - `CommandHandlerRegistryInitializer` — registers command handlers (broadcast/media-server handlers instantiated with explicit `CommandType`)
 - `JobHandlerRegistryInitializer`
 - `DownloaderInitializer`, `YtdlpGatewayInitializer`, `YtdlpDownloadAdapterInitializer`
-- `ProviderHttpClientInitializer`, `MediaServerHttpClientInitializer`
+- `MediaServerHttpClientInitializer`
 
 Fixture paths in testing initializers resolve from project root (`dirname(__DIR__, 3)` from `System/Wiring/`).
 

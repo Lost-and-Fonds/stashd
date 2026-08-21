@@ -20,10 +20,11 @@ Provider code discovers and describes upstream media. Download code retrieves as
 - Use fixtures/fake providers for normal tests.
 - Live provider tests are opt-in only.
 
-## YouTube / yt-dlp
+## External acquisition plugins
 
-- ytdlphp is the only download/process boundary.
-- Do not shell out directly to `yt-dlp` from domain/application code.
+- External plugins are the download/process boundary for provider-specific acquisition.
+- A plugin may receive a generic helper grant such as `yt-dlp`; core must not shell out
+  to provider helpers or interpret their arguments directly.
 - Minimize bot/rate-limit risk.
 - Prefer fast discovery paths where already designed.
 - Keep provider-specific quirks out of Vault/Broadcast code.

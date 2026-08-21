@@ -1,14 +1,13 @@
 # Providers
 
-Stashd providers resolve stash inputs, discover media items, enrich metadata, and (when enabled) download media through typed strategy handlers.
+Stashd's bundled providers resolve inputs and discover media items. External Input plugins own provider-specific mechanisms and return facts or staged artifacts to the normal Stashd pipeline.
 
 | Capability | Interface / adapter | Phase |
 |---|---|---|
-| Discovery | `DiscoveryStrategyHandler` | 3A+ |
-| Metadata | `MetadataStrategyHandler` | 3B+ |
-| Download | `DownloadStrategyHandler` / `YtdlpDownloadAdapter` | 3B boundary, 4B implementation |
+| Discovery | External Input Component or test provider | current |
+| Acquisition | `DownloaderInterface` and plugin staging adapter | current |
 
-`ProviderStrategySelector` picks the lowest-cost available strategy per purpose. Last-resort strategies (e.g. ytdlp) are excluded unless explicitly allowed.
+Provider-specific mechanism selection happens inside the external plugin. Core only selects the registered logical provider implementation.
 
 ## Fake provider
 
@@ -20,48 +19,17 @@ URIs: `fake://channel/{name}`, `fake://playlist/{name}`, `fake://item/{id}`
 |---|---|---|
 | Discovery | `fake.feed` | Low |
 
-Used for tests, local development, and Docker smoke. Downloads use `FakeDownloader` (never ytdlphp).
+Used for tests, local development, and Docker smoke. Downloads use `FakeDownloader`.
 
 Fixtures: `tests/fixtures/providers/fake/`
 
-## YouTube provider
+## YouTube Input plugin
 
 Key: `youtube`
 
-Supports channel handles, `/channel/UC…`, playlists, watch URLs, and `youtu.be` links.
+The bundled Component under `plugins/youtube` owns YouTube source parsing, RSS/Data API discovery, and yt-dlp acquisition. Its manifest contributes logical provider key `youtube`; the implementation package identity is runtime provenance only.
 
-| Strategy | Key | Cost | Notes |
-|---|---|---|---|
-| Discovery | `youtube.rss` | Low | No API key; RSS/Atom fixtures in CI |
-| Metadata | `youtube.data_api` | Medium | Requires `YOUTUBE_DATA_API_KEY` |
-| Download | `youtube.ytdlp` | Last resort | Real downloads on by default outside tests (`STASHD_REAL_DOWNLOADS_ENABLED`) + yt-dlp |
-
-### Discovery (RSS)
-
-Strategy key: `youtube.rss`
-
-Uses public RSS feeds where possible. CI tests bind `FixtureProviderHttpClient` to fixture HTTP responses under `tests/fixtures/providers/youtube/http/`.
-
-### Metadata (Data API)
-
-Strategy key: `youtube.data_api`
-
-Optional enrichment via YouTube Data API when `YOUTUBE_DATA_API_KEY` is configured. Skipped automatically when the key is absent.
-
-### Download (ytdlp via ytdlphp)
-
-Strategy key: `youtube.ytdlp`
-
-Package: [`hazel/ytdlphp`](https://github.com/hipsterjazzbo/ytdlphp) `^1.0.2`, resolved from its VCS repository (see `composer.json`). Update it with `composer update hazel/ytdlphp`; no local sibling checkout or path repository is required.
-
-All yt-dlp interaction **must** go through ytdlphp (`Ytdlphp\YtDlp`, `Ytdlphp\Options`) behind `YtdlpGateway`. Stashd must not call `shell_exec`, `exec`, `proc_open`, or Symfony/Tempest Process for yt-dlp directly.
-
-Phase 4B ships `YtdlphpDownloadAdapter` + `YtdlpDownloader`:
-
-- Provider strategy probe reports binary/version unless `STASHD_REAL_DOWNLOADS_ENABLED=0` (real downloads are on by default outside `ENVIRONMENT=testing`)
-- Downloads: `RoutingDownloader` → `YtdlpDownloader` → `YtdlpGateway` → ytdlphp → temp staging → existing `DownloadExecutor` Vault ingest
-- Normal CI uses `StubYtdlpGateway` (no network)
-- **Live download progress**: `YtDlp::download()` accepts an optional `$onProgress` callback (ytdlphp's own feature, added alongside this) — when given, it runs the process via `--progress-template` + `--newline` instead of the default blocking call, parsing yt-dlp's own progress fields (`downloaded_bytes`/`total_bytes`/`eta`/`speed`) into `Ytdlphp\DownloadProgress`. `DownloaderInterface::download()`, `YtdlpGateway::download()`, and `DownloadMediaItem::execute()` all thread this callback through; `DownloadJobHandler` forwards it into `JobProgressUpdate::ofPercent()` (throttled to ~1/sec, final update always forwarded) and calls `$context->heartbeat($job)` on the same cadence — the first real per-second heartbeat a download job has ever had, since `executor->execute()` used to block with no callback at all. Percent isn't monotonic across a single download: yt-dlp reports progress per stream, so a merged video+audio download can drop back down when it moves from one stream to the next.
+The Component chooses RSS versus Data API based on semantic discovery intent and granted capabilities. The host supplies bounded HTTP, credential use, staging, and the trusted `yt-dlp` helper without exposing those mechanisms as core provider strategies.
 
 ## Download service
 
@@ -70,8 +38,8 @@ All stash downloads go through `App\Domain\Download\DownloaderInterface`:
 | Implementation | When |
 |---|---|
 | `FakeDownloader` | `providerKey=fake` (tests, dev, Docker smoke) |
-| `YtdlpDownloader` | Non-fake providers, on by default outside tests (`STASHD_REAL_DOWNLOADS_ENABLED`) |
-| `RoutingDownloader` | Default binding; selects the above |
+| External plugin adapter | Registered non-fake provider implementation |
+| `DelegatingDownloader` | Default binding; selects fake or external implementation |
 
 - Command: `item.download` → temp staging → Vault ingest → asset rows
 - Vault originals are not overwritten by default; `force=true` returns `download_force_not_supported`
@@ -88,7 +56,8 @@ tests/fixtures/providers/youtube/http/
 tests/fixtures/providers/fake/
 ```
 
-Map URLs to fixture bodies in `map.json`. Tests bind `FixtureProviderHttpClient` when `ENVIRONMENT=testing`.
+Map URLs to fixture bodies in `map.json`. The plugin host consumes these
+fixture mappings during deterministic Component tests.
 
 Optional live provider tests:
 
@@ -127,7 +96,6 @@ Per the engineering spec, provider domain types are typed internally; raw string
 |---|---|
 | `StashdUri` | Wraps `Tempest\Support\Uri\Uri` — parse, fake URIs, path/query helpers |
 | `ProviderDates` | Parses/constructs `Tempest\DateTime\DateTime` (`tryParse()`, `utc()`) |
-| `YouTubeUris` | Centralized watch/feed/oembed/Data API URL builders |
 | `DiscoveredItem` / `ResolvedInput` | Hold `StashdUri` + `DateTime`; serializers emit `toString()` / RFC3339 `Z` |
 | `Tempest\Support\str()` | String helpers (not raw PHP string functions) |
 
