@@ -32,5 +32,12 @@ export STASHD_PLUGIN_FIXTURE_DIR="$fixture_directory"
 export STASHD_PLUGIN_HELPER_EXECUTABLE="$helper"
 export YOUTUBE_DATA_API_KEY='test-api-key'
 
-ENVIRONMENT=testing DB_CONNECTION=sqlite vendor/bin/pest tests/Feature/ExternalInputPluginLifecycleTest.php --no-progress
+ENVIRONMENT="${ENVIRONMENT:-testing}" \
+DB_CONNECTION="${DB_CONNECTION:-sqlite}" \
+DB_HOST="${DB_HOST:-127.0.0.1}" \
+DB_PORT="${DB_PORT:-5432}" \
+DB_DATABASE="${DB_DATABASE:-stashd}" \
+DB_USERNAME="${DB_USERNAME:-postgres}" \
+DB_PASSWORD="${DB_PASSWORD:-}" \
+vendor/bin/pest tests/Feature/ExternalInputPluginLifecycleTest.php --no-progress
 echo 'external Input plugin lifecycle check passed'

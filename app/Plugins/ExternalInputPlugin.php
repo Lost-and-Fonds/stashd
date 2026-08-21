@@ -92,7 +92,7 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
     {
         return [
             new ProviderStrategy(self::REFRESH, StrategyPurpose::Discovery, StrategyCost::Low, supportsIncremental: true, supportsBackfill: true, priority: 10),
-            new ProviderStrategy(self::COMPLETE, StrategyPurpose::Discovery, StrategyCost::Medium, requiresAuth: true, supportsIncremental: false, supportsBackfill: true, priority: 10),
+            new ProviderStrategy(self::COMPLETE, StrategyPurpose::Discovery, StrategyCost::Medium, requiresAuth: $this->definition->operationRequiresCredential('complete'), supportsIncremental: false, supportsBackfill: true, priority: 10),
         ];
     }
 
@@ -131,9 +131,9 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
         }
 
         return match ($strategy->key) {
-            self::REFRESH => true,
-            self::COMPLETE => $this->definition->hasCredential($this->secrets, 'complete'),
-            self::ACQUIRE => $this->definition->helperExecutable() !== null,
+            self::REFRESH => $this->definition->operationAvailable($this->secrets, 'refresh'),
+            self::COMPLETE => $this->definition->operationAvailable($this->secrets, 'complete'),
+            self::ACQUIRE => $this->definition->operationAvailable($this->secrets, 'acquire'),
             default => false,
         };
     }
@@ -156,7 +156,7 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
     public function probe(): DownloadProbeResult
     {
         return new DownloadProbeResult(
-            available: is_file($this->definition->componentPath) && $this->definition->helperExecutable() !== null,
+            available: is_file($this->definition->componentPath) && $this->definition->operationAvailable($this->secrets, 'acquire'),
             implementation: $this->implementationName(),
             implementationVersion: $this->implementationVersion(),
         );
@@ -165,9 +165,6 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
     public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult
     {
         $helper = $this->definition->helperExecutable();
-        if ($helper === null) {
-            throw DownloadException::withCode('plugin_helper_unavailable', 'External Input plugin helper is unavailable.');
-        }
 
         $item = [
             'id' => $request->providerItemId,
@@ -183,7 +180,9 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
             $this->definition->componentPath,
             $item,
             $request->tempDirectory,
-            new PluginHelperGrant($this->definition->helperName ?? $helper, $helper),
+            $helper !== null
+                ? new PluginHelperGrant($this->definition->helperName ?? $helper, $helper)
+                : null,
             $request->downloadPolicy->value === 'audio_only' ? 'audio' : 'video',
         );
         $artifacts = $result->acquisition['artifacts'] ?? [];

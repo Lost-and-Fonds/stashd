@@ -533,3 +533,24 @@ malformed feeds, unavailable feeds, missing credentials, authentication and
 rate-limit failures, and a later invocation after those failures. It also
 rejects obvious provider-mechanism terms in the generic WIT as a small guard
 against repeating this boundary mistake.
+
+## Declarative plugin UI boundary
+
+Plugins may describe UI, but they do not ship arbitrary frontend code. The
+Stashd frontend remains first-party and renders plugin declarations with its
+own components.
+
+The likely extension surfaces are setup/configuration, Input or Broadcast
+creation options, detail-page fields/status, actions, and badges/adornments.
+The control vocabulary should remain small and evidence-driven; the current
+working candidates are `text`, `textarea`, `number`, `boolean`, `select`,
+`multi-select`, `secret`, and `url`. This is a direction, not a final schema.
+
+Static UI metadata can come from a manifest or description: labels, help text,
+fixed fields, and credential configuration. Dynamic metadata may require a
+plugin invocation for remote choices, status, actions, or discovered options.
+
+The first version must not accept arbitrary Vue, plugin JavaScript, plugin CSS,
+custom routes, navigation entries, or iframe mini-apps. Podcast is the next
+real stress test for a declarative Broadcast UI contract; this Input milestone
+does not implement that migration.

@@ -129,7 +129,7 @@ final class PluginHostClient
         string $componentPath,
         array $item,
         string $stagingDirectory,
-        PluginHelperGrant $helper,
+        ?PluginHelperGrant $helper,
         string $mediaKind = 'video',
         bool $includeCaptions = false,
         ?string $captionLanguages = null,

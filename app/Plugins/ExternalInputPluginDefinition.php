@@ -12,6 +12,7 @@ final readonly class ExternalInputPluginDefinition
     /**
      * @param list<string> $sourcePrefixes
      * @param list<array<string, mixed>> $httpGrants
+     * @param array<string, list<string>> $operations
      */
     public function __construct(
         public string $id,
@@ -21,6 +22,7 @@ final readonly class ExternalInputPluginDefinition
         public string $socketPath,
         public array $sourcePrefixes,
         public array $httpGrants,
+        public array $operations,
         public ?string $helperName,
         public ?string $helperExecutable,
     ) {
@@ -47,6 +49,7 @@ final readonly class ExternalInputPluginDefinition
             static fn (mixed $prefix): bool => is_string($prefix) && trim($prefix) !== '',
         ));
         $httpGrants = self::mapList($manifest['http_grants'] ?? []);
+        $operations = self::operationMap($manifest['operations'] ?? []);
         $helper = self::stringMapOrNull($manifest['helper'] ?? null);
 
         return new self(
@@ -57,11 +60,50 @@ final readonly class ExternalInputPluginDefinition
             socketPath: $socketPath,
             sourcePrefixes: $sourcePrefixes,
             httpGrants: $httpGrants,
+            operations: $operations,
             helperName: $helper !== null ? $string($helper, 'name') : null,
             helperExecutable: $helper !== null
                 ? self::environmentOverride($helper, 'executable')
                 : null,
         );
+    }
+
+    public function supportsOperation(string $operation): bool
+    {
+        return array_key_exists($operation, $this->operations);
+    }
+
+    public function operationRequiresCredential(string $operation): bool
+    {
+        return $this->hasRequirement($operation, 'credential:');
+    }
+
+    public function operationRequiresHelper(string $operation): bool
+    {
+        return $this->hasRequirement($operation, 'helper:');
+    }
+
+    public function operationAvailable(SecretsService $secrets, string $operation): bool
+    {
+        if (! $this->supportsOperation($operation)) {
+            return false;
+        }
+
+        foreach ($this->operations[$operation] as $requirement) {
+            if (str_starts_with($requirement, 'credential:')) {
+                if (! $this->hasCredential($secrets, $operation, substr($requirement, strlen('credential:')))) {
+                    return false;
+                }
+            } elseif (str_starts_with($requirement, 'helper:')) {
+                if ($this->helperName !== substr($requirement, strlen('helper:')) || $this->helperExecutable() === null) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** @return list<PluginHttpGrant> */
@@ -109,10 +151,10 @@ final readonly class ExternalInputPluginDefinition
         return $grants;
     }
 
-    public function hasCredential(SecretsService $secrets, string $operation): bool
+    public function hasCredential(SecretsService $secrets, string $operation, ?string $name = null): bool
     {
         foreach ($this->httpGrants($secrets, $operation) as $grant) {
-            if ($grant->credential !== null) {
+            if ($grant->credential !== null && ($name === null || $grant->credential->name === $name)) {
                 return true;
             }
         }
@@ -125,6 +167,17 @@ final readonly class ExternalInputPluginDefinition
         return $this->helperExecutable !== null && trim($this->helperExecutable) !== ''
             ? $this->helperExecutable
             : null;
+    }
+
+    private function hasRequirement(string $operation, string $prefix): bool
+    {
+        foreach ($this->operations[$operation] ?? [] as $requirement) {
+            if (str_starts_with($requirement, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function resolvePath(string $root, string $path): string
@@ -194,5 +247,27 @@ final readonly class ExternalInputPluginDefinition
         }
 
         return $list;
+    }
+
+    /** @return array<string, list<string>> */
+    private static function operationMap(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $operations = [];
+        foreach ($value as $operation => $requirements) {
+            if (! is_string($operation) || ! is_array($requirements)) {
+                continue;
+            }
+
+            $operations[$operation] = array_values(array_filter(
+                $requirements,
+                static fn (mixed $requirement): bool => is_string($requirement) && trim($requirement) !== '',
+            ));
+        }
+
+        return $operations;
     }
 }
