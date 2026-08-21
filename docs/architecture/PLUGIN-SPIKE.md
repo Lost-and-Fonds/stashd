@@ -213,6 +213,20 @@ Future Stashd core would perform:
 
 Do NOT implement the full preservation pipeline in this spike.
 
+## Known proof limitation: whole-file buffering
+
+This spike intentionally buffers the fixture-sized proof data in memory. The
+Rust host reads the granted asset with `fs::read` in `plugin-host/src/main.rs`
+and stores it in `VaultAssetResource::bytes`. It also accumulates every staged
+write in `StagingOutputResource::bytes` before `finish` writes the complete
+buffer to the staging path.
+
+That is not suitable for multi-gigabyte media. The smallest likely follow-up
+is to replace those two invocation-local buffers with host-owned seekable input
+and append-only staging handles, preserving the same opaque WIT resources and
+chunked calls. The follow-up should measure the Wasm boundary's copy costs
+before introducing a larger streaming abstraction.
+
 ---
 
 # Invocation-scoped grants

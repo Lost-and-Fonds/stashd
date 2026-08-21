@@ -28,7 +28,7 @@ impl Guest for ExamplePlugin {
             panic!("deliberate example plugin trap");
         }
 
-        let source_bytes = VaultAsset::size(&asset);
+        let source_bytes = VaultAsset::size(asset);
         host::report_progress(&host::Progress {
             fraction: 0.5,
             stage: "reading asset".to_owned(),
@@ -37,11 +37,11 @@ impl Guest for ExamplePlugin {
         let mut offset = 0;
         while offset < source_bytes {
             let maximum = (source_bytes - offset).min(1024) as u32;
-            let chunk = VaultAsset::read(&asset, offset, maximum).map_err(|error| {
+            let chunk = VaultAsset::read(asset, offset, maximum).map_err(|error| {
                 PluginError::HostFailure(format!("asset read failed: {error:?}"))
             })?;
             let chunk_len = chunk.len() as u64;
-            StagingOutput::write(&staging, &chunk).map_err(|error| {
+            StagingOutput::write(staging, &chunk).map_err(|error| {
                 PluginError::HostFailure(format!("staging write failed: {error:?}"))
             })?;
             offset += chunk_len;
@@ -51,7 +51,7 @@ impl Guest for ExamplePlugin {
             fraction: 0.8,
             stage: "writing output".to_owned(),
         });
-        let output = StagingOutput::finish(&staging).map_err(|error| {
+        let output = StagingOutput::finish(staging).map_err(|error| {
             PluginError::HostFailure(format!("staging finish failed: {error:?}"))
         })?;
         host::report_progress(&host::Progress {
