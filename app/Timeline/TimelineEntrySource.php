@@ -8,5 +8,4 @@ enum TimelineEntrySource: string
 {
     case Provider = 'provider';
     case Ytdlp = 'yt_dlp';
-    case SponsorBlock = 'sponsorblock';
 }

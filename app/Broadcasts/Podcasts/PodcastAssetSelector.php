@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Broadcasts\Podcasts;
 
-use App\Broadcasts\BroadcastItemId;
-use App\Broadcasts\BroadcastItemRecord;
 use App\Vault\AssetKind;
 use App\Vault\AssetRecord;
 use App\Vault\AssetRepository;
@@ -57,21 +55,6 @@ final readonly class PodcastAssetSelector
         }
 
         return null;
-    }
-
-    public function assetForBroadcastItem(BroadcastItemRecord $item, PodcastMediaKind $kind): ?PodcastAssetSelection
-    {
-        $asset = $this->assets->findByBroadcastItemAndRole(BroadcastItemId::fromPrimaryKey($item->id), AssetRole::RemuxedVideo);
-
-        if ($asset === null || $asset->state !== AssetState::Ready || $asset->path === null || ! is_file($asset->path)) {
-            return null;
-        }
-
-        $mimeType = $kind === PodcastMediaKind::Audio
-            ? $this->mimeTypes->forAudioAsset($asset)
-            : $this->mimeTypes->forVideoAsset($asset);
-
-        return $mimeType === null ? null : $this->selection($asset, $mimeType);
     }
 
     public function artworkAsset(MediaItemId $mediaItemId): ?AssetRecord

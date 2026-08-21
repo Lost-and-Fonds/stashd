@@ -5,11 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Broadcasts\BroadcastId;
-use App\Broadcasts\BroadcastItemId;
-use App\Broadcasts\BroadcastItemRecord;
 use App\Broadcasts\BroadcastPathBuilder;
 use App\Broadcasts\BroadcastRecord;
-use App\Broadcasts\SponsorBlockSegment;
 use App\Config\StashdConfig;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashItemState;
@@ -17,8 +14,6 @@ use App\System\Activity\ActivityEventRecord;
 use App\System\Secret\SecretRepository;
 use App\System\Secret\SecretsService;
 use App\System\Secret\SecretType;
-use App\Timeline\SponsorBlockTimelineSynchronizer;
-use App\Timeline\TimelineEntryCategory;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
@@ -144,49 +139,6 @@ test('valid video podcast episode token returns an X-Accel-Redirect to the Vault
         ->assertHeaderContains('X-Accel-Redirect', '/vault' . podcastEpisodeExpectedAccelPath($mediaItemId, 'original.mp4'));
 
     expect($response->body)->toBeNull();
-});
-
-test('SponsorBlock podcast episode token returns an X-Accel-Redirect to its broadcast remux', function (): void {
-    [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-sponsorblock');
-    $config = $this->container->get(StashdConfig::class);
-    $assets = $this->container->get(AssetRepository::class);
-    podcastEpisodeCreateAsset($config, $assets, $mediaItemId, AssetKind::Video, 'original.mp4', 'video/mp4', 'episode-video-bytes');
-
-    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'podcast',
-        'name' => 'SponsorBlock Episode',
-        'slug' => 'episode-sponsorblock-' . bin2hex(random_bytes(3)),
-        'settings' => ['media_kind' => 'video', 'sponsorblock_enabled' => true, 'sponsorblock_categories' => ['sponsor']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->container->get(SponsorBlockTimelineSynchronizer::class)->sync(
-        MediaItemId::parse($mediaItemId),
-        [new SponsorBlockSegment('segment-1', TimelineEntryCategory::Sponsor, 15.0, 30.0, 'Ad read', ['UUID' => 'segment-1'])],
-    );
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $feedXml = (string) file_get_contents(podcastEpisodeFeedPath($config, $broadcast->body['broadcast']['id']));
-    $parts = podcastEpisodeUrlParts(podcastEpisodeEnclosureUrlFromFeed($feedXml));
-    $item = BroadcastItemRecord::select()->where('broadcastId', $broadcast->body['broadcast']['id'])->first();
-    $remux = $assets->findByBroadcastItemAndRole(BroadcastItemId::fromPrimaryKey($item->id), AssetRole::RemuxedVideo);
-    $relative = substr((string) $remux?->path, strlen(rtrim($config->broadcastsPath(), '/') . '/'));
-    $accelPath = '/broadcasts/' . implode('/', array_map(rawurlencode(...), explode('/', $relative)));
-
-    $chapters = $this->http->get('/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode($parts['itemToken']) . '/chapters.json');
-    $chapters->assertStatus(Status::OK)->assertHeaderContains('Content-Type', 'application/json; charset=utf-8');
-    expect(json_decode($chapters->body, true, flags: JSON_THROW_ON_ERROR))->toBe([
-        'version' => '1.2.0',
-        'chapters' => [['startTime' => 15, 'title' => 'Ad read']],
-    ])->and($chapters->body)->not->toContain('segment-1');
-
-    $this->http->get('/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode($parts['itemToken']) . '/episode.mp4')
-        ->assertStatus(Status::OK)
-        ->assertHeaderContains('Content-Type', 'video/mp4')
-        ->assertHeaderContains('X-Accel-Redirect', $accelPath);
 });
 
 test('episode route requires path tokens, not a query parameter', function (): void {

@@ -664,7 +664,6 @@ paths:
                 slug: { type: string, description: Derived from name if omitted }
                 settings:
                   type: object
-                  description: "For SponsorBlock-derived media, set sponsorblock_enabled: true and sponsorblock_categories to a non-empty category list (for example, [sponsor])."
                   additionalProperties: true
       responses:
         "201":
@@ -702,7 +701,6 @@ paths:
               properties:
                 type: { $ref: "#/components/schemas/BroadcastType" }
                 mediaKind: { type: string, description: "PodcastMediaKind (audio/video); only relevant for type=podcast." }
-                sponsorblockEnabled: { type: boolean, description: "Whether the preview should include broadcast-local SponsorBlock-derived media." }
       responses:
         "200":
           description: Preview
@@ -1406,7 +1404,7 @@ components:
     StashInputState: { type: string, enum: [ready, failed, disabled] }
     MediaItemState: { type: string, enum: [discovered, metadata_ready, download_pending, downloading, ready, failed, ignored, missing] }
     UpstreamState: { type: string, enum: [available, unavailable, private, deleted, region_blocked, unknown] }
-    AssetRole: { type: string, enum: [vault_original, source_thumbnail, subtitle, transcript, podcast_audio, episode_artwork, feed_artwork, feed_xml, nfo, hardlink, remuxed_video, metadata_json, source_json] }
+    AssetRole: { type: string, enum: [vault_original, source_thumbnail, subtitle, transcript, podcast_audio, episode_artwork, feed_artwork, feed_xml, nfo, hardlink, metadata_json, source_json] }
     AssetKind: { type: string, enum: [video, audio, image, subtitle, metadata, link, feed, other] }
     AssetState: { type: string, enum: [pending, processing, ready, stale, missing, failed] }
     BroadcastType: { type: string, enum: [jellyfin, plex, podcast] }

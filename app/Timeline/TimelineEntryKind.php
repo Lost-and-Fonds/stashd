@@ -7,5 +7,4 @@ namespace App\Timeline;
 enum TimelineEntryKind: string
 {
     case Chapter = 'chapter';
-    case Segment = 'segment';
 }

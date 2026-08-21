@@ -111,7 +111,6 @@ final readonly class BroadcastController
             StashId::parse($stashId),
             $typeRaw,
             $mediaKind,
-            ($body['sponsorblockEnabled'] ?? false) === true,
         );
 
         return new Json(['preview' => ApiJson::encode($preview->toArray())]);
@@ -191,12 +190,6 @@ final readonly class BroadcastController
         }
 
         $settings = is_array($body['settings'] ?? null) ? ApiJson::encode($body['settings']) : null;
-
-        try {
-            SponsorBlockSettings::fromBroadcastSettings($settings ?? []);
-        } catch (\InvalidArgumentException $exception) {
-            return $this->validationError($exception->getMessage());
-        }
 
         $destinationPath = $settings['destination_path'] ?? null;
 

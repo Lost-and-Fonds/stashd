@@ -12,8 +12,6 @@ final readonly class BroadcastCreationPreview
         public int $vaultSizeBytes,
         public int $hardlinkedItemCount,
         public int $transcodeItemCount,
-        public int $derivedMediaItemCount = 0,
-        public int $derivedMediaBytes = 0,
     ) {
     }
 
@@ -26,8 +24,6 @@ final readonly class BroadcastCreationPreview
             'vaultSizeBytes' => $this->vaultSizeBytes,
             'hardlinkedItemCount' => $this->hardlinkedItemCount,
             'transcodeItemCount' => $this->transcodeItemCount,
-            'derivedMediaItemCount' => $this->derivedMediaItemCount,
-            'derivedMediaBytes' => $this->derivedMediaBytes,
         ];
     }
 }

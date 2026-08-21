@@ -1493,7 +1493,6 @@ function stashDetailComponent(stashId: string) {
 		actionFeedback: null as string | null,
 		newBroadcastType: 'podcast',
 		newBroadcastMediaKind: 'audio',
-		newBroadcastSponsorBlockEnabled: false,
 		newBroadcastName: '',
 		newBroadcastDestinationPath: '',
 		creatingBroadcast: false,
@@ -2187,7 +2186,6 @@ function stashDetailComponent(stashId: string) {
 					body: JSON.stringify({
 						type: this.newBroadcastType,
 						...(this.newBroadcastType === 'podcast' ? { mediaKind: this.newBroadcastMediaKind } : {}),
-						...(this.newBroadcastSponsorBlockEnabled ? { sponsorblockEnabled: true } : {}),
 					}),
 				})
 				if (!response.ok) {
@@ -2236,10 +2234,6 @@ function stashDetailComponent(stashId: string) {
 		async createBroadcast() {
 			this.creatingBroadcast = true
 			const settings: Record<string, unknown> = this.newBroadcastType === 'podcast' ? { media_kind: this.newBroadcastMediaKind } : {}
-			if (this.newBroadcastSponsorBlockEnabled) {
-				settings.sponsorblock_enabled = true
-				settings.sponsorblock_categories = ['sponsor']
-			}
 			const destinationPath = this.newBroadcastDestinationPath.trim()
 			if (destinationPath !== '') settings.destination_path = destinationPath
 			const name = this.newBroadcastName.trim()
@@ -2260,7 +2254,6 @@ function stashDetailComponent(stashId: string) {
 				}
 				this.newBroadcastName = ''
 				this.newBroadcastDestinationPath = ''
-				this.newBroadcastSponsorBlockEnabled = false
 				this.broadcastPreview = null
 				this.error = null
 				await this.refresh()

@@ -353,12 +353,6 @@
 						<input type="text" x-model="newBroadcastDestinationPath" placeholder="Destination path (optional) — e.g. /mnt/nas/media/TV"
 							class="mt-2 w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
 
-						<label class="mt-2 flex items-center gap-2 text-[12px] text-muted">
-							<input type="checkbox" x-model="newBroadcastSponsorBlockEnabled" x-on:change="cancelBroadcastPreview()"
-								class="rounded border-line bg-espresso text-amber focus:ring-amber"/>
-							<span>Skip SponsorBlock sponsor segments (experimental; creates broadcast-local media)</span>
-						</label>
-
 						<p class="mt-2 text-[12px] text-muted" x-show="isSeriesBroadcastType(newBroadcastType) && inputs.length > 1">
 							Multiple inputs go into Season 01 by default — you can map each one to its own season from this broadcast's card once it's created.
 						</p>

@@ -13,8 +13,6 @@ final class StubFfmpegGateway implements FfmpegGateway
 {
     public int $transcodeCalls = 0;
 
-    public int $remuxCalls = 0;
-
     public bool $failNextTranscode = false;
 
     public function probe(): FfmpegProbeResult
@@ -55,11 +53,4 @@ final class StubFfmpegGateway implements FfmpegGateway
         return new FfmpegTranscodeResult(successful: true, exitCode: 0);
     }
 
-    public function remuxWithChapters(string $sourcePath, string $destinationPath, string $chaptersMetadata): FfmpegTranscodeResult
-    {
-        $this->remuxCalls++;
-        file_put_contents($destinationPath, "stub-ffmpeg-remux\nsource={$sourcePath}\n{$chaptersMetadata}");
-
-        return new FfmpegTranscodeResult(successful: true, exitCode: 0);
-    }
 }

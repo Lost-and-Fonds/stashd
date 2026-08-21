@@ -28,7 +28,7 @@ feature belongs in the Input contract.
 | Audio-only acquisition | Format policy and MP3 output | Component owns audio format selection | Fixture path proven |
 | Captions/language selection | Existing downloader/provider options | Generic persisted option values are passed opaquely to the Component, which owns yt-dlp flags | Parity for the demonstrated caption path |
 | Provider-specific retry classification | Bot check, rate limit, transient unavailable, timeout | Typed plugin/helper/runtime failures, with less detailed provider classification | Gap |
-| SponsorBlock | Core behavior is keyed to `providerKey === 'youtube'` | Component items currently use `youtube-component` | Transitional coupling remains |
+| SponsorBlock | Removed from Stashd | Not part of the Component | No migration or parity blocker |
 
 ## Input options classification
 
@@ -40,16 +40,13 @@ feature belongs in the Input contract.
 - Caption/subtitle selection is acquisition configuration and belongs inside
   the YouTube plugin, with a small generic acquisition-options mapping if a
   real migration requires it.
-- SponsorBlock is optional enrichment/post-processing, not Input discovery.
-  It should not be added to the Input contract in this milestone.
+- SponsorBlock was removed from Stashd rather than carried into the external
+  plugin or generalized as an enrichment contract.
 
 ## SponsorBlock disposition
 
-`SponsorBlockProviderEligibility` accepts persisted media items whose logical
-`providerKey` is `youtube`. The external manifest declares that same logical
-key, while retaining `youtube-component` only as implementation provenance.
-Existing SponsorBlock behavior therefore remains unchanged. A full
-enrichment plugin API is deferred.
+SponsorBlock is removed from Stashd. It is not part of the Input contract,
+external Component, lifecycle, persistence model, or migration decision.
 
 ## Progress disposition
 

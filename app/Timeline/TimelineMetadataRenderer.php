@@ -29,17 +29,6 @@ final readonly class TimelineMetadataRenderer
         return $metadata;
     }
 
-    public function hasSponsorBlockEntries(MediaItemId $mediaItemId): bool
-    {
-        foreach ($this->entries->listForMediaItem($mediaItemId) as $entry) {
-            if ($entry->source === TimelineEntrySource::SponsorBlock) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     public function hasEntries(MediaItemId $mediaItemId): bool
     {
         return $this->entries->listForMediaItem($mediaItemId) !== [];

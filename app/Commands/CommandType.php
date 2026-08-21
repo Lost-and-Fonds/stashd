@@ -20,7 +20,6 @@ enum CommandType: string
     case StashRetryFailed = 'stash.retry_failed';
     case SystemBoot = 'system.boot';
     case SystemStorageCheck = 'system.storage_check';
-    case SystemSponsorBlockRefresh = 'system.sponsorblock_refresh';
     case ItemDownload = 'item.download';
     case AssetVerify = 'asset.verify';
     case SystemVerifyVault = 'system.verify_vault';

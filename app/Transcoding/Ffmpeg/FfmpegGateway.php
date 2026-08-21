@@ -22,5 +22,4 @@ interface FfmpegGateway
         ?callable $onProgress = null,
     ): FfmpegTranscodeResult;
 
-    public function remuxWithChapters(string $sourcePath, string $destinationPath, string $chaptersMetadata): FfmpegTranscodeResult;
 }

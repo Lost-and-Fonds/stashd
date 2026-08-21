@@ -4,26 +4,16 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Broadcasts\BroadcastChapterRemuxer;
-use App\Broadcasts\BroadcastException;
 use App\Broadcasts\BroadcastFilenameBuilder;
 use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastLifecycleService;
 use App\Broadcasts\BroadcastPathBuilder;
 use App\Broadcasts\BroadcastRepository;
 use App\Broadcasts\HardlinkPublisher;
-use App\Broadcasts\SponsorBlockRefreshRepository;
-use App\Broadcasts\SponsorBlockSegment;
 use App\Config\StashdConfig;
 use App\Stashes\StashId;
 use App\Stashes\StashItemRecord;
 use App\System\Activity\ActivityEventRecord;
-use App\System\Scheduler\SponsorBlockRefreshScheduler;
-use App\Timeline\SponsorBlockTimelineSynchronizer;
-use App\Timeline\TimelineEntryCategory;
-use App\Timeline\TimelineEntryKind;
-use App\Timeline\TimelineEntryRepository;
-use App\Timeline\TimelineEntrySource;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
@@ -127,24 +117,6 @@ test('previewing a jellyfin broadcast reports eligible items and their vault siz
         ->and($preview['vault_size_bytes'])->toBeGreaterThan(0)
         ->and($preview['hardlinked_item_count'])->toBe(1)
         ->and($preview['transcode_item_count'])->toBe(0);
-});
-
-test('previewing SponsorBlock chapters reports potential derived media storage', function (): void {
-    [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('broadcast-preview-sponsorblock');
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'item.download',
-        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $preview = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts/preview', [
-        'type' => 'jellyfin',
-        'sponsorblock_enabled' => true,
-    ], headers: $headers)->assertOk()->body['preview'];
-
-    expect($preview['derived_media_item_count'])->toBe(1)
-        ->and($preview['derived_media_bytes'])->toBeGreaterThan(0);
 });
 
 test('previewing an audio podcast counts video-sourced episodes as needing transcode', function (): void {
@@ -365,151 +337,6 @@ test('broadcast.rebuild publishes hardlinks from vault originals', function (): 
         expect(filesize($vaultPath))->toBe(filesize($publishedPath));
         expect(file_get_contents($vaultPath))->toBe(file_get_contents($publishedPath));
     }
-});
-
-test('broadcast publication schedules one delayed SponsorBlock refresh per item', function (): void {
-    [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('broadcast-sponsorblock-refresh');
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'item.download',
-        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $mediaItem = MediaItemRecord::findById(new \Tempest\Database\PrimaryKey($mediaItemId));
-    $mediaItem->providerKey = 'youtube';
-    $mediaItem->save();
-    $broadcast = $this->container->get(BroadcastRepository::class)->find(BroadcastId::parse($broadcastId));
-    $broadcast->settings = ['sponsorblock_enabled' => true, 'sponsorblock_categories' => ['sponsor']];
-    $this->container->get(BroadcastRepository::class)->save($broadcast);
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcastId],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $itemId = $this->http->get('/api/v1/broadcasts/' . $broadcastId . '/items', headers: $headers)
-        ->assertOk()
-        ->body['items'][0]['id'];
-    $refreshes = $this->container->get(SponsorBlockRefreshRepository::class);
-
-    $refresh = $refreshes->findForBroadcastItem(\App\Broadcasts\BroadcastItemId::parse($itemId));
-    expect($refresh)->not->toBeNull()
-        ->and($refresh->nextCheckAt->equals($refresh->createdAt))->toBeTrue()
-        ->and($refresh->expiresAt->equals($refresh->createdAt->plusDays(7)))->toBeTrue();
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcastId],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    expect($refreshes->listDue(\Tempest\DateTime\DateTime::now(\Tempest\DateTime\Timezone::UTC)))->toHaveCount(1);
-
-    expect($this->container->get(SponsorBlockRefreshScheduler::class)->scheduleDueRefresh())->toBeTrue()
-        ->and(\App\Jobs\JobRecord::select()->where('intent', \App\Jobs\JobIntent::SponsorBlockRefresh)->first())->not->toBeNull();
-});
-
-test('SponsorBlock synchronization preserves provider chapters and ignores unchanged segments', function (): void {
-    [, , $mediaItemId] = $this->bootstrapFakeDownloadBroadcast('broadcast-sponsorblock-timeline');
-    $mediaItem = MediaItemId::parse($mediaItemId);
-    $entries = $this->container->get(TimelineEntryRepository::class);
-    $entries->create($mediaItem, TimelineEntrySource::Provider, TimelineEntryKind::Chapter, TimelineEntryCategory::Chapter, 0.0, 60.0, 'Provider chapter');
-    $segments = [new SponsorBlockSegment('segment-1', TimelineEntryCategory::Sponsor, 15.0, 30.0, 'Ad read', ['UUID' => 'segment-1'])];
-    $synchronizer = $this->container->get(SponsorBlockTimelineSynchronizer::class);
-
-    expect($synchronizer->sync($mediaItem, $segments))->toBeTrue()
-        ->and($synchronizer->sync($mediaItem, $segments))->toBeFalse()
-        ->and($entries->listForMediaItem($mediaItem))->toHaveCount(2)
-        ->and($entries->listForMediaItem($mediaItem)[0]->source)->toBe(TimelineEntrySource::Provider)
-        ->and($entries->listForMediaItem($mediaItem)[1]->source)->toBe(TimelineEntrySource::SponsorBlock);
-});
-
-test('SponsorBlock chapters produce a broadcast-local remux without changing the Vault asset', function (): void {
-    [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('broadcast-sponsorblock-remux');
-    $this->http->post('/api/v1/commands', [
-        'type' => 'item.download',
-        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $broadcast = $this->container->get(BroadcastRepository::class)->find(BroadcastId::parse($broadcastId));
-    $broadcast->settings = ['sponsorblock_enabled' => true, 'sponsorblock_categories' => ['sponsor']];
-    $this->container->get(BroadcastRepository::class)->save($broadcast);
-    $mediaItem = MediaItemId::parse($mediaItemId);
-    $assets = $this->container->get(AssetRepository::class);
-    $vault = $assets->readyVaultOriginalsByMediaItem([$mediaItemId])[$mediaItemId];
-    $mp4Path = $vault->path . '.mp4';
-    rename($vault->path, $mp4Path);
-    $vault->path = $mp4Path;
-    $assets->save($vault);
-    $this->container->get(SponsorBlockTimelineSynchronizer::class)->sync(
-        $mediaItem,
-        [new SponsorBlockSegment('segment-1', TimelineEntryCategory::Sponsor, 15.0, 30.0, 'Ad read', ['UUID' => 'segment-1'])],
-    );
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcastId],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $publishedPath = $this->http->get('/api/v1/broadcasts/' . $broadcastId . '/items', headers: $headers)
-        ->assertOk()
-        ->body['items'][0]['published_path'];
-    $vaultPath = $assets->readyVaultOriginalsByMediaItem([$mediaItemId])[$mediaItemId]->path;
-
-    expect(HardlinkPublisher::sameFile($vaultPath, $publishedPath))->toBeFalse()
-        ->and(file_get_contents($publishedPath))->toContain('stub-ffmpeg-remux')
-        ->and(file_get_contents($vaultPath))->not->toContain('stub-ffmpeg-remux');
-});
-
-test('chapter remux rejects a broadcast container that cannot carry chapters', function (): void {
-    [, , $mediaItemId] = $this->bootstrapFakeDownloadBroadcast('broadcast-chapters-unsupported');
-    $mediaItem = MediaItemId::parse($mediaItemId);
-    $this->container->get(SponsorBlockTimelineSynchronizer::class)->sync(
-        $mediaItem,
-        [new SponsorBlockSegment('segment-1', TimelineEntryCategory::Sponsor, 15.0, 30.0, 'Ad read', ['UUID' => 'segment-1'])],
-    );
-
-    try {
-        $this->container->get(BroadcastChapterRemuxer::class)->remux(
-            $mediaItem,
-            '/not-used/source.mp4',
-            $this->container->get(StashdConfig::class)->broadcastsPath() . '/unsupported.avi',
-        );
-    } catch (BroadcastException $exception) {
-        expect($exception->errorCode)->toBe('broadcast_chapters_unsupported')
-            ->and($exception->getMessage())->toBe('The broadcast container cannot carry chapters.');
-
-        return;
-    }
-
-    throw new \RuntimeException('Expected unsupported chapter container to be rejected.');
-});
-
-test('SponsorBlock polling ignores unsupported provider items', function (): void {
-    [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('broadcast-sponsorblock-unsupported');
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'item.download',
-        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $broadcast = $this->container->get(BroadcastRepository::class)->find(BroadcastId::parse($broadcastId));
-    $broadcast->settings = ['sponsorblock_enabled' => true, 'sponsorblock_categories' => ['sponsor']];
-    $this->container->get(BroadcastRepository::class)->save($broadcast);
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcastId],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    expect($this->container->get(SponsorBlockRefreshRepository::class)
-        ->listDue(\Tempest\DateTime\DateTime::now(\Tempest\DateTime\Timezone::UTC)))->toBeEmpty();
 });
 
 test('broadcast.rebuild_item republishes only the selected broadcast item', function (): void {

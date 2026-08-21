@@ -791,7 +791,7 @@ id
 media_item_id
 broadcast_id
 broadcast_item_id
-role                  vault_original | source_thumbnail | subtitle | transcript | podcast_audio | episode_artwork | feed_artwork | feed_xml | nfo | hardlink | remuxed_video | metadata_json | source_json
+role                  vault_original | source_thumbnail | subtitle | transcript | podcast_audio | episode_artwork | feed_artwork | feed_xml | nfo | hardlink | metadata_json | source_json
 kind                  video | audio | image | subtitle | metadata | link | feed | other
 path
 relative_path
@@ -2732,10 +2732,6 @@ AI summaries/search
 full-text transcript search
 chapter metadata model
 source/provider chapter capture
-SponsorBlock segment fetch/refresh
-media-server metadata refresh when new segments arrive
-optional segment marking in broadcasts
-optional segment removal in derived broadcast assets
 multiple Stashd nodes
 advanced editorial metadata editor
 ```
@@ -2768,11 +2764,11 @@ If Stashd becomes boring infrastructure, it has succeeded.
 
 ---
 
-# 36. Future: Chapters and SponsorBlock
+# 36. Future: Chapters
 
 ## Status
 
-Chapter and SponsorBlock support are **not required for v1**, but the v1 data model and asset/enrichment pipeline should not make them difficult to add later.
+Chapter support is **not required for v1**, but the v1 data model should not make it difficult to add later.
 
 ## Native / Provider Chapters
 
@@ -2782,9 +2778,9 @@ Future chapter metadata should support:
 
 ```text
 media_item_id
-source                 provider | yt_dlp | sponsorblock | user
-kind                   chapter | segment | marker
-category               chapter | sponsor | intro | outro | selfpromo | interaction | music_offtopic | preview | filler | highlight | other
+source                 provider | yt_dlp | user
+kind                   chapter | marker
+category               chapter | other
 title
 start_seconds
 end_seconds
@@ -2809,63 +2805,20 @@ embedded media chapters
 chapter-aware UI display
 ```
 
-## SponsorBlock Integration
-
-SponsorBlock support is a good v2 feature.
-
-SponsorBlock data should be treated as **time-based segment metadata**, not as destructive editing by default.
-
-Default future behavior should be:
-
-```text
-fetch SponsorBlock segments
-store segment metadata
-mark/label segments where supported
-update affected broadcasts/media-server metadata
-do not cut media by default
-```
-
-Removing/skipping segments should be explicit and opt-in.
-
-## Timing Problem
-
-SponsorBlock data may not exist when a video is first downloaded.
-
-Stashd should support delayed availability:
-
-```text
-download item
-capture initial metadata/chapters
-schedule future SponsorBlock segment refresh
-fetch segments later
-mark chapter/segment asset stale or ready
-rebuild affected broadcast metadata
-trigger Jellyfin/Plex rescan if needed
-update podcast feeds/chapters if needed
-```
-
-This means SponsorBlock refresh is not part of the initial download contract. It is an enrichment/repair job that can run later.
-
 ## Suggested Future Jobs
 
 ```text
 chapters.capture
 chapters.refresh
-sponsorblock.fetch
-sponsorblock.refresh
 broadcast.refresh_chapters
 media_server.refresh_metadata
 ```
 
 ## Rules
 
-- SponsorBlock integration must be optional.
-- SponsorBlock segments should be stored with provenance.
-- Stashd should distinguish provider chapters from SponsorBlock segments.
 - Stashd should not destructively modify Vault originals.
-- Segment removal from broadcast derivatives may be supported later, but only with explicit user configuration.
-- Media-server broadcasts should be marked stale when new chapter/segment metadata becomes available.
-- Podcast broadcasts should be able to regenerate feeds/chapters when segment metadata changes.
+- Media-server broadcasts should be marked stale when new chapter metadata becomes available.
+- Podcast broadcasts should be able to regenerate feeds/chapters when chapter metadata changes.
 
 ## v2 Roadmap Note
 
@@ -2874,10 +2827,7 @@ Add to v2 candidates:
 ```text
 chapter metadata model
 source/provider chapter capture
-SponsorBlock segment fetch/refresh
-media-server metadata refresh when new segments arrive
-optional segment marking in broadcasts
-optional segment removal in derived broadcast assets
+media-server metadata refresh when new chapters arrive
 ```
 
 ## Misc Notes

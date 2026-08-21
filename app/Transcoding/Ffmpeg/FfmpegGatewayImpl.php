@@ -103,44 +103,6 @@ final readonly class FfmpegGatewayImpl implements FfmpegGateway
         return new FfmpegTranscodeResult(successful: true, exitCode: $result->exitCode);
     }
 
-    public function remuxWithChapters(string $sourcePath, string $destinationPath, string $chaptersMetadata): FfmpegTranscodeResult
-    {
-        $metadataPath = tempnam(sys_get_temp_dir(), 'stashd-ffmetadata-');
-
-        if ($metadataPath === false || file_put_contents($metadataPath, $chaptersMetadata) === false) {
-            throw new \RuntimeException('Could not prepare chapter metadata.');
-        }
-
-        try {
-            $result = $this->executor->run(new PendingProcess(
-                command: [
-                    $this->config->binary,
-                    '-y',
-                    '-loglevel', 'error',
-                    '-i', $sourcePath,
-                    '-i', $metadataPath,
-                    '-map', '0',
-                    '-map_metadata', '0',
-                    '-map_chapters', '1',
-                    '-c', 'copy',
-                    $destinationPath,
-                ],
-                timeout: Duration::seconds($this->config->timeoutSeconds),
-            ));
-        } finally {
-            @unlink($metadataPath);
-        }
-
-        if (! $result->successful()) {
-            throw new FfmpegProcessFailedException(
-                $result,
-                $this->redact($result->errorOutput) ?: 'ffmpeg exited with status ' . $result->exitCode,
-            );
-        }
-
-        return new FfmpegTranscodeResult(successful: true, exitCode: $result->exitCode);
-    }
-
     /**
      * Consumes complete `key=value` lines from the start of `$buffer`, leaving
      * any trailing partial line for the next chunk. ffmpeg's `-progress`

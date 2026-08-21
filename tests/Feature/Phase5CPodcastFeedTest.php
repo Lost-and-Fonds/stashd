@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Broadcasts\BroadcastItemId;
 use App\Broadcasts\BroadcastItemRecord;
 use App\Broadcasts\BroadcastPathBuilder;
 use App\Broadcasts\BroadcastPluginRegistry;
 use App\Broadcasts\BroadcastRecord;
 use App\Broadcasts\Plugins\PodcastBroadcastPlugin;
-use App\Broadcasts\SponsorBlockSegment;
 use App\Config\StashdConfig;
 use App\Jobs\JobIntent;
 use App\Jobs\JobRecord;
@@ -18,8 +16,6 @@ use App\Jobs\JobState;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashItemState;
 use App\System\Activity\ActivityEventRecord;
-use App\Timeline\SponsorBlockTimelineSynchronizer;
-use App\Timeline\TimelineEntryCategory;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
@@ -158,44 +154,6 @@ test('broadcast.rebuild writes video podcast feed for supported ready video asse
         ->and((string) $xml->channel->item->enclosure['url'])->toContain('/episode.mp4')
         ->and((string) $xml->channel->item->enclosure['type'])->toBe('video/mp4')
         ->and((string) $xml->channel->item->children('http://www.itunes.com/dtds/podcast-1.0.dtd')->duration)->toBe('630');
-});
-
-test('SponsorBlock chapters create a podcast-local remux for the episode', function (): void {
-    [$headers, $stashId, $mediaItemId] = podcastFeedReadyStash($this, 'podcast-sponsorblock-remux');
-    $config = $this->container->get(StashdConfig::class);
-    $assets = $this->container->get(AssetRepository::class);
-    podcastFeedCreateAsset($config, $assets, $mediaItemId, AssetKind::Video, 'original.mp4', 'video/mp4', 'video-bytes');
-
-    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'podcast',
-        'name' => 'SponsorBlock Feed',
-        'slug' => 'sponsorblock-feed-' . bin2hex(random_bytes(3)),
-        'settings' => [
-            'media_kind' => 'video',
-            'sponsorblock_enabled' => true,
-            'sponsorblock_categories' => ['sponsor'],
-        ],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->container->get(SponsorBlockTimelineSynchronizer::class)->sync(
-        MediaItemId::parse($mediaItemId),
-        [new SponsorBlockSegment('segment-1', TimelineEntryCategory::Sponsor, 15.0, 30.0, 'Ad read', ['UUID' => 'segment-1'])],
-    );
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $item = BroadcastItemRecord::select()->where('broadcastId', $broadcast->body['broadcast']['id'])->first();
-    $remux = $assets->findByBroadcastItemAndRole(BroadcastItemId::fromPrimaryKey($item->id), AssetRole::RemuxedVideo);
-    $source = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::VaultOriginal);
-
-    expect($remux)->not->toBeNull()
-        ->and($remux->path)->not->toBe($source?->path)
-        ->and($remux->path)->toContain($config->broadcastsPath())
-        ->and(file_get_contents($remux->path))->toContain('stub-ffmpeg-remux')
-        ->and(file_get_contents($source?->path))->toBe('video-bytes');
 });
 
 test('caption downloads complete before they queue a podcast rebuild', function (): void {

@@ -6,7 +6,6 @@ namespace App\Console;
 
 use App\System\Boot\SqliteConfigurator;
 use App\System\Scheduler\RoutineDiscoveryScheduler;
-use App\System\Scheduler\SponsorBlockRefreshScheduler;
 use Tempest\Console\ConsoleCommand;
 use Tempest\Console\ExitCode;
 use Tempest\Console\HasConsole;
@@ -20,7 +19,6 @@ final readonly class SchedulerTickCommand
 
     public function __construct(
         private RoutineDiscoveryScheduler $scheduler,
-        private SponsorBlockRefreshScheduler $sponsorBlock,
         private SqliteConfigurator $sqlite,
         private DatabaseConfig $databaseConfig,
     ) {
@@ -42,10 +40,6 @@ final readonly class SchedulerTickCommand
 
         if ($count > 0) {
             $this->console->info("Scheduled {$count} routine preflight job(s).");
-        }
-
-        if ($this->sponsorBlock->scheduleDueRefresh()) {
-            $this->console->info('Scheduled SponsorBlock refresh job.');
         }
 
         return ExitCode::SUCCESS;

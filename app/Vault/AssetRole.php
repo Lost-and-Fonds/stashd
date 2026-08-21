@@ -16,7 +16,6 @@ enum AssetRole: string
     case FeedXml = 'feed_xml';
     case Nfo = 'nfo';
     case Hardlink = 'hardlink';
-    case RemuxedVideo = 'remuxed_video';
     case MetadataJson = 'metadata_json';
     case SourceJson = 'source_json';
 }

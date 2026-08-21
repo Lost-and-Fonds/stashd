@@ -75,7 +75,7 @@ final readonly class PodcastEpisodeController
         }
 
         $kind = PodcastMediaKind::forBroadcast($broadcast);
-        $selection = $this->assets->assetForBroadcastItem($item, $kind) ?? match ($kind) {
+        $selection = match ($kind) {
             PodcastMediaKind::Audio => $this->assets->audioAsset($item->mediaItemId),
             PodcastMediaKind::Video => $this->assets->videoAsset($item->mediaItemId),
         };

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Broadcasts\Plugins;
 
-use App\Broadcasts\BroadcastChapterRemuxer;
 use App\Broadcasts\BroadcastContext;
 use App\Broadcasts\BroadcastContextFactory;
 use App\Broadcasts\BroadcastFilenameBuilder;
@@ -25,14 +24,11 @@ use App\Broadcasts\BroadcastSidecarWriter;
 use App\Broadcasts\BroadcastVerifyResult;
 use App\Broadcasts\FileKind;
 use App\Broadcasts\HardlinkPublisher;
-use App\Broadcasts\SponsorBlockRefreshScheduler;
-use App\Broadcasts\SponsorBlockSettings;
 use App\Broadcasts\UiControl;
 use App\Commands\CommandDispatchService;
 use App\Commands\CommandType;
 use App\Stashes\StashItemId;
 use App\System\State\StateTransitionService;
-use App\Timeline\TimelineMetadataRenderer;
 use App\Vault\AssetId;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
@@ -62,9 +58,6 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         protected BroadcastSidecarWriter $sidecarWriter,
         protected HardlinkPublisher $hardlinks,
         protected BroadcastItemRepository $broadcastItems,
-        protected SponsorBlockRefreshScheduler $sponsorBlockRefreshes,
-        protected BroadcastChapterRemuxer $chapterRemuxer,
-        protected TimelineMetadataRenderer $timeline,
         protected AssetRepository $assets,
         protected StateTransitionService $transitions,
         protected CommandDispatchService $dispatch,
@@ -267,12 +260,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
             }
 
             try {
-                $remuxed = $this->shouldRemux($context, $planned)
-                    && $this->chapterRemuxer->remux(MediaItemId::parse($planned->mediaItemId), $planned->sourcePath, $planned->absolutePath);
-
-                if (! $remuxed) {
-                    $this->hardlinks->publishHardlink($planned->sourcePath, $planned->absolutePath, $root);
-                }
+                $this->hardlinks->publishHardlink($planned->sourcePath, $planned->absolutePath, $root);
 
                 $item->publishedPath = $planned->absolutePath;
                 $item->publishedUri = null;
@@ -288,11 +276,10 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                     path: $planned->absolutePath,
                     relativePath: $planned->relativePath,
                     sourcePath: $planned->sourcePath,
-                    role: $remuxed ? AssetRole::RemuxedVideo : AssetRole::Hardlink,
+                    role: AssetRole::Hardlink,
                 );
 
                 $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Ready);
-                $this->sponsorBlockRefreshes->schedule($context->broadcast, $item, $context->mediaItems[$planned->mediaItemId]);
                 $publishedPaths[] = $planned->absolutePath;
                 $publishedCount++;
             } catch (\App\Broadcasts\BroadcastException $exception) {
@@ -372,7 +359,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                 continue;
             }
 
-            if (! $this->shouldRemux($context, $planned) && ! $this->hardlinks->verifyHardlink($planned->sourcePath, $path)) {
+            if (! $this->hardlinks->verifyHardlink($planned->sourcePath, $path)) {
                 $invalidLinkItemIds[] = (string) $item->id;
                 $this->markItemStale($item, 'hardlink_target_invalid');
 
@@ -636,12 +623,6 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         } else {
             $this->assets->save($existing);
         }
-    }
-
-    private function shouldRemux(BroadcastContext $context, BroadcastPlannedFile $planned): bool
-    {
-        return SponsorBlockSettings::fromBroadcastSettings($context->settings())->enabled
-            && $this->timeline->hasSponsorBlockEntries(MediaItemId::parse($planned->mediaItemId));
     }
 
     private function markItemStale(\App\Broadcasts\BroadcastItemRecord $item, string $reason): void
