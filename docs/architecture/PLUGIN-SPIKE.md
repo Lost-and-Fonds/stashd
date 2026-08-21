@@ -586,6 +586,20 @@ That is a successful spike if supported by evidence.
 
 Run all existing relevant Stashd tests plus new spike-specific tests.
 
+For local development, run the spike from the Lerd custom application
+container so PHP and `stashd-plugin-host` share the same process and
+filesystem namespace:
+
+```bash
+podman exec -i -w /var/www/html lerd-custom-stashd \
+  /bin/bash -lc './scripts/plugin-spike.sh'
+```
+
+The development image supplies Cargo, the Rust toolchain, the
+`wasm32-wasip2` target, and native build tools. The script places its socket
+and other transient outputs under the container's temporary directory; it
+does not require a host socket mount or exposed port.
+
 Run:
 
 - PHP formatting/static checks expected by the repository

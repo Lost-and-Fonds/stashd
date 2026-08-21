@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-tmp=$(mktemp -d)
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/stashd-plugin-spike.XXXXXX")
 host_pid=''
 trap 'if [[ -n "$host_pid" ]]; then kill "$host_pid" 2>/dev/null || true; wait "$host_pid" 2>/dev/null || true; fi; rm -rf "$tmp"' EXIT
 
@@ -20,6 +20,11 @@ host="$root/target/release/stashd-plugin-host"
 "$host" serve "$socket" 2>"$tmp/host.log" &
 host_pid=$!
 for _ in {1..50}; do [[ -S "$socket" ]] && break; sleep 0.1; done
+if [[ ! -S "$socket" ]]; then
+    echo 'stashd-plugin-host did not create its Unix socket' >&2
+    cat "$tmp/host.log" >&2
+    exit 1
+fi
 
 copy_output=$(php "$root/scripts/plugin-spike-php.php" "$socket" "$component" "$asset" "$staging" copy)
 cmp "$asset" "$staging"

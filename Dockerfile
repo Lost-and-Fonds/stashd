@@ -7,6 +7,11 @@ FROM docker.io/composer:2 AS composer
 # so this stage stays pure Node (no PHP needed).
 FROM docker.io/node:22-bookworm-slim AS node
 
+FROM docker.io/rust:1.97-bookworm AS rust
+
+RUN rustup target add wasm32-wasip2 \
+    && rustup component add rustfmt clippy
+
 FROM node AS assets
 WORKDIR /app
 ENV TEMPEST_PLUGIN_CONFIGURATION_OVERRIDE='{"build_directory":"build","bridge_file_name":"vite-tempest","manifest":"manifest.json","entrypoints":["src/main.entrypoint.ts"]}'
@@ -107,11 +112,26 @@ FROM base AS dev
 # through lerd's exec tooling) -- the same prerequisites any non-Dockerized
 # local PHP setup would need.
 COPY --from=node /usr/local /usr/local
-RUN install-php-extensions xdebug pcov
+COPY --from=rust /usr/local/cargo /usr/local/cargo
+COPY --from=rust /usr/local/rustup /usr/local/rustup
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        pkg-config \
+    && rm -rf /var/lib/apt/lists/* \
+    && install-php-extensions xdebug pcov
+
+RUN for binary in cargo cargo-clippy cargo-fmt clippy-driver rustc rustdoc rustfmt rustup; do \
+        ln -s "/usr/local/cargo/bin/${binary}" "/usr/local/bin/${binary}"; \
+    done
 
 COPY docker/php-dev.ini /usr/local/etc/php/conf.d/zz-stashd-dev.ini
 
 ENV XDEBUG_MODE=off
+ENV PATH="/usr/local/cargo/bin:${PATH}" \
+    CARGO_HOME=/usr/local/cargo \
+    RUSTUP_HOME=/usr/local/rustup
 
 FROM base AS prod
 
