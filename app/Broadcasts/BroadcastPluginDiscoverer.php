@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use App\Plugins\ExternalBroadcastPlugin;
+use App\Plugins\ExternalBroadcastPluginRegistry;
 use Psr\Container\ContainerInterface;
 use Tempest\Discovery\Discovery;
 use Tempest\Discovery\DiscoveryItems;
@@ -43,6 +45,52 @@ final class BroadcastPluginDiscoverer implements Discovery
     public function apply(): void
     {
         $registeredKeys = [];
+
+        /** @var ExternalBroadcastPluginRegistry $externalPlugins */
+        $externalPlugins = $this->container->get(ExternalBroadcastPluginRegistry::class);
+
+        foreach ($externalPlugins->all() as $definition) {
+            try {
+                $host = new \App\Plugins\PluginHostClient($definition->socketPath);
+                /** @var BroadcastContextFactory $contexts */
+                $contexts = $this->container->get(BroadcastContextFactory::class);
+                /** @var BroadcastPathBuilder $paths */
+                $paths = $this->container->get(BroadcastPathBuilder::class);
+                /** @var BroadcastItemRepository $items */
+                $items = $this->container->get(BroadcastItemRepository::class);
+                /** @var \App\System\State\StateTransitionService $transitions */
+                $transitions = $this->container->get(\App\System\State\StateTransitionService::class);
+                /** @var PublishedResourceService $publications */
+                $publications = $this->container->get(PublishedResourceService::class);
+                /** @var PublishedResourceRepository $publicationRecords */
+                $publicationRecords = $this->container->get(PublishedResourceRepository::class);
+                $instance = new ExternalBroadcastPlugin(
+                    definition: $definition,
+                    host: $host,
+                    contexts: $contexts,
+                    paths: $paths,
+                    items: $items,
+                    transitions: $transitions,
+                    publications: $publications,
+                    publicationRecords: $publicationRecords,
+                );
+            } catch (\Throwable $e) {
+                error_log("[stashd] BroadcastPluginDiscoverer: failed to resolve external {$definition->id}: {$e->getMessage()}");
+
+                continue;
+            }
+
+            $broadcastKeys = $instance->broadcastKeys();
+            $registeredKeys = array_merge($registeredKeys, $broadcastKeys);
+
+            BroadcastPluginRegistry::add(new DiscoveredPlugin(
+                className: ExternalBroadcastPlugin::class,
+                name: $definition->name,
+                description: 'External Broadcast Component',
+                broadcastKeys: $broadcastKeys,
+                plugin: $instance,
+            ));
+        }
 
         foreach ($this->discoveryItems as $meta) {
             try {

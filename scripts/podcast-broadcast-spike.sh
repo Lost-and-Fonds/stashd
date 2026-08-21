@@ -50,26 +50,23 @@ $request = [
     'component_path' => $component,
     'staging_dir' => $stage,
     'broadcast' => [
-        'broadcast_id' => 'broadcast-fixture',
+        'reference' => 'broadcast-fixture',
         'settings' => [
             ['key' => 'title', 'value' => ['kind' => 'text', 'value' => 'Fixture Podcast']],
         ],
-        'public_base_url' => 'https://stashd.test',
-        'broadcast_token' => 'broadcast-token',
-        'episodes' => [[
+        'items' => [[
             'id' => 'episode-fixture',
-            'publication_token' => 'item-token',
             'title' => 'Fixture Episode',
             'description' => 'A deterministic fixture episode.',
             'published_at' => 'Wed, 01 Jan 2025 00:00:00 +0000',
             'duration_seconds' => 42,
-            'media_reference' => 'episode.mp3',
-            'media_url' => 'https://stashd.test/published/publication-fixture/access/fixture-credential',
-            'media_type' => 'audio/mpeg',
-            'media_size_bytes' => 123,
-            'artwork_reference' => null,
-            'transcript_reference' => null,
-            'chapter_reference' => null,
+            'resources' => [[
+                'reference' => 'episode.mp3',
+                'kind' => 'audio',
+                'url' => 'https://stashd.test/published/publication-fixture/access/fixture-credential',
+                'media_type' => 'audio/mpeg',
+                'size_bytes' => 123,
+            ]],
         ]],
     ],
 ];

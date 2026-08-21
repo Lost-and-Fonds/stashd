@@ -567,6 +567,21 @@ against repeating this boundary mistake.
 
 ## Declarative plugin UI boundary
 
+The first external Broadcast migration is now wired through the normal runtime:
+the bundled Podcast Component is registered from `plugins/podcast/plugin.json`
+under the logical key `podcast`, and the generic Broadcast adapter invokes it
+through the shared plugin host. The old PHP Podcast implementation, routes,
+token service, and Podcast-specific transcode jobs are removed. Published feed
+and asset URLs use the generic `PublishedResource` endpoint; the Component
+receives those URLs as opaque values and owns the feed document semantics.
+
+The generic Broadcast WIT intentionally contains no feed, episode, enclosure,
+or provider-token vocabulary. A plugin supplies its own output meaning while
+core owns lifecycle state, asset authority, publication credentials, and byte
+serving. The historical `Broadcast-Plugin-Architecture-Plan.md` remains a
+design record and may describe the superseded in-tree PHP implementation; use
+the current code and this section for the runtime model.
+
 Plugins may describe UI, but they do not ship arbitrary frontend code. The
 Stashd frontend remains first-party and renders plugin declarations with its
 own components.

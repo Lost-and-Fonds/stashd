@@ -263,6 +263,10 @@ The plugin contributes a reproducible document-to-listening presentation: eligib
 - **Per Connection:** endpoint/account/model access when using an external TTS service.
 - **PHP authority:** document Items, existing derived Assets, Broadcast identity/tokens, output lifecycle, preservation decisions, and all durable Asset/provenance records.
 
+> Migration note (2026-08-22): the Podcast implementation now lives in the
+> external Component. The generic runtime owns publication credentials and
+> PublishedResource serving; it does not own Podcast tokens or feed routes.
+
 ### OCR and derived Assets
 
 The case proves that the plugin needs to ask for existing derived Assets by semantic role (for example extracted text or OCR), not by filesystem path. It does not yet prove a complete enrichment API. OCR should remain a deferred reusable-enrichment design unless multiple features need it; the first API can expose “read a granted suitable Asset” and return “missing prerequisite” with a suggested host operation.
@@ -277,7 +281,9 @@ A local engine needs model/runtime availability and possibly a trusted media ope
 
 Preflight may first count eligible documents, then asynchronously calculate missing OCR/text work and audio estimates. It can return partial facts: known item count, known text bytes, unknown speech duration, a range, or “unable to estimate”. Progress should report current Item and stage (selecting text, OCR prerequisite, preparing text, synthesising, writing output) with optional byte/duration totals. Cancellation must stop generation and discard or quarantine incomplete staging output.
 
-The plugin must not expose a feed route, Vue component, raw HTML, or public token. Stashd owns the podcast surface and token rules.
+The plugin must not expose a route, Vue component, or raw HTML. It may use
+generic PublishedResource URLs supplied by Stashd; the plugin owns how those
+opaque URLs are represented in its output.
 
 ## 8. Stress test D — hypothetical LaserDisc Capture Input
 

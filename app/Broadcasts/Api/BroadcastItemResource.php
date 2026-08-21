@@ -30,7 +30,6 @@ final readonly class BroadcastItemResource
             'stashItemId' => (string) $this->item->stashItemId,
             'mediaItemId' => (string) $this->item->mediaItemId,
             'state' => $this->item->state->value,
-            'tokenPreview' => $this->item->tokenPreview,
             'publishedPath' => $this->item->publishedPath,
             'publishedUri' => $this->item->publishedUri,
             'lastPublishedAt' => $this->item->lastPublishedAt,

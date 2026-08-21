@@ -224,8 +224,6 @@ final class CreateDomainSchema implements MigratesUp
             ->string('name')
             ->string('slug')
             ->enum('state', BroadcastState::class, default: BroadcastState::Pending)
-            ->raw($this->fkColumn('tokenSecretId', 40, 'secrets', OnDelete::SET_NULL, nullable: true))
-            ->string('tokenPreview', nullable: true)
             ->text('settingsJson', nullable: true)
             ->datetime('lastPlannedAt', nullable: true)
             ->datetime('lastBuiltAt', nullable: true)

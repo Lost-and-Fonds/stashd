@@ -149,7 +149,7 @@ final readonly class BroadcastController
         }
 
         // A name is a formality here, not something worth blocking on --
-        // default to "{stash} {plugin label}" (e.g. "My Channel Podcast")
+        // default to "{stash} {plugin label}"
         // and dedupe the slug automatically so adding a second broadcast of
         // the same type to a stash just works.
         $nameWasProvided = $name !== '';

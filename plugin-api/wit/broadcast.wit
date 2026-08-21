@@ -32,31 +32,27 @@ interface broadcast-plugin {
         value: option-value,
     }
 
-    record episode {
+    record item-resource {
+        reference: string,
+        kind: string,
+        url: option<string>,
+        media-type: option<string>,
+        size-bytes: u64,
+    }
+
+    record item {
         id: string,
-        publication-token: string,
         title: string,
         description: option<string>,
         published-at: option<string>,
         duration-seconds: option<u32>,
-        media-reference: string,
-        media-url: option<string>,
-        media-type: option<string>,
-        media-size-bytes: u64,
-        artwork-reference: option<string>,
-        artwork-url: option<string>,
-        transcript-reference: option<string>,
-        transcript-url: option<string>,
-        chapter-reference: option<string>,
-        chapter-url: option<string>,
+        resources: list<item-resource>,
     }
 
     record publish-request {
-        broadcast-id: string,
+        reference: string,
         settings: list<setting>,
-        public-base-url: string,
-        broadcast-token: string,
-        episodes: list<episode>,
+        items: list<item>,
     }
 
     record artifact {

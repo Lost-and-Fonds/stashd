@@ -4,7 +4,7 @@ wit_bindgen::generate!({
 });
 
 use exports::stashd::plugin::broadcast_plugin::{
-    Artifact, Episode, Error, Guest, OptionValue, PluginError, Publication, PublishRequest, Setting,
+    Artifact, Error, Guest, Item, OptionValue, PluginError, Publication, PublishRequest, Setting,
 };
 use stashd::plugin::broadcast_host;
 
@@ -13,26 +13,20 @@ struct PodcastBroadcast;
 impl Guest for PodcastBroadcast {
     fn publish(request: PublishRequest) -> Result<Publication, PluginError> {
         broadcast_host::report_progress("publishing");
-        let feed_url = setting_text(&request.settings, "feed_url").unwrap_or_else(|| {
-            format!(
-                "{}/b/{}/feed.xml",
-                request.public_base_url.trim_end_matches('/'),
-                request.broadcast_token
-            )
-        });
+        let feed_url = setting_text(&request.settings, "publication_url")
+            .unwrap_or_else(|| "urn:stashd:published-resource".to_owned());
         let metadata = Metadata::from_settings(&request.settings);
         let xml = build_feed(&request, &metadata, &feed_url);
         let staging = broadcast_host::open_staging_area();
-        let xml = xml.into_bytes();
         let artifact = broadcast_host::StagingArea::write(
             &staging,
             "feed.xml",
-            &xml,
+            &xml.into_bytes(),
             Some("application/rss+xml"),
         )
         .map_err(|error| match error {
             broadcast_host::StagingError::InvalidReference => {
-                failed("invalid feed output reference", false)
+                failed("invalid output reference", false)
             }
             broadcast_host::StagingError::Failed(message) => failed(&message, true),
         })?;
@@ -44,7 +38,7 @@ impl Guest for PodcastBroadcast {
                 media_type: artifact.media_type,
                 size_bytes: artifact.size_bytes,
             },
-            published_metadata: vec![text_setting("feed_url", feed_url)],
+            published_metadata: vec![text_setting("publication_url", feed_url)],
         })
     }
 }
@@ -60,6 +54,7 @@ struct Metadata {
     funding: Option<String>,
     complete: bool,
     guid: Option<String>,
+    media_kind: Option<String>,
 }
 
 impl Metadata {
@@ -76,6 +71,7 @@ impl Metadata {
             funding: setting_text(settings, "funding_url"),
             complete: setting_bool(settings, "complete"),
             guid: setting_text(settings, "podcast_guid"),
+            media_kind: setting_text(settings, "media_kind"),
         }
     }
 }
@@ -103,7 +99,7 @@ fn build_feed(request: &PublishRequest, metadata: &Metadata, feed_url: &str) -> 
     tag(
         &mut xml,
         "podcast:guid",
-        metadata.guid.as_deref().unwrap_or(&request.broadcast_id),
+        metadata.guid.as_deref().unwrap_or(&request.reference),
     );
     if let Some(author) = &metadata.author {
         tag(&mut xml, "itunes:author", author);
@@ -126,63 +122,69 @@ fn build_feed(request: &PublishRequest, metadata: &Metadata, feed_url: &str) -> 
         "itunes:explicit",
         if metadata.explicit { "yes" } else { "no" },
     );
-    for episode in &request.episodes {
-        episode_xml(&mut xml, request, episode);
+    for item in &request.items {
+        item_xml(&mut xml, item, metadata);
     }
     xml.push_str("</channel></rss>");
     xml
 }
 
-fn episode_xml(xml: &mut String, request: &PublishRequest, episode: &Episode) {
+fn item_xml(xml: &mut String, item: &Item, metadata: &Metadata) {
+    let media = item
+        .resources
+        .iter()
+        .find(|resource| {
+            (metadata.media_kind.as_deref() == Some("video") && resource.kind == "video")
+                || (metadata.media_kind.as_deref() != Some("video") && resource.kind == "audio")
+        })
+        .or_else(|| {
+            item.resources
+                .iter()
+                .find(|resource| resource.kind == "audio" || resource.kind == "video")
+        });
+    let Some(media) = media else {
+        return;
+    };
+
     xml.push_str("<item>");
-    tag(xml, "guid", &episode.id);
-    tag(xml, "title", &episode.title);
-    if let Some(description) = &episode.description {
+    tag(xml, "guid", &item.id);
+    tag(xml, "title", &item.title);
+    if let Some(description) = &item.description {
         tag(xml, "description", description);
         xml.push_str("<content:encoded>");
         xml.push_str(&cdata(description));
         xml.push_str("</content:encoded>");
     }
-    if let Some(published_at) = &episode.published_at {
+    if let Some(published_at) = &item.published_at {
         tag(xml, "pubDate", published_at);
     }
-    let extension = extension(&episode.media_reference);
-    let url = episode.media_url.clone().unwrap_or_else(|| {
-        format!(
-            "{}/b/{}/items/{}/episode.{}",
-            request.public_base_url.trim_end_matches('/'),
-            request.broadcast_token,
-            episode.publication_token,
-            extension
-        )
-    });
     xml.push_str("<enclosure url=\"");
-    xml.push_str(&escape(&url));
+    xml.push_str(&escape(media.url.as_deref().unwrap_or("")));
     xml.push_str("\" length=\"");
-    xml.push_str(&episode.media_size_bytes.to_string());
+    xml.push_str(&media.size_bytes.to_string());
     xml.push_str("\" type=\"");
-    xml.push_str(&escape(
-        episode.media_type.as_deref().unwrap_or("audio/mpeg"),
-    ));
+    xml.push_str(&escape(media.media_type.as_deref().unwrap_or("audio/mpeg")));
     xml.push_str("\"/>");
-    if let Some(seconds) = episode.duration_seconds {
+    if let Some(seconds) = item.duration_seconds {
         tag(xml, "itunes:duration", &seconds.to_string());
     }
-    if episode.artwork_reference.is_some() {
-        let url = episode.artwork_url.as_deref().unwrap_or("");
+    if let Some(resource) = item
+        .resources
+        .iter()
+        .find(|resource| resource.kind == "image")
+    {
         xml.push_str("<itunes:image href=\"");
-        xml.push_str(&escape(url));
+        xml.push_str(&escape(resource.url.as_deref().unwrap_or("")));
         xml.push_str("\"/>");
     }
-    if episode.transcript_reference.is_some() {
+    if let Some(resource) = item
+        .resources
+        .iter()
+        .find(|resource| resource.kind == "subtitle")
+    {
         xml.push_str("<podcast:transcript url=\"");
-        xml.push_str(&escape(episode.transcript_url.as_deref().unwrap_or("")));
+        xml.push_str(&escape(resource.url.as_deref().unwrap_or("")));
         xml.push_str("\" type=\"text/vtt\"/>");
-    }
-    if episode.chapter_reference.is_some() {
-        xml.push_str("<podcast:chapters url=\"");
-        xml.push_str(&escape(episode.chapter_url.as_deref().unwrap_or("")));
-        xml.push_str("\" type=\"application/json\"/>");
     }
     xml.push_str("</item>");
 }
@@ -207,14 +209,7 @@ fn escape(value: &str) -> String {
 }
 
 fn cdata(value: &str) -> String {
-    format!("<![CDATA[{}]]>", value.replace("]]>", "]]]]><![CDATA[>"))
-}
-
-fn extension(reference: &str) -> &str {
-    reference
-        .rsplit_once('.')
-        .map(|(_, ext)| ext)
-        .unwrap_or("mp3")
+    format!("<![CDATA[{}]]>", value.replace("]]>", "]]><![CDATA[>"))
 }
 
 fn setting_text(settings: &[Setting], key: &str) -> Option<String> {

@@ -119,9 +119,6 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
                 $this->failJob($job, $error);
                 $this->activity->downloadFailed($job, $exception->errorCode, $exception->getMessage());
             }
-        } catch (\App\Transcoding\TranscodeException $exception) {
-            $this->failJob($job, $exception->errorCode . ': ' . $exception->getMessage());
-            $this->activity->podcastAudioTranscodeFailed($job, $exception->errorCode, $exception->getMessage());
         } catch (\App\Broadcasts\BroadcastException $exception) {
             $this->failJob($job, $exception->errorCode . ': ' . $exception->getMessage());
         } catch (\App\MediaServers\MediaServerException $exception) {

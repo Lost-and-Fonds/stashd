@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\System\Boot;
 
-use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Commands\CommandId;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
@@ -21,7 +20,6 @@ final readonly class BootstrapService
         private StorageCapabilityChecker $storageChecks,
         private SqliteConfigurator $sqlite,
         private MigrationRunner $migrations,
-        private PodcastTokenService $podcastTokens,
         private CommandRepository $commands,
         private JobRepository $jobs,
     ) {
@@ -34,7 +32,6 @@ final readonly class BootstrapService
         $this->sqlite->configure($databaseConfig);
         $this->sqlite->enableWriteAheadLogging($databaseConfig);
         $this->migrations->run($databaseConfig);
-        $this->podcastTokens->backfillMissingTokenDigests();
         $this->storageChecks->checkAll();
 
         $command = $this->commands->create(CommandType::SystemBoot);

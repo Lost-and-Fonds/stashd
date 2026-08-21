@@ -20,7 +20,6 @@ use App\Stashes\StashPreflightCommandHandler;
 use App\Stashes\StashRetryFailedCommandHandler;
 use App\Stashes\StashSyncInputCommandHandler;
 use App\System\SystemStorageCheckCommandHandler;
-use App\Transcoding\AssetTranscodePodcastAudioCommandHandler;
 use App\Vault\AssetVerifyCommandHandler;
 use App\Vault\SystemVerifyVaultCommandHandler;
 use Tempest\Container\Container;
@@ -46,7 +45,6 @@ final class CommandHandlerRegistryInitializer implements Initializer
             $container->get(SystemStorageCheckCommandHandler::class),
             $container->get(SystemVerifyVaultCommandHandler::class),
             $container->get(AssetVerifyCommandHandler::class),
-            $container->get(AssetTranscodePodcastAudioCommandHandler::class),
             new BroadcastCommandHandler($commands, $jobs, $broadcasts, $broadcastItems, CommandType::BroadcastPlan),
             new BroadcastCommandHandler($commands, $jobs, $broadcasts, $broadcastItems, CommandType::BroadcastRebuild),
             new BroadcastCommandHandler($commands, $jobs, $broadcasts, $broadcastItems, CommandType::BroadcastRebuildItem),

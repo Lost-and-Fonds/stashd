@@ -14,8 +14,8 @@ use Tempest\Router\ResponseSender;
 /**
  * Tempest's stock GenericResponseSender only special-cases a Generator body
  * wrapped in EventStream (SSE framing) -- any other Generator body (e.g.
- * PodcastEpisodeController's bounded-chunk file reads, needed so a
- * hundreds-of-MB episode is never buffered whole in memory) falls through to
+ * bounded-chunk file reads, needed so a hundreds-of-MB response is never
+ * buffered whole in memory) falls through to
  * `echo $body`, which throws because Generator has no __toString. That
  * throws after headers -- including Content-Length -- are already sent,
  * corrupting the response instead of cleanly failing. This decorates the

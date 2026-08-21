@@ -11,13 +11,13 @@ final readonly class BroadcastResource
 {
     public function __construct(
         private BroadcastRecord $broadcast,
-        private ?string $feedUrl = null,
+        private ?string $publishedUrl = null,
     ) {
     }
 
-    public static function fromRecord(BroadcastRecord $broadcast, ?string $feedUrl = null): BroadcastResource
+    public static function fromRecord(BroadcastRecord $broadcast, ?string $publishedUrl = null): BroadcastResource
     {
-        return new self($broadcast, $feedUrl);
+        return new self($broadcast, $publishedUrl);
     }
 
     /** @return array<string, mixed> */
@@ -39,9 +39,8 @@ final readonly class BroadcastResource
             'updatedAt' => $this->broadcast->updatedAt,
         ];
 
-        if ($this->feedUrl !== null) {
-            $payload['feedUrl'] = $this->feedUrl;
-            $payload['tokenPreview'] = $this->broadcast->tokenPreview;
+        if ($this->publishedUrl !== null) {
+            $payload['publishedUrl'] = $this->publishedUrl;
         }
 
         // season_mapping is keyed by opaque stash_input_id strings, not DTO

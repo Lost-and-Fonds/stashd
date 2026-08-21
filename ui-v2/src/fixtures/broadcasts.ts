@@ -17,7 +17,7 @@ export const broadcastFixtures: BroadcastFixture[] = [
     itemsPublished: 412,
     itemsTotal: 412,
     sizeLabel: '64 GB',
-    feedUrl: 'https://stashd.example/feeds/oc-imp-9f2a1c/rss.xml'
+    publishedUrl: 'https://stashd.example/published/oc-imp-9f2a1c'
   },
   {
     id: 'broadcast-2',
@@ -48,7 +48,7 @@ export const broadcastFixtures: BroadcastFixture[] = [
     itemsPublished: 82,
     itemsTotal: 96,
     sizeLabel: '16 GB',
-    feedUrl: 'https://stashd.example/feeds/field-rec-6b40de/rss.xml'
+    publishedUrl: 'https://stashd.example/published/field-rec-6b40de'
   },
   {
     id: 'broadcast-4',
@@ -63,7 +63,7 @@ export const broadcastFixtures: BroadcastFixture[] = [
     itemsPublished: 1204,
     itemsTotal: 1204,
     sizeLabel: '310 GB',
-    feedUrl: 'https://stashd.example/feeds/crit-role-15dd3a/rss.xml'
+    publishedUrl: 'https://stashd.example/published/crit-role-15dd3a'
   },
   {
     id: 'broadcast-5',
@@ -106,6 +106,6 @@ export const broadcastFixtures: BroadcastFixture[] = [
     itemsPublished: 180,
     itemsTotal: 210,
     sizeLabel: '32 GB',
-    feedUrl: 'https://stashd.example/feeds/ice-core-7ae120/rss.xml'
+    publishedUrl: 'https://stashd.example/published/ice-core-7ae120'
   }
 ]

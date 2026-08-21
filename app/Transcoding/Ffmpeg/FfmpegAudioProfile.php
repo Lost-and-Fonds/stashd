@@ -15,7 +15,7 @@ final readonly class FfmpegAudioProfile
     ) {
     }
 
-    /** MP3, 128kbps, stereo -- the engineering spec's stated v1 default podcast audio profile. */
+    /** MP3, 128kbps, stereo -- the default audio representation profile. */
     public static function v1Default(): self
     {
         return new self(

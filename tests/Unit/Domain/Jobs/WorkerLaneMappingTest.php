@@ -23,7 +23,6 @@ test('every job intent belongs to exactly one lane', function (): void {
 
 test('bulk work and interactive work are in separate lanes', function (): void {
     expect(JobIntent::Download->lane())->toBe(JobLane::Bulk)
-        ->and(JobIntent::TranscodePodcastAudio->lane())->toBe(JobLane::Bulk)
         ->and(JobIntent::Broadcast->lane())->toBe(JobLane::Bulk)
         ->and(JobIntent::InitialBackfill->lane())->toBe(JobLane::Discovery)
         ->and(JobIntent::Preflight->lane())->toBe(JobLane::Interactive)

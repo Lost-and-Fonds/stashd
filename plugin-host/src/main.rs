@@ -197,35 +197,28 @@ struct AcquireItemRequest {
 
 #[derive(Debug, Deserialize)]
 struct BroadcastPublishRequest {
-    broadcast_id: String,
+    reference: String,
     settings: Vec<InputOptionRequest>,
-    public_base_url: String,
-    broadcast_token: String,
-    episodes: Vec<BroadcastEpisodeRequest>,
+    items: Vec<BroadcastItemRequest>,
 }
 
 #[derive(Debug, Deserialize)]
-struct BroadcastEpisodeRequest {
+struct BroadcastResourceRequest {
+    reference: String,
+    kind: String,
+    url: Option<String>,
+    media_type: Option<String>,
+    size_bytes: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct BroadcastItemRequest {
     id: String,
-    publication_token: String,
     title: String,
     description: Option<String>,
     published_at: Option<String>,
     duration_seconds: Option<u32>,
-    media_reference: String,
-    #[serde(default)]
-    media_url: Option<String>,
-    media_type: Option<String>,
-    media_size_bytes: u64,
-    artwork_reference: Option<String>,
-    #[serde(default)]
-    artwork_url: Option<String>,
-    transcript_reference: Option<String>,
-    #[serde(default)]
-    transcript_url: Option<String>,
-    chapter_reference: Option<String>,
-    #[serde(default)]
-    chapter_url: Option<String>,
+    resources: Vec<BroadcastResourceRequest>,
 }
 
 #[derive(Debug, Serialize)]
@@ -922,36 +915,33 @@ fn invoke_broadcast(
     wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
     broadcast_world::BroadcastWorld::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state)?;
     let plugin = broadcast_world::BroadcastWorld::instantiate(&mut store, component, &linker)?;
-    let request = broadcast_world::exports::stashd::plugin::broadcast_plugin::PublishRequest {
-        broadcast_id: request.broadcast_id,
-        settings: request.settings.into_iter().map(broadcast_option).collect(),
-        public_base_url: request.public_base_url,
-        broadcast_token: request.broadcast_token,
-        episodes: request
-            .episodes
-            .into_iter()
-            .map(
-                |episode| broadcast_world::exports::stashd::plugin::broadcast_plugin::Episode {
-                    id: episode.id,
-                    publication_token: episode.publication_token,
-                    title: episode.title,
-                    description: episode.description,
-                    published_at: episode.published_at,
-                    duration_seconds: episode.duration_seconds,
-                    media_reference: episode.media_reference,
-                    media_url: episode.media_url,
-                    media_type: episode.media_type,
-                    media_size_bytes: episode.media_size_bytes,
-                    artwork_reference: episode.artwork_reference,
-                    artwork_url: episode.artwork_url,
-                    transcript_reference: episode.transcript_reference,
-                    transcript_url: episode.transcript_url,
-                    chapter_reference: episode.chapter_reference,
-                    chapter_url: episode.chapter_url,
-                },
-            )
-            .collect(),
-    };
+    let request =
+        broadcast_world::exports::stashd::plugin::broadcast_plugin::PublishRequest {
+            reference: request.reference,
+            settings: request.settings.into_iter().map(broadcast_option).collect(),
+            items: request
+                .items
+                .into_iter()
+                .map(|item| {
+                    broadcast_world::exports::stashd::plugin::broadcast_plugin::Item {
+                    id: item.id,
+                    title: item.title,
+                    description: item.description,
+                    published_at: item.published_at,
+                    duration_seconds: item.duration_seconds,
+                        resources: item.resources.into_iter().map(|resource| {
+                        broadcast_world::exports::stashd::plugin::broadcast_plugin::ItemResource {
+                            reference: resource.reference,
+                            kind: resource.kind,
+                            url: resource.url,
+                            media_type: resource.media_type,
+                            size_bytes: resource.size_bytes,
+                        }
+                        }).collect(),
+                    }
+                })
+                .collect(),
+        };
     let result = plugin
         .stashd_plugin_broadcast_plugin()
         .call_publish(&mut store, &request)?

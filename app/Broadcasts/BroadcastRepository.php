@@ -48,16 +48,13 @@ final class BroadcastRepository
         query(BroadcastRecord::class)->insert($record)->execute();
 
         return BroadcastRecord::select()
-            ->include('tokenSecretId')
             ->get(new PrimaryKey($id))
             ?? throw new InvalidArgumentException('Failed to persist broadcast record.');
     }
 
     public function find(BroadcastId $id): ?BroadcastRecord
     {
-        return BroadcastRecord::select()
-            ->include('tokenSecretId')
-            ->get($id->toPrimaryKey());
+        return BroadcastRecord::select()->get($id->toPrimaryKey());
     }
 
     /**
@@ -99,7 +96,6 @@ final class BroadcastRepository
     public function listForStash(StashId $stashId): array
     {
         return BroadcastRecord::select()
-            ->include('tokenSecretId')
             ->where('stashId', $stashId->toString())
             ->orderBy('createdAt', \Tempest\Database\Direction::ASC)
             ->all();
@@ -111,17 +107,6 @@ final class BroadcastRepository
             ->where('stashId', $stashId->toString())
             ->where('slug', $slug)
             ->first();
-    }
-
-    public function findPodcastByTokenSecretId(string $secretId): ?BroadcastRecord
-    {
-        $broadcast = BroadcastRecord::select()
-            ->include('tokenSecretId')
-            ->where('type', 'podcast')
-            ->where('tokenSecretId', $secretId)
-            ->first();
-
-        return $broadcast instanceof BroadcastRecord ? $broadcast : null;
     }
 
     /**

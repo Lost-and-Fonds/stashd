@@ -1,6 +1,14 @@
 # Broadcast Plugin Architecture — Implementation Plan
 
-## Status (2026-07-01)
+## Status (historical plan; current implementation updated 2026-08-21)
+
+The implementation plan below is retained as historical design context. The
+current state has completed the external Podcast migration: Podcast is
+registered from `plugins/podcast/plugin.json`, invoked through the generic
+Broadcast adapter and shared plugin host, and no longer has a PHP
+`PodcastBroadcastPlugin`, Podcast routes, token service, or Podcast-specific
+core transcode job. The durable Broadcast key remains `podcast`; the component
+package identity is runtime provenance only.
 
 **Phase 1 is done, in-tree, under `app/Broadcasts/Plugins/`.** `BroadcastPlugin`,
 `#[StashdBroadcast]`, `BroadcastPluginDiscoverer`, `BroadcastPluginRegistry`,

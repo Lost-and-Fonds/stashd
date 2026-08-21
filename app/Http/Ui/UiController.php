@@ -17,7 +17,7 @@ use function Tempest\View\view;
  * RequireAuthMiddleware is auto-applied to every route by Tempest's
  * HttpMiddlewareDiscovery (any HttpMiddleware implementation is global, not
  * opt-in), so these public shells must each explicitly opt out via `without:`
- * — the same mechanism PodcastFeedController/PodcastEpisodeController use.
+ * — the same mechanism generated-resource responses use.
  * The shells carry no data; they hydrate client-side against the
  * bearer-cookie-authenticated /api/v1. An unauthenticated visit renders the
  * frame, then the client auth gate redirects to /login when the session

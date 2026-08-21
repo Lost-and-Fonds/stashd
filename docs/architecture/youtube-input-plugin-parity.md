@@ -52,5 +52,5 @@ deduplication, options, acquisition, staging, Vault ingest, and failure
 recovery. PostgreSQL is used for the durable identity/lifecycle proof.
 
 This is still experimental plugin architecture, not a stable Plugin API v1.
-The next bounded plugin milestone is Podcast as the first external Broadcast
+The Podcast migration is now the first completed external Broadcast
 plugin; it must drive its own contract rather than copying YouTube concepts.

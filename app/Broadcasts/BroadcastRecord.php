@@ -11,7 +11,6 @@ use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 use Tempest\DateTime\DateTime;
-use Tempest\Mapper\Hidden;
 
 #[Table(name: 'broadcasts')]
 final class BroadcastRecord
@@ -30,9 +29,6 @@ final class BroadcastRecord
         public string $name,
         public string $slug,
         public BroadcastState $state,
-        #[Hidden]
-        public ?string $tokenSecretId = null,
-        public ?string $tokenPreview = null,
         public ?array $settings = null,
         public ?DateTime $lastPlannedAt = null,
         public ?DateTime $lastBuiltAt = null,

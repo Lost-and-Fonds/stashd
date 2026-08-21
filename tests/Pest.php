@@ -102,6 +102,18 @@ $data = sys_get_temp_dir() . '/stashd-test/' . $worker . '/data';
 $media = sys_get_temp_dir() . '/stashd-test/' . $worker . '/media';
 $databaseConnection = strtolower((string) (getenv('DB_CONNECTION') ?: 'sqlite'));
 
+if (! is_string(getenv('STASHD_PLUGIN_FIXTURE_DIR')) || trim((string) getenv('STASHD_PLUGIN_FIXTURE_DIR')) === '') {
+    putenv('STASHD_PLUGIN_FIXTURE_DIR=' . dirname(__DIR__) . '/tests/fixtures/providers/youtube/http');
+}
+
+if (! is_string(getenv('YOUTUBE_DATA_API_KEY')) || trim((string) getenv('YOUTUBE_DATA_API_KEY')) === '') {
+    putenv('YOUTUBE_DATA_API_KEY=fixture-secret-do-not-cross-wasm');
+}
+
+if (! is_string(getenv('STASHD_PLUGIN_HELPER_EXECUTABLE')) || trim((string) getenv('STASHD_PLUGIN_HELPER_EXECUTABLE')) === '') {
+    putenv('STASHD_PLUGIN_HELPER_EXECUTABLE=' . dirname(__DIR__) . '/tests/fixtures/providers/youtube/fake-yt-dlp.sh');
+}
+
 foreach ([$data, $media] as $directory) {
     if (! is_dir($directory)) {
         mkdir($directory, 0775, true);

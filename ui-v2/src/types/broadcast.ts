@@ -23,5 +23,5 @@ export interface BroadcastFixture {
   itemsPublished: number
   itemsTotal: number
   sizeLabel?: string
-  feedUrl?: string
+  publishedUrl?: string
 }

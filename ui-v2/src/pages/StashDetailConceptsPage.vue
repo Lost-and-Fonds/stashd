@@ -30,18 +30,14 @@ function monogram(name: string) {
 const { copy } = useClipboard()
 const copiedId = ref<string | null>(null)
 
-function copyFeed(broadcast: BroadcastFixture) {
-  if (!broadcast.feedUrl) return
-  copy(broadcast.feedUrl)
+function copyPublishedUrl(broadcast: BroadcastFixture) {
+  if (!broadcast.publishedUrl) return
+  copy(broadcast.publishedUrl)
   copiedId.value = broadcast.id
   setTimeout(() => { if (copiedId.value === broadcast.id) copiedId.value = null }, 1500)
 }
 
 // Structured, labeled facts for the Broadcast operational region — replaces
-// the old "Podcast · Audio · 412 of 412 · 64 GB · rebuilt 2h ago" sentence.
-// Kind-specific: a podcast surfaces format/published/size/rebuilt, a media
-// library surfaces type/published/size/rebuilt/destination. Not every kind
-// gets the same fields — only what's actually useful for it.
 function rebuiltValue(b: BroadcastFixture) {
   if (b.buildState === 'stale') {
     return b.status === 'needs-attention' ? `Failed · last built ${b.lastRebuild}` : `Needs rebuild · last built ${b.lastRebuild}`
@@ -51,14 +47,6 @@ function rebuiltValue(b: BroadcastFixture) {
 
 function broadcastFacts(b: BroadcastFixture) {
   const published = `${b.itemsPublished.toLocaleString()} / ${b.itemsTotal.toLocaleString()}`
-  if (b.kind === 'podcast') {
-    return [
-      { label: 'Format', value: b.formLabel },
-      { label: 'Published', value: published },
-      { label: 'Size', value: b.sizeLabel },
-      { label: 'Rebuilt', value: rebuiltValue(b) }
-    ]
-  }
   return [
     { label: 'Type', value: b.formLabel },
     { label: 'Published', value: published },
@@ -141,7 +129,7 @@ function broadcastFacts(b: BroadcastFixture) {
           <div v-for="broadcast in broadcasts" :key="broadcast.id" class="rounded-md bg-muted p-3.5">
             <!-- Tier 1: recognize -->
             <div class="flex items-center gap-3">
-              <UIcon :name="broadcast.kind === 'podcast' ? 'i-lucide-rss' : 'i-lucide-tv'" class="size-4 shrink-0 text-muted" />
+              <UIcon name="i-lucide-box" class="size-4 shrink-0 text-muted" />
               <div class="min-w-0 flex-1">
                 <p class="truncate font-mono text-sm text-highlighted">{{ broadcast.name }}</p>
                 <p class="mt-0.5 flex items-center gap-1.5 text-xs" :class="statusMeta[broadcast.status].text">
@@ -151,7 +139,7 @@ function broadcastFacts(b: BroadcastFixture) {
               </div>
               <UButton
                 v-if="broadcast.buildState !== 'rebuilding'"
-                :label="broadcast.kind === 'podcast' ? 'Rebuild' : 'Sync now'"
+                label="Rebuild"
                 icon="i-lucide-refresh-cw" variant="subtle" color="neutral" size="sm"
               />
               <UDropdownMenu :items="[[{ label: 'Reconfigure', icon: 'i-lucide-settings' }], [{ label: 'Remove', icon: 'i-lucide-trash-2', color: 'error' }]]">
@@ -170,17 +158,17 @@ function broadcastFacts(b: BroadcastFixture) {
                 </div>
               </div>
 
-              <div v-if="broadcast.feedUrl" class="mt-3 space-y-1.5">
+              <div v-if="broadcast.publishedUrl" class="mt-3 space-y-1.5">
                 <div class="flex items-center gap-2 rounded-md bg-accented p-2">
                   <UIcon name="i-lucide-rss" class="size-3.5 shrink-0 text-dimmed" />
-                  <p class="min-w-0 flex-1 truncate font-mono text-xs text-muted">{{ broadcast.feedUrl }}</p>
+                  <p class="min-w-0 flex-1 truncate font-mono text-xs text-muted">{{ broadcast.publishedUrl }}</p>
                   <UButton
                     :label="copiedId === broadcast.id ? 'Copied' : 'Copy'"
                     :icon="copiedId === broadcast.id ? 'i-lucide-check' : 'i-lucide-copy'"
                     :color="copiedId === broadcast.id ? 'success' : 'neutral'"
-                    variant="soft" size="xs" @click="copyFeed(broadcast)"
+                    variant="soft" size="xs" @click="copyPublishedUrl(broadcast)"
                   />
-                  <UButton icon="i-lucide-external-link" :to="broadcast.feedUrl" target="_blank" aria-label="Open feed" variant="ghost" color="neutral" size="xs" />
+                  <UButton icon="i-lucide-external-link" :to="broadcast.publishedUrl" target="_blank" aria-label="Open published resource" variant="ghost" color="neutral" size="xs" />
                 </div>
                 <p class="text-xs text-dimmed">Anyone with this link can access the feed — treat it like a password.</p>
               </div>

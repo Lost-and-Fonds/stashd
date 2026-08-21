@@ -7,8 +7,8 @@ namespace App\Broadcasts;
 /**
  * Interface for broadcast plugins that generate views from stashed media.
  *
- * Each implementation represents a broadcast format (e.g. Jellyfin, Plex,
- * podcast) and provides the full lifecycle: planning, publishing, verifying,
+ * Each implementation represents a broadcast format and provides the full
+ * lifecycle: planning, publishing, verifying,
  * and pruning broadcast output.
  */
 interface BroadcastPlugin

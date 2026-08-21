@@ -5,6 +5,12 @@
   "version": "0.1.0",
   "component": "plugins/podcast/target/wasm32-wasip2/release/stashd_podcast_plugin.wasm",
   "component_environment": "STASHD_BROADCAST_PLUGIN_COMPONENT",
+  "output_path": "feed.xml",
+  "output_media_type": "application/rss+xml",
+  "supports_item_rebuild": true,
+  "actions": [
+    {"id": "rotate-publication-credentials", "label": "Rotate publication credentials", "intent": "rotate_token", "operation": "rotate-publication-credentials", "confirmation": true}
+  ],
   "ui_options": [
     {"key": "title", "label": "Podcast Title", "type": "text"},
     {"key": "description", "label": "Podcast Description", "type": "textarea"},

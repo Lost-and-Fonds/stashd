@@ -25,7 +25,7 @@ test('creating a podcast configured for video on a metadata-only stash warns wit
         ->and($response->body['policy_mismatch'])->not->toBeNull()
         ->and($response->body['policy_mismatch']['download_policy'])->toBe('metadata_only')
         ->and($response->body['policy_mismatch']['broadcast_type'])->toBe('podcast')
-        ->and($response->body['policy_mismatch']['compatible_download_policies'])->toBe(['video', 'manual_download']);
+        ->and($response->body['policy_mismatch']['compatible_download_policies'])->toBe(['video', 'audio_only', 'manual_download']);
 });
 
 test('creating a podcast configured for video on an audio-only stash warns without blocking', function (): void {
@@ -43,7 +43,7 @@ test('creating a podcast configured for video on an audio-only stash warns witho
     ], headers: $headers);
 
     $response->assertStatus(Status::CREATED);
-    expect($response->body['policy_mismatch']['compatible_download_policies'])->toBe(['video', 'manual_download']);
+    expect($response->body['policy_mismatch'])->toBeNull();
 });
 
 test('creating a podcast configured for audio on an audio-only stash has no mismatch', function (): void {

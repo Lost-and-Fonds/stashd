@@ -335,11 +335,6 @@
 									<option x-bind:value="plugin.key" x-text="plugin.label"></option>
 								</template>
 							</select>
-							<select x-show="broadcastPluginHasControl(newBroadcastType, 'media_kind')" x-model="newBroadcastMediaKind" x-on:change="onBroadcastTypeChanged()"
-								class="rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
-								<option value="audio">Audio episodes</option>
-								<option value="video">Video episodes</option>
-							</select>
 							<input type="text" x-model="newBroadcastName" placeholder="Name (optional)"
 								class="flex-1 rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
 							<button type="button" x-show="!broadcastPreview" x-on:click="previewBroadcastCreation()"

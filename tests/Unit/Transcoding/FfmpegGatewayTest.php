@@ -9,7 +9,7 @@ use App\Transcoding\Ffmpeg\FfmpegAudioProfile;
 use App\Transcoding\Ffmpeg\FfmpegGatewayImpl;
 use Tempest\Process\GenericProcessExecutor;
 
-test('podcast audio transcodes explicitly preserve source chapters and metadata', function (): void {
+test('audio transcodes explicitly preserve source chapters and metadata', function (): void {
     $binary = sys_get_temp_dir() . '/stashd-ffmpeg-args-' . bin2hex(random_bytes(4));
     $arguments = sys_get_temp_dir() . '/stashd-ffmpeg-args-' . bin2hex(random_bytes(4)) . '.txt';
     file_put_contents($binary, "#!/bin/sh\nprintf '%s\\n' \"\$@\" > " . escapeshellarg($arguments) . "\n");

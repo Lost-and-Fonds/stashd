@@ -300,16 +300,11 @@ function onAddInputSubmit(event: FormSubmitEvent<typeof addInputForm>) {
   addInputOpen.value = false
 }
 
-function broadcastOverflowActions(kind: BroadcastKind) {
-  const kindSpecific = kind === 'podcast'
-    ? [{ label: 'Rotate feed URL', icon: 'i-lucide-refresh-cw' }]
-    : [{ label: 'Reconfigure destination', icon: 'i-lucide-settings' }]
-  return [kindSpecific, [{ label: 'Remove', icon: 'i-lucide-trash-2', color: 'error' as const }]]
+function broadcastOverflowActions() {
+  return [[{ label: 'Reconfigure', icon: 'i-lucide-settings' }], [{ label: 'Remove', icon: 'i-lucide-trash-2', color: 'error' as const }]]
 }
 
-// Structured, labeled facts for the Broadcast operational region — kind-specific,
-// not a uniform schema. A podcast surfaces format/published/size/rebuilt; a media
-// library adds destination. See planning/DECISIONS.md, "Stash detail page".
+// Structured, labeled facts for the Broadcast operational region.
 function rebuiltValue(b: BroadcastFixture) {
   if (b.buildState === 'stale') {
     return b.status === 'needs-attention' ? `Failed · last built ${b.lastRebuild}` : `Needs rebuild · last built ${b.lastRebuild}`
@@ -319,29 +314,21 @@ function rebuiltValue(b: BroadcastFixture) {
 
 function broadcastFacts(b: BroadcastFixture) {
   const published = `${b.itemsPublished.toLocaleString()} / ${b.itemsTotal.toLocaleString()}`
-  if (b.kind === 'podcast') {
-    return [
-      { label: 'Format', value: b.formLabel },
-      { label: 'Published', value: published },
-      { label: 'Size', value: b.sizeLabel },
-      { label: 'Rebuilt', value: rebuiltValue(b) }
-    ]
-  }
   return [
     { label: 'Type', value: b.formLabel },
     { label: 'Published', value: published },
     { label: 'Size', value: b.sizeLabel },
     { label: 'Rebuilt', value: rebuiltValue(b) },
-    { label: 'Destination', value: b.kind === 'jellyfin' ? 'Jellyfin media library' : 'Plex media library' }
+    { label: 'Format', value: b.formLabel }
   ]
 }
 
 const { copy } = useClipboard()
 const copiedId = ref<string | null>(null)
 
-function copyFeed(broadcast: BroadcastFixture) {
-  if (!broadcast.feedUrl) return
-  copy(broadcast.feedUrl)
+function copyPublishedUrl(broadcast: BroadcastFixture) {
+  if (!broadcast.publishedUrl) return
+  copy(broadcast.publishedUrl)
   copiedId.value = broadcast.id
   setTimeout(() => {
     if (copiedId.value === broadcast.id) copiedId.value = null
@@ -658,13 +645,13 @@ const itemTableUi = {
           </div>
           <UButton
             v-if="broadcast.buildState !== 'rebuilding'"
-            :label="broadcast.kind === 'podcast' ? 'Rebuild' : 'Sync now'"
+            label="Rebuild"
             icon="i-lucide-refresh-cw"
             variant="subtle"
             color="neutral"
             size="sm"
           />
-          <UDropdownMenu :items="broadcastOverflowActions(broadcast.kind)">
+          <UDropdownMenu :items="broadcastOverflowActions()">
             <UButton icon="i-lucide-ellipsis-vertical" aria-label="More actions" title="More actions" variant="ghost" color="neutral" size="sm" />
           </UDropdownMenu>
         </div>
@@ -689,23 +676,23 @@ const itemTableUi = {
             </div>
           </div>
 
-          <div v-if="broadcast.feedUrl" class="mt-3 space-y-1.5">
+          <div v-if="broadcast.publishedUrl" class="mt-3 space-y-1.5">
             <div class="flex items-center gap-2 rounded-md bg-accented p-2">
               <UIcon name="i-lucide-rss" class="size-3.5 shrink-0 text-dimmed" />
-              <p class="min-w-0 flex-1 truncate font-mono text-xs text-muted">{{ broadcast.feedUrl }}</p>
+              <p class="min-w-0 flex-1 truncate font-mono text-xs text-muted">{{ broadcast.publishedUrl }}</p>
               <UButton
                 :label="copiedId === broadcast.id ? 'Copied' : 'Copy'"
                 :icon="copiedId === broadcast.id ? 'i-lucide-check' : 'i-lucide-copy'"
                 :color="copiedId === broadcast.id ? 'success' : 'neutral'"
                 variant="soft"
                 size="xs"
-                @click="copyFeed(broadcast)"
+                @click="copyPublishedUrl(broadcast)"
               />
               <UButton
                 icon="i-lucide-external-link"
                 aria-label="Open feed"
                 title="Open feed"
-                :to="broadcast.feedUrl"
+                :to="broadcast.publishedUrl"
                 target="_blank"
                 variant="ghost"
                 color="neutral"

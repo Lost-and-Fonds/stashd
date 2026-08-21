@@ -21,4 +21,10 @@ final readonly class ExternalBroadcastPluginRegistry
 
         return null;
     }
+
+    /** @return list<ExternalBroadcastPluginDefinition> */
+    public function all(): array
+    {
+        return $this->plugins;
+    }
 }

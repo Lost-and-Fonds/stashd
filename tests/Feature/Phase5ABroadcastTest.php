@@ -119,29 +119,6 @@ test('previewing a jellyfin broadcast reports eligible items and their vault siz
         ->and($preview['transcode_item_count'])->toBe(0);
 });
 
-test('previewing an audio podcast counts video-sourced episodes as needing transcode', function (): void {
-    [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('broadcast-preview-podcast');
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'item.download',
-        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $response = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts/preview', [
-        'type' => 'podcast',
-        'mediaKind' => 'audio',
-    ], headers: $headers)->assertOk();
-
-    $preview = $response->body['preview'];
-
-    // manual_download-policy fake downloads produce a video original, so an
-    // audio podcast needs it transcoded.
-    expect($preview['eligible_item_count'])->toBe(1)
-        ->and($preview['transcode_item_count'])->toBe(1)
-        ->and($preview['hardlinked_item_count'])->toBe(0);
-});
-
 test('previewing skips items that have not been downloaded yet', function (): void {
     [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('broadcast-preview-skipped'), 0, 2);
 

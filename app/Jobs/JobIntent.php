@@ -21,13 +21,12 @@ enum JobIntent: string
     case Boot = 'boot';
     case VerifyVault = 'verify_vault';
     case MediaServer = 'media_server';
-    case TranscodePodcastAudio = 'transcode_podcast_audio';
     case DownloadCaptions = 'download_captions';
 
     public function lane(): JobLane
     {
         return match ($this) {
-            self::Download, self::Broadcast, self::TranscodePodcastAudio, self::DownloadCaptions => JobLane::Bulk,
+            self::Download, self::Broadcast, self::DownloadCaptions => JobLane::Bulk,
             self::InitialBackfill, self::SyncInput => JobLane::Discovery,
             default => JobLane::Interactive,
         };

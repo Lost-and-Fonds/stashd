@@ -144,7 +144,7 @@ test('ffprobe sees embedded chapters in a Vault file and its broadcast hardlink'
     }
 })->group('live');
 
-test('ffprobe sees chapters preserved in a podcast audio transcode', function (): void {
+test('ffprobe sees chapters preserved in an audio transcode', function (): void {
     liveFfmpegSkipUnlessEnabled($this);
 
     $id = bin2hex(random_bytes(4));
