@@ -44,8 +44,11 @@ interface broadcast-plugin {
         media-type: option<string>,
         media-size-bytes: u64,
         artwork-reference: option<string>,
+        artwork-url: option<string>,
         transcript-reference: option<string>,
+        transcript-url: option<string>,
         chapter-reference: option<string>,
+        chapter-url: option<string>,
     }
 
     record publish-request {

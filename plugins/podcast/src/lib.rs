@@ -169,43 +169,22 @@ fn episode_xml(xml: &mut String, request: &PublishRequest, episode: &Episode) {
         tag(xml, "itunes:duration", &seconds.to_string());
     }
     if episode.artwork_reference.is_some() {
+        let url = episode.artwork_url.as_deref().unwrap_or("");
         xml.push_str("<itunes:image href=\"");
-        xml.push_str(&escape(&publication_url(
-            request,
-            &episode.publication_token,
-            "artwork",
-        )));
+        xml.push_str(&escape(url));
         xml.push_str("\"/>");
     }
     if episode.transcript_reference.is_some() {
         xml.push_str("<podcast:transcript url=\"");
-        xml.push_str(&escape(&publication_url(
-            request,
-            &episode.publication_token,
-            "transcript",
-        )));
+        xml.push_str(&escape(episode.transcript_url.as_deref().unwrap_or("")));
         xml.push_str("\" type=\"text/vtt\"/>");
     }
     if episode.chapter_reference.is_some() {
         xml.push_str("<podcast:chapters url=\"");
-        xml.push_str(&escape(&publication_url(
-            request,
-            &episode.publication_token,
-            "chapters.json",
-        )));
+        xml.push_str(&escape(episode.chapter_url.as_deref().unwrap_or("")));
         xml.push_str("\" type=\"application/json\"/>");
     }
     xml.push_str("</item>");
-}
-
-fn publication_url(request: &PublishRequest, publication_token: &str, suffix: &str) -> String {
-    format!(
-        "{}/b/{}/items/{}/{}",
-        request.public_base_url.trim_end_matches('/'),
-        request.broadcast_token,
-        publication_token,
-        suffix,
-    )
 }
 
 fn tag(xml: &mut String, name: &str, value: &str) {

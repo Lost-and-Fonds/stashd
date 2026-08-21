@@ -32,6 +32,19 @@ final readonly class PublishedResourceService
         string $access = 'public',
         ?string $downloadName = null,
     ): PublishedResourceRecord {
+        $existing = $this->resources->findByBroadcastAndAsset(
+            BroadcastId::fromPrimaryKey($broadcast->id),
+            (string) $asset->id,
+            $mediaType,
+        );
+        if ($existing !== null) {
+            $existing->downloadName = $downloadName;
+            $existing->access = $access;
+            $existing->state = 'ready';
+
+            return $this->resources->save($existing);
+        }
+
         return $this->create($broadcast, $mediaType, $access, $downloadName, assetId: (string) $asset->id);
     }
 

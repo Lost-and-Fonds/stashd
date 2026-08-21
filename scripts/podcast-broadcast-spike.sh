@@ -28,12 +28,17 @@ for _ in $(seq 1 50); do
 done
 [[ -S "$socket" ]] || { cat /tmp/stashd-podcast-plugin-host.log; exit 1; }
 
-SOCKET="$socket" COMPONENT="$root/target/wasm32-wasip2/release/stashd_podcast_plugin.wasm" STAGE="$stage_dir" php <<'PHP'
+php_bin="${STASHD_PHP_BIN:-}"
+if [[ -z "$php_bin" && -x /usr/bin/php ]]; then
+    php_bin=/usr/bin/php
+fi
+php_bin="${php_bin:-php}"
+"$php_bin" /dev/stdin "$socket" "$root/target/wasm32-wasip2/release/stashd_podcast_plugin.wasm" "$stage_dir" <<'PHP'
 <?php
 
-$socket = getenv('SOCKET');
-$component = getenv('COMPONENT');
-$stage = getenv('STAGE');
+$socket = $argv[1] ?? '';
+$component = $argv[2] ?? '';
+$stage = $argv[3] ?? '';
 $stream = stream_socket_client('unix://' . $socket, $errno, $error, 5);
 if (! is_resource($stream)) {
     throw new RuntimeException($error ?: 'Could not connect to plugin host.');

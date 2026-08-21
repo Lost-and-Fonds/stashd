@@ -50,6 +50,17 @@ final readonly class PublishedResourceRepository
         return $resource instanceof PublishedResourceRecord ? $resource : null;
     }
 
+    public function findByBroadcastAndAsset(BroadcastId $broadcastId, string $assetId, string $mediaType): ?PublishedResourceRecord
+    {
+        $resource = PublishedResourceRecord::select()
+            ->where('broadcastId', $broadcastId->toString())
+            ->where('assetId', $assetId)
+            ->where('mediaType', $mediaType)
+            ->first();
+
+        return $resource instanceof PublishedResourceRecord ? $resource : null;
+    }
+
     /** @return list<PublishedResourceRecord> */
     public function listForBroadcast(BroadcastId $broadcastId): array
     {

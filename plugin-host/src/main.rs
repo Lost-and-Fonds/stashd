@@ -218,8 +218,14 @@ struct BroadcastEpisodeRequest {
     media_type: Option<String>,
     media_size_bytes: u64,
     artwork_reference: Option<String>,
+    #[serde(default)]
+    artwork_url: Option<String>,
     transcript_reference: Option<String>,
+    #[serde(default)]
+    transcript_url: Option<String>,
     chapter_reference: Option<String>,
+    #[serde(default)]
+    chapter_url: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -937,8 +943,11 @@ fn invoke_broadcast(
                     media_type: episode.media_type,
                     media_size_bytes: episode.media_size_bytes,
                     artwork_reference: episode.artwork_reference,
+                    artwork_url: episode.artwork_url,
                     transcript_reference: episode.transcript_reference,
+                    transcript_url: episode.transcript_url,
                     chapter_reference: episode.chapter_reference,
+                    chapter_url: episode.chapter_url,
                 },
             )
             .collect(),
