@@ -17,6 +17,7 @@ final readonly class StrategySelectionOptions
          * rather than a cheap preview.
          */
         public bool $preferHighestCapability = false,
+        public bool $preferIncremental = false,
     ) {
     }
 }

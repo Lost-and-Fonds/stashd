@@ -9,6 +9,11 @@ The original Broadcast-shaped spike contract is quarantined under
 regression script and must not be extended or treated as the active semantic
 contract. Active experimental Input WIT lives under `plugin-api/wit/`.
 
+HTTP destinations and credential-use rules are supplied as invocation-scoped
+generic grants. They are not hard-coded YouTube or Google policy in the Rust
+host; provider registrations supply the destination prefixes and credential
+placement needed by their implementation.
+
 The purpose is to prove or disprove the proposed PHP / Rust / WebAssembly Component Model architecture before designing the stable Plugin API.
 
 Do not prematurely generalize the spike into a complete plugin framework.

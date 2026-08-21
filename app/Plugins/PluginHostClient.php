@@ -103,23 +103,25 @@ final class PluginHostClient
         throw new RuntimeException('Plugin host closed the IPC connection without a result.');
     }
 
+    /** @param list<PluginHttpGrant>|null $httpGrants */
     public function resolveInput(
         string $componentPath,
         string $source,
         ?string $fixtureDirectory = null,
-        ?PluginHttpGrant $httpGrant = null,
+        ?array $httpGrants = null,
     ): PluginInputResult {
-        return $this->invokeInput('input-resolve', $componentPath, $source, null, $fixtureDirectory, httpGrant: $httpGrant);
+        return $this->invokeInput('input-resolve', $componentPath, $source, null, $fixtureDirectory, httpGrants: $httpGrants);
     }
 
+    /** @param list<PluginHttpGrant>|null $httpGrants */
     public function discoverInput(
         string $componentPath,
         string $inputId,
         ?string $fixtureDirectory = null,
         string $intent = 'refresh',
-        ?PluginHttpGrant $httpGrant = null,
+        ?array $httpGrants = null,
     ): PluginInputResult {
-        return $this->invokeInput('input-discover', $componentPath, null, $inputId, $fixtureDirectory, $intent, httpGrant: $httpGrant);
+        return $this->invokeInput('input-discover', $componentPath, null, $inputId, $fixtureDirectory, $intent, httpGrants: $httpGrants);
     }
 
     /** @param array<string, mixed> $item */
@@ -149,7 +151,10 @@ final class PluginHostClient
         );
     }
 
-    /** @param array<string, mixed>|null $item */
+    /**
+     * @param array<string, mixed>|null $item
+     * @param list<PluginHttpGrant>|null $httpGrants
+     */
     private function invokeInput(
         string $operation,
         string $componentPath,
@@ -157,7 +162,7 @@ final class PluginHostClient
         ?string $inputId,
         ?string $fixtureDirectory,
         string $intent = 'refresh',
-        ?PluginHttpGrant $httpGrant = null,
+        ?array $httpGrants = null,
         ?string $stagingDirectory = null,
         ?PluginHelperGrant $helper = null,
         ?array $item = null,
@@ -180,11 +185,15 @@ final class PluginHostClient
             'input_id' => $inputId,
             'fixture_dir' => $fixtureDirectory,
             'intent' => $intent,
-            'http_grants' => $httpGrant === null ? null : [[
-                'allowed_prefixes' => $httpGrant->allowedPrefixes,
-                'credential_name' => $httpGrant->credential?->name,
-                'credential_value' => $httpGrant->credential?->value,
-            ]],
+            'http_grants' => $httpGrants === null ? null : array_map(
+                static fn (PluginHttpGrant $grant): array => [
+                    'allowed_prefixes' => $grant->allowedPrefixes,
+                    'credential_name' => $grant->credential?->name,
+                    'credential_value' => $grant->credential?->value,
+                    'credential_parameter' => $grant->credential?->queryParameter,
+                ],
+                $httpGrants,
+            ),
             'staging_dir' => $stagingDirectory,
             'helper_name' => $helper?->name,
             'helper_executable' => $helper?->executable,

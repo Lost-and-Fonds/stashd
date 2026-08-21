@@ -26,14 +26,14 @@ try {
         'UCStashdDemoCh0012345678',
         $fixtureDirectory,
         'complete',
-        httpGrant: new PluginHttpGrant(
+        httpGrants: [new PluginHttpGrant(
             [
                 'https://www.googleapis.com/youtube/v3/channels?',
                 'https://www.googleapis.com/youtube/v3/playlistItems?',
                 'https://www.googleapis.com/youtube/v3/videos?',
             ],
-            new PluginCredentialGrant('youtube-data-api', $secret),
-        ),
+            new PluginCredentialGrant('youtube-data-api', $secret, 'key'),
+        )],
     );
 
     $map = json_decode((string) file_get_contents($fixtureDirectory . '/map.json'), true, flags: JSON_THROW_ON_ERROR);

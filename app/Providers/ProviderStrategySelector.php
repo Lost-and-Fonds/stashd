@@ -42,6 +42,16 @@ final readonly class ProviderStrategySelector
             throw new InvalidArgumentException("No available {$purpose->value} strategies for provider {$provider->key()}.");
         }
 
+        if ($options->preferIncremental) {
+            $incremental = array_values(array_filter(
+                $strategies,
+                static fn (ProviderStrategy $strategy): bool => $strategy->supportsIncremental,
+            ));
+            if ($incremental !== []) {
+                $strategies = $incremental;
+            }
+        }
+
         usort($strategies, static function (ProviderStrategy $a, ProviderStrategy $b) use ($options): int {
             $costOrder = [
                 StrategyCost::Low->value => 0,

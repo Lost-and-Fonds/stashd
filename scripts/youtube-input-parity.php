@@ -28,12 +28,12 @@ try {
         'https://www.youtube.com/channel/',
         'https://www.youtube.com/feeds/videos.xml?channel_id=',
     ]);
-    $resolved = $client->resolveInput($component, $source, $fixtureDirectory, $httpGrant);
+    $resolved = $client->resolveInput($component, $source, $fixtureDirectory, [$httpGrant]);
     $inputId = $resolved->resolved['id'] ?? null;
     if (! is_string($inputId)) {
         throw new RuntimeException('plugin returned no input ID');
     }
-    $discovered = $client->discoverInput($component, $inputId, $fixtureDirectory, httpGrant: $httpGrant);
+    $discovered = $client->discoverInput($component, $inputId, $fixtureDirectory, httpGrants: [$httpGrant]);
 
     $map = json_decode((string) file_get_contents($fixtureDirectory . '/map.json'), true, flags: JSON_THROW_ON_ERROR);
     $http = new FixtureProviderHttpClient($fixtureDirectory, $map);

@@ -58,7 +58,8 @@ final readonly class DiscoverStashInput
         // Strategies still gate their own availability (e.g. no key
         // configured), so this is a no-op when only the cheap one exists.
         $selectionOptions = match ($intent) {
-            JobIntent::Preflight, JobIntent::InitialBackfill, JobIntent::SyncInput => new StrategySelectionOptions(preferHighestCapability: true),
+            JobIntent::Preflight, JobIntent::InitialBackfill => new StrategySelectionOptions(preferHighestCapability: true),
+            JobIntent::SyncInput => new StrategySelectionOptions(preferHighestCapability: true, preferIncremental: true),
             default => null,
         };
         $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);

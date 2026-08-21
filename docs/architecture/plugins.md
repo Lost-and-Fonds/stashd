@@ -498,25 +498,27 @@ staging workspace, captures its result, and reports newly created files. This
 is trusted installed helper software for the development experiment, not a
 general hostile-native-code sandbox or a YouTube-specific host bridge.
 
-The host grants invocation-scoped runtime resources internally. In fixture mode it
-reads the committed YouTube HTTP fixtures; outside fixture mode Rust performs
-the HTTP request. The host allowlist permits only `https://www.youtube.com`:
-channel page paths (`/@…`, `/c/…`, `/user/…`, `/channel/…`) and channel RSS
-URLs (`/feeds/videos.xml?channel_id=…`). Watch URLs, other hosts, HTTP, and
-other paths are denied. This is an experimental YouTube capability, not the
-final network permission model.
+The host grants invocation-scoped runtime resources internally. In fixture mode
+it reads the fixture mapping supplied by the invocation; outside fixture mode
+Rust performs the HTTP request. HTTP destinations and credential-use rules are
+provided as generic invocation grants containing approved HTTPS URL prefixes
+and, where needed, a named credential with its declared placement. The host
+does not contain a provider allowlist; the plugin registration supplies the
+provider-specific grant data. Redirects are disabled. This is an experimental
+capability model, not the final network permission system.
 
 For YouTube, `refresh` currently uses RSS while `complete` requests
 the channel uploads playlist, pages `playlistItems`, then batches `videos`
 details. These requests use the same HTTP resource with a named credential-use
 intent (`youtube-data-api`). PHP decides whether the invocation receives that
-grant; the Rust host validates the grant and appends the configured key only
-after validating the HTTPS Google API host and approved endpoint paths. The
-key is never returned to Wasm. Redirects are disabled, so an approved request
-cannot carry credentials to another host. Missing grants and provider HTTP
-statuses are reported as the compact generic plugin error outcomes. These are
-YouTube implementation choices, not part of the generic Input contract or a
-copy of PHP strategy classes.
+grant; the Rust host validates the invocation-supplied destination and
+credential grant, then injects the credential using the grant's declared
+query-parameter placement. The raw secret is never returned to Wasm.
+Redirects are disabled, so an approved request cannot carry credentials to
+another host. Missing grants and provider HTTP statuses are reported as the
+compact generic plugin error outcomes. These are YouTube implementation
+choices, not part of the generic Input contract or a copy of PHP strategy
+classes.
 
 Run the deterministic proof from the Lerd development container with:
 

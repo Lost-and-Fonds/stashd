@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Plugins\ExternalInputPluginRegistry;
 use App\Providers\Fake\FakeProvider;
 use App\Providers\YouTube\YouTubeProvider;
 use InvalidArgumentException;
@@ -15,8 +16,14 @@ final class ProviderRegistry
     /** @var array<string, Provider> */
     private array $providers = [];
 
-    public function __construct(FakeProvider $fakeProvider, YouTubeProvider $youtubeProvider)
-    {
+    public function __construct(
+        FakeProvider $fakeProvider,
+        YouTubeProvider $youtubeProvider,
+        ?ExternalInputPluginRegistry $externalPlugins = null,
+    ) {
+        foreach ($externalPlugins?->providers() ?? [] as $plugin) {
+            $this->register($plugin);
+        }
         $this->register($fakeProvider);
         $this->register($youtubeProvider);
     }

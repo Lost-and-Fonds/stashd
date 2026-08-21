@@ -9,6 +9,7 @@ final readonly class PluginCredentialGrant
     public function __construct(
         public string $name,
         public string $value,
+        public string $queryParameter,
     ) {
     }
 }

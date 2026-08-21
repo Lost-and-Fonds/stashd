@@ -28,18 +28,18 @@ try {
     $httpGrant = new PluginHttpGrant(
         $prefixes,
         is_string($credentialName) && is_string($credentialValue)
-            ? new PluginCredentialGrant($credentialName, $credentialValue)
+            ? new PluginCredentialGrant($credentialName, $credentialValue, 'key')
             : null,
     );
     if ($operation === 'resolve') {
-        $client->resolveInput($component, $value, $fixtureDirectory, $httpGrant);
+        $client->resolveInput($component, $value, $fixtureDirectory, [$httpGrant]);
     } else {
         $client->discoverInput(
             $component,
             $value,
             $fixtureDirectory,
             is_string($intent) ? $intent : 'refresh',
-            httpGrant: $httpGrant,
+            httpGrants: [$httpGrant],
         );
     }
     fwrite(STDERR, "expected plugin error was not returned\n");

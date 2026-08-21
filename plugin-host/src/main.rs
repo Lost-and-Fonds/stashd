@@ -78,6 +78,7 @@ struct InputState {
 struct CredentialGrant {
     name: String,
     value: String,
+    query_parameter: String,
 }
 
 struct HttpGrant {
@@ -135,6 +136,7 @@ struct HttpGrantRequest {
     allowed_prefixes: Vec<String>,
     credential_name: Option<String>,
     credential_value: Option<String>,
+    credential_parameter: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -467,7 +469,10 @@ fn fixture_status(filename: &str) -> u16 {
 fn fixture_lookup_url(url: &str, grants: &[HttpGrant]) -> String {
     grants.iter().fold(url.to_owned(), |url, grant| {
         grant.credential.as_ref().map_or(url.clone(), |credential| {
-            url.replace(&format!("&key={}", credential.value), "&key=test-api-key")
+            url.replace(
+                &format!("&{}={}", credential.query_parameter, credential.value),
+                &format!("&{}=test-api-key", credential.query_parameter),
+            )
         })
     })
 }
@@ -498,13 +503,16 @@ fn authenticated_url(
                 .iter()
                 .any(|prefix| url.starts_with(prefix))
                 && credential.name == requested
-                && !credential.value.is_empty())
+                && !credential.value.is_empty()
+                && !credential.query_parameter.is_empty())
             .then_some(credential)
         });
         let grant = grant.ok_or(input_host::HttpError::CredentialUnavailable)?;
         let mut parsed = url::Url::parse(url)
             .map_err(|_| input_host::HttpError::Failed("invalid approved URL".to_owned()))?;
-        parsed.query_pairs_mut().append_pair("key", &grant.value);
+        parsed
+            .query_pairs_mut()
+            .append_pair(&grant.query_parameter, &grant.value);
         return Ok(parsed.to_string());
     }
 
@@ -523,7 +531,12 @@ fn into_http_grants(requests: Option<Vec<HttpGrantRequest>>) -> Vec<HttpGrant> {
             credential: request
                 .credential_name
                 .zip(request.credential_value)
-                .map(|(name, value)| CredentialGrant { name, value }),
+                .zip(request.credential_parameter)
+                .map(|((name, value), query_parameter)| CredentialGrant {
+                    name,
+                    value,
+                    query_parameter,
+                }),
         })
         .collect()
 }
@@ -1102,6 +1115,7 @@ mod tests {
             credential: Some(CredentialGrant {
                 name: "provider-key".to_owned(),
                 value: "fixture-secret".to_owned(),
+                query_parameter: "token".to_owned(),
             }),
         }];
         let url = authenticated_url(
@@ -1110,7 +1124,7 @@ mod tests {
             &grants,
         )
         .expect("approved credential use should succeed");
-        assert!(url.contains("key=fixture-secret"));
+        assert!(url.contains("token=fixture-secret"));
         assert!(matches!(
             authenticated_url("https://api.invalid/v1/items?id=x", None, &grants),
             Err(input_host::HttpError::CredentialUnavailable)
@@ -1148,6 +1162,7 @@ mod tests {
             credential: Some(CredentialGrant {
                 name: "provider-key".to_owned(),
                 value: "fixture-secret".to_owned(),
+                query_parameter: "token".to_owned(),
             }),
         }];
         assert!(matches!(

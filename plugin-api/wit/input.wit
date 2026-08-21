@@ -75,8 +75,6 @@ interface input-host {
 }
 
 interface input-plugin {
-    use input-host.{http-client};
-    use input-host.{staging-area};
     use input-host.{staged-artifact};
 
     enum discovery-intent {

@@ -6,6 +6,7 @@ namespace App\Downloads;
 
 use App\Downloads\Fake\FakeDownloader;
 use App\Downloads\Ytdlp\YtdlpDownloader;
+use App\Plugins\ExternalInputPluginRegistry;
 
 /**
  * Routes downloads to the fake provider downloader or ytdlphp based on provider identity.
@@ -15,6 +16,7 @@ final readonly class DelegatingDownloader implements DownloaderInterface
     public function __construct(
         private FakeDownloader $fake,
         private YtdlpDownloader $ytdlp,
+        private ?ExternalInputPluginRegistry $externalPlugins = null,
     ) {
     }
 
@@ -43,6 +45,11 @@ final readonly class DelegatingDownloader implements DownloaderInterface
 
     public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult
     {
+        $external = $this->externalPlugins?->find($request->providerKey);
+        if ($external !== null) {
+            return $external->download($request, $onProgress);
+        }
+
         if ($request->providerKey === 'fake') {
             return $this->fake->download($request, $onProgress);
         }
