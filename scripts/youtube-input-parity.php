@@ -21,11 +21,11 @@ if ($socket === null || $component === null || $fixtureDirectory === null || $so
 try {
     $client = new PluginHostClient($socket);
     $resolved = $client->resolveInput($component, $source, $fixtureDirectory);
-    $channelId = $resolved->resolved['provider_input_id'] ?? null;
-    if (! is_string($channelId)) {
-        throw new RuntimeException('plugin returned no channel ID');
+    $inputId = $resolved->resolved['id'] ?? null;
+    if (! is_string($inputId)) {
+        throw new RuntimeException('plugin returned no input ID');
     }
-    $discovered = $client->discoverInput($component, $channelId, $fixtureDirectory);
+    $discovered = $client->discoverInput($component, $inputId, $fixtureDirectory);
 
     $map = json_decode((string) file_get_contents($fixtureDirectory . '/map.json'), true, flags: JSON_THROW_ON_ERROR);
     $http = new FixtureProviderHttpClient($fixtureDirectory, $map);
@@ -36,11 +36,11 @@ try {
         'channel',
     );
 
-    if (($resolved->resolved['provider_input_id'] ?? null) !== $oracleChannel->id
+    if (($resolved->resolved['id'] ?? null) !== $oracleChannel->id
         || count($discovered->items ?? []) !== count($oracleItems)
-        || ($discovered->items[0]['provider_item_id'] ?? null) !== $oracleItems[0]->providerItemId
+        || ($discovered->items[0]['id'] ?? null) !== $oracleItems[0]->providerItemId
         || ($discovered->items[0]['title'] ?? null) !== $oracleItems[0]->title
-        || ($discovered->items[0]['canonical_uri'] ?? null) !== $oracleItems[0]->canonicalUri->toString()) {
+        || ($discovered->items[0]['reference'] ?? null) !== $oracleItems[0]->canonicalUri->toString()) {
         throw new RuntimeException('YouTube plugin parity check failed: ' . json_encode([
             'plugin_resolved' => $resolved->resolved,
             'plugin_first_item' => $discovered->items[0] ?? null,

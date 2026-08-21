@@ -26,13 +26,13 @@ if (! is_string($socket) || ! is_string($component) || ! is_string($helper)) {
 
 $url = 'https://www.youtube.com/watch?v=StashdVid01';
 $item = [
-    'provider_item_id' => 'StashdVid01',
-    'canonical_uri' => $url,
+    'id' => 'StashdVid01',
+    'reference' => $url,
     'title' => 'Stashd Video 1',
     'description' => 'Desc 1',
     'published_at' => '2026-01-01T00:00:00Z',
     'duration_seconds' => 600,
-    'content_type' => 'regular',
+    'kind' => 'regular',
 ];
 $root = sys_get_temp_dir() . '/stashd-youtube-acquire-parity-' . bin2hex(random_bytes(6));
 $pluginStage = $root . '/plugin';
@@ -81,7 +81,7 @@ try {
         throw new RuntimeException('primary artifact parity failed');
     }
     echo json_encode([
-        'provider_item_id' => $item['provider_item_id'],
+        'id' => $item['id'],
         'primary_sha256' => hash_file('sha256', $pluginPrimary),
         'php_roles' => array_map(static fn ($file): string => $file->role->value, $phpResult->files),
         'plugin_roles' => array_column($plugin->acquisition['artifacts'], 'role'),

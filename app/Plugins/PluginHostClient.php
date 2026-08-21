@@ -103,19 +103,19 @@ final class PluginHostClient
         throw new RuntimeException('Plugin host closed the IPC connection without a result.');
     }
 
-    public function resolveInput(string $componentPath, string $sourceUri, ?string $fixtureDirectory = null): PluginInputResult
+    public function resolveInput(string $componentPath, string $source, ?string $fixtureDirectory = null): PluginInputResult
     {
-        return $this->invokeInput('input-resolve', $componentPath, $sourceUri, null, $fixtureDirectory);
+        return $this->invokeInput('input-resolve', $componentPath, $source, null, $fixtureDirectory);
     }
 
     public function discoverInput(
         string $componentPath,
-        string $channelId,
+        string $inputId,
         ?string $fixtureDirectory = null,
-        string $mode = 'rss',
+        string $intent = 'refresh',
         ?PluginCredentialGrant $credential = null,
     ): PluginInputResult {
-        return $this->invokeInput('input-discover', $componentPath, null, $channelId, $fixtureDirectory, $mode, $credential);
+        return $this->invokeInput('input-discover', $componentPath, null, $inputId, $fixtureDirectory, $intent, $credential);
     }
 
     /** @param array<string, mixed> $item */
@@ -134,7 +134,7 @@ final class PluginHostClient
             null,
             null,
             null,
-            'rss',
+            'refresh',
             null,
             $stagingDirectory,
             $helper,
@@ -149,10 +149,10 @@ final class PluginHostClient
     private function invokeInput(
         string $operation,
         string $componentPath,
-        ?string $sourceUri,
-        ?string $channelId,
+        ?string $source,
+        ?string $inputId,
         ?string $fixtureDirectory,
-        string $mode = 'rss',
+        string $intent = 'refresh',
         ?PluginCredentialGrant $credential = null,
         ?string $stagingDirectory = null,
         ?PluginHelperGrant $helper = null,
@@ -172,10 +172,10 @@ final class PluginHostClient
             'id' => $requestId,
             'op' => $operation,
             'component_path' => $componentPath,
-            'source_uri' => $sourceUri,
-            'channel_id' => $channelId,
+            'source' => $source,
+            'input_id' => $inputId,
             'fixture_dir' => $fixtureDirectory,
-            'mode' => $mode,
+            'intent' => $intent,
             'credential_name' => $credential?->name,
             'credential_value' => $credential?->value,
             'staging_dir' => $stagingDirectory,

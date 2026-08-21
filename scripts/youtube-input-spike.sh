@@ -3,6 +3,17 @@ set -euo pipefail
 
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 
+if command -v rg >/dev/null 2>&1; then
+    generic_wit_leak=$(rg -n -i 'youtube|channel|rss|data-api|yt-dlp|feed' plugin-api/wit || true)
+else
+    generic_wit_leak=$(grep -REin 'youtube|channel|rss|data-api|yt-dlp|feed' plugin-api/wit || true)
+fi
+if [[ -n "$generic_wit_leak" ]]; then
+    printf '%s\n' "$generic_wit_leak" >&2
+    echo 'generic Input WIT contains provider-specific terminology' >&2
+    exit 1
+fi
+
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/stashd-youtube-input.XXXXXX")
 host_pid=''
@@ -28,25 +39,25 @@ if [[ ! -S "$socket" ]]; then
 fi
 
 output=$(php "$root/scripts/youtube-input-parity.php" "$socket" "$component" "$fixture_directory" "https://www.youtube.com/@StashdDemo")
-grep -q '"provider_input_id":"UCStashdDemoCh0012345678"' <<<"$output"
-grep -q '"provider_item_id":"demoVideo01"' <<<"$output"
+grep -q '"id":"UCStashdDemoCh0012345678"' <<<"$output"
+grep -q '"id":"demoVideo01"' <<<"$output"
 grep -q '"stage":"complete"' <<<"$output"
 grep -q '"first_title":"Demo Episode One"' <<<"$output"
 
-php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdBadFeed0123456789 malformed_feed
-php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdPrivateCh12345678 source_not_found
-php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdUnknownCh012345678 upstream_unavailable
-php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" resolve https://www.youtube.com/c/StashdUnresolvableChannel channel_resolution_failed
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdBadFeed0123456789 invalid_data
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdPrivateCh12345678 not_found
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdUnknownCh012345678 unavailable
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" resolve https://www.youtube.com/c/StashdUnresolvableChannel invalid_data
 
 php "$root/scripts/youtube-data-api-parity.php" "$socket" "$component" "$fixture_directory"
-php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdDemoCh0012345678 credential_unavailable data-api
-php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdAuthFailCh0012345678 authentication_rejected data-api youtube-data-api fixture-secret-do-not-cross-wasm
-php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdRateLimitCh0123456789 rate_limited data-api youtube-data-api fixture-secret-do-not-cross-wasm
-php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdMalformedApi012345678 malformed_api_response data-api youtube-data-api fixture-secret-do-not-cross-wasm
-php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdMissingUploads12345678 source_not_found data-api youtube-data-api fixture-secret-do-not-cross-wasm
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdDemoCh0012345678 authentication complete
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdAuthFailCh0012345678 authentication complete youtube-data-api fixture-secret-do-not-cross-wasm
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdRateLimitCh0123456789 rate_limited complete youtube-data-api fixture-secret-do-not-cross-wasm
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdMalformedApi012345678 invalid_data complete youtube-data-api fixture-secret-do-not-cross-wasm
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdMissingUploads12345678 not_found complete youtube-data-api fixture-secret-do-not-cross-wasm
 php "$root/scripts/youtube-acquire-spike.php" "$socket" "$component" "$helper"
 php "$root/scripts/youtube-acquire-parity.php" "$socket" "$component" "$helper"
-php "$root/scripts/plugin-acquire-error.php" "$socket" "$component" "$helper" "https://www.youtube.com/watch?v=fail-acquisition" helper_failed
+php "$root/scripts/plugin-acquire-error.php" "$socket" "$component" "$helper" "https://www.youtube.com/watch?v=fail-acquisition" failed
 
 if php "$root/scripts/youtube-input-parity.php" "$socket" "$component" "$fixture_directory" "https://www.youtube.com/watch?v=demoVideo01"; then
     echo 'unsupported YouTube source unexpectedly succeeded' >&2

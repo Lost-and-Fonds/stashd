@@ -6,10 +6,10 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Plugins\PluginHostClient;
 
-[$script, $socket, $component, $fixtureDirectory, $operation, $value, $expected, $mode, $credentialName, $credentialValue] = array_pad($argv, 10, null);
+[$script, $socket, $component, $fixtureDirectory, $operation, $value, $expected, $intent, $credentialName, $credentialValue] = array_pad($argv, 10, null);
 
 if (! is_string($socket) || ! is_string($component) || ! is_string($fixtureDirectory) || ! is_string($operation) || ! is_string($value) || ! is_string($expected)) {
-    fwrite(STDERR, "usage: plugin-input-error.php <socket> <component> <fixture-directory> <resolve|discover> <value> <expected-error> [mode] [credential-name] [credential-value]\n");
+    fwrite(STDERR, "usage: plugin-input-error.php <socket> <component> <fixture-directory> <resolve|discover> <value> <expected-error> [intent] [credential-name] [credential-value]\n");
     exit(64);
 }
 
@@ -22,7 +22,7 @@ try {
             $component,
             $value,
             $fixtureDirectory,
-            is_string($mode) ? $mode : 'rss',
+            is_string($intent) ? $intent : 'refresh',
             is_string($credentialName) && is_string($credentialValue)
                 ? new App\Plugins\PluginCredentialGrant($credentialName, $credentialValue)
                 : null,

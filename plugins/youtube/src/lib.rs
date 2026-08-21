@@ -1,33 +1,60 @@
 wit_bindgen::generate!({
     path: "../../plugin-api/wit",
-    world: "youtube-input-world",
+    world: "input-world",
 });
 
 use exports::stashd::plugin::input_plugin::{
-    AcquisitionOptions, AcquisitionResult, DiscoveredItem, DiscoveryMode, Guest, MediaKind,
-    PluginError, ResolvedInput,
+    AcquisitionOptions, AcquisitionResult, DiscoveredItem, DiscoveryIntent, Error, Guest,
+    MediaKind, PluginError, ResolvedInput,
 };
 use serde_json::Value;
-use stashd::plugin::input_host::{self, ArtifactRole, HttpClient, StagingArea};
+use stashd::plugin::input_host::{self, ArtifactRole};
 
 struct YouTubeInput;
 
+fn error(message: &str, retryable: bool) -> Error {
+    Error {
+        message: message.to_owned(),
+        retryable,
+    }
+}
+
+fn unsupported(message: &str) -> PluginError {
+    PluginError::Unsupported(error(message, false))
+}
+
+fn not_found(message: &str) -> PluginError {
+    PluginError::NotFound(error(message, false))
+}
+
+fn authentication(message: &str, retryable: bool) -> PluginError {
+    PluginError::Authentication(error(message, retryable))
+}
+
+fn unavailable(message: &str, retryable: bool) -> PluginError {
+    PluginError::Unavailable(error(message, retryable))
+}
+
+fn invalid_data(message: &str) -> PluginError {
+    PluginError::InvalidData(error(message, false))
+}
+
+fn failed(message: &str, retryable: bool) -> PluginError {
+    PluginError::Failed(error(message, retryable))
+}
+
 impl Guest for YouTubeInput {
-    fn resolve(client: &HttpClient, source_uri: String) -> Result<ResolvedInput, PluginError> {
-        let path = source_uri
+    fn resolve(source: String) -> Result<ResolvedInput, PluginError> {
+        let path = source
             .strip_prefix("https://www.youtube.com")
-            .ok_or_else(|| {
-                PluginError::UnsupportedSource("YouTube channel URL required".to_owned())
-            })?;
+            .ok_or_else(|| unsupported("YouTube channel reference required"))?;
         let direct_id = if let Some(id) = path.strip_prefix("/channel/") {
             let id = id.split('/').next().unwrap_or_default();
             Some(id.to_owned())
         } else if path.starts_with("/@") || path.starts_with("/c/") || path.starts_with("/user/") {
             None
         } else {
-            return Err(PluginError::UnsupportedSource(
-                "channel URL required".to_owned(),
-            ));
+            return Err(unsupported("channel reference required"));
         };
 
         let (channel_id, title, avatar) = if let Some(id) = direct_id {
@@ -36,23 +63,18 @@ impl Guest for YouTubeInput {
             input_host::report_progress(&input_host::Progress {
                 stage: "resolving channel".to_owned(),
             });
-            let response = get(client, &source_uri)?;
+            let client = input_host::open_http_client();
+            let response = get(&client, &source)?;
             if response.status == 404 {
-                return Err(PluginError::SourceNotFound(
-                    "channel page not found".to_owned(),
-                ));
+                return Err(not_found("channel page not found"));
             }
             if response.status < 200 || response.status >= 300 {
-                return Err(PluginError::UpstreamUnavailable(
-                    "channel page unavailable".to_owned(),
-                ));
+                return Err(unavailable("channel page unavailable", true));
             }
-            let html = String::from_utf8(response.body).map_err(|_| {
-                PluginError::ChannelResolutionFailed("channel page was not UTF-8".to_owned())
-            })?;
-            let id = extract_channel_id(&html).ok_or_else(|| {
-                PluginError::ChannelResolutionFailed("channel ID was not found".to_owned())
-            })?;
+            let html = String::from_utf8(response.body)
+                .map_err(|_| invalid_data("channel page was not text"))?;
+            let id = extract_channel_id(&html)
+                .ok_or_else(|| invalid_data("channel identity was not found"))?;
             (
                 id,
                 extract_meta(&html, "og:title"),
@@ -62,47 +84,42 @@ impl Guest for YouTubeInput {
 
         input_host::log("YouTube channel resolved");
         Ok(ResolvedInput {
-            provider_key: "youtube".to_owned(),
-            input_type: "channel".to_owned(),
-            source_uri,
-            canonical_source_uri: format!("https://www.youtube.com/channel/{channel_id}"),
-            provider_input_id: channel_id,
+            id: channel_id.clone(),
+            canonical_reference: Some(format!("https://www.youtube.com/channel/{channel_id}")),
+            kind: Some("channel".to_owned()),
             title,
-            avatar_uri: avatar,
+            artwork_reference: avatar,
             estimated_item_count: None,
         })
     }
 
     fn discover(
-        client: &HttpClient,
-        channel_id: String,
-        mode: DiscoveryMode,
+        input_id: String,
+        intent: DiscoveryIntent,
     ) -> Result<Vec<DiscoveredItem>, PluginError> {
-        if matches!(mode, DiscoveryMode::DataApi) {
-            return discover_data_api(client, &channel_id);
+        if matches!(intent, DiscoveryIntent::Complete) {
+            let client = input_host::open_http_client();
+            return discover_data_api(&client, &input_id);
         }
         input_host::report_progress(&input_host::Progress {
             stage: "fetching feed".to_owned(),
         });
+        let client = input_host::open_http_client();
         let response = get(
-            client,
-            &format!("https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"),
+            &client,
+            &format!("https://www.youtube.com/feeds/videos.xml?channel_id={input_id}"),
         )?;
         if response.status == 404 {
-            return Err(PluginError::SourceNotFound(
-                "channel feed not found".to_owned(),
-            ));
+            return Err(not_found("channel feed not found"));
         }
         if response.status < 200 || response.status >= 300 {
-            return Err(PluginError::UpstreamUnavailable(
-                "channel feed unavailable".to_owned(),
-            ));
+            return Err(unavailable("channel feed unavailable", true));
         }
         input_host::report_progress(&input_host::Progress {
             stage: "parsing feed".to_owned(),
         });
-        let xml = String::from_utf8(response.body)
-            .map_err(|_| PluginError::MalformedFeed("feed was not UTF-8".to_owned()))?;
+        let xml =
+            String::from_utf8(response.body).map_err(|_| invalid_data("feed was not text"))?;
         let items = parse_feed(&xml)?;
         input_host::log("YouTube RSS discovery complete");
         input_host::report_progress(&input_host::Progress {
@@ -112,7 +129,6 @@ impl Guest for YouTubeInput {
     }
 
     fn acquire(
-        staging: &StagingArea,
         item: DiscoveredItem,
         options: AcquisitionOptions,
     ) -> Result<AcquisitionResult, PluginError> {
@@ -153,57 +169,41 @@ impl Guest for YouTubeInput {
                 options.caption_languages.unwrap_or_else(|| "en".to_owned()),
             ]);
         }
-        args.push(item.canonical_uri.clone());
+        args.push(item.reference.clone());
         input_host::report_progress(&input_host::Progress {
             stage: "downloading media".to_owned(),
         });
+        let staging = input_host::open_staging_area();
         let result =
-            input_host::StagingArea::run_helper(staging, "yt-dlp", &args).map_err(|error| {
+            input_host::StagingArea::run_helper(&staging, "yt-dlp", &args).map_err(|error| {
                 match error {
-                    input_host::HelperError::Denied => {
-                        PluginError::HelperUnavailable("yt-dlp helper was not granted".to_owned())
+                    input_host::HelperError::Denied | input_host::HelperError::Unavailable(_) => {
+                        unavailable("acquisition helper is unavailable", true)
                     }
-                    input_host::HelperError::Unavailable(_) => {
-                        PluginError::HelperUnavailable("yt-dlp helper is unavailable".to_owned())
-                    }
-                    input_host::HelperError::Failed(_) => {
-                        PluginError::HelperFailed("yt-dlp helper could not be started".to_owned())
-                    }
+                    input_host::HelperError::Failed(_) => failed("acquisition helper failed", true),
                 }
             })?;
         if result.exit_code == 124 {
-            return Err(PluginError::AcquisitionTimeout(
-                "YouTube acquisition helper timed out".to_owned(),
-            ));
+            return Err(failed("acquisition timed out", true));
         }
         if result.exit_code != 0 {
-            return Err(PluginError::HelperFailed(
-                "YouTube acquisition helper failed".to_owned(),
-            ));
+            return Err(failed("acquisition helper failed", true));
         }
         let mut artifacts = Vec::new();
         for file in result.files {
-            let (role, media_type) = artifact_kind(&file).ok_or_else(|| {
-                PluginError::UnexpectedAcquisitionResult(
-                    "YouTube helper produced an unrecognized artifact".to_owned(),
-                )
-            })?;
+            let (role, media_type) = artifact_kind(&file)
+                .ok_or_else(|| invalid_data("acquisition produced an unrecognized artifact"))?;
             artifacts.push(
-                input_host::StagingArea::stage(staging, &file, role, Some(media_type)).map_err(
-                    |_| {
-                        PluginError::UnexpectedAcquisitionResult(
-                            "YouTube artifact could not be staged".to_owned(),
-                        )
-                    },
-                )?,
+                input_host::StagingArea::stage(&staging, &file, role, Some(media_type))
+                    .map_err(|_| invalid_data("acquisition artifact could not be staged"))?,
             );
         }
         if !artifacts
             .iter()
             .any(|artifact| artifact.role == ArtifactRole::Primary)
         {
-            return Err(PluginError::UnexpectedAcquisitionResult(
-                "YouTube helper produced no primary media artifact".to_owned(),
+            return Err(invalid_data(
+                "acquisition produced no primary media artifact",
             ));
         }
         input_host::report_progress(&input_host::Progress {
@@ -220,14 +220,14 @@ impl Guest for YouTubeInput {
 fn artifact_kind(file: &str) -> Option<(ArtifactRole, &'static str)> {
     let lower = file.to_ascii_lowercase();
     if lower.ends_with(".info.json") {
-        Some((ArtifactRole::ProviderMetadata, "application/json"))
+        Some((ArtifactRole::Metadata, "application/json"))
     } else if lower.ends_with(".vtt") {
         Some((ArtifactRole::Captions, "text/vtt"))
     } else if [".jpg", ".jpeg", ".png", ".webp"]
         .iter()
         .any(|extension| lower.ends_with(extension))
     {
-        Some((ArtifactRole::Thumbnail, "image/*"))
+        Some((ArtifactRole::Artwork, "image/*"))
     } else if [".mp4", ".mkv", ".webm"]
         .iter()
         .any(|extension| lower.ends_with(extension))
@@ -240,7 +240,10 @@ fn artifact_kind(file: &str) -> Option<(ArtifactRole, &'static str)> {
     }
 }
 
-fn get(client: &HttpClient, url: &str) -> Result<input_host::HttpResponse, PluginError> {
+fn get(
+    client: &input_host::HttpClient,
+    url: &str,
+) -> Result<input_host::HttpResponse, PluginError> {
     input_host::HttpClient::get(
         client,
         &input_host::HttpRequest {
@@ -248,26 +251,24 @@ fn get(client: &HttpClient, url: &str) -> Result<input_host::HttpResponse, Plugi
             credential: None,
         },
     )
-    .map_err(|error| match error {
-        input_host::HttpError::Denied => {
-            PluginError::UpstreamUnavailable("HTTP capability denied request".to_owned())
-        }
+    .map_err(|http_error| match http_error {
+        input_host::HttpError::Denied => unavailable("HTTP capability denied request", false),
         input_host::HttpError::CredentialUnavailable => {
-            PluginError::CredentialUnavailable("credential use was not granted".to_owned())
+            authentication("required credential is unavailable", false)
         }
         input_host::HttpError::AuthenticationRejected => {
-            PluginError::AuthenticationRejected("YouTube authentication was rejected".to_owned())
+            authentication("upstream authentication was rejected", false)
         }
         input_host::HttpError::RateLimited => {
-            PluginError::RateLimited("YouTube request was rate limited".to_owned())
+            PluginError::RateLimited(error("upstream request was rate limited", true))
         }
         input_host::HttpError::Unavailable(message) | input_host::HttpError::Failed(message) => {
-            PluginError::UpstreamUnavailable(message)
+            unavailable(&message, true)
         }
     })
 }
 
-fn data_api_get(client: &HttpClient, url: &str) -> Result<Value, PluginError> {
+fn data_api_get(client: &input_host::HttpClient, url: &str) -> Result<Value, PluginError> {
     input_host::report_progress(&input_host::Progress {
         stage: "fetching Data API".to_owned(),
     });
@@ -278,55 +279,50 @@ fn data_api_get(client: &HttpClient, url: &str) -> Result<Value, PluginError> {
             credential: Some("youtube-data-api".to_owned()),
         },
     )
-    .map_err(|error| match error {
-        input_host::HttpError::Denied => {
-            PluginError::UpstreamUnavailable("HTTP capability denied request".to_owned())
+    .map_err(|http_error| match http_error {
+        input_host::HttpError::Denied => unavailable("HTTP capability denied request", false),
+        input_host::HttpError::CredentialUnavailable => {
+            authentication("required credential is unavailable", false)
         }
-        input_host::HttpError::CredentialUnavailable => PluginError::CredentialUnavailable(
-            "YouTube Data API credential is unavailable".to_owned(),
-        ),
         input_host::HttpError::AuthenticationRejected => {
-            PluginError::AuthenticationRejected("YouTube authentication was rejected".to_owned())
+            authentication("upstream authentication was rejected", false)
         }
         input_host::HttpError::RateLimited => {
-            PluginError::RateLimited("YouTube request was rate limited".to_owned())
+            PluginError::RateLimited(error("upstream request was rate limited", true))
         }
         input_host::HttpError::Unavailable(_) | input_host::HttpError::Failed(_) => {
-            PluginError::UpstreamUnavailable("YouTube Data API is unavailable".to_owned())
+            unavailable("upstream service is unavailable", true)
         }
     })?;
 
     match response.status {
         401 | 403 => {
-            return Err(PluginError::AuthenticationRejected(
-                "YouTube authentication was rejected".to_owned(),
+            return Err(authentication(
+                "upstream authentication was rejected",
+                false,
             ));
         }
         404 => {
-            return Err(PluginError::SourceNotFound(
-                "YouTube Data API resource was not found".to_owned(),
-            ));
+            return Err(not_found("upstream resource was not found"));
         }
         429 => {
-            return Err(PluginError::RateLimited(
-                "YouTube Data API quota was rate limited".to_owned(),
-            ));
+            return Err(PluginError::RateLimited(error(
+                "upstream request was rate limited",
+                true,
+            )));
         }
         status if !(200..300).contains(&status) => {
-            return Err(PluginError::UpstreamUnavailable(
-                "YouTube Data API request failed".to_owned(),
-            ));
+            return Err(unavailable("upstream request failed", true));
         }
         _ => {}
     }
 
-    serde_json::from_slice(&response.body).map_err(|_| {
-        PluginError::MalformedApiResponse("YouTube Data API returned invalid JSON".to_owned())
-    })
+    serde_json::from_slice(&response.body)
+        .map_err(|_| invalid_data("upstream response was invalid"))
 }
 
 fn discover_data_api(
-    client: &HttpClient,
+    client: &input_host::HttpClient,
     channel_id: &str,
 ) -> Result<Vec<DiscoveredItem>, PluginError> {
     input_host::report_progress(&input_host::Progress {
@@ -347,9 +343,7 @@ fn discover_data_api(
         .and_then(|playlists| playlists.get("uploads"))
         .and_then(Value::as_str)
         .filter(|id| !id.is_empty())
-        .ok_or_else(|| {
-            PluginError::SourceNotFound("channel uploads playlist was not found".to_owned())
-        })?
+        .ok_or_else(|| not_found("input collection was not found"))?
         .to_owned();
 
     let mut entries = Vec::new();
@@ -380,7 +374,7 @@ fn discover_data_api(
                             .unwrap_or_else(|| video_id.to_owned()),
                         description: string_field(snippet, "description"),
                         published_at: string_field(snippet, "publishedAt"),
-                        thumbnail_uri: best_thumbnail(
+                        artwork_reference: best_thumbnail(
                             snippet.and_then(|value| value.get("thumbnails")),
                         ),
                     });
@@ -422,16 +416,16 @@ fn discover_data_api(
                 item.get("id").and_then(Value::as_str) == Some(entry.video_id.as_str())
             });
             let Some(detail) = detail else { continue };
-            let (duration_seconds, content_type) = classify(detail);
+            let (duration_seconds, kind) = classify(detail);
             output.push(DiscoveredItem {
-                provider_item_id: entry.video_id.clone(),
-                canonical_uri: format!("https://www.youtube.com/watch?v={}", entry.video_id),
+                id: entry.video_id.clone(),
+                reference: format!("https://www.youtube.com/watch?v={}", entry.video_id),
                 title: entry.title.clone(),
                 description: entry.description.clone(),
                 published_at: entry.published_at.clone(),
-                thumbnail_uri: entry.thumbnail_uri.clone(),
+                artwork_reference: entry.artwork_reference.clone(),
                 duration_seconds,
-                content_type: Some(content_type),
+                kind: Some(kind),
             });
         }
     }
@@ -447,7 +441,7 @@ struct PlaylistEntry {
     title: String,
     description: Option<String>,
     published_at: Option<String>,
-    thumbnail_uri: Option<String>,
+    artwork_reference: Option<String>,
 }
 
 fn string_field(value: Option<&Value>, field: &str) -> Option<String> {
@@ -551,9 +545,7 @@ fn parse_feed(xml: &str) -> Result<Vec<DiscoveredItem>, PluginError> {
                 let name = local_name(event_name.as_ref());
                 if !root_seen {
                     if name != b"feed" {
-                        return Err(PluginError::MalformedFeed(
-                            "RSS document has no Atom feed root".to_owned(),
-                        ));
+                        return Err(invalid_data("document has no feed root"));
                     }
                     root_seen = true;
                 }
@@ -576,7 +568,7 @@ fn parse_feed(xml: &str) -> Result<Vec<DiscoveredItem>, PluginError> {
             Ok(Event::Text(event)) => {
                 let value = event
                     .unescape()
-                    .map_err(|_| PluginError::MalformedFeed("invalid XML text".to_owned()))?
+                    .map_err(|_| invalid_data("document contains invalid text"))?
                     .into_owned();
                 let value = value.trim().to_owned();
                 match current.as_str() {
@@ -594,8 +586,8 @@ fn parse_feed(xml: &str) -> Result<Vec<DiscoveredItem>, PluginError> {
             Ok(Event::End(event)) if local_name(event.name().as_ref()) == b"entry" => {
                 if !id.is_empty() {
                     items.push(DiscoveredItem {
-                        provider_item_id: id.clone(),
-                        canonical_uri: canonical
+                        id: id.clone(),
+                        reference: canonical
                             .clone()
                             .unwrap_or_else(|| format!("https://www.youtube.com/watch?v={id}")),
                         title: if title.is_empty() {
@@ -605,9 +597,9 @@ fn parse_feed(xml: &str) -> Result<Vec<DiscoveredItem>, PluginError> {
                         },
                         description: description.clone(),
                         published_at: published.clone(),
-                        thumbnail_uri: thumbnail.clone(),
+                        artwork_reference: thumbnail.clone(),
                         duration_seconds: None,
-                        content_type: None,
+                        kind: None,
                     });
                 }
                 id.clear();
@@ -620,14 +612,10 @@ fn parse_feed(xml: &str) -> Result<Vec<DiscoveredItem>, PluginError> {
             }
             Ok(Event::Eof) if root_seen => break,
             Ok(Event::Eof) => {
-                return Err(PluginError::MalformedFeed(
-                    "RSS document was empty".to_owned(),
-                ));
+                return Err(invalid_data("document was empty"));
             }
             Err(_) => {
-                return Err(PluginError::MalformedFeed(
-                    "RSS XML could not be parsed".to_owned(),
-                ));
+                return Err(invalid_data("document could not be parsed"));
             }
             _ => {}
         }

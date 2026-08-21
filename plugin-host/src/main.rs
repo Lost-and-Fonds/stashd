@@ -29,7 +29,7 @@ pub struct StagingAreaResource;
 mod youtube_input_world {
     wasmtime::component::bindgen!({
         path: "../plugin-api/wit",
-        world: "youtube-input-world",
+        world: "input-world",
         with: {
             "stashd:plugin/input-host/http-client": super::HttpClientResource,
             "stashd:plugin/input-host/staging-area": super::StagingAreaResource,
@@ -37,9 +37,10 @@ mod youtube_input_world {
     });
 }
 
-use youtube_input_world::YoutubeInputWorld;
+use youtube_input_world::InputWorld;
 use youtube_input_world::exports::stashd::plugin::input_plugin::{
-    AcquisitionOptions, AcquisitionResult, DiscoveredItem, DiscoveryMode, MediaKind, ResolvedInput,
+    AcquisitionOptions, AcquisitionResult, DiscoveredItem, DiscoveryIntent, MediaKind,
+    ResolvedInput,
 };
 use youtube_input_world::stashd::plugin::input_host::{
     self as input_host, ArtifactRole, HelperError, HelperResult, Host as InputHost, HostHttpClient,
@@ -110,10 +111,10 @@ struct Request {
     asset_path: Option<PathBuf>,
     staging_path: Option<PathBuf>,
     operation: Option<String>,
-    source_uri: Option<String>,
-    channel_id: Option<String>,
+    source: Option<String>,
+    input_id: Option<String>,
     fixture_dir: Option<PathBuf>,
-    mode: Option<String>,
+    intent: Option<String>,
     credential_name: Option<String>,
     credential_value: Option<String>,
     staging_dir: Option<PathBuf>,
@@ -127,14 +128,14 @@ struct Request {
 
 #[derive(Debug, Deserialize)]
 struct AcquireItemRequest {
-    provider_item_id: String,
-    canonical_uri: String,
+    id: String,
+    reference: String,
     title: String,
     description: Option<String>,
     published_at: Option<String>,
-    thumbnail_uri: Option<String>,
+    artwork_reference: Option<String>,
     duration_seconds: Option<u32>,
-    content_type: Option<String>,
+    kind: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -263,6 +264,18 @@ impl HostStagingOutput for HostState {
 }
 
 impl InputHost for InputState {
+    fn open_http_client(&mut self) -> Resource<HttpClientResource> {
+        self.table
+            .push(HttpClientResource)
+            .expect("resource table is available")
+    }
+
+    fn open_staging_area(&mut self) -> Resource<StagingAreaResource> {
+        self.table
+            .push(StagingAreaResource)
+            .expect("resource table is available")
+    }
+
     fn report_progress(&mut self, progress: input_host::Progress) {
         self.progress.push(progress);
     }
@@ -500,9 +513,9 @@ fn invoke_input(
     engine: &Engine,
     component: &Component,
     fixture_dir: Option<PathBuf>,
-    source_uri: Option<&str>,
-    channel_id: Option<&str>,
-    mode: Option<&str>,
+    source: Option<&str>,
+    input_id: Option<&str>,
+    intent: Option<&str>,
     credential_name: Option<String>,
     credential_value: Option<String>,
 ) -> Result<(
@@ -527,32 +540,31 @@ fn invoke_input(
     );
     let mut linker = Linker::new(engine);
     wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
-    YoutubeInputWorld::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state)?;
-    let plugin = YoutubeInputWorld::instantiate(&mut store, component, &linker)?;
-    let client = store.data_mut().table.push(HttpClientResource)?;
-    let (resolved, items) = if let Some(source) = source_uri {
+    InputWorld::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state)?;
+    let plugin = InputWorld::instantiate(&mut store, component, &linker)?;
+    let (resolved, items) = if let Some(source) = source {
         (
             Some(
                 plugin
                     .stashd_plugin_input_plugin()
-                    .call_resolve(&mut store, client, source)?
+                    .call_resolve(&mut store, source)?
                     .map_err(|error| anyhow::anyhow!("plugin input error: {error:?}"))?,
             ),
             None,
         )
     } else {
-        let channel = channel_id.context("input discovery requires channel_id")?;
-        let mode = match mode.unwrap_or("rss") {
-            "rss" => DiscoveryMode::Rss,
-            "data-api" => DiscoveryMode::DataApi,
-            other => anyhow::bail!("unsupported discovery mode: {other}"),
+        let input_id = input_id.context("input discovery requires input_id")?;
+        let intent = match intent.unwrap_or("refresh") {
+            "refresh" => DiscoveryIntent::Refresh,
+            "complete" => DiscoveryIntent::Complete,
+            other => anyhow::bail!("unsupported discovery intent: {other}"),
         };
         (
             None,
             Some(
                 plugin
                     .stashd_plugin_input_plugin()
-                    .call_discover(&mut store, client, channel, mode)?
+                    .call_discover(&mut store, input_id, intent)?
                     .map_err(|error| anyhow::anyhow!("plugin input error: {error:?}"))?,
             ),
         )
@@ -589,18 +601,17 @@ fn invoke_acquire(
     );
     let mut linker = Linker::new(engine);
     wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
-    YoutubeInputWorld::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state)?;
-    let plugin = YoutubeInputWorld::instantiate(&mut store, component, &linker)?;
-    let staging = store.data_mut().table.push(StagingAreaResource)?;
+    InputWorld::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state)?;
+    let plugin = InputWorld::instantiate(&mut store, component, &linker)?;
     let item = DiscoveredItem {
-        provider_item_id: item.provider_item_id,
-        canonical_uri: item.canonical_uri,
+        id: item.id,
+        reference: item.reference,
         title: item.title,
         description: item.description,
         published_at: item.published_at,
-        thumbnail_uri: item.thumbnail_uri,
+        artwork_reference: item.artwork_reference,
         duration_seconds: item.duration_seconds,
-        content_type: item.content_type,
+        kind: item.kind,
     };
     let media_kind = match media_kind {
         "video" => MediaKind::Video,
@@ -611,7 +622,6 @@ fn invoke_acquire(
         .stashd_plugin_input_plugin()
         .call_acquire(
             &mut store,
-            staging,
             &item,
             &AcquisitionOptions {
                 media_kind,
@@ -625,27 +635,25 @@ fn invoke_acquire(
 
 fn resolved_json(value: &ResolvedInput) -> serde_json::Value {
     serde_json::json!({
-        "provider_key": value.provider_key,
-        "input_type": value.input_type,
-        "source_uri": value.source_uri,
-        "canonical_source_uri": value.canonical_source_uri,
-        "provider_input_id": value.provider_input_id,
+        "id": value.id,
+        "canonical_reference": value.canonical_reference,
+        "kind": value.kind,
         "title": value.title,
-        "avatar_uri": value.avatar_uri,
+        "artwork_reference": value.artwork_reference,
         "estimated_item_count": value.estimated_item_count,
     })
 }
 
 fn item_json(value: &DiscoveredItem) -> serde_json::Value {
     serde_json::json!({
-        "provider_item_id": value.provider_item_id,
-        "canonical_uri": value.canonical_uri,
+        "id": value.id,
+        "reference": value.reference,
         "title": value.title,
         "description": value.description,
         "published_at": value.published_at,
-        "thumbnail_uri": value.thumbnail_uri,
+        "artwork_reference": value.artwork_reference,
         "duration_seconds": value.duration_seconds,
-        "content_type": value.content_type,
+        "kind": value.kind,
     })
 }
 
@@ -653,8 +661,8 @@ fn artifact_json(value: &StagedArtifact) -> serde_json::Value {
     let role = match value.role {
         ArtifactRole::Primary => "primary",
         ArtifactRole::Captions => "captions",
-        ArtifactRole::Thumbnail => "thumbnail",
-        ArtifactRole::ProviderMetadata => "provider-metadata",
+        ArtifactRole::Artwork => "artwork",
+        ArtifactRole::Metadata => "metadata",
     };
     serde_json::json!({
         "reference": value.reference,
@@ -666,23 +674,13 @@ fn artifact_json(value: &StagedArtifact) -> serde_json::Value {
 
 fn plugin_error_code(message: &str) -> &'static str {
     [
-        ("UnsupportedSource", "unsupported_source"),
-        ("ChannelResolutionFailed", "channel_resolution_failed"),
-        ("UpstreamUnavailable", "upstream_unavailable"),
-        ("MalformedFeed", "malformed_feed"),
-        ("SourceNotFound", "source_not_found"),
-        ("MalformedApiResponse", "malformed_api_response"),
-        ("CredentialUnavailable", "credential_unavailable"),
-        ("AuthenticationRejected", "authentication_rejected"),
+        ("Unsupported", "unsupported"),
+        ("NotFound", "not_found"),
+        ("Authentication", "authentication"),
         ("RateLimited", "rate_limited"),
-        ("HelperUnavailable", "helper_unavailable"),
-        ("HelperFailed", "helper_failed"),
-        ("AcquisitionTimeout", "acquisition_timeout"),
-        ("UnsupportedMedia", "unsupported_media"),
-        (
-            "UnexpectedAcquisitionResult",
-            "unexpected_acquisition_result",
-        ),
+        ("Unavailable", "unavailable"),
+        ("InvalidData", "invalid_data"),
+        ("Failed", "failed"),
     ]
     .into_iter()
     .find_map(|(variant, code)| message.contains(variant).then_some(code))
@@ -898,12 +896,12 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                 &component,
                 request.fixture_dir,
                 (request.op == "input-resolve")
-                    .then_some(request.source_uri.as_deref())
+                    .then_some(request.source.as_deref())
                     .flatten(),
                 (request.op == "input-discover")
-                    .then_some(request.channel_id.as_deref())
+                    .then_some(request.input_id.as_deref())
                     .flatten(),
-                request.mode.as_deref(),
+                request.intent.as_deref(),
                 request.credential_name,
                 request.credential_value,
             );

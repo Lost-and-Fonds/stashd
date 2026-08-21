@@ -448,20 +448,45 @@ by granting Components broader access to Stashd internals.
 
 ## Experimental YouTube Input Component
 
+### Semantic boundary rule
+
+Public plugin contracts describe Stashd semantics, not the implementation
+mechanisms of the first plugin that needed them. Provider-specific behavior
+belongs inside the provider plugin; core must not need to understand a
+provider's URLs, feeds, APIs, credentials, helper tools, or identifiers.
+
+Runtime capabilities such as HTTP, credential use, helper execution, and
+staging are infrastructure available to implementations. They are not Input
+semantics or arguments that define what `resolve`, `discover`, and `acquire`
+mean. Before adding a field to a generic Input contract, ask whether it would
+still make sense for a local-folder Input.
+
+The experimental semantic contract is intentionally small:
+
+- `resolve(source)` returns an opaque resolved input identity and optional
+  canonical reference, kind, title, artwork reference, and estimate.
+- `discover(input-id, intent)` accepts `refresh` or `complete` intent. The
+  plugin chooses its own mechanisms and fallback behavior.
+- `acquire(item, options)` returns generic staged artifact facts for core to
+  validate and preserve.
+
+The generic WIT world is named `input-world`; provider identity belongs to the
+plugin package, not the world name.
+
 The first real plugin implementation lives under `plugins/youtube/`. It is a
 standalone Rust WebAssembly Component compiled for `wasm32-wasip2`; it does not
 call Stashd's PHP YouTube provider. The built-in provider remains a behavioral
 oracle in the fixture-backed parity harness.
 
-The Component exports separate `resolve` and `discover` operations. It parses
-channel URLs/pages and YouTube RSS/Atom inside Wasm, returning only semantic
+The Component exports `resolve`, `discover`, and `acquire`. It parses YouTube
+references and upstream responses inside Wasm, returning only semantic
 resolved-input and discovered-item facts. PHP may translate those facts into
 authoritative Stashd records, but the plugin never receives database objects or
 PHP provider classes.
 
-The experimental Input world also exports `acquire`. It accepts a discovered
-item and semantic media options, then returns staged artifacts with generic
-roles: `primary`, `captions`, `thumbnail`, and `provider-metadata`. The host
+The experimental Input world accepts a discovered item and semantic media
+options, then returns staged artifacts with generic roles: `primary`,
+`captions`, `artwork`, and `metadata`. The host
 validates each artifact against the invocation's private staging workspace and
 returns only a safe relative reference, role, media type, and size. The plugin
 cannot return arbitrary filesystem paths or promote anything into the Vault.
@@ -473,7 +498,7 @@ staging workspace, captures its result, and reports newly created files. This
 is trusted installed helper software for the development experiment, not a
 general hostile-native-code sandbox or a YouTube-specific host bridge.
 
-The host grants an invocation-scoped `http-client` resource. In fixture mode it
+The host grants invocation-scoped runtime resources internally. In fixture mode it
 reads the committed YouTube HTTP fixtures; outside fixture mode Rust performs
 the HTTP request. The host allowlist permits only `https://www.youtube.com`:
 channel page paths (`/@…`, `/c/…`, `/user/…`, `/channel/…`) and channel RSS
@@ -481,7 +506,7 @@ URLs (`/feeds/videos.xml?channel_id=…`). Watch URLs, other hosts, HTTP, and
 other paths are denied. This is an experimental YouTube capability, not the
 final network permission model.
 
-The Component also accepts the semantic `data-api` discovery mode. It requests
+For YouTube, `refresh` currently uses RSS while `complete` requests
 the channel uploads playlist, pages `playlistItems`, then batches `videos`
 details. These requests use the same HTTP resource with a named credential-use
 intent (`youtube-data-api`). PHP decides whether the invocation receives that
@@ -489,9 +514,9 @@ grant; the Rust host validates the grant and appends the configured key only
 after validating the HTTPS Google API host and approved endpoint paths. The
 key is never returned to Wasm. Redirects are disabled, so an approved request
 cannot carry credentials to another host. Missing grants and provider HTTP
-statuses are reported as typed plugin errors. RSS remains the cheap default;
-Data API is an explicit stronger/backfill mode, not a copy of PHP strategy
-classes.
+statuses are reported as the compact generic plugin error outcomes. These are
+YouTube implementation choices, not part of the generic Input contract or a
+copy of PHP strategy classes.
 
 Run the deterministic proof from the Lerd development container with:
 
@@ -503,4 +528,6 @@ The script builds the Component and host, uses a temporary private Unix socket,
 checks RSS and Data API parity against the PHP provider using the same
 fixtures, and exercises unsupported sources, channel-resolution failure,
 malformed feeds, unavailable feeds, missing credentials, authentication and
-rate-limit failures, and a later invocation after those failures.
+rate-limit failures, and a later invocation after those failures. It also
+rejects obvious provider-mechanism terms in the generic WIT as a small guard
+against repeating this boundary mistake.

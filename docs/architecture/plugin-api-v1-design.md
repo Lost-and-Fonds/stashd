@@ -47,6 +47,13 @@ The spike did not define plugin semantics, production streaming, network policy,
 7. **Real differences remain visible.** A YouTube Input, a filesystem Broadcast, a TTS Broadcast, and a hardware capture Input need not share one artificial workflow interface.
 8. **Semantic portability comes before runtime portability.** The API should describe Stashd capabilities, not Wasmtime, PHP, or a particular process model.
 
+The current contract review adds a practical constraint: public Input
+contracts describe Stashd semantics, not the mechanisms of the first provider
+implemented. Runtime facilities such as HTTP, credential use, helper
+execution, and staging remain implementation capabilities, separate from
+`resolve`, `discover`, and `acquire`. Before adding a generic Input field, ask
+whether it would still make sense for a local-folder Input.
+
 ## 4. Existing-system archaeology
 
 ### 4.1 YouTube

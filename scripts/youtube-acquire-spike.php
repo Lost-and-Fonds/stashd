@@ -14,14 +14,14 @@ if (! is_string($socket) || ! is_string($component) || ! is_string($helper)) {
 }
 
 $item = [
-    'provider_item_id' => 'StashdVid01',
-    'canonical_uri' => 'https://www.youtube.com/watch?v=StashdVid01',
+    'id' => 'StashdVid01',
+    'reference' => 'https://www.youtube.com/watch?v=StashdVid01',
     'title' => 'Stashd Video 1',
     'description' => 'Desc 1',
     'published_at' => '2026-01-01T00:00:00Z',
-    'thumbnail_uri' => 'https://i.ytimg.com/vi/StashdVid01/hqdefault.jpg',
+    'artwork_reference' => 'https://i.ytimg.com/vi/StashdVid01/hqdefault.jpg',
     'duration_seconds' => 600,
-    'content_type' => 'regular',
+    'kind' => 'regular',
 ];
 $staging = sys_get_temp_dir() . '/stashd-youtube-acquire-' . bin2hex(random_bytes(6));
 mkdir($staging, 0700, true);
@@ -36,7 +36,7 @@ try {
     );
     $artifacts = $result->acquisition['artifacts'] ?? [];
     $roles = array_column($artifacts, 'role');
-    foreach (['primary', 'captions', 'thumbnail', 'provider-metadata'] as $role) {
+    foreach (['primary', 'captions', 'artwork', 'metadata'] as $role) {
         if (! in_array($role, $roles, true)) {
             throw new RuntimeException("missing {$role} artifact");
         }

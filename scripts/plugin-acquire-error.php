@@ -19,8 +19,8 @@ try {
     (new PluginHostClient($socket))->acquireInput(
         $component,
         [
-            'provider_item_id' => 'fixture-error',
-            'canonical_uri' => $url,
+            'id' => 'fixture-error',
+            'reference' => $url,
             'title' => 'Fixture Error',
         ],
         $staging,

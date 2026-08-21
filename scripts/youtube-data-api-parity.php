@@ -24,7 +24,7 @@ try {
         $component,
         'UCStashdDemoCh0012345678',
         $fixtureDirectory,
-        'data-api',
+        'complete',
         new PluginCredentialGrant('youtube-data-api', $secret),
     );
 
@@ -47,14 +47,14 @@ try {
     foreach ($oracleItems as $index => $item) {
         $actual = $pluginItems[$index] ?? [];
         $expected = [
-            'provider_item_id' => $item->providerItemId,
-            'canonical_uri' => $item->canonicalUri->toString(),
+            'id' => $item->providerItemId,
+            'reference' => $item->canonicalUri->toString(),
             'title' => $item->title,
             'description' => $item->description,
             'published_at' => $item->publishedAt?->toRfc3339(useZ: true),
-            'thumbnail_uri' => $item->thumbnailUri?->toString(),
+            'artwork_reference' => $item->thumbnailUri?->toString(),
             'duration_seconds' => $item->durationSeconds,
-            'content_type' => $item->contentType,
+            'kind' => $item->contentType,
         ];
         foreach ($expected as $field => $value) {
             if ($field === 'published_at' && $value !== null) {
