@@ -13,11 +13,13 @@ struct PodcastBroadcast;
 impl Guest for PodcastBroadcast {
     fn publish(request: PublishRequest) -> Result<Publication, PluginError> {
         broadcast_host::report_progress("publishing");
-        let feed_url = format!(
-            "{}/b/{}/feed.xml",
-            request.public_base_url.trim_end_matches('/'),
-            request.broadcast_token
-        );
+        let feed_url = setting_text(&request.settings, "feed_url").unwrap_or_else(|| {
+            format!(
+                "{}/b/{}/feed.xml",
+                request.public_base_url.trim_end_matches('/'),
+                request.broadcast_token
+            )
+        });
         let metadata = Metadata::from_settings(&request.settings);
         let xml = build_feed(&request, &metadata, &feed_url);
         let staging = broadcast_host::open_staging_area();
@@ -145,13 +147,15 @@ fn episode_xml(xml: &mut String, request: &PublishRequest, episode: &Episode) {
         tag(xml, "pubDate", published_at);
     }
     let extension = extension(&episode.media_reference);
-    let url = format!(
-        "{}/b/{}/items/{}/episode.{}",
-        request.public_base_url.trim_end_matches('/'),
-        request.broadcast_token,
-        episode.publication_token,
-        extension
-    );
+    let url = episode.media_url.clone().unwrap_or_else(|| {
+        format!(
+            "{}/b/{}/items/{}/episode.{}",
+            request.public_base_url.trim_end_matches('/'),
+            request.broadcast_token,
+            episode.publication_token,
+            extension
+        )
+    });
     xml.push_str("<enclosure url=\"");
     xml.push_str(&escape(&url));
     xml.push_str("\" length=\"");

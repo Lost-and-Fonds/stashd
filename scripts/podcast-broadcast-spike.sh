@@ -59,6 +59,7 @@ $request = [
             'published_at' => 'Wed, 01 Jan 2025 00:00:00 +0000',
             'duration_seconds' => 42,
             'media_reference' => 'episode.mp3',
+            'media_url' => 'https://stashd.test/published/publication-fixture/access/fixture-credential',
             'media_type' => 'audio/mpeg',
             'media_size_bytes' => 123,
             'artwork_reference' => null,
@@ -82,7 +83,7 @@ if (! is_string($reference) || ! is_file($stage . '/' . $reference)) {
 }
 
 $feed = file_get_contents($stage . '/' . $reference);
-if (! is_string($feed) || ! str_contains($feed, '<enclosure ') || ! str_contains($feed, 'Fixture Episode')) {
+if (! is_string($feed) || ! str_contains($feed, '<enclosure ') || ! str_contains($feed, 'Fixture Episode') || ! str_contains($feed, '/published/publication-fixture/access/fixture-credential')) {
     throw new RuntimeException('Podcast Component feed output was incomplete.');
 }
 

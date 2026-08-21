@@ -40,6 +40,7 @@ interface broadcast-plugin {
         published-at: option<string>,
         duration-seconds: option<u32>,
         media-reference: string,
+        media-url: option<string>,
         media-type: option<string>,
         media-size-bytes: u64,
         artwork-reference: option<string>,

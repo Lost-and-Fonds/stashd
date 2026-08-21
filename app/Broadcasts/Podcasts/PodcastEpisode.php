@@ -23,6 +23,7 @@ final readonly class PodcastEpisode
         public ?string $transcriptLanguage = null,
         public ?string $chapterUrl = null,
         public ?string $publicationToken = null,
+        public ?string $publishedMediaUrl = null,
     ) {
     }
 }

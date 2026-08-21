@@ -312,6 +312,15 @@ A plugin may contribute ways to generate outputs from granted read-only Assets
 and writable staging resources. Stashd remains responsible for Broadcast
 lifecycle, publication policy, verification, and user presentation.
 
+The experimental publication capability gives a plugin a bounded way to expose
+an existing Asset or a generated file through a core-owned opaque URL. Core
+stores the publication, applies its public or credential-protected access
+policy, and serves the bytes (including media range handling) through one
+generic endpoint. Plugins receive URLs as opaque values; they do not register
+HTTP routes or receive filesystem paths. Publication destinations and
+credential-use rules are invocation/application data, not provider policy in
+the generic host.
+
 ### Connection capability
 
 A plugin may contribute a reusable integration with an external service.

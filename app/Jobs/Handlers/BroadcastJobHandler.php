@@ -214,7 +214,7 @@ final readonly class BroadcastJobHandler implements JobHandler
         $this->activity->broadcastPluginActionCompleted($command, $job, $broadcastId, 'rotate_token', $result);
         $context->progress($job, JobProgressUpdate::ofSteps(2, 2, 'Broadcast plugin action complete'));
 
-        return ['result' => $result];
+        return ['token' => $result];
     }
 
     /** @return array<string, mixed> */

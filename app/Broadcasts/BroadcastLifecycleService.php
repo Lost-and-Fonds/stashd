@@ -53,6 +53,7 @@ final readonly class BroadcastLifecycleService
         private BroadcastTriggerService $triggers,
         private StateTransitionService $transitions,
         private BroadcastPathBuilder $paths,
+        private PublishedResourceService $publications,
     ) {
     }
 
@@ -307,6 +308,8 @@ final readonly class BroadcastLifecycleService
                 throw BroadcastException::withCode('broadcast_delete_failed', 'Could not remove generated broadcast output.');
             }
         }
+
+        $this->publications->revokeForBroadcast($broadcastId);
 
         $this->broadcasts->delete($broadcast);
 

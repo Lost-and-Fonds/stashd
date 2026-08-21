@@ -213,6 +213,8 @@ struct BroadcastEpisodeRequest {
     published_at: Option<String>,
     duration_seconds: Option<u32>,
     media_reference: String,
+    #[serde(default)]
+    media_url: Option<String>,
     media_type: Option<String>,
     media_size_bytes: u64,
     artwork_reference: Option<String>,
@@ -931,6 +933,7 @@ fn invoke_broadcast(
                     published_at: episode.published_at,
                     duration_seconds: episode.duration_seconds,
                     media_reference: episode.media_reference,
+                    media_url: episode.media_url,
                     media_type: episode.media_type,
                     media_size_bytes: episode.media_size_bytes,
                     artwork_reference: episode.artwork_reference,

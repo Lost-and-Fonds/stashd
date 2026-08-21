@@ -70,6 +70,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         private CommandDispatchService $dispatch,
         private TimelineMetadataRenderer $timeline,
         private StashdConfig $config,
+        private \App\Broadcasts\PublishedResourceService $publications,
     ) {
     }
 
@@ -210,6 +211,14 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         $included = 0;
 
         $this->paths->claimRoot($context->broadcast);
+        $feedPublication = $this->publications->publishFile(
+            $context->broadcast,
+            'feed.xml',
+            'application/rss+xml',
+            access: 'credential',
+            downloadName: 'feed.xml',
+        );
+        $feedUrl = $this->publications->url($feedPublication);
 
         foreach ($this->contextFactory->publishableStashItems($context) as $stashItem) {
 
@@ -258,13 +267,28 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
 
             $itemToken = $this->tokens->ensureItemToken($item);
             $this->markItemReady($context, $item, $mediaItem);
-            $episodes[] = $this->episode($context, $stashItem, $mediaItem, $item, $selection, $broadcastToken, $itemToken);
+            $mediaPublication = $this->publications->publishAsset(
+                $context->broadcast,
+                $selection->asset,
+                $selection->mimeType,
+                access: 'credential',
+            );
+            $episodes[] = $this->episode(
+                $context,
+                $stashItem,
+                $mediaItem,
+                $item,
+                $selection,
+                $broadcastToken,
+                $itemToken,
+                $this->publications->url($mediaPublication),
+            );
             $includedDescriptions[] = $mediaItem->description;
             $included++;
         }
 
         $feedPath = $this->feedPath($context);
-        $this->writeFeed($feedPath, $this->feedContent($context, $broadcastToken, $episodes, $includedDescriptions));
+        $this->writeFeed($feedPath, $this->feedContent($context, $broadcastToken, $episodes, $includedDescriptions, $feedUrl));
 
         return new BroadcastPublishResult(
             publishedCount: 1,
@@ -423,6 +447,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         \App\Broadcasts\Podcasts\PodcastAssetSelection $selection,
         string $broadcastToken,
         string $itemToken,
+        ?string $publishedMediaUrl = null,
     ): PodcastEpisode {
         return new PodcastEpisode(
             guid: $this->guids->forItem($item),
@@ -445,13 +470,14 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
                 ? $this->urls->chapterUrl($broadcastToken, $itemToken)
                 : null,
             publicationToken: $itemToken,
+            publishedMediaUrl: $publishedMediaUrl,
         );
     }
 
     /** @param list<PodcastEpisode> $episodes
      *  @param list<string|null> $includedDescriptions
      */
-    private function feedContent(BroadcastContext $context, string $broadcastToken, array $episodes, array $includedDescriptions): string
+    private function feedContent(BroadcastContext $context, string $broadcastToken, array $episodes, array $includedDescriptions, ?string $feedUrl = null): string
     {
         $component = getenv('STASHD_BROADCAST_PLUGIN_COMPONENT');
         $component = is_string($component) && trim($component) !== ''
@@ -486,6 +512,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
                 ),
                 'public_base_url' => rtrim($this->config->publicUrl, '/'),
                 'broadcast_token' => $broadcastToken,
+                'feed_url' => $feedUrl ?? $this->urls->feedUrl($broadcastToken),
                 'episodes' => array_map(
                     static fn (PodcastEpisode $episode): array => [
                         'id' => $episode->guid,
@@ -500,6 +527,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
                             (string) parse_url($episode->enclosureUrl, PHP_URL_PATH),
                             PATHINFO_EXTENSION,
                         ) ?: 'mp3',
+                        'media_url' => $episode->publishedMediaUrl,
                         'media_type' => $episode->enclosureMimeType,
                         'media_size_bytes' => $episode->enclosureLength,
                         'artwork_reference' => $episode->imageUrl === null ? null : 'available',
