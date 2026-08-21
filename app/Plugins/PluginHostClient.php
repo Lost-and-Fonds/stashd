@@ -103,6 +103,111 @@ final class PluginHostClient
         throw new RuntimeException('Plugin host closed the IPC connection without a result.');
     }
 
+    public function resolveInput(string $componentPath, string $sourceUri, ?string $fixtureDirectory = null): PluginInputResult
+    {
+        return $this->invokeInput('input-resolve', $componentPath, $sourceUri, null, $fixtureDirectory);
+    }
+
+    public function discoverInput(string $componentPath, string $channelId, ?string $fixtureDirectory = null): PluginInputResult
+    {
+        return $this->invokeInput('input-discover', $componentPath, null, $channelId, $fixtureDirectory);
+    }
+
+    private function invokeInput(string $operation, string $componentPath, ?string $sourceUri, ?string $channelId, ?string $fixtureDirectory): PluginInputResult
+    {
+        $error = null;
+        $socket = stream_socket_client('unix://' . $this->socketPath, $errorNumber, $error, 5);
+        if (! is_resource($socket)) {
+            throw new RuntimeException('Unable to connect to stashd-plugin-host: ' . ($error ?: 'unknown error'));
+        }
+
+        $requestId = bin2hex(random_bytes(8));
+        $request = array_filter([
+            'id' => $requestId,
+            'op' => $operation,
+            'component_path' => $componentPath,
+            'source_uri' => $sourceUri,
+            'channel_id' => $channelId,
+            'fixture_dir' => $fixtureDirectory,
+        ], static fn (mixed $value): bool => $value !== null);
+        /** @var list<array{fraction: float, stage: string}> $progress */
+        $progress = [];
+        $logs = [];
+        /** @var array<string, mixed>|null $resolved */
+        $resolved = null;
+        /** @var list<array<string, mixed>>|null $items */
+        $items = null;
+
+        try {
+            fwrite($socket, json_encode($request, JSON_THROW_ON_ERROR) . "\n");
+            while (($line = fgets($socket)) !== false) {
+                $event = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+                if (! is_array($event) || ($event['id'] ?? null) !== $requestId) {
+                    throw new RuntimeException('Plugin host returned an invalid input event.');
+                }
+                /** @var array<string, mixed> $event */
+                match ($event['event'] ?? null) {
+                    'progress' => $progress[] = $this->inputProgress($event),
+                    'log' => $logs[] = $this->inputString($event['message'] ?? null, 'message'),
+                    'input_resolved' => $resolved = $this->inputObject($event['resolved'] ?? null, 'resolved'),
+                    'input_discovered' => $items = $this->inputObjects($event['items'] ?? null),
+                    'error' => $this->throwExecutionError($event),
+                    default => throw new RuntimeException('Plugin host returned an unknown input event.'),
+                };
+                if (isset($resolved) || isset($items)) {
+                    return new PluginInputResult($progress, $logs, $resolved ?? null, $items ?? null);
+                }
+            }
+        } catch (JsonException $exception) {
+            throw new RuntimeException('Plugin host returned malformed JSON.', previous: $exception);
+        } finally {
+            fclose($socket);
+        }
+
+        throw new RuntimeException('Plugin host closed the IPC connection without an input result.');
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return array{fraction: float, stage: string}
+     */
+    private function inputProgress(array $event): array
+    {
+        $fraction = $event['fraction'] ?? 0;
+        $stage = $event['stage'] ?? '';
+        if ((! is_float($fraction) && ! is_int($fraction)) || ! is_string($stage)) {
+            throw new RuntimeException('Plugin host returned invalid input progress.');
+        }
+        return ['fraction' => (float) $fraction, 'stage' => $stage];
+    }
+
+    private function inputString(mixed $value, string $field): string
+    {
+        if (! is_string($value)) {
+            throw new RuntimeException("Plugin host returned invalid input {$field}.");
+        }
+        return $value;
+    }
+
+    /** @return array<string, mixed> */
+    private function inputObject(mixed $value, string $field): array
+    {
+        if (! is_array($value) || array_keys($value) !== array_filter(array_keys($value), 'is_string')) {
+            throw new RuntimeException("Plugin host returned invalid input {$field}.");
+        }
+        /** @var array<string, mixed> $value */
+        return $value;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function inputObjects(mixed $value): array
+    {
+        if (! is_array($value) || ! array_is_list($value)) {
+            throw new RuntimeException('Plugin host returned invalid input items.');
+        }
+        return array_map(fn (mixed $item): array => $this->inputObject($item, 'item'), $value);
+    }
+
     /**
      * @param list<array{fraction: float, stage: string}> $progress
      * @param array<string, mixed> $event

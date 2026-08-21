@@ -1,0 +1,11 @@
+[package]
+name = "stashd-youtube-plugin"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+quick-xml = "0.37"
+wit-bindgen = "0.44"

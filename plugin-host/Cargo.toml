@@ -10,3 +10,4 @@ serde_json = "1"
 wasmtime = { version = "38", features = ["component-model"] }
 wasmtime-wasi = "38"
 wit-component = "0.232"
+ureq = "2"

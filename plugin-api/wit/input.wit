@@ -1,0 +1,65 @@
+package stashd:plugin@0.1.0;
+
+interface input-host {
+    record http-response {
+        status: u16,
+        body: list<u8>,
+    }
+
+    variant http-error {
+        denied,
+        unavailable(string),
+        failed(string),
+    }
+
+    resource http-client {
+        get: func(url: string) -> result<http-response, http-error>;
+    }
+
+    record progress {
+        stage: string,
+    }
+
+    report-progress: func(progress: progress);
+    log: func(message: string);
+}
+
+interface input-plugin {
+    use input-host.{http-client};
+
+    record resolved-input {
+        provider-key: string,
+        input-type: string,
+        source-uri: string,
+        canonical-source-uri: string,
+        provider-input-id: string,
+        title: option<string>,
+        avatar-uri: option<string>,
+        estimated-item-count: option<u32>,
+    }
+
+    record discovered-item {
+        provider-item-id: string,
+        canonical-uri: string,
+        title: string,
+        description: option<string>,
+        published-at: option<string>,
+        thumbnail-uri: option<string>,
+    }
+
+    variant plugin-error {
+        unsupported-source(string),
+        channel-resolution-failed(string),
+        upstream-unavailable(string),
+        malformed-feed(string),
+        source-not-found(string),
+    }
+
+    resolve: func(client: borrow<http-client>, source-uri: string) -> result<resolved-input, plugin-error>;
+    discover: func(client: borrow<http-client>, channel-id: string) -> result<list<discovered-item>, plugin-error>;
+}
+
+world youtube-input-world {
+    import input-host;
+    export input-plugin;
+}

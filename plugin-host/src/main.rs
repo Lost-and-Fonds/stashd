@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 
@@ -22,6 +22,24 @@ use exports::stashd::plugin::plugin::RunResult;
 use stashd::plugin::host::Operation;
 use stashd::plugin::host::{self, Host, HostStagingOutput, HostVaultAsset};
 
+pub struct HttpClientResource;
+
+mod youtube_input_world {
+    wasmtime::component::bindgen!({
+        path: "../plugin-api/wit",
+        world: "youtube-input-world",
+        with: {
+            "stashd:plugin/input-host/http-client": super::HttpClientResource,
+        },
+    });
+}
+
+use youtube_input_world::YoutubeInputWorld;
+use youtube_input_world::exports::stashd::plugin::input_plugin::{DiscoveredItem, ResolvedInput};
+use youtube_input_world::stashd::plugin::input_host::{
+    self as input_host, Host as InputHost, HostHttpClient,
+};
+
 pub struct VaultAssetResource {
     bytes: Vec<u8>,
 }
@@ -39,7 +57,24 @@ struct HostState {
     logs: Vec<String>,
 }
 
+struct InputState {
+    table: ResourceTable,
+    wasi: WasiCtx,
+    progress: Vec<input_host::Progress>,
+    logs: Vec<String>,
+    fixture_dir: Option<PathBuf>,
+}
+
 impl WasiView for HostState {
+    fn ctx(&mut self) -> WasiCtxView<'_> {
+        WasiCtxView {
+            ctx: &mut self.wasi,
+            table: &mut self.table,
+        }
+    }
+}
+
+impl WasiView for InputState {
     fn ctx(&mut self) -> WasiCtxView<'_> {
         WasiCtxView {
             ctx: &mut self.wasi,
@@ -56,6 +91,9 @@ struct Request {
     asset_path: Option<PathBuf>,
     staging_path: Option<PathBuf>,
     operation: Option<String>,
+    source_uri: Option<String>,
+    channel_id: Option<String>,
+    fixture_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Serialize)]
@@ -75,6 +113,16 @@ enum Response {
         source_bytes: u64,
         output_id: String,
         output_bytes: u64,
+    },
+    #[serde(rename = "input_resolved")]
+    InputResolved {
+        id: String,
+        resolved: serde_json::Value,
+    },
+    #[serde(rename = "input_discovered")]
+    InputDiscovered {
+        id: String,
+        items: serde_json::Value,
     },
     #[serde(rename = "error")]
     Error {
@@ -166,6 +214,167 @@ impl HostStagingOutput for HostState {
     fn drop(&mut self, output: Resource<StagingOutputResource>) -> wasmtime::Result<()> {
         Ok(self.table.delete(output).map(|_| ())?)
     }
+}
+
+impl InputHost for InputState {
+    fn report_progress(&mut self, progress: input_host::Progress) {
+        self.progress.push(progress);
+    }
+
+    fn log(&mut self, message: String) {
+        self.logs.push(message);
+    }
+}
+
+impl HostHttpClient for InputState {
+    fn get(
+        &mut self,
+        client: Resource<HttpClientResource>,
+        url: String,
+    ) -> Result<input_host::HttpResponse, input_host::HttpError> {
+        let _ = self
+            .table
+            .get(&client)
+            .map_err(|_| input_host::HttpError::Failed("HTTP capability expired".to_owned()))?;
+        if !allowed_youtube_url(&url) {
+            return Err(input_host::HttpError::Denied);
+        }
+
+        if let Some(directory) = &self.fixture_dir {
+            let map_path = directory.join("map.json");
+            let map: std::collections::HashMap<String, String> = serde_json::from_slice(
+                &fs::read(&map_path)
+                    .map_err(|error| input_host::HttpError::Failed(error.to_string()))?,
+            )
+            .map_err(|error| input_host::HttpError::Failed(error.to_string()))?;
+            let filename = map.get(&url).ok_or_else(|| {
+                input_host::HttpError::Unavailable("fixture not found".to_owned())
+            })?;
+            let path = directory.join(filename);
+            let body =
+                fs::read(path).map_err(|error| input_host::HttpError::Failed(error.to_string()))?;
+            let status = if filename == "unavailable.txt" {
+                404
+            } else {
+                200
+            };
+            return Ok(input_host::HttpResponse { status, body });
+        }
+
+        let response = ureq::get(&url)
+            .call()
+            .map_err(|error| input_host::HttpError::Unavailable(error.to_string()))?;
+        let status = response.status() as u16;
+        let mut body = Vec::new();
+        response
+            .into_reader()
+            .read_to_end(&mut body)
+            .map_err(|error| input_host::HttpError::Failed(error.to_string()))?;
+        Ok(input_host::HttpResponse { status, body })
+    }
+
+    fn drop(&mut self, client: Resource<HttpClientResource>) -> wasmtime::Result<()> {
+        Ok(self.table.delete(client).map(|_| ())?)
+    }
+}
+
+fn allowed_youtube_url(url: &str) -> bool {
+    let Some(path) = url.strip_prefix("https://www.youtube.com") else {
+        return false;
+    };
+    path.starts_with("/@")
+        || path.starts_with("/c/")
+        || path.starts_with("/user/")
+        || path.starts_with("/channel/")
+        || path.starts_with("/feeds/videos.xml?channel_id=")
+}
+
+fn invoke_input(
+    engine: &Engine,
+    component: &Component,
+    fixture_dir: Option<PathBuf>,
+    source_uri: Option<&str>,
+    channel_id: Option<&str>,
+) -> Result<(
+    Option<ResolvedInput>,
+    Option<Vec<DiscoveredItem>>,
+    InputState,
+)> {
+    let mut store = Store::new(
+        engine,
+        InputState {
+            table: ResourceTable::new(),
+            wasi: WasiCtxBuilder::new().build(),
+            progress: Vec::new(),
+            logs: Vec::new(),
+            fixture_dir,
+        },
+    );
+    let mut linker = Linker::new(engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
+    YoutubeInputWorld::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state)?;
+    let plugin = YoutubeInputWorld::instantiate(&mut store, component, &linker)?;
+    let client = store.data_mut().table.push(HttpClientResource)?;
+    let (resolved, items) = if let Some(source) = source_uri {
+        (
+            Some(
+                plugin
+                    .stashd_plugin_input_plugin()
+                    .call_resolve(&mut store, client, source)?
+                    .map_err(|error| anyhow::anyhow!("plugin input error: {error:?}"))?,
+            ),
+            None,
+        )
+    } else {
+        let channel = channel_id.context("input discovery requires channel_id")?;
+        (
+            None,
+            Some(
+                plugin
+                    .stashd_plugin_input_plugin()
+                    .call_discover(&mut store, client, channel)?
+                    .map_err(|error| anyhow::anyhow!("plugin input error: {error:?}"))?,
+            ),
+        )
+    };
+    Ok((resolved, items, store.into_data()))
+}
+
+fn resolved_json(value: &ResolvedInput) -> serde_json::Value {
+    serde_json::json!({
+        "provider_key": value.provider_key,
+        "input_type": value.input_type,
+        "source_uri": value.source_uri,
+        "canonical_source_uri": value.canonical_source_uri,
+        "provider_input_id": value.provider_input_id,
+        "title": value.title,
+        "avatar_uri": value.avatar_uri,
+        "estimated_item_count": value.estimated_item_count,
+    })
+}
+
+fn item_json(value: &DiscoveredItem) -> serde_json::Value {
+    serde_json::json!({
+        "provider_item_id": value.provider_item_id,
+        "canonical_uri": value.canonical_uri,
+        "title": value.title,
+        "description": value.description,
+        "published_at": value.published_at,
+        "thumbnail_uri": value.thumbnail_uri,
+    })
+}
+
+fn plugin_error_code(message: &str) -> &'static str {
+    [
+        ("UnsupportedSource", "unsupported_source"),
+        ("ChannelResolutionFailed", "channel_resolution_failed"),
+        ("UpstreamUnavailable", "upstream_unavailable"),
+        ("MalformedFeed", "malformed_feed"),
+        ("SourceNotFound", "source_not_found"),
+    ]
+    .into_iter()
+    .find_map(|(variant, code)| message.contains(variant).then_some(code))
+    .unwrap_or("plugin_error")
 }
 
 fn invoke(
@@ -304,6 +513,76 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                 )?,
             }
         }
+        "input-resolve" | "input-discover" => {
+            let component_path = request
+                .component_path
+                .as_deref()
+                .context("input invocation requires component_path")?;
+            let component = Component::from_file(engine, component_path)
+                .with_context(|| format!("loading component {}", component_path.display()))?;
+            let result = invoke_input(
+                engine,
+                &component,
+                request.fixture_dir,
+                (request.op == "input-resolve")
+                    .then_some(request.source_uri.as_deref())
+                    .flatten(),
+                (request.op == "input-discover")
+                    .then_some(request.channel_id.as_deref())
+                    .flatten(),
+            );
+            let (resolved, items, state) = match result {
+                Ok(result) => result,
+                Err(error) => {
+                    let message = error.to_string();
+                    send(
+                        stream,
+                        Response::Error {
+                            id: request.id,
+                            code: plugin_error_code(&message).to_owned(),
+                            message,
+                        },
+                    )?;
+                    return Ok(());
+                }
+            };
+            for progress in state.progress {
+                send(
+                    stream,
+                    Response::Progress {
+                        id: request.id.clone(),
+                        fraction: 0.0,
+                        stage: progress.stage,
+                    },
+                )?;
+            }
+            for message in state.logs {
+                send(
+                    stream,
+                    Response::Log {
+                        id: request.id.clone(),
+                        message,
+                    },
+                )?;
+            }
+            if let Some(value) = resolved {
+                send(
+                    stream,
+                    Response::InputResolved {
+                        id: request.id,
+                        resolved: resolved_json(&value),
+                    },
+                )?;
+            } else if let Some(values) = items {
+                send(
+                    stream,
+                    Response::InputDiscovered {
+                        id: request.id,
+                        items: serde_json::Value::Array(values.iter().map(item_json).collect()),
+                    },
+                )?;
+            }
+        }
         "cancel" => send(
             stream,
             Response::Error {
@@ -402,5 +681,23 @@ fn main() -> Result<()> {
         _ => anyhow::bail!(
             "usage: stashd-plugin-host build-component <core.wasm> <component.wasm> | serve <socket>"
         ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::allowed_youtube_url;
+
+    #[test]
+    fn input_http_capability_allows_only_youtube_channel_requests() {
+        assert!(allowed_youtube_url("https://www.youtube.com/@StashdDemo"));
+        assert!(allowed_youtube_url(
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UCStashdDemoCh0012345678"
+        ));
+        assert!(!allowed_youtube_url(
+            "https://www.youtube.com/watch?v=demoVideo01"
+        ));
+        assert!(!allowed_youtube_url("https://example.com/anything"));
+        assert!(!allowed_youtube_url("http://www.youtube.com/@StashdDemo"));
     }
 }

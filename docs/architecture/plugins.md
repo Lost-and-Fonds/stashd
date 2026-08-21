@@ -447,3 +447,35 @@ limits, and failure recovery without leaking its database model into WIT.
 These questions should be resolved through bounded follow-up spikes. They must
 not be answered by turning the private IPC protocol into a second domain API or
 by granting Components broader access to Stashd internals.
+
+## Experimental YouTube Input Component
+
+The first real plugin implementation lives under `plugins/youtube/`. It is a
+standalone Rust WebAssembly Component compiled for `wasm32-wasip2`; it does not
+call Stashd's PHP YouTube provider. The built-in provider remains a behavioral
+oracle in the fixture-backed parity harness.
+
+The Component exports separate `resolve` and `discover` operations. It parses
+channel URLs/pages and YouTube RSS/Atom inside Wasm, returning only semantic
+resolved-input and discovered-item facts. PHP may translate those facts into
+authoritative Stashd records, but the plugin never receives database objects or
+PHP provider classes.
+
+The host grants an invocation-scoped `http-client` resource. In fixture mode it
+reads the committed YouTube HTTP fixtures; outside fixture mode Rust performs
+the HTTP request. The host allowlist permits only `https://www.youtube.com`:
+channel page paths (`/@…`, `/c/…`, `/user/…`, `/channel/…`) and channel RSS
+URLs (`/feeds/videos.xml?channel_id=…`). Watch URLs, other hosts, HTTP, and
+other paths are denied. This is an experimental YouTube capability, not the
+final network permission model.
+
+Run the deterministic proof from the Lerd development container with:
+
+```bash
+./scripts/youtube-input-spike.sh
+```
+
+The script builds the Component and host, uses a temporary private Unix socket,
+checks parity against the PHP provider using the same fixtures, and exercises
+unsupported sources, channel-resolution failure, malformed feeds, unavailable
+feeds, and a later invocation after those failures.
