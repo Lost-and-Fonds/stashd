@@ -142,6 +142,20 @@ The host boundary owns:
 - progress and log forwarding;
 - transient component and runtime caches.
 
+### Normal runtime provisioning
+
+Development and production-like application containers provision one shared
+`stashd-plugin-host` process. It listens on the private Unix socket named by
+`STASHD_PLUGIN_HOST_SOCKET`; bundled Input and Broadcast Component paths are
+supplied by their manifests through environment overrides. PHP lifecycle code
+uses the same registry/adapter path as tests and does not launch a host per
+operation.
+
+If the host, socket, or Component is unavailable, external plugin execution
+returns a generic unavailable failure. It must not silently switch to a
+provider implementation in application code once an external implementation
+is registered.
+
 Some of these responsibilities, especially production limits, cancellation,
 network enforcement, and stronger operating-system isolation, were not fully
 solved by the spike. They belong at this boundary when designed; they do not

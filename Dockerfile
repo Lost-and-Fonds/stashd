@@ -12,6 +12,30 @@ FROM docker.io/rust:1.97-bookworm AS rust
 RUN rustup target add wasm32-wasip2 \
     && rustup component add rustfmt clippy
 
+# The plugin host and bundled Components are part of the normal application
+# runtime.  Build them once here so the PHP lifecycle uses the same private
+# host process as the development spike; PHP never needs to compile or launch
+# provider code itself.
+FROM rust AS plugin-runtime
+WORKDIR /plugin-build
+ENV CARGO_BUILD_JOBS=1
+COPY Cargo.toml Cargo.lock ./
+COPY plugin-api ./plugin-api
+COPY plugin-host ./plugin-host
+COPY plugins/example ./plugins/example
+COPY plugins/youtube ./plugins/youtube
+COPY plugins/podcast ./plugins/podcast
+RUN cargo build -p stashd-plugin-host --release \
+    && cargo build -p stashd-youtube-plugin --target wasm32-wasip2 --release \
+    && cargo build -p stashd-podcast-plugin --target wasm32-wasip2 --release \
+    && mkdir -p /plugin-output \
+    && target/release/stashd-plugin-host build-component \
+        target/wasm32-wasip2/release/stashd_youtube_plugin.wasm \
+        /plugin-output/youtube.wasm \
+    && target/release/stashd-plugin-host build-component \
+        target/wasm32-wasip2/release/stashd_podcast_plugin.wasm \
+        /plugin-output/podcast.wasm
+
 FROM node AS assets
 WORKDIR /app
 ENV TEMPEST_PLUGIN_CONFIGURATION_OVERRIDE='{"build_directory":"build","bridge_file_name":"vite-tempest","manifest":"manifest.json","entrypoints":["src/main.entrypoint.ts"]}'
@@ -78,6 +102,8 @@ RUN case "${TARGETARCH}" in \
     && chmod a+rx /usr/local/bin/deno
 
 COPY --from=composer /usr/bin/composer /usr/bin/composer
+COPY --from=plugin-runtime /plugin-build/target/release/stashd-plugin-host /usr/local/bin/stashd-plugin-host
+COPY --from=plugin-runtime /plugin-output /usr/local/share/stashd/plugins
 
 WORKDIR /var/www/html
 
@@ -92,7 +118,10 @@ ENV STASHD_HTTP_PORT=8474 \
     STASHD_FFMPEG_BINARY=ffmpeg \
     STASHD_DATA_PATH=/data \
     STASHD_MEDIA_PATH=/media \
-    STASHD_PUBLIC_URL=http://localhost:8474
+    STASHD_PUBLIC_URL=http://localhost:8474 \
+    STASHD_PLUGIN_HOST_SOCKET=/tmp/stashd-plugin-host.sock \
+    STASHD_PLUGIN_COMPONENT=/usr/local/share/stashd/plugins/youtube.wasm \
+    STASHD_BROADCAST_PLUGIN_COMPONENT=/usr/local/share/stashd/plugins/podcast.wasm
 
 EXPOSE 8474
 

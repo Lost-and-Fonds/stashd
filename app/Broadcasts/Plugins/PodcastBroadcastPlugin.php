@@ -16,13 +16,10 @@ use App\Broadcasts\BroadcastPlan;
 use App\Broadcasts\BroadcastPlannedSidecar;
 use App\Broadcasts\BroadcastPruneResult;
 use App\Broadcasts\BroadcastPublishResult;
-use App\Broadcasts\BroadcastRepository;
 use App\Broadcasts\BroadcastSidecarType;
 use App\Broadcasts\BroadcastVerifyResult;
 use App\Broadcasts\FileKind;
 use App\Broadcasts\Podcasts\PodcastEpisode;
-use App\Broadcasts\Podcasts\PodcastFeedBuilder;
-use App\Broadcasts\Podcasts\PodcastFeedMetadata;
 use App\Broadcasts\Podcasts\PodcastFeedSettings;
 use App\Broadcasts\Podcasts\PodcastGuid;
 use App\Broadcasts\Podcasts\PodcastMediaKind;
@@ -32,6 +29,7 @@ use App\Broadcasts\UiControl;
 use App\Commands\CommandDispatchService;
 use App\Commands\CommandType;
 use App\Config\StashdConfig;
+use App\Plugins\ExternalBroadcastPluginRegistry;
 use App\Plugins\PluginHostClient;
 use App\Stashes\StashItemId;
 use App\Stashes\StashItemState;
@@ -40,7 +38,6 @@ use App\System\State\StateTransitionService;
 use App\Timeline\TimelineMetadataRenderer;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
-use Symfony\Component\Uid\Uuid;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
@@ -58,19 +55,17 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         private BroadcastContextFactory $contextFactory,
         private BroadcastPathBuilder $paths,
         private BroadcastItemRepository $broadcastItems,
-        private BroadcastRepository $broadcasts,
         private \App\Broadcasts\Podcasts\PodcastAssetSelector $assets,
         private PodcastTokenService $tokens,
         private \App\Broadcasts\Podcasts\PodcastEpisodeUrlBuilder $urls,
         private PodcastGuid $guids,
-        private PodcastFeedBuilder $feedBuilder,
         private StateTransitionService $transitions,
-        private \App\Broadcasts\Podcasts\PodcastFundingLinkDetector $fundingDetector,
         private \App\Broadcasts\Podcasts\PodcastTranscodeFallback $transcodeFallback,
         private CommandDispatchService $dispatch,
         private TimelineMetadataRenderer $timeline,
         private StashdConfig $config,
         private \App\Broadcasts\PublishedResourceService $publications,
+        private ExternalBroadcastPluginRegistry $externalPlugins,
     ) {
     }
 
@@ -206,7 +201,6 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
     {
         $broadcastToken = $this->tokens->ensureBroadcastToken($context->broadcast);
         $episodes = [];
-        $includedDescriptions = [];
         $failed = [];
         $included = 0;
 
@@ -283,12 +277,11 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
                 $itemToken,
                 $this->publications->url($mediaPublication),
             );
-            $includedDescriptions[] = $mediaItem->description;
             $included++;
         }
 
         $feedPath = $this->feedPath($context);
-        $this->writeFeed($feedPath, $this->feedContent($context, $broadcastToken, $episodes, $includedDescriptions, $feedUrl));
+        $this->writeFeed($feedPath, $this->feedContent($context, $broadcastToken, $episodes, $feedUrl));
 
         return new BroadcastPublishResult(
             publishedCount: 1,
@@ -475,20 +468,18 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
     }
 
     /** @param list<PodcastEpisode> $episodes
-     *  @param list<string|null> $includedDescriptions
      */
-    private function feedContent(BroadcastContext $context, string $broadcastToken, array $episodes, array $includedDescriptions, ?string $feedUrl = null): string
+    private function feedContent(BroadcastContext $context, string $broadcastToken, array $episodes, ?string $feedUrl = null): string
     {
-        $component = getenv('STASHD_BROADCAST_PLUGIN_COMPONENT');
-        $component = is_string($component) && trim($component) !== ''
-            ? trim($component)
-            : dirname(__DIR__, 3) . '/target/wasm32-wasip2/release/stashd_podcast_plugin.wasm';
+        $definition = $this->externalPlugins->findByLogicalKey('podcast');
+        $component = $definition?->componentPath;
+        $socket = $definition?->socketPath;
 
-        $socket = getenv('STASHD_PLUGIN_HOST_SOCKET');
-        $socket = is_string($socket) && trim($socket) !== '' ? trim($socket) : '/tmp/stashd-plugin-host.sock';
-
-        if (! is_file($component) || ! file_exists($socket)) {
-            return $this->feedBuilder->build($this->metadata($context, $broadcastToken, $includedDescriptions), $episodes);
+        if ($component === null || $socket === null || ! $definition->available()) {
+            throw BroadcastException::withCode(
+                'broadcast_plugin_unavailable',
+                'The external Broadcast plugin runtime is unavailable.',
+            );
         }
 
         $stage = sys_get_temp_dir() . '/stashd-broadcast-plugin-' . bin2hex(random_bytes(8));
@@ -557,51 +548,6 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             }
             @rmdir($stage);
         }
-    }
-
-    /** @param list<string|null> $includedDescriptions */
-    private function metadata(BroadcastContext $context, string $broadcastToken, array $includedDescriptions): PodcastFeedMetadata
-    {
-        $settings = PodcastFeedSettings::fromArray($this->settings($context));
-        $title = $settings->title
-            ?? $context->stash->name
-            ?? $context->broadcast->name;
-        $description = $settings->description
-            ?? $context->stash->description
-            ?? 'Private Stashd podcast feed.';
-        $fundingUrl = $settings->fundingUrl
-            ?? $this->fundingDetector->detect($includedDescriptions);
-
-        return new PodcastFeedMetadata(
-            title: $title,
-            description: $description,
-            feedUrl: $this->urls->feedUrl($broadcastToken),
-            linkUrl: $settings->linkUrl,
-            author: $settings->author,
-            imageUrl: $settings->imageUrl ?? $this->nonEmptyString($context->stash->iconUri),
-            fundingUrl: $fundingUrl,
-            language: $settings->language,
-            explicit: $settings->explicit,
-            complete: $settings->complete,
-            podcastGuid: $this->feedGuid($context),
-        );
-    }
-
-    private function feedGuid(BroadcastContext $context): string
-    {
-        $settings = $context->broadcast->settings ?? [];
-        $guid = $settings['podcast_guid'] ?? null;
-
-        if (is_string($guid) && Uuid::isValid($guid)) {
-            return $guid;
-        }
-
-        $guid = Uuid::v4()->toRfc4122();
-        $settings['podcast_guid'] = $guid;
-        $context->broadcast->settings = $settings;
-        $this->broadcasts->save($context->broadcast);
-
-        return $guid;
     }
 
     private function episodeTitle(\App\Stashes\StashItemRecord $stashItem, MediaItemRecord $mediaItem): string
