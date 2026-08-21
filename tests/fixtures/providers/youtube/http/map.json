@@ -17,5 +17,10 @@
   "https://www.googleapis.com/youtube/v3/playlists?id=PLStashdDemoPlaylist01&part=snippet&key=test-api-key": "data_api_playlist.json",
   "https://www.googleapis.com/youtube/v3/playlistItems?playlistId=UUStashdDemoCh0012345678&part=snippet&maxResults=50&key=test-api-key&pageToken=PAGE2": "data_api_playlist_items_page2.json",
   "https://www.googleapis.com/youtube/v3/playlistItems?playlistId=UUStashdDemoCh0012345678&part=snippet&maxResults=50&key=test-api-key": "data_api_playlist_items_page1.json",
-  "https://www.googleapis.com/youtube/v3/videos?id=StashdVid01": "data_api_videos_batch.json"
+  "https://www.googleapis.com/youtube/v3/videos?id=StashdVid01": "data_api_videos_batch.json",
+  "https://www.googleapis.com/youtube/v3/channels?id=UCStashdAuthFailCh0012345678&part=contentDetails&key=test-api-key": "auth_rejected.json",
+  "https://www.googleapis.com/youtube/v3/channels?id=UCStashdRateLimitCh0123456789&part=contentDetails&key=test-api-key": "rate_limited.json",
+  "https://www.googleapis.com/youtube/v3/playlistItems?playlistId=UUStashdDemoCh0012345678&part=snippet&maxResults=50&pageToken=PAGE2&key=test-api-key": "data_api_playlist_items_page2.json",
+  "https://www.googleapis.com/youtube/v3/channels?id=UCStashdMalformedApi012345678&part=contentDetails&key=test-api-key": "malformed_api.json",
+  "https://www.googleapis.com/youtube/v3/channels?id=UCStashdMissingUploads12345678&part=contentDetails&key=test-api-key": "data_api_channel_missing_uploads.json"
 }

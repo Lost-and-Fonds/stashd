@@ -108,13 +108,25 @@ final class PluginHostClient
         return $this->invokeInput('input-resolve', $componentPath, $sourceUri, null, $fixtureDirectory);
     }
 
-    public function discoverInput(string $componentPath, string $channelId, ?string $fixtureDirectory = null): PluginInputResult
-    {
-        return $this->invokeInput('input-discover', $componentPath, null, $channelId, $fixtureDirectory);
+    public function discoverInput(
+        string $componentPath,
+        string $channelId,
+        ?string $fixtureDirectory = null,
+        string $mode = 'rss',
+        ?PluginCredentialGrant $credential = null,
+    ): PluginInputResult {
+        return $this->invokeInput('input-discover', $componentPath, null, $channelId, $fixtureDirectory, $mode, $credential);
     }
 
-    private function invokeInput(string $operation, string $componentPath, ?string $sourceUri, ?string $channelId, ?string $fixtureDirectory): PluginInputResult
-    {
+    private function invokeInput(
+        string $operation,
+        string $componentPath,
+        ?string $sourceUri,
+        ?string $channelId,
+        ?string $fixtureDirectory,
+        string $mode = 'rss',
+        ?PluginCredentialGrant $credential = null,
+    ): PluginInputResult {
         $error = null;
         $socket = stream_socket_client('unix://' . $this->socketPath, $errorNumber, $error, 5);
         if (! is_resource($socket)) {
@@ -129,6 +141,9 @@ final class PluginHostClient
             'source_uri' => $sourceUri,
             'channel_id' => $channelId,
             'fixture_dir' => $fixtureDirectory,
+            'mode' => $mode,
+            'credential_name' => $credential?->name,
+            'credential_value' => $credential?->value,
         ], static fn (mixed $value): bool => $value !== null);
         /** @var list<array{fraction: float, stage: string}> $progress */
         $progress = [];

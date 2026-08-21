@@ -37,6 +37,13 @@ php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_dire
 php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdUnknownCh012345678 upstream_unavailable
 php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" resolve https://www.youtube.com/c/StashdUnresolvableChannel channel_resolution_failed
 
+php "$root/scripts/youtube-data-api-parity.php" "$socket" "$component" "$fixture_directory"
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdDemoCh0012345678 credential_unavailable data-api
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdAuthFailCh0012345678 authentication_rejected data-api youtube-data-api fixture-secret-do-not-cross-wasm
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdRateLimitCh0123456789 rate_limited data-api youtube-data-api fixture-secret-do-not-cross-wasm
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdMalformedApi012345678 malformed_api_response data-api youtube-data-api fixture-secret-do-not-cross-wasm
+php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdMissingUploads12345678 source_not_found data-api youtube-data-api fixture-secret-do-not-cross-wasm
+
 if php "$root/scripts/youtube-input-parity.php" "$socket" "$component" "$fixture_directory" "https://www.youtube.com/watch?v=demoVideo01"; then
     echo 'unsupported YouTube source unexpectedly succeeded' >&2
     exit 1

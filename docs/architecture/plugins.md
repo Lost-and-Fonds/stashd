@@ -419,13 +419,11 @@ plugin arbitrary UI.
 
 ### Permissions model
 
-The following are not designed:
-
-- network permissions and destination restrictions;
-- secret usage versus secret access;
-- capability declaration and review;
-- permission prompts and audit history;
-- operating-system-level Vault and staging mounts.
+The production permissions model is not designed. The YouTube experiment has
+only a narrow invocation-scoped exception: an allowlisted HTTPS HTTP resource
+and named credential-use grant, with host-side secret injection and no secret
+read capability. It does not establish a general permissions UI, credential
+system, or audit model.
 
 ### Production Input and Broadcast APIs
 
@@ -469,6 +467,18 @@ URLs (`/feeds/videos.xml?channel_id=…`). Watch URLs, other hosts, HTTP, and
 other paths are denied. This is an experimental YouTube capability, not the
 final network permission model.
 
+The Component also accepts the semantic `data-api` discovery mode. It requests
+the channel uploads playlist, pages `playlistItems`, then batches `videos`
+details. These requests use the same HTTP resource with a named credential-use
+intent (`youtube-data-api`). PHP decides whether the invocation receives that
+grant; the Rust host validates the grant and appends the configured key only
+after validating the HTTPS Google API host and approved endpoint paths. The
+key is never returned to Wasm. Redirects are disabled, so an approved request
+cannot carry credentials to another host. Missing grants and provider HTTP
+statuses are reported as typed plugin errors. RSS remains the cheap default;
+Data API is an explicit stronger/backfill mode, not a copy of PHP strategy
+classes.
+
 Run the deterministic proof from the Lerd development container with:
 
 ```bash
@@ -476,6 +486,7 @@ Run the deterministic proof from the Lerd development container with:
 ```
 
 The script builds the Component and host, uses a temporary private Unix socket,
-checks parity against the PHP provider using the same fixtures, and exercises
-unsupported sources, channel-resolution failure, malformed feeds, unavailable
-feeds, and a later invocation after those failures.
+checks RSS and Data API parity against the PHP provider using the same
+fixtures, and exercises unsupported sources, channel-resolution failure,
+malformed feeds, unavailable feeds, missing credentials, authentication and
+rate-limit failures, and a later invocation after those failures.

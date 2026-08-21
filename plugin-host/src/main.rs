@@ -35,7 +35,9 @@ mod youtube_input_world {
 }
 
 use youtube_input_world::YoutubeInputWorld;
-use youtube_input_world::exports::stashd::plugin::input_plugin::{DiscoveredItem, ResolvedInput};
+use youtube_input_world::exports::stashd::plugin::input_plugin::{
+    DiscoveredItem, DiscoveryMode, ResolvedInput,
+};
 use youtube_input_world::stashd::plugin::input_host::{
     self as input_host, Host as InputHost, HostHttpClient,
 };
@@ -63,6 +65,12 @@ struct InputState {
     progress: Vec<input_host::Progress>,
     logs: Vec<String>,
     fixture_dir: Option<PathBuf>,
+    credential: Option<CredentialGrant>,
+}
+
+struct CredentialGrant {
+    name: String,
+    value: String,
 }
 
 impl WasiView for HostState {
@@ -94,6 +102,9 @@ struct Request {
     source_uri: Option<String>,
     channel_id: Option<String>,
     fixture_dir: Option<PathBuf>,
+    mode: Option<String>,
+    credential_name: Option<String>,
+    credential_value: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -230,15 +241,17 @@ impl HostHttpClient for InputState {
     fn get(
         &mut self,
         client: Resource<HttpClientResource>,
-        url: String,
+        request: input_host::HttpRequest,
     ) -> Result<input_host::HttpResponse, input_host::HttpError> {
         let _ = self
             .table
             .get(&client)
             .map_err(|_| input_host::HttpError::Failed("HTTP capability expired".to_owned()))?;
-        if !allowed_youtube_url(&url) {
-            return Err(input_host::HttpError::Denied);
-        }
+        let url = authenticated_url(
+            &request.url,
+            request.credential.as_deref(),
+            self.credential.as_ref(),
+        )?;
 
         if let Some(directory) = &self.fixture_dir {
             let map_path = directory.join("map.json");
@@ -247,35 +260,83 @@ impl HostHttpClient for InputState {
                     .map_err(|error| input_host::HttpError::Failed(error.to_string()))?,
             )
             .map_err(|error| input_host::HttpError::Failed(error.to_string()))?;
-            let filename = map.get(&url).ok_or_else(|| {
-                input_host::HttpError::Unavailable("fixture not found".to_owned())
-            })?;
+            let fixture_url = fixture_lookup_url(&url, self.credential.as_ref());
+            let filename = map
+                .get(&fixture_url)
+                .or_else(|| {
+                    map.iter()
+                        .find(|(pattern, _)| fixture_url.starts_with(pattern.as_str()))
+                        .map(|(_, filename)| filename)
+                })
+                .ok_or_else(|| {
+                    input_host::HttpError::Unavailable("fixture not found".to_owned())
+                })?;
             let path = directory.join(filename);
             let body =
                 fs::read(path).map_err(|error| input_host::HttpError::Failed(error.to_string()))?;
-            let status = if filename == "unavailable.txt" {
-                404
-            } else {
-                200
-            };
+            let status = fixture_status(filename);
             return Ok(input_host::HttpResponse { status, body });
         }
 
-        let response = ureq::get(&url)
-            .call()
-            .map_err(|error| input_host::HttpError::Unavailable(error.to_string()))?;
+        let agent = ureq::AgentBuilder::new().redirects(0).build();
+        let response = agent.get(&url).call().map_err(|_| {
+            input_host::HttpError::Unavailable("approved HTTP request unavailable".to_owned())
+        })?;
         let status = response.status() as u16;
         let mut body = Vec::new();
-        response
-            .into_reader()
-            .read_to_end(&mut body)
-            .map_err(|error| input_host::HttpError::Failed(error.to_string()))?;
+        response.into_reader().read_to_end(&mut body).map_err(|_| {
+            input_host::HttpError::Failed("approved HTTP response could not be read".to_owned())
+        })?;
         Ok(input_host::HttpResponse { status, body })
     }
 
     fn drop(&mut self, client: Resource<HttpClientResource>) -> wasmtime::Result<()> {
         Ok(self.table.delete(client).map(|_| ())?)
     }
+}
+
+fn fixture_status(filename: &str) -> u16 {
+    match filename {
+        "unavailable.txt" => 404,
+        "auth_rejected.json" => 401,
+        "rate_limited.json" => 429,
+        _ => 200,
+    }
+}
+
+fn fixture_lookup_url(url: &str, grant: Option<&CredentialGrant>) -> String {
+    grant.map_or_else(
+        || url.to_owned(),
+        |grant| url.replace(&format!("&key={}", grant.value), "&key=test-api-key"),
+    )
+}
+
+fn authenticated_url(
+    url: &str,
+    requested_credential: Option<&str>,
+    grant: Option<&CredentialGrant>,
+) -> Result<String, input_host::HttpError> {
+    if allowed_youtube_url(url) {
+        if requested_credential.is_some() {
+            return Err(input_host::HttpError::Denied);
+        }
+        return Ok(url.to_owned());
+    }
+
+    if !allowed_data_api_url(url) {
+        return Err(input_host::HttpError::Denied);
+    }
+
+    let requested = requested_credential.ok_or(input_host::HttpError::CredentialUnavailable)?;
+    let grant = grant.ok_or(input_host::HttpError::CredentialUnavailable)?;
+    if requested != grant.name || grant.name != "youtube-data-api" || grant.value.is_empty() {
+        return Err(input_host::HttpError::CredentialUnavailable);
+    }
+
+    let mut parsed = url::Url::parse(url)
+        .map_err(|_| input_host::HttpError::Failed("invalid approved API URL".to_owned()))?;
+    parsed.query_pairs_mut().append_pair("key", &grant.value);
+    Ok(parsed.to_string())
 }
 
 fn allowed_youtube_url(url: &str) -> bool {
@@ -289,12 +350,25 @@ fn allowed_youtube_url(url: &str) -> bool {
         || path.starts_with("/feeds/videos.xml?channel_id=")
 }
 
+fn allowed_data_api_url(url: &str) -> bool {
+    let Some(path) = url.strip_prefix("https://www.googleapis.com/youtube/v3/") else {
+        return false;
+    };
+    path.starts_with("channels?")
+        || path.starts_with("playlistItems?")
+        || path.starts_with("videos?")
+}
+
+#[allow(clippy::too_many_arguments)]
 fn invoke_input(
     engine: &Engine,
     component: &Component,
     fixture_dir: Option<PathBuf>,
     source_uri: Option<&str>,
     channel_id: Option<&str>,
+    mode: Option<&str>,
+    credential_name: Option<String>,
+    credential_value: Option<String>,
 ) -> Result<(
     Option<ResolvedInput>,
     Option<Vec<DiscoveredItem>>,
@@ -308,6 +382,9 @@ fn invoke_input(
             progress: Vec::new(),
             logs: Vec::new(),
             fixture_dir,
+            credential: credential_name
+                .zip(credential_value)
+                .map(|(name, value)| CredentialGrant { name, value }),
         },
     );
     let mut linker = Linker::new(engine);
@@ -327,12 +404,17 @@ fn invoke_input(
         )
     } else {
         let channel = channel_id.context("input discovery requires channel_id")?;
+        let mode = match mode.unwrap_or("rss") {
+            "rss" => DiscoveryMode::Rss,
+            "data-api" => DiscoveryMode::DataApi,
+            other => anyhow::bail!("unsupported discovery mode: {other}"),
+        };
         (
             None,
             Some(
                 plugin
                     .stashd_plugin_input_plugin()
-                    .call_discover(&mut store, client, channel)?
+                    .call_discover(&mut store, client, channel, mode)?
                     .map_err(|error| anyhow::anyhow!("plugin input error: {error:?}"))?,
             ),
         )
@@ -361,6 +443,8 @@ fn item_json(value: &DiscoveredItem) -> serde_json::Value {
         "description": value.description,
         "published_at": value.published_at,
         "thumbnail_uri": value.thumbnail_uri,
+        "duration_seconds": value.duration_seconds,
+        "content_type": value.content_type,
     })
 }
 
@@ -371,6 +455,10 @@ fn plugin_error_code(message: &str) -> &'static str {
         ("UpstreamUnavailable", "upstream_unavailable"),
         ("MalformedFeed", "malformed_feed"),
         ("SourceNotFound", "source_not_found"),
+        ("MalformedApiResponse", "malformed_api_response"),
+        ("CredentialUnavailable", "credential_unavailable"),
+        ("AuthenticationRejected", "authentication_rejected"),
+        ("RateLimited", "rate_limited"),
     ]
     .into_iter()
     .find_map(|(variant, code)| message.contains(variant).then_some(code))
@@ -530,6 +618,9 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                 (request.op == "input-discover")
                     .then_some(request.channel_id.as_deref())
                     .flatten(),
+                request.mode.as_deref(),
+                request.credential_name,
+                request.credential_value,
             );
             let (resolved, items, state) = match result {
                 Ok(result) => result,
@@ -686,7 +777,7 @@ fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::allowed_youtube_url;
+    use super::{CredentialGrant, allowed_youtube_url, authenticated_url, input_host};
 
     #[test]
     fn input_http_capability_allows_only_youtube_channel_requests() {
@@ -699,5 +790,52 @@ mod tests {
         ));
         assert!(!allowed_youtube_url("https://example.com/anything"));
         assert!(!allowed_youtube_url("http://www.youtube.com/@StashdDemo"));
+    }
+
+    #[test]
+    fn credential_use_is_bound_to_the_approved_api_origin_and_grant() {
+        let grant = CredentialGrant {
+            name: "youtube-data-api".to_owned(),
+            value: "fixture-secret-do-not-cross-wasm".to_owned(),
+        };
+        let url = authenticated_url(
+            "https://www.googleapis.com/youtube/v3/videos?id=demoVideo01&part=snippet",
+            Some("youtube-data-api"),
+            Some(&grant),
+        )
+        .expect("approved credential use should succeed");
+        assert!(url.contains("key=fixture-secret-do-not-cross-wasm"));
+        assert!(matches!(
+            authenticated_url(
+                "https://www.googleapis.com/youtube/v3/videos?id=x",
+                None,
+                Some(&grant)
+            ),
+            Err(input_host::HttpError::CredentialUnavailable)
+        ));
+        assert!(matches!(
+            authenticated_url(
+                "https://example.com/redirect",
+                Some("youtube-data-api"),
+                Some(&grant)
+            ),
+            Err(input_host::HttpError::Denied)
+        ));
+        assert!(matches!(
+            authenticated_url(
+                "http://www.googleapis.com/youtube/v3/videos?id=x",
+                Some("youtube-data-api"),
+                Some(&grant)
+            ),
+            Err(input_host::HttpError::Denied)
+        ));
+        assert!(matches!(
+            authenticated_url(
+                "https://www.youtube.com/@StashdDemo",
+                Some("youtube-data-api"),
+                Some(&grant)
+            ),
+            Err(input_host::HttpError::Denied)
+        ));
     }
 }

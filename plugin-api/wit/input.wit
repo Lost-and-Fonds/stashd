@@ -1,6 +1,11 @@
 package stashd:plugin@0.1.0;
 
 interface input-host {
+    record http-request {
+        url: string,
+        credential: option<string>,
+    }
+
     record http-response {
         status: u16,
         body: list<u8>,
@@ -8,12 +13,15 @@ interface input-host {
 
     variant http-error {
         denied,
+        credential-unavailable,
+        authentication-rejected,
+        rate-limited,
         unavailable(string),
         failed(string),
     }
 
     resource http-client {
-        get: func(url: string) -> result<http-response, http-error>;
+        get: func(request: http-request) -> result<http-response, http-error>;
     }
 
     record progress {
@@ -26,6 +34,11 @@ interface input-host {
 
 interface input-plugin {
     use input-host.{http-client};
+
+    enum discovery-mode {
+        rss,
+        data-api,
+    }
 
     record resolved-input {
         provider-key: string,
@@ -45,6 +58,8 @@ interface input-plugin {
         description: option<string>,
         published-at: option<string>,
         thumbnail-uri: option<string>,
+        duration-seconds: option<u32>,
+        content-type: option<string>,
     }
 
     variant plugin-error {
@@ -52,11 +67,15 @@ interface input-plugin {
         channel-resolution-failed(string),
         upstream-unavailable(string),
         malformed-feed(string),
+        malformed-api-response(string),
         source-not-found(string),
+        credential-unavailable(string),
+        authentication-rejected(string),
+        rate-limited(string),
     }
 
     resolve: func(client: borrow<http-client>, source-uri: string) -> result<resolved-input, plugin-error>;
-    discover: func(client: borrow<http-client>, channel-id: string) -> result<list<discovered-item>, plugin-error>;
+    discover: func(client: borrow<http-client>, channel-id: string, mode: discovery-mode) -> result<list<discovered-item>, plugin-error>;
 }
 
 world youtube-input-world {
