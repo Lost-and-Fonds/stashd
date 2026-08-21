@@ -459,6 +459,20 @@ resolved-input and discovered-item facts. PHP may translate those facts into
 authoritative Stashd records, but the plugin never receives database objects or
 PHP provider classes.
 
+The experimental Input world also exports `acquire`. It accepts a discovered
+item and semantic media options, then returns staged artifacts with generic
+roles: `primary`, `captions`, `thumbnail`, and `provider-metadata`. The host
+validates each artifact against the invocation's private staging workspace and
+returns only a safe relative reference, role, media type, and size. The plugin
+cannot return arbitrary filesystem paths or promote anything into the Vault.
+
+The YouTube Component currently fulfills acquisition by requesting the generic
+granted helper named `yt-dlp`, constructing and interpreting all yt-dlp
+arguments and output itself. The host only runs the granted executable in the
+staging workspace, captures its result, and reports newly created files. This
+is trusted installed helper software for the development experiment, not a
+general hostile-native-code sandbox or a YouTube-specific host bridge.
+
 The host grants an invocation-scoped `http-client` resource. In fixture mode it
 reads the committed YouTube HTTP fixtures; outside fixture mode Rust performs
 the HTTP request. The host allowlist permits only `https://www.youtube.com`:

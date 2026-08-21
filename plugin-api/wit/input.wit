@@ -24,6 +24,44 @@ interface input-host {
         get: func(request: http-request) -> result<http-response, http-error>;
     }
 
+    enum artifact-role {
+        primary,
+        captions,
+        thumbnail,
+        provider-metadata,
+    }
+
+    record helper-result {
+        exit-code: s32,
+        stdout: string,
+        stderr: string,
+        files: list<string>,
+    }
+
+    variant helper-error {
+        denied,
+        unavailable(string),
+        failed(string),
+    }
+
+    record staged-artifact {
+        reference: string,
+        role: artifact-role,
+        media-type: option<string>,
+        size-bytes: u64,
+    }
+
+    variant staging-error {
+        invalid-reference,
+        missing,
+        failed(string),
+    }
+
+    resource staging-area {
+        run-helper: func(name: string, args: list<string>) -> result<helper-result, helper-error>;
+        stage: func(relative-path: string, role: artifact-role, media-type: option<string>) -> result<staged-artifact, staging-error>;
+    }
+
     record progress {
         stage: string,
     }
@@ -34,10 +72,27 @@ interface input-host {
 
 interface input-plugin {
     use input-host.{http-client};
+    use input-host.{staging-area};
+    use input-host.{staged-artifact};
 
     enum discovery-mode {
         rss,
         data-api,
+    }
+
+    enum media-kind {
+        video,
+        audio,
+    }
+
+    record acquisition-options {
+        media-kind: media-kind,
+        include-captions: bool,
+        caption-languages: option<string>,
+    }
+
+    record acquisition-result {
+        artifacts: list<staged-artifact>,
     }
 
     record resolved-input {
@@ -72,10 +127,16 @@ interface input-plugin {
         credential-unavailable(string),
         authentication-rejected(string),
         rate-limited(string),
+        helper-unavailable(string),
+        helper-failed(string),
+        acquisition-timeout(string),
+        unsupported-media(string),
+        unexpected-acquisition-result(string),
     }
 
     resolve: func(client: borrow<http-client>, source-uri: string) -> result<resolved-input, plugin-error>;
     discover: func(client: borrow<http-client>, channel-id: string, mode: discovery-mode) -> result<list<discovered-item>, plugin-error>;
+    acquire: func(staging: borrow<staging-area>, item: discovered-item, options: acquisition-options) -> result<acquisition-result, plugin-error>;
 }
 
 world youtube-input-world {

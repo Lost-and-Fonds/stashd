@@ -15,6 +15,7 @@ core="$root/target/wasm32-wasip2/release/stashd_youtube_plugin.wasm"
 component="$tmp/youtube-input.component.wasm"
 socket="$tmp/plugin-host.sock"
 fixture_directory="$root/tests/fixtures/providers/youtube/http"
+helper="$fixture_directory/../fake-yt-dlp.sh"
 host="$root/target/release/stashd-plugin-host"
 
 "$host" build-component "$core" "$component"
@@ -43,6 +44,9 @@ php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_dire
 php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdRateLimitCh0123456789 rate_limited data-api youtube-data-api fixture-secret-do-not-cross-wasm
 php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdMalformedApi012345678 malformed_api_response data-api youtube-data-api fixture-secret-do-not-cross-wasm
 php "$root/scripts/plugin-input-error.php" "$socket" "$component" "$fixture_directory" discover UCStashdMissingUploads12345678 source_not_found data-api youtube-data-api fixture-secret-do-not-cross-wasm
+php "$root/scripts/youtube-acquire-spike.php" "$socket" "$component" "$helper"
+php "$root/scripts/youtube-acquire-parity.php" "$socket" "$component" "$helper"
+php "$root/scripts/plugin-acquire-error.php" "$socket" "$component" "$helper" "https://www.youtube.com/watch?v=fail-acquisition" helper_failed
 
 if php "$root/scripts/youtube-input-parity.php" "$socket" "$component" "$fixture_directory" "https://www.youtube.com/watch?v=demoVideo01"; then
     echo 'unsupported YouTube source unexpectedly succeeded' >&2

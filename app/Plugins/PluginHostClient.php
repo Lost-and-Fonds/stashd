@@ -118,6 +118,34 @@ final class PluginHostClient
         return $this->invokeInput('input-discover', $componentPath, null, $channelId, $fixtureDirectory, $mode, $credential);
     }
 
+    /** @param array<string, mixed> $item */
+    public function acquireInput(
+        string $componentPath,
+        array $item,
+        string $stagingDirectory,
+        PluginHelperGrant $helper,
+        string $mediaKind = 'video',
+        bool $includeCaptions = false,
+        ?string $captionLanguages = null,
+    ): PluginInputResult {
+        return $this->invokeInput(
+            'input-acquire',
+            $componentPath,
+            null,
+            null,
+            null,
+            'rss',
+            null,
+            $stagingDirectory,
+            $helper,
+            $item,
+            $mediaKind,
+            $includeCaptions,
+            $captionLanguages,
+        );
+    }
+
+    /** @param array<string, mixed>|null $item */
     private function invokeInput(
         string $operation,
         string $componentPath,
@@ -126,6 +154,12 @@ final class PluginHostClient
         ?string $fixtureDirectory,
         string $mode = 'rss',
         ?PluginCredentialGrant $credential = null,
+        ?string $stagingDirectory = null,
+        ?PluginHelperGrant $helper = null,
+        ?array $item = null,
+        ?string $mediaKind = null,
+        ?bool $includeCaptions = null,
+        ?string $captionLanguages = null,
     ): PluginInputResult {
         $error = null;
         $socket = stream_socket_client('unix://' . $this->socketPath, $errorNumber, $error, 5);
@@ -144,6 +178,13 @@ final class PluginHostClient
             'mode' => $mode,
             'credential_name' => $credential?->name,
             'credential_value' => $credential?->value,
+            'staging_dir' => $stagingDirectory,
+            'helper_name' => $helper?->name,
+            'helper_executable' => $helper?->executable,
+            'item' => $item,
+            'media_kind' => $mediaKind,
+            'include_captions' => $includeCaptions,
+            'caption_languages' => $captionLanguages,
         ], static fn (mixed $value): bool => $value !== null);
         /** @var list<array{fraction: float, stage: string}> $progress */
         $progress = [];
@@ -152,6 +193,8 @@ final class PluginHostClient
         $resolved = null;
         /** @var list<array<string, mixed>>|null $items */
         $items = null;
+        /** @var array<string, mixed>|null $acquisition */
+        $acquisition = null;
 
         try {
             fwrite($socket, json_encode($request, JSON_THROW_ON_ERROR) . "\n");
@@ -166,11 +209,12 @@ final class PluginHostClient
                     'log' => $logs[] = $this->inputString($event['message'] ?? null, 'message'),
                     'input_resolved' => $resolved = $this->inputObject($event['resolved'] ?? null, 'resolved'),
                     'input_discovered' => $items = $this->inputObjects($event['items'] ?? null),
+                    'input_acquired' => $acquisition = $this->inputObject($event['acquisition'] ?? null, 'acquisition'),
                     'error' => $this->throwExecutionError($event),
                     default => throw new RuntimeException('Plugin host returned an unknown input event.'),
                 };
-                if (isset($resolved) || isset($items)) {
-                    return new PluginInputResult($progress, $logs, $resolved ?? null, $items ?? null);
+                if (isset($resolved) || isset($items) || isset($acquisition)) {
+                    return new PluginInputResult($progress, $logs, $resolved ?? null, $items ?? null, $acquisition);
                 }
             }
         } catch (JsonException $exception) {

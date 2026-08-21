@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,7 @@ use stashd::plugin::host::Operation;
 use stashd::plugin::host::{self, Host, HostStagingOutput, HostVaultAsset};
 
 pub struct HttpClientResource;
+pub struct StagingAreaResource;
 
 mod youtube_input_world {
     wasmtime::component::bindgen!({
@@ -30,16 +32,18 @@ mod youtube_input_world {
         world: "youtube-input-world",
         with: {
             "stashd:plugin/input-host/http-client": super::HttpClientResource,
+            "stashd:plugin/input-host/staging-area": super::StagingAreaResource,
         },
     });
 }
 
 use youtube_input_world::YoutubeInputWorld;
 use youtube_input_world::exports::stashd::plugin::input_plugin::{
-    DiscoveredItem, DiscoveryMode, ResolvedInput,
+    AcquisitionOptions, AcquisitionResult, DiscoveredItem, DiscoveryMode, MediaKind, ResolvedInput,
 };
 use youtube_input_world::stashd::plugin::input_host::{
-    self as input_host, Host as InputHost, HostHttpClient,
+    self as input_host, ArtifactRole, HelperError, HelperResult, Host as InputHost, HostHttpClient,
+    HostStagingArea, StagedArtifact, StagingError,
 };
 
 pub struct VaultAssetResource {
@@ -66,11 +70,18 @@ struct InputState {
     logs: Vec<String>,
     fixture_dir: Option<PathBuf>,
     credential: Option<CredentialGrant>,
+    staging_dir: Option<PathBuf>,
+    helper: Option<HelperGrant>,
 }
 
 struct CredentialGrant {
     name: String,
     value: String,
+}
+
+struct HelperGrant {
+    name: String,
+    executable: PathBuf,
 }
 
 impl WasiView for HostState {
@@ -105,6 +116,25 @@ struct Request {
     mode: Option<String>,
     credential_name: Option<String>,
     credential_value: Option<String>,
+    staging_dir: Option<PathBuf>,
+    helper_name: Option<String>,
+    helper_executable: Option<PathBuf>,
+    item: Option<AcquireItemRequest>,
+    media_kind: Option<String>,
+    include_captions: Option<bool>,
+    caption_languages: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AcquireItemRequest {
+    provider_item_id: String,
+    canonical_uri: String,
+    title: String,
+    description: Option<String>,
+    published_at: Option<String>,
+    thumbnail_uri: Option<String>,
+    duration_seconds: Option<u32>,
+    content_type: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -134,6 +164,11 @@ enum Response {
     InputDiscovered {
         id: String,
         items: serde_json::Value,
+    },
+    #[serde(rename = "input_acquired")]
+    InputAcquired {
+        id: String,
+        acquisition: serde_json::Value,
     },
     #[serde(rename = "error")]
     Error {
@@ -295,6 +330,107 @@ impl HostHttpClient for InputState {
     }
 }
 
+impl HostStagingArea for InputState {
+    fn run_helper(
+        &mut self,
+        area: Resource<StagingAreaResource>,
+        name: String,
+        args: Vec<String>,
+    ) -> Result<HelperResult, HelperError> {
+        let _ = self
+            .table
+            .get(&area)
+            .map_err(|_| HelperError::Failed("staging capability expired".to_owned()))?;
+        let staging = self
+            .staging_dir
+            .as_ref()
+            .ok_or_else(|| HelperError::Unavailable("staging workspace unavailable".to_owned()))?;
+        let helper = self.helper.as_ref().ok_or(HelperError::Denied)?;
+        if helper.name != name {
+            return Err(HelperError::Denied);
+        }
+        let before = workspace_files(staging).map_err(HelperError::Failed)?;
+        let executable = if helper.executable.is_absolute() {
+            helper.executable.clone()
+        } else {
+            std::env::current_dir()
+                .map_err(|error| HelperError::Unavailable(error.to_string()))?
+                .join(&helper.executable)
+        };
+        let output = Command::new(executable)
+            .args(args)
+            .current_dir(staging)
+            .output()
+            .map_err(|error| HelperError::Unavailable(error.to_string()))?;
+        let after = workspace_files(staging).map_err(HelperError::Failed)?;
+        let files = after.difference(&before).cloned().collect();
+        Ok(HelperResult {
+            exit_code: output.status.code().unwrap_or(-1),
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            files,
+        })
+    }
+
+    fn stage(
+        &mut self,
+        area: Resource<StagingAreaResource>,
+        relative_path: String,
+        role: ArtifactRole,
+        media_type: Option<String>,
+    ) -> Result<StagedArtifact, StagingError> {
+        let _ = self
+            .table
+            .get(&area)
+            .map_err(|_| StagingError::Failed("staging capability expired".to_owned()))?;
+        let staging = self.staging_dir.as_ref().ok_or(StagingError::Missing)?;
+        let path =
+            safe_staging_path(staging, &relative_path).ok_or(StagingError::InvalidReference)?;
+        let metadata = fs::metadata(&path).map_err(|_| StagingError::Missing)?;
+        if !metadata.is_file() {
+            return Err(StagingError::Missing);
+        }
+        Ok(StagedArtifact {
+            reference: relative_path,
+            role,
+            media_type,
+            size_bytes: metadata.len(),
+        })
+    }
+
+    fn drop(&mut self, area: Resource<StagingAreaResource>) -> wasmtime::Result<()> {
+        Ok(self.table.delete(area).map(|_| ())?)
+    }
+}
+
+fn safe_staging_path(root: &Path, relative: &str) -> Option<PathBuf> {
+    let path = Path::new(relative);
+    if relative.is_empty()
+        || path.is_absolute()
+        || path
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        return None;
+    }
+    Some(root.join(path))
+}
+
+fn workspace_files(root: &Path) -> Result<std::collections::BTreeSet<String>, String> {
+    let mut files = std::collections::BTreeSet::new();
+    for entry in fs::read_dir(root).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        if entry
+            .file_type()
+            .map_err(|error| error.to_string())?
+            .is_file()
+        {
+            files.insert(entry.file_name().to_string_lossy().into_owned());
+        }
+    }
+    Ok(files)
+}
+
 fn fixture_status(filename: &str) -> u16 {
     match filename {
         "unavailable.txt" => 404,
@@ -385,6 +521,8 @@ fn invoke_input(
             credential: credential_name
                 .zip(credential_value)
                 .map(|(name, value)| CredentialGrant { name, value }),
+            staging_dir: None,
+            helper: None,
         },
     );
     let mut linker = Linker::new(engine);
@@ -422,6 +560,69 @@ fn invoke_input(
     Ok((resolved, items, store.into_data()))
 }
 
+#[allow(clippy::too_many_arguments)]
+fn invoke_acquire(
+    engine: &Engine,
+    component: &Component,
+    staging_dir: Option<PathBuf>,
+    helper_name: Option<String>,
+    helper_executable: Option<PathBuf>,
+    item: AcquireItemRequest,
+    media_kind: &str,
+    include_captions: bool,
+    caption_languages: Option<String>,
+) -> Result<(AcquisitionResult, InputState)> {
+    let mut store = Store::new(
+        engine,
+        InputState {
+            table: ResourceTable::new(),
+            wasi: WasiCtxBuilder::new().build(),
+            progress: Vec::new(),
+            logs: Vec::new(),
+            fixture_dir: None,
+            credential: None,
+            staging_dir,
+            helper: helper_name
+                .zip(helper_executable)
+                .map(|(name, executable)| HelperGrant { name, executable }),
+        },
+    );
+    let mut linker = Linker::new(engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
+    YoutubeInputWorld::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state)?;
+    let plugin = YoutubeInputWorld::instantiate(&mut store, component, &linker)?;
+    let staging = store.data_mut().table.push(StagingAreaResource)?;
+    let item = DiscoveredItem {
+        provider_item_id: item.provider_item_id,
+        canonical_uri: item.canonical_uri,
+        title: item.title,
+        description: item.description,
+        published_at: item.published_at,
+        thumbnail_uri: item.thumbnail_uri,
+        duration_seconds: item.duration_seconds,
+        content_type: item.content_type,
+    };
+    let media_kind = match media_kind {
+        "video" => MediaKind::Video,
+        "audio" => MediaKind::Audio,
+        other => anyhow::bail!("unsupported media kind: {other}"),
+    };
+    let result = plugin
+        .stashd_plugin_input_plugin()
+        .call_acquire(
+            &mut store,
+            staging,
+            &item,
+            &AcquisitionOptions {
+                media_kind,
+                include_captions,
+                caption_languages,
+            },
+        )?
+        .map_err(|error| anyhow::anyhow!("plugin input error: {error:?}"))?;
+    Ok((result, store.into_data()))
+}
+
 fn resolved_json(value: &ResolvedInput) -> serde_json::Value {
     serde_json::json!({
         "provider_key": value.provider_key,
@@ -448,6 +649,21 @@ fn item_json(value: &DiscoveredItem) -> serde_json::Value {
     })
 }
 
+fn artifact_json(value: &StagedArtifact) -> serde_json::Value {
+    let role = match value.role {
+        ArtifactRole::Primary => "primary",
+        ArtifactRole::Captions => "captions",
+        ArtifactRole::Thumbnail => "thumbnail",
+        ArtifactRole::ProviderMetadata => "provider-metadata",
+    };
+    serde_json::json!({
+        "reference": value.reference,
+        "role": role,
+        "media_type": value.media_type,
+        "size_bytes": value.size_bytes,
+    })
+}
+
 fn plugin_error_code(message: &str) -> &'static str {
     [
         ("UnsupportedSource", "unsupported_source"),
@@ -459,6 +675,14 @@ fn plugin_error_code(message: &str) -> &'static str {
         ("CredentialUnavailable", "credential_unavailable"),
         ("AuthenticationRejected", "authentication_rejected"),
         ("RateLimited", "rate_limited"),
+        ("HelperUnavailable", "helper_unavailable"),
+        ("HelperFailed", "helper_failed"),
+        ("AcquisitionTimeout", "acquisition_timeout"),
+        ("UnsupportedMedia", "unsupported_media"),
+        (
+            "UnexpectedAcquisitionResult",
+            "unexpected_acquisition_result",
+        ),
     ]
     .into_iter()
     .find_map(|(variant, code)| message.contains(variant).then_some(code))
@@ -600,6 +824,67 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                     },
                 )?,
             }
+        }
+        "input-acquire" => {
+            let component_path = request
+                .component_path
+                .as_deref()
+                .context("input acquisition requires component_path")?;
+            let component = Component::from_file(engine, component_path)
+                .with_context(|| format!("loading component {}", component_path.display()))?;
+            let (result, state) = match invoke_acquire(
+                engine,
+                &component,
+                request.staging_dir,
+                request.helper_name,
+                request.helper_executable,
+                request.item.context("input acquisition requires item")?,
+                request.media_kind.as_deref().unwrap_or("video"),
+                request.include_captions.unwrap_or(false),
+                request.caption_languages,
+            ) {
+                Ok(result) => result,
+                Err(error) => {
+                    let message = error.to_string();
+                    send(
+                        stream,
+                        Response::Error {
+                            id: request.id,
+                            code: plugin_error_code(&message).to_owned(),
+                            message,
+                        },
+                    )?;
+                    return Ok(());
+                }
+            };
+            for progress in state.progress {
+                send(
+                    stream,
+                    Response::Progress {
+                        id: request.id.clone(),
+                        fraction: 0.0,
+                        stage: progress.stage,
+                    },
+                )?;
+            }
+            for message in state.logs {
+                send(
+                    stream,
+                    Response::Log {
+                        id: request.id.clone(),
+                        message,
+                    },
+                )?;
+            }
+            send(
+                stream,
+                Response::InputAcquired {
+                    id: request.id,
+                    acquisition: serde_json::json!({
+                        "artifacts": result.artifacts.iter().map(artifact_json).collect::<Vec<_>>(),
+                    }),
+                },
+            )?;
         }
         "input-resolve" | "input-discover" => {
             let component_path = request

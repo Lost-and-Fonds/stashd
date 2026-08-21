@@ -4,10 +4,11 @@ wit_bindgen::generate!({
 });
 
 use exports::stashd::plugin::input_plugin::{
-    DiscoveredItem, DiscoveryMode, Guest, PluginError, ResolvedInput,
+    AcquisitionOptions, AcquisitionResult, DiscoveredItem, DiscoveryMode, Guest, MediaKind,
+    PluginError, ResolvedInput,
 };
 use serde_json::Value;
-use stashd::plugin::input_host::{self, HttpClient};
+use stashd::plugin::input_host::{self, ArtifactRole, HttpClient, StagingArea};
 
 struct YouTubeInput;
 
@@ -108,6 +109,134 @@ impl Guest for YouTubeInput {
             stage: "complete".to_owned(),
         });
         Ok(items)
+    }
+
+    fn acquire(
+        staging: &StagingArea,
+        item: DiscoveredItem,
+        options: AcquisitionOptions,
+    ) -> Result<AcquisitionResult, PluginError> {
+        input_host::report_progress(&input_host::Progress {
+            stage: "preparing acquisition".to_owned(),
+        });
+        let mut args = vec![
+            "--no-playlist".to_owned(),
+            "--newline".to_owned(),
+            "--no-warnings".to_owned(),
+            "--restrict-filenames".to_owned(),
+            "--output".to_owned(),
+            "stashd-original.%(ext)s".to_owned(),
+            "--write-info-json".to_owned(),
+            "--write-thumbnail".to_owned(),
+        ];
+        match options.media_kind {
+            MediaKind::Video => args.extend([
+                "--format".to_owned(),
+                "bestvideo[height<=1080]+bestaudio/best[height<=1080]".to_owned(),
+                "--merge-output-format".to_owned(),
+                "mp4".to_owned(),
+            ]),
+            MediaKind::Audio => args.extend([
+                "--extract-audio".to_owned(),
+                "--audio-format".to_owned(),
+                "mp3".to_owned(),
+                "--audio-quality".to_owned(),
+                "128K".to_owned(),
+            ]),
+        }
+        if options.include_captions {
+            args.extend([
+                "--write-subs".to_owned(),
+                "--sub-format".to_owned(),
+                "vtt".to_owned(),
+                "--sub-langs".to_owned(),
+                options.caption_languages.unwrap_or_else(|| "en".to_owned()),
+            ]);
+        }
+        args.push(item.canonical_uri.clone());
+        input_host::report_progress(&input_host::Progress {
+            stage: "downloading media".to_owned(),
+        });
+        let result =
+            input_host::StagingArea::run_helper(staging, "yt-dlp", &args).map_err(|error| {
+                match error {
+                    input_host::HelperError::Denied => {
+                        PluginError::HelperUnavailable("yt-dlp helper was not granted".to_owned())
+                    }
+                    input_host::HelperError::Unavailable(_) => {
+                        PluginError::HelperUnavailable("yt-dlp helper is unavailable".to_owned())
+                    }
+                    input_host::HelperError::Failed(_) => {
+                        PluginError::HelperFailed("yt-dlp helper could not be started".to_owned())
+                    }
+                }
+            })?;
+        if result.exit_code == 124 {
+            return Err(PluginError::AcquisitionTimeout(
+                "YouTube acquisition helper timed out".to_owned(),
+            ));
+        }
+        if result.exit_code != 0 {
+            return Err(PluginError::HelperFailed(
+                "YouTube acquisition helper failed".to_owned(),
+            ));
+        }
+        let mut artifacts = Vec::new();
+        for file in result.files {
+            let (role, media_type) = artifact_kind(&file).ok_or_else(|| {
+                PluginError::UnexpectedAcquisitionResult(
+                    "YouTube helper produced an unrecognized artifact".to_owned(),
+                )
+            })?;
+            artifacts.push(
+                input_host::StagingArea::stage(staging, &file, role, Some(media_type)).map_err(
+                    |_| {
+                        PluginError::UnexpectedAcquisitionResult(
+                            "YouTube artifact could not be staged".to_owned(),
+                        )
+                    },
+                )?,
+            );
+        }
+        if !artifacts
+            .iter()
+            .any(|artifact| artifact.role == ArtifactRole::Primary)
+        {
+            return Err(PluginError::UnexpectedAcquisitionResult(
+                "YouTube helper produced no primary media artifact".to_owned(),
+            ));
+        }
+        input_host::report_progress(&input_host::Progress {
+            stage: "finalizing artifacts".to_owned(),
+        });
+        input_host::log("YouTube acquisition complete");
+        input_host::report_progress(&input_host::Progress {
+            stage: "complete".to_owned(),
+        });
+        Ok(AcquisitionResult { artifacts })
+    }
+}
+
+fn artifact_kind(file: &str) -> Option<(ArtifactRole, &'static str)> {
+    let lower = file.to_ascii_lowercase();
+    if lower.ends_with(".info.json") {
+        Some((ArtifactRole::ProviderMetadata, "application/json"))
+    } else if lower.ends_with(".vtt") {
+        Some((ArtifactRole::Captions, "text/vtt"))
+    } else if [".jpg", ".jpeg", ".png", ".webp"]
+        .iter()
+        .any(|extension| lower.ends_with(extension))
+    {
+        Some((ArtifactRole::Thumbnail, "image/*"))
+    } else if [".mp4", ".mkv", ".webm"]
+        .iter()
+        .any(|extension| lower.ends_with(extension))
+    {
+        Some((ArtifactRole::Primary, "video/*"))
+    } else if lower.ends_with(".mp3") || lower.ends_with(".m4a") || lower.ends_with(".opus") {
+        Some((ArtifactRole::Primary, "audio/*"))
+    } else {
+        None
     }
 }
 

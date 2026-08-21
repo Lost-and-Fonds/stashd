@@ -11,12 +11,14 @@ final readonly class PluginInputResult
      * @param list<string> $logs
      * @param array<string, mixed>|null $resolved
      * @param list<array<string, mixed>>|null $items
+     * @param array<string, mixed>|null $acquisition
      */
     public function __construct(
         public array $progress,
         public array $logs,
         public ?array $resolved,
         public ?array $items,
+        public ?array $acquisition = null,
     ) {
     }
 }
