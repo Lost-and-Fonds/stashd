@@ -58,11 +58,7 @@ final readonly class DownloadCaptionsJobHandler implements JobHandler
         $this->publisher->jobCompleted($job);
 
         foreach ($this->broadcastItems->listForMediaItem(MediaItemId::parse($mediaItemId)) as $item) {
-            $captions = $item->broadcast->settings['captions'] ?? 'off';
-
-            if ($item->broadcast->type === 'podcast' || in_array($captions, ['creator_only', 'creator_or_auto'], true)) {
-                $this->dispatch->dispatch(CommandType::BroadcastRebuild, ['broadcast_id' => (string) $item->broadcast->id]);
-            }
+            $this->dispatch->dispatch(CommandType::BroadcastRebuild, ['broadcast_id' => (string) $item->broadcast->id]);
         }
     }
 }

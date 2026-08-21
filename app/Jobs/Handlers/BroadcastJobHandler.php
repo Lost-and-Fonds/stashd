@@ -209,12 +209,12 @@ final readonly class BroadcastJobHandler implements JobHandler
         JobHandlerContext $context,
         BroadcastId $broadcastId,
     ): array {
-        $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Rotating podcast token'));
-        $result = $this->lifecycle->rotateToken($broadcastId);
-        $this->activity->broadcastTokenRotated($command, $job, $broadcastId, $result->toArray());
-        $context->progress($job, JobProgressUpdate::ofSteps(2, 2, 'Podcast token rotated'));
+        $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Executing broadcast plugin action'));
+        $result = $this->lifecycle->invokePluginAction($broadcastId, 'rotate_token');
+        $this->activity->broadcastPluginActionCompleted($command, $job, $broadcastId, 'rotate_token', $result);
+        $context->progress($job, JobProgressUpdate::ofSteps(2, 2, 'Broadcast plugin action complete'));
 
-        return ['token' => $result->toArray()];
+        return ['result' => $result];
     }
 
     /** @return array<string, mixed> */

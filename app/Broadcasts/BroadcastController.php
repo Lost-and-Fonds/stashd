@@ -6,9 +6,6 @@ namespace App\Broadcasts;
 
 use App\Broadcasts\Api\BroadcastItemResource;
 use App\Broadcasts\Api\BroadcastResource;
-use App\Broadcasts\Podcasts\PodcastEpisodeUrlBuilder;
-use App\Broadcasts\Podcasts\PodcastMediaKind;
-use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Commands\CommandDispatchService;
 use App\Commands\CommandType;
 use App\Http\Api\ApiJson;
@@ -41,8 +38,6 @@ final readonly class BroadcastController
         private StashInputRepository $stashInputs,
         private BroadcastRepository $broadcasts,
         private BroadcastItemRepository $broadcastItems,
-        private PodcastTokenService $podcastTokens,
-        private PodcastEpisodeUrlBuilder $podcastUrls,
         private BroadcastLifecycleService $lifecycle,
         private BroadcastContextFactory $contexts,
         private MediaItemRepository $mediaItems,
@@ -378,9 +373,12 @@ final readonly class BroadcastController
     private function policyMismatch(DownloadPolicy $policy, BroadcastRecord $broadcast): ?array
     {
         $type = $broadcast->type;
-        $mediaKind = PodcastMediaKind::forBroadcast($broadcast);
+        $plugin = BroadcastPluginRegistry::findByKey($type)?->plugin;
+        $satisfied = $plugin instanceof BroadcastPluginPolicy
+            ? $plugin->acceptsDownloadPolicy($broadcast, $policy)
+            : $policy !== DownloadPolicy::MetadataOnly;
 
-        if ($this->isTypeSatisfiedByPolicy($type, $policy, $mediaKind)) {
+        if ($satisfied) {
             return null;
         }
 
@@ -392,20 +390,12 @@ final readonly class BroadcastController
                 fn (DownloadPolicy $candidate): string => $candidate->value,
                 array_filter(
                     DownloadPolicy::cases(),
-                    fn (DownloadPolicy $candidate): bool => $this->isTypeSatisfiedByPolicy($type, $candidate, $mediaKind),
+                    fn (DownloadPolicy $candidate): bool => $plugin instanceof BroadcastPluginPolicy
+                        ? $plugin->acceptsDownloadPolicy($broadcast, $candidate)
+                        : $candidate !== DownloadPolicy::MetadataOnly,
                 ),
             )),
         ];
-    }
-
-    /** Check if a broadcast type (string key) satisfies the download policy. */
-    private function isTypeSatisfiedByPolicy(string $type, DownloadPolicy $policy, ?PodcastMediaKind $mediaKind): bool
-    {
-        return match ($policy) {
-            DownloadPolicy::MetadataOnly => false,
-            DownloadPolicy::AudioOnly => $type !== 'podcast' || $mediaKind !== PodcastMediaKind::Video,
-            DownloadPolicy::Video, DownloadPolicy::ManualDownload => true,
-        };
     }
 
     /** Check if a broadcast type (string key) is a series-type broadcast. */
@@ -446,13 +436,27 @@ final readonly class BroadcastController
             'impact' => ApiJson::encode($this->lifecycle->impactFor($broadcast, $context)->toArray()),
         ];
 
-        if ($broadcast->type !== 'podcast') {
-            return [...BroadcastResource::fromRecord($broadcast)->toArray(), ...$extra];
+        $plugin = BroadcastPluginRegistry::findByKey($broadcast->type)?->plugin;
+        $metadata = $plugin instanceof BroadcastPluginPresentation
+            ? $plugin->detailFields($broadcast)
+            : [];
+        $actions = $plugin instanceof BroadcastPluginPresentation
+            ? $plugin->actions($broadcast)
+            : [];
+        $publishedUrl = null;
+        foreach ($metadata as $field) {
+            if (is_array($field) && ($field['kind'] ?? null) === 'url' && is_string($field['value'] ?? null)) {
+                $publishedUrl = $field['value'];
+                break;
+            }
         }
 
-        $token = $this->podcastTokens->ensureBroadcastToken($broadcast);
-
-        return [...BroadcastResource::fromRecord($broadcast, $this->podcastUrls->feedUrl($token))->toArray(), ...$extra];
+        return [
+            ...BroadcastResource::fromRecord($broadcast, $publishedUrl)->toArray(),
+            ...$extra,
+            'plugin_detail_fields' => $metadata,
+            'plugin_actions' => $actions,
+        ];
     }
 
     /**

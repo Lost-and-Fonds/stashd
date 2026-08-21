@@ -52,7 +52,7 @@ use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemExceptio
  * Podcast broadcast plugin — generates RSS podcast feeds with episode media URLs.
  */
 #[StashdBroadcast('Podcast', 'RSS podcast feed with episode media URLs.')]
-final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\BroadcastPlugin
+final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\BroadcastPlugin, \App\Broadcasts\BroadcastPluginPresentation, \App\Broadcasts\BroadcastPluginActions, \App\Broadcasts\BroadcastPluginPolicy
 {
     public function __construct(
         private BroadcastContextFactory $contextFactory,
@@ -86,6 +86,64 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
     public function supportsItemRebuild(): bool
     {
         return true;
+    }
+
+    public function detailFields(\App\Broadcasts\BroadcastRecord $broadcast): array
+    {
+        $token = $this->tokens->ensureBroadcastToken($broadcast);
+
+        return [[
+            'id' => 'publication-url',
+            'label' => 'Feed URL',
+            'value' => $this->urls->feedUrl($token),
+            'kind' => 'url',
+            'link' => $this->urls->feedUrl($token),
+        ]];
+    }
+
+    public function actions(\App\Broadcasts\BroadcastRecord $broadcast): array
+    {
+        return [[
+            'id' => 'rotate-publication-token',
+            'label' => 'Rotate token',
+            'intent' => 'rotate_token',
+            'confirmation' => true,
+        ]];
+    }
+
+    public function invokeAction(\App\Broadcasts\BroadcastRecord $broadcast, string $intent, array $payload = []): array
+    {
+        if ($intent !== 'rotate_token') {
+            throw BroadcastException::withCode('broadcast_action_unsupported', 'Broadcast action is unsupported.');
+        }
+
+        return $this->tokens->rotateBroadcastToken($broadcast)->toArray();
+    }
+
+    public function acceptsDownloadPolicy(\App\Broadcasts\BroadcastRecord $broadcast, \App\Stashes\DownloadPolicy $policy): bool
+    {
+        return match ($policy) {
+            \App\Stashes\DownloadPolicy::MetadataOnly => false,
+            \App\Stashes\DownloadPolicy::AudioOnly => $this->preferredMediaKindFor($broadcast) !== PodcastMediaKind::Video,
+            \App\Stashes\DownloadPolicy::Video, \App\Stashes\DownloadPolicy::ManualDownload => true,
+        };
+    }
+
+    public function derivedWorkCount(\App\Broadcasts\BroadcastContext $context): int
+    {
+        if ($this->preferredMediaKindFor($context->broadcast) !== PodcastMediaKind::Audio) {
+            return 0;
+        }
+
+        return count(array_filter(
+            $context->vaultOriginals,
+            static fn ($asset): bool => $asset?->kind === \App\Vault\AssetKind::Video,
+        ));
+    }
+
+    public function prunesAfterPublish(): bool
+    {
+        return false;
     }
 
     public function uiControls(): array
@@ -395,7 +453,10 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             ? trim($component)
             : dirname(__DIR__, 3) . '/target/wasm32-wasip2/release/stashd_podcast_plugin.wasm';
 
-        if (! is_file($component)) {
+        $socket = getenv('STASHD_PLUGIN_HOST_SOCKET');
+        $socket = is_string($socket) && trim($socket) !== '' ? trim($socket) : '/tmp/stashd-plugin-host.sock';
+
+        if (! is_file($component) || ! file_exists($socket)) {
             return $this->feedBuilder->build($this->metadata($context, $broadcastToken, $includedDescriptions), $episodes);
         }
 
@@ -443,8 +504,6 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
                     $episodes,
                 )),
             ];
-            $socket = getenv('STASHD_PLUGIN_HOST_SOCKET');
-            $socket = is_string($socket) && trim($socket) !== '' ? trim($socket) : '/tmp/stashd-plugin-host.sock';
             $result = (new PluginHostClient($socket))->publishBroadcast($component, $stage, $request);
             $reference = $result->publication['artifact']['reference'] ?? null;
             if (! is_string($reference) || $reference === '') {
@@ -528,6 +587,11 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
     private function settings(BroadcastContext $context): array
     {
         return $context->broadcast->settings ?? [];
+    }
+
+    private function preferredMediaKindFor(\App\Broadcasts\BroadcastRecord $broadcast): PodcastMediaKind
+    {
+        return PodcastMediaKind::forBroadcast($broadcast);
     }
 
     private function nonEmptyString(mixed $value): ?string

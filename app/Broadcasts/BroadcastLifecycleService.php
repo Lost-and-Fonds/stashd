@@ -4,12 +4,8 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
-use App\Broadcasts\Podcasts\PodcastMediaKind;
-use App\Broadcasts\Podcasts\PodcastTokenRotationResult;
-use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Stashes\StashId;
 use App\System\State\StateTransitionService;
-use App\Vault\AssetKind;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
@@ -55,7 +51,6 @@ final readonly class BroadcastLifecycleService
         private BroadcastContextFactory $contextFactory,
         private BroadcastPluginRegistry $plugins,
         private BroadcastTriggerService $triggers,
-        private PodcastTokenService $podcastTokens,
         private StateTransitionService $transitions,
         private BroadcastPathBuilder $paths,
     ) {
@@ -81,11 +76,8 @@ final readonly class BroadcastLifecycleService
      * reuse the real eligibility rule (publishableStashItems) instead of
      * re-deriving it here.
      *
-     * Every plugin hardlinks (near-zero extra space) except podcast audio
-     * episodes sourced from a video original, which get transcoded --
-     * that's the only transcode pathway that exists today (see
-     * PodcastTranscodeFallback). Transcoded output size isn't known ahead of
-     * time, so those items are reported as a count, not a byte estimate.
+     * Plugins may report generic derived work that is not known to be a byte
+     * estimate yet; the lifecycle only displays the count.
      */
     public function preview(StashId $stashId, string $type, ?string $mediaKind): BroadcastCreationPreview
     {
@@ -120,18 +112,18 @@ final readonly class BroadcastLifecycleService
         $context ??= $this->contextFactory->build($broadcast);
         $eligible = $this->contextFactory->publishableStashItems($context);
 
-        $needsAudioTranscode = $broadcast->type === 'podcast' && PodcastMediaKind::forBroadcast($broadcast) === PodcastMediaKind::Audio;
         $vaultSizeBytes = 0;
-        $transcodeItemCount = 0;
 
         foreach ($eligible as $stashItem) {
             $vaultOriginal = $context->vaultOriginals[(string) $stashItem->mediaItemId] ?? null;
             $vaultSizeBytes += $vaultOriginal->sizeBytes ?? 0;
 
-            if ($needsAudioTranscode && $vaultOriginal?->kind === AssetKind::Video) {
-                $transcodeItemCount++;
-            }
         }
+
+        $plugin = $this->resolvePlugin($broadcast->type)->plugin;
+        $transcodeItemCount = $plugin instanceof BroadcastPluginPolicy
+            ? $plugin->derivedWorkCount($context)
+            : 0;
 
         return new BroadcastCreationPreview(
             eligibleItemCount: count($eligible),
@@ -164,9 +156,10 @@ final readonly class BroadcastLifecycleService
         $broadcast->lastError = null;
         $this->broadcasts->save($broadcast);
 
-        // Podcast prune intentionally deletes its generated feed, while
-        // series prune reconciles it with the current filesystem plan.
-        $prune = $broadcast->type === 'podcast' ? null : $this->prune($broadcastId);
+        $plugin = $this->resolvePlugin($broadcast->type)->plugin;
+        $prune = ! ($plugin instanceof BroadcastPluginPolicy) || $plugin->prunesAfterPublish()
+            ? $this->prune($broadcastId)
+            : null;
 
         if ($onProgress !== null) {
             $onProgress('Verifying broadcast');
@@ -328,19 +321,18 @@ final readonly class BroadcastLifecycleService
         return $this->triggers->execute($broadcast, 'manual');
     }
 
-    public function rotateToken(BroadcastId $broadcastId): PodcastTokenRotationResult
+    /** @return array<string, mixed> */
+    public function invokePluginAction(BroadcastId $broadcastId, string $intent, array $payload = []): array
     {
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
+        $plugin = $this->resolvePlugin($broadcast->type)->plugin;
 
-        if ($broadcast->type !== 'podcast') {
-            throw BroadcastException::withCode(
-                'broadcast_token_rotation_unsupported',
-                'Token rotation is only supported for podcast broadcasts.',
-            );
+        if (! $plugin instanceof BroadcastPluginActions) {
+            throw BroadcastException::withCode('broadcast_action_unsupported', 'Broadcast action is unsupported.');
         }
 
-        return $this->podcastTokens->rotateBroadcastToken($broadcast);
+        return $plugin->invokeAction($broadcast, $intent, $payload);
     }
 
     private function planOnly(BroadcastRecord $broadcast): BroadcastPlan

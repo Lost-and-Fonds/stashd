@@ -50,11 +50,12 @@ final readonly class BroadcastCommandHandler implements CommandHandler
             throw InvalidCommandPayload::withErrors(['Broadcast not found.']);
         }
 
-        if (
-            $this->commandType === CommandType::BroadcastRotateToken
-            && $broadcast->type !== 'podcast'
-        ) {
-            throw InvalidCommandPayload::withErrors(['Token rotation is only supported for podcast broadcasts.']);
+        if ($this->commandType === CommandType::BroadcastRotateToken) {
+            $plugin = BroadcastPluginRegistry::findByKey($broadcast->type)?->plugin;
+
+            if (! $plugin instanceof BroadcastPluginActions) {
+                throw InvalidCommandPayload::withErrors(['This broadcast does not provide the requested plugin action.']);
+            }
         }
     }
 

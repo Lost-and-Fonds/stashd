@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Jobs\Handlers;
 
 use App\Broadcasts\BroadcastItemRepository;
-use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Commands\CommandDispatchService;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
@@ -120,27 +119,13 @@ final readonly class TranscodePodcastAudioJobHandler implements JobHandler
         $this->retriggerAffectedBroadcasts((string) $mediaItemId);
     }
 
-    /**
-     * Re-runs broadcast.rebuild for every audio-configured podcast broadcast
-     * referencing this media item, whether the transcode succeeded or failed,
-     * so the broadcast's state always reflects the item's real outcome instead
-     * of sitting on a stale "pending" state. Rebuild is idempotent/safe per the
-     * broadcast rules, so a redundant dispatch (e.g. several media items in one
-     * broadcast finishing around the same time) is wasteful but not incorrect.
-     */
+    /** Rebuild every affected broadcast after a derived asset changes. */
     private function retriggerAffectedBroadcasts(string $mediaItemId): void
     {
         $broadcastIds = [];
 
         foreach ($this->broadcastItems->listForMediaItem(MediaItemId::parse($mediaItemId)) as $item) {
-            $broadcast = $item->broadcast;
-
-            if (
-                $broadcast->type === 'podcast'
-                && PodcastMediaKind::forBroadcast($broadcast) === PodcastMediaKind::Audio
-            ) {
-                $broadcastIds[(string) $broadcast->id] = true;
-            }
+            $broadcastIds[(string) $item->broadcast->id] = true;
         }
 
         foreach (array_keys($broadcastIds) as $broadcastId) {

@@ -393,6 +393,27 @@ final readonly class ActivityEventService
         );
     }
 
+    /** @param array<string, mixed> $result */
+    public function broadcastPluginActionCompleted(
+        CommandRecord $command,
+        JobRecord $job,
+        BroadcastId $broadcastId,
+        string $intent,
+        array $result,
+    ): ActivityEventRecord {
+        return $this->emit(
+            level: ActivityLevel::Info,
+            type: 'broadcast.plugin_action_completed',
+            message: 'Broadcast plugin action completed.',
+            entityType: 'broadcast',
+            entityId: $broadcastId->toString(),
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: ['intent' => $intent, 'result' => $result],
+        );
+    }
+
     /** @param array<string, mixed> $prune */
     public function broadcastPruned(
         CommandRecord $command,
