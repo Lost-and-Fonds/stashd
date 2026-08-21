@@ -321,7 +321,9 @@ final readonly class BroadcastLifecycleService
         return $this->triggers->execute($broadcast, 'manual');
     }
 
-    /** @return array<string, mixed> */
+    /** @param array<string, mixed> $payload
+     *  @return array<string, mixed>
+     */
     public function invokePluginAction(BroadcastId $broadcastId, string $intent, array $payload = []): array
     {
         $broadcast = $this->broadcasts->find($broadcastId)

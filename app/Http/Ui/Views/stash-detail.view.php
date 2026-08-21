@@ -132,7 +132,7 @@
 								<div class="flex items-center justify-between gap-3">
 									<div>
 										<p class="text-[13px] font-semibold text-cream" x-text="broadcast.name"></p>
-										<p class="text-[12px] text-muted" x-text="broadcast.type === 'podcast' ? `podcast (${broadcast.settings?.media_kind ?? 'audio'})` : broadcast.type.replace(/_/g, ' ')"></p>
+										<p class="text-[12px] text-muted" x-text="broadcast.type.replace(/_/g, ' ')"></p>
 									</div>
 									<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(broadcast.state).text">
 										<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(broadcast.state).dot, statusBadge(broadcast.state).pulse ? 'pulse-dot' : '']"></span>
@@ -251,7 +251,7 @@
 									</button>
 									<button type="button"
 										class="inline-flex items-center gap-1.5 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-50"
-										x-show="broadcast.feed_url"
+										x-show="broadcast.plugin_actions?.some(action => action.intent === 'rotate_token')"
 										x-bind:disabled="actionPending === broadcast.id + ':rotate_token'"
 										x-on:click="runBroadcastAction(broadcast.id, 'rotate_token')">
 										<span x-show="actionPending === broadcast.id + ':rotate_token'" class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
@@ -269,13 +269,13 @@
 								</details>
 								</div>
 
-								<div class="mt-3 rounded border border-line bg-espresso p-2" x-show="broadcast.feed_url">
+									<div class="mt-3 rounded border border-line bg-espresso p-2" x-show="broadcastDetailField(broadcast, 'url')">
 									<p class="text-[11px] uppercase tracking-wide text-muted">Private feed URL</p>
 									<div class="mt-1 flex items-center gap-2">
-										<code class="flex-1 overflow-x-auto text-[12px] text-cream" x-text="broadcast.feed_url"></code>
+										<code class="flex-1 overflow-x-auto text-[12px] text-cream" x-text="broadcastDetailField(broadcast, 'url')"></code>
 										<button type="button"
 											class="shrink-0 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream"
-											x-on:click="copyFeedUrl(broadcast.feed_url)">copy</button>
+											x-on:click="copyFeedUrl(broadcastDetailField(broadcast, 'url'))">copy</button>
 									</div>
 									<p class="mt-1 text-[12px] text-warn">Anyone with this link can listen — treat it like a password.</p>
 								</div>
@@ -335,7 +335,7 @@
 									<option x-bind:value="plugin.key" x-text="plugin.label"></option>
 								</template>
 							</select>
-							<select x-show="newBroadcastType === 'podcast'" x-model="newBroadcastMediaKind" x-on:change="onBroadcastTypeChanged()"
+							<select x-show="broadcastPluginHasControl(newBroadcastType, 'media_kind')" x-model="newBroadcastMediaKind" x-on:change="onBroadcastTypeChanged()"
 								class="rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
 								<option value="audio">Audio episodes</option>
 								<option value="video">Video episodes</option>

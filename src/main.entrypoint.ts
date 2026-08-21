@@ -834,6 +834,8 @@ interface BroadcastSummary {
 	updated_at: string
 	feed_url?: string
 	token_preview?: string
+	plugin_detail_fields?: Array<{ id: string; label: string; value: unknown; kind?: string; link?: string }>
+	plugin_actions?: Array<{ id: string; label: string; intent: string; confirmation?: boolean }>
 	items: BroadcastItemSummary[]
 	impact: BroadcastCreationPreviewSummary | null
 }
@@ -1694,8 +1696,6 @@ function stashDetailComponent(stashId: string) {
 				const body = await response.json()
 				const plugins = (body.plugins ?? this.broadcastPlugins) as BroadcastPluginSummary[]
 				this.broadcastPlugins = plugins.sort((left, right) => {
-					if (left.key === 'podcast') return -1
-					if (right.key === 'podcast') return 1
 					return 0
 				})
 				this.newBroadcastType = this.broadcastPlugins[0]?.key ?? this.newBroadcastType
@@ -1732,6 +1732,15 @@ function stashDetailComponent(stashId: string) {
 				&& job.entity_id !== null
 				&& mediaItemIds.has(job.entity_id)
 				&& ['pending', 'processing'].includes(job.state))
+		},
+
+		broadcastDetailField(broadcast: BroadcastSummary, kind: string): string | null {
+			const field = broadcast.plugin_detail_fields?.find((candidate) => candidate.kind === kind)
+			return field && typeof field.value === 'string' ? field.value : null
+		},
+
+		broadcastPluginHasControl(type: string, name: string): boolean {
+			return this.broadcastPlugins.find((plugin) => plugin.key === type)?.ui_controls.some((control) => control.name === name) ?? false
 		},
 
 		broadcastReadyItemCount(broadcast: BroadcastSummary): number {

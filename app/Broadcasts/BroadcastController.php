@@ -445,7 +445,7 @@ final readonly class BroadcastController
             : [];
         $publishedUrl = null;
         foreach ($metadata as $field) {
-            if (is_array($field) && ($field['kind'] ?? null) === 'url' && is_string($field['value'] ?? null)) {
+            if (($field['kind'] ?? null) === 'url' && is_string($field['value'] ?? null)) {
                 $publishedUrl = $field['value'];
                 break;
             }

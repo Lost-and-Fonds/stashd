@@ -111,6 +111,9 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         ]];
     }
 
+    /** @param array<string, mixed> $payload
+     *  @return array<string, mixed>
+     */
     public function invokeAction(\App\Broadcasts\BroadcastRecord $broadcast, string $intent, array $payload = []): array
     {
         if ($intent !== 'rotate_token') {
@@ -445,7 +448,9 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         );
     }
 
-    /** @param list<PodcastEpisode> $episodes */
+    /** @param list<PodcastEpisode> $episodes
+     *  @param list<string|null> $includedDescriptions
+     */
     private function feedContent(BroadcastContext $context, string $broadcastToken, array $episodes, array $includedDescriptions): string
     {
         $component = getenv('STASHD_BROADCAST_PLUGIN_COMPONENT');
@@ -469,7 +474,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             $settings = $this->settings($context);
             $request = [
                 'broadcast_id' => (string) $context->broadcast->id,
-                'settings' => array_values(array_map(
+                'settings' => array_map(
                     static fn (string $key, mixed $value): array => [
                         'key' => $key,
                         'value' => is_bool($value)
@@ -478,10 +483,10 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
                     ],
                     array_keys($settings),
                     $settings,
-                )),
+                ),
                 'public_base_url' => rtrim($this->config->publicUrl, '/'),
                 'broadcast_token' => $broadcastToken,
-                'episodes' => array_values(array_map(
+                'episodes' => array_map(
                     static fn (PodcastEpisode $episode): array => [
                         'id' => $episode->guid,
                         'publication_token' => $episode->publicationToken ?? '',
@@ -502,10 +507,12 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
                         'chapter_reference' => $episode->chapterUrl === null ? null : 'available',
                     ],
                     $episodes,
-                )),
+                ),
             ];
             $result = (new PluginHostClient($socket))->publishBroadcast($component, $stage, $request);
-            $reference = $result->publication['artifact']['reference'] ?? null;
+            $publication = $result->publication;
+            $artifact = is_array($publication['artifact'] ?? null) ? $publication['artifact'] : [];
+            $reference = $artifact['reference'] ?? null;
             if (! is_string($reference) || $reference === '') {
                 throw BroadcastException::withCode('podcast_feed_write_failed', 'Podcast plugin returned no feed artifact.');
             }
