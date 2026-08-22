@@ -1,9 +1,25 @@
 package stashd:plugin@0.1.0;
 
 interface broadcast-host {
+    enum http-method {
+        get,
+        post,
+        put,
+        patch,
+        delete,
+    }
+
+    record http-header {
+        name: string,
+        value: string,
+    }
+
     record http-request {
+        method: http-method,
         url: string,
         credential: option<string>,
+        headers: list<http-header>,
+        body: list<u8>,
     }
 
     record http-response {
@@ -19,7 +35,7 @@ interface broadcast-host {
     }
 
     resource http-client {
-        get: func(request: http-request) -> result<http-response, http-error>;
+        request: func(request: http-request) -> result<http-response, http-error>;
     }
 
     open-http-client: func() -> http-client;
@@ -114,6 +130,11 @@ interface broadcast-plugin {
         published-metadata: list<setting>,
     }
 
+    record finalization-request {
+        request: publish-request,
+        publication: publication,
+    }
+
     record operation-request {
         name: string,
         settings: list<setting>,
@@ -159,6 +180,7 @@ interface broadcast-plugin {
 
     prepare: func(request: publish-request) -> result<preparation, plugin-error>;
     publish: func(request: publish-request) -> result<publication, plugin-error>;
+    finalize: func(request: finalization-request) -> result<publication, plugin-error>;
     operation: func(request: operation-request) -> result<operation-result, plugin-error>;
 }
 

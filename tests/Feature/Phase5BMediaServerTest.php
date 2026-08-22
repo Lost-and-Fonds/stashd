@@ -279,7 +279,7 @@ test('external media server operations return generic library choices', function
         ->and($libraries->body['libraries'][0]['name'])->toBe('TV Shows');
 });
 
-test('external jellyfin rebuild refreshes through the Component without the legacy PHP trigger', function (): void {
+test('external jellyfin rebuild refreshes through the Component with POST after publication', function (): void {
     [$headers, $stashId, $mediaItemId, $broadcastId, $connectionId] = $this->bootstrapJellyfinDownloadBroadcast('trigger-success');
 
     $this->http->post('/api/v1/commands', [
@@ -301,6 +301,57 @@ test('external jellyfin rebuild refreshes through the Component without the lega
     expect($broadcast->body['broadcast']['state'])->toBe('ready');
 
     expect($connectionId)->not->toBe('');
+});
+
+test('external jellyfin refresh failure leaves the published file and reports failure', function (): void {
+    [$headers, $stashId, $mediaItemId] = array_slice(
+        $this->bootstrapFakeDownloadStash('jellyfin-refresh-failure'),
+        0,
+        3,
+    );
+
+    $server = $this->http->post('/api/v1/media-servers', [
+        'type' => 'jellyfin',
+        'name' => 'Failing Fixture Jellyfin',
+        'base_uri' => 'https://jellyfin-fail.test',
+        'token' => 'fixture-jellyfin-token',
+        'settings' => [
+            'library_id' => 'shows-lib',
+            'library_name' => 'TV Shows',
+        ],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'jellyfin',
+        'name' => 'Failing Jellyfin Demo Series',
+        'slug' => 'jellyfin-refresh-failure-' . bin2hex(random_bytes(3)),
+        'settings' => [
+            'media_server_connection_id' => $server->body['media_server']['id'],
+            'auto_trigger_scan' => true,
+        ],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'item.download',
+        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
+    ], headers: $headers);
+    $this->processAllJobs();
+
+    $rebuild = $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
+    ], headers: $headers);
+    $this->processAllJobs();
+
+    $command = $this->http->get('/api/v1/commands/' . $rebuild->body['command_id'], headers: $headers);
+    $item = $this->http->get(
+        '/api/v1/broadcasts/' . $broadcast->body['broadcast']['id'] . '/items',
+        headers: $headers,
+    )->body['items'][0];
+
+    expect($command->body['command']['state'])->toBe('failed')
+        ->and($item['published_path'])->not->toBeNull()
+        ->and(is_file($item['published_path']))->toBeTrue();
 });
 
 test('broadcast nfo builder escapes unsafe xml characters', function (): void {

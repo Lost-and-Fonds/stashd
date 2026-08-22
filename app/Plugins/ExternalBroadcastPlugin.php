@@ -250,6 +250,18 @@ final readonly class ExternalBroadcastPlugin implements
                 copy($stage . '/' . $reference, $outputPath);
             }
             $this->publishFiles($context, $publication['files'] ?? [], $stagedAssets);
+            $this->host->finalizeBroadcast(
+                $this->definition->componentPath,
+                $stage,
+                [
+                    'reference' => (string) $context->broadcast->id,
+                    'settings' => $settings,
+                    'items' => $items,
+                ],
+                $publication,
+                $this->httpGrants($context),
+                getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR') ?: null,
+            );
         } catch (BroadcastException $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
@@ -361,6 +373,24 @@ final readonly class ExternalBroadcastPlugin implements
         }
         if ($action === null) {
             throw BroadcastException::withCode('broadcast_action_unsupported', 'Broadcast action is unsupported.');
+        }
+        if (is_string($action['operation'] ?? null) && $action['operation'] !== 'rotate-publication-credentials') {
+            $context = $this->contexts->build($broadcast);
+            $settings = $this->settings($context);
+            $this->appendConnectionSettings($context, $settings);
+
+            return $this->host->broadcastOperation(
+                $this->definition->componentPath,
+                sys_get_temp_dir(),
+                [
+                    'reference' => (string) $broadcast->id,
+                    'settings' => $settings,
+                    'items' => [],
+                ],
+                (string) $action['operation'],
+                $this->httpGrants($context),
+                getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR') ?: null,
+            );
         }
         if (($action['operation'] ?? null) === 'rotate-publication-credentials') {
             $urls = [];

@@ -4,10 +4,10 @@ wit_bindgen::generate!({
 });
 
 use exports::stashd::plugin::broadcast_plugin::{
-    Artifact, Choice, Error, Guest, Item, OperationRequest, OperationResult, OptionValue,
-    PluginError, Preparation, Publication, PublishRequest, Setting,
+    Artifact, Choice, Error, FinalizationRequest, Guest, Item, OperationRequest, OperationResult,
+    OptionValue, PluginError, Preparation, Publication, PublishRequest, Setting,
 };
-use stashd::plugin::broadcast_host;
+use stashd::plugin::broadcast_host::{self, HttpMethod};
 
 struct JellyfinBroadcast;
 
@@ -17,26 +17,6 @@ impl Guest for JellyfinBroadcast {
     }
 
     fn publish(request: PublishRequest) -> Result<Publication, PluginError> {
-        let http = broadcast_host::open_http_client();
-        let server = setting_text(&request.settings, "server_url")
-            .ok_or_else(|| failed("Jellyfin server URL is not configured", false))?;
-        let credential = setting_text(&request.settings, "credential_name")
-            .unwrap_or_else(|| "jellyfin-api-token".to_owned());
-        let response = broadcast_host::HttpClient::get(
-            &http,
-            &broadcast_host::HttpRequest {
-                url: format!("{}/Library/Refresh", server.trim_end_matches('/')),
-                credential: Some(credential),
-            },
-        )
-        .map_err(|error| failed(&format!("Jellyfin refresh failed: {error:?}"), true))?;
-        if response.status < 200 || response.status >= 300 {
-            return Err(failed(
-                &format!("Jellyfin refresh returned HTTP {}", response.status),
-                response.status >= 500,
-            ));
-        }
-
         let files = request
             .items
             .iter()
@@ -71,6 +51,34 @@ impl Guest for JellyfinBroadcast {
         })
     }
 
+    fn finalize(request: FinalizationRequest) -> Result<Publication, PluginError> {
+        let http = broadcast_host::open_http_client();
+        let server = setting_text(&request.request.settings, "server_url")
+            .ok_or_else(|| failed("Jellyfin server URL is not configured", false))?;
+        let credential = setting_text(&request.request.settings, "credential_name")
+            .unwrap_or_else(|| "jellyfin-api-token".to_owned());
+        let response = broadcast_host::HttpClient::request(
+            &http,
+            &broadcast_host::HttpRequest {
+                method: HttpMethod::Post,
+                url: format!("{}/Library/Refresh", server.trim_end_matches('/')),
+                credential: Some(credential),
+                headers: vec![],
+                body: vec![],
+            },
+        )
+        .map_err(|error| failed(&format!("Jellyfin refresh failed: {error:?}"), true))?;
+        if response.status < 200 || response.status >= 300 {
+            return Err(failed(
+                &format!("Jellyfin refresh returned HTTP {}", response.status),
+                response.status >= 500,
+            ));
+        }
+
+        broadcast_host::report_progress("remote refresh complete");
+        Ok(request.publication)
+    }
+
     fn operation(request: OperationRequest) -> Result<OperationResult, PluginError> {
         let http = broadcast_host::open_http_client();
         let server = setting_text(&request.settings, "server_url")
@@ -80,13 +88,22 @@ impl Guest for JellyfinBroadcast {
         let path = match request.name.as_str() {
             "test-connection" => "/System/Info/Public",
             "discover-libraries" => "/Library/MediaFolders",
+            "refresh-library" => "/Library/Refresh",
             _ => return Err(failed("Unsupported external operation", false)),
         };
-        let response = broadcast_host::HttpClient::get(
+        let method = if request.name == "refresh-library" {
+            HttpMethod::Post
+        } else {
+            HttpMethod::Get
+        };
+        let response = broadcast_host::HttpClient::request(
             &http,
             &broadcast_host::HttpRequest {
+                method,
                 url: format!("{}{}", server.trim_end_matches('/'), path),
                 credential: Some(credential),
+                headers: vec![],
+                body: vec![],
             },
         )
         .map_err(|error| failed(&format!("Jellyfin request failed: {error:?}"), true))?;
@@ -95,6 +112,12 @@ impl Guest for JellyfinBroadcast {
                 &format!("Jellyfin request returned HTTP {}", response.status),
                 response.status >= 500,
             ));
+        }
+        if request.name == "refresh-library" {
+            return Ok(OperationResult {
+                choices: vec![],
+                values: vec![text_setting("ok", "true")],
+            });
         }
         let json: serde_json::Value = serde_json::from_slice(&response.body)
             .map_err(|_| failed("Jellyfin returned invalid JSON", false))?;

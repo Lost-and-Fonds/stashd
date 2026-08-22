@@ -184,6 +184,23 @@ final class PluginHostClient
     }
 
     /** @param array<string, mixed> $broadcast
+     *  @param array<string, mixed> $publication
+     *  @param list<PluginHttpGrant>|null $httpGrants
+     */
+    public function finalizeBroadcast(
+        string $componentPath,
+        string $stagingDirectory,
+        array $broadcast,
+        array $publication,
+        ?array $httpGrants = null,
+        ?string $fixtureDirectory = null,
+    ): PluginBroadcastResult {
+        $broadcast['publication'] = $publication;
+
+        return $this->invokeBroadcast('broadcast-finalize', 'broadcast_finalized', $componentPath, $stagingDirectory, $broadcast, null, $httpGrants, $fixtureDirectory);
+    }
+
+    /** @param array<string, mixed> $broadcast
      *  @param list<PluginHttpGrant>|null $httpGrants
      *  @return array<string, mixed>
      */
@@ -321,7 +338,10 @@ final class PluginHostClient
                 return new PluginBroadcastResult(
                     progress: $progress,
                     logs: $logs,
-                    publication: $this->inputObject($event[$eventName === 'broadcast_prepared' ? 'preparation' : 'publication'] ?? null, $eventName),
+                    publication: $this->inputObject(
+                        $event[$eventName === 'broadcast_prepared' ? 'preparation' : ($eventName === 'broadcast_finalized' ? 'finalization' : 'publication')] ?? null,
+                        $eventName,
+                    ),
                 );
             }
         } catch (JsonException $exception) {

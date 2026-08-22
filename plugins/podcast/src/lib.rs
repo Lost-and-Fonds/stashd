@@ -4,8 +4,8 @@ wit_bindgen::generate!({
 });
 
 use exports::stashd::plugin::broadcast_plugin::{
-    Artifact, DerivedArtifact, Error, Guest, Item, OperationRequest, OperationResult, OptionValue,
-    PluginError, Preparation, Publication, PublishRequest, Setting,
+    Artifact, DerivedArtifact, Error, FinalizationRequest, Guest, Item, OperationRequest,
+    OperationResult, OptionValue, PluginError, Preparation, Publication, PublishRequest, Setting,
 };
 use stashd::plugin::broadcast_host;
 
@@ -111,6 +111,10 @@ impl Guest for PodcastBroadcast {
 
     fn operation(_request: OperationRequest) -> Result<OperationResult, PluginError> {
         Err(failed("Unsupported broadcast operation", false))
+    }
+
+    fn finalize(request: FinalizationRequest) -> Result<Publication, PluginError> {
+        Ok(request.publication)
     }
 }
 

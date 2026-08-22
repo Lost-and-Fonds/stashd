@@ -13,7 +13,8 @@
   "credential": {"name": "jellyfin-api-token", "parameter": "X-Emby-Token", "placement": "header"},
   "operations": {
     "test_connection": "test-connection",
-    "list_libraries": "discover-libraries"
+    "list_libraries": "discover-libraries",
+    "refresh_library": "refresh-library"
   },
   "ui_options": [
     {"key": "media_server_connection_id", "label": "Jellyfin connection", "type": "text", "required": true},
@@ -21,6 +22,6 @@
     {"key": "caption_languages", "label": "Caption languages", "type": "text", "default": "en"}
   ],
   "actions": [
-    {"id": "refresh-library", "label": "Refresh Jellyfin library", "intent": "refresh_library"}
+    {"id": "refresh-library", "label": "Refresh Jellyfin library", "intent": "refresh_library", "operation": "refresh-library"}
   ]
 }

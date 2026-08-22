@@ -61,8 +61,14 @@ final readonly class ExternalMediaServerClient implements MediaServerClient
         MediaServerLibraryRef $library,
         ?string $path = null,
     ): MediaServerTriggerResult {
-        unset($connection, $token, $library, $path);
-        return new MediaServerTriggerResult(false, 'External scan is performed during plugin publication.', null);
+        unset($library, $path);
+        try {
+            $this->invoke($connection, 'refresh_library', $token);
+        } catch (MediaServerException $exception) {
+            return new MediaServerTriggerResult(false, $exception->getMessage(), null);
+        }
+
+        return new MediaServerTriggerResult(true, 'External library refresh completed.', null);
     }
 
     /** @return array<string, mixed> */

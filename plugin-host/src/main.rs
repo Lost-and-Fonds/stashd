@@ -209,6 +209,29 @@ struct BroadcastPublishRequest {
     reference: String,
     settings: Vec<InputOptionRequest>,
     items: Vec<BroadcastItemRequest>,
+    #[serde(default)]
+    publication: Option<BroadcastPublicationRequest>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PublishedFileRequest {
+    item_id: String,
+    source_reference: String,
+    relative_path: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct BroadcastPublicationRequest {
+    artifact: BroadcastArtifactRequest,
+    files: Vec<PublishedFileRequest>,
+    published_metadata: Vec<InputOptionRequest>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BroadcastArtifactRequest {
+    reference: String,
+    media_type: Option<String>,
+    size_bytes: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -273,6 +296,11 @@ enum Response {
     BroadcastPrepared {
         id: String,
         preparation: serde_json::Value,
+    },
+    #[serde(rename = "broadcast_finalized")]
+    BroadcastFinalized {
+        id: String,
+        finalization: serde_json::Value,
     },
     #[serde(rename = "broadcast_operation")]
     BroadcastOperation {
@@ -394,7 +422,7 @@ impl broadcast_world::stashd::plugin::broadcast_host::Host for BroadcastState {
 }
 
 impl broadcast_world::stashd::plugin::broadcast_host::HostHttpClient for BroadcastState {
-    fn get(
+    fn request(
         &mut self,
         client: Resource<BroadcastHttpClientResource>,
         request: broadcast_world::stashd::plugin::broadcast_host::HttpRequest,
@@ -407,9 +435,10 @@ impl broadcast_world::stashd::plugin::broadcast_host::HostHttpClient for Broadca
                 "HTTP capability expired".to_owned(),
             )
         })?;
-        let (url, header) = authenticated_broadcast_request(
+        let (url, headers) = authenticated_broadcast_request(
             &request.url,
             request.credential.as_deref(),
+            &request.headers,
             &self.http_grants,
         )?;
 
@@ -426,8 +455,17 @@ impl broadcast_world::stashd::plugin::broadcast_host::HostHttpClient for Broadca
                         error.to_string(),
                     )
                 })?;
+            let method = match request.method {
+                broadcast_world::stashd::plugin::broadcast_host::HttpMethod::Get => "GET",
+                broadcast_world::stashd::plugin::broadcast_host::HttpMethod::Post => "POST",
+                broadcast_world::stashd::plugin::broadcast_host::HttpMethod::Put => "PUT",
+                broadcast_world::stashd::plugin::broadcast_host::HttpMethod::Patch => "PATCH",
+                broadcast_world::stashd::plugin::broadcast_host::HttpMethod::Delete => "DELETE",
+            };
+            let method_url = format!("{method} {url}");
             let filename = map
-                .get(&url)
+                .get(&method_url)
+                .or_else(|| map.get(&url))
                 .or_else(|| {
                     map.iter()
                         .find(|(pattern, _)| url.starts_with(pattern.as_str()))
@@ -452,11 +490,26 @@ impl broadcast_world::stashd::plugin::broadcast_host::HostHttpClient for Broadca
         }
 
         let agent = ureq::AgentBuilder::new().redirects(0).build();
-        let mut request_builder = agent.get(&url);
-        if let Some((name, value)) = header {
+        let mut request_builder = match request.method {
+            broadcast_world::stashd::plugin::broadcast_host::HttpMethod::Get => agent.get(&url),
+            broadcast_world::stashd::plugin::broadcast_host::HttpMethod::Post => agent.post(&url),
+            broadcast_world::stashd::plugin::broadcast_host::HttpMethod::Put => agent.put(&url),
+            broadcast_world::stashd::plugin::broadcast_host::HttpMethod::Patch => {
+                agent.request("PATCH", &url)
+            }
+            broadcast_world::stashd::plugin::broadcast_host::HttpMethod::Delete => {
+                agent.delete(&url)
+            }
+        };
+        for (name, value) in headers {
             request_builder = request_builder.set(&name, &value);
         }
-        let response = request_builder.call().map_err(|_| {
+        let response = if request.body.is_empty() {
+            request_builder.call()
+        } else {
+            request_builder.send_bytes(&request.body)
+        };
+        let response = response.map_err(|_| {
             broadcast_world::stashd::plugin::broadcast_host::HttpError::Unavailable(
                 "approved HTTP request unavailable".to_owned(),
             )
@@ -893,9 +946,10 @@ fn authenticated_url(
 fn authenticated_broadcast_request(
     url: &str,
     requested_credential: Option<&str>,
+    requested_headers: &[broadcast_world::stashd::plugin::broadcast_host::HttpHeader],
     grants: &[HttpGrant],
 ) -> Result<
-    (String, Option<(String, String)>),
+    (String, Vec<(String, String)>),
     broadcast_world::stashd::plugin::broadcast_host::HttpError,
 > {
     if !url.starts_with("https://") {
@@ -912,7 +966,13 @@ fn authenticated_broadcast_request(
     };
     let Some(requested) = requested_credential else {
         return if grant.credential.is_none() {
-            Ok((url.to_owned(), None))
+            Ok((
+                url.to_owned(),
+                requested_headers
+                    .iter()
+                    .map(|header| (header.name.clone(), header.value.clone()))
+                    .collect(),
+            ))
         } else {
             Err(broadcast_world::stashd::plugin::broadcast_host::HttpError::CredentialUnavailable)
         };
@@ -923,9 +983,23 @@ fn authenticated_broadcast_request(
         .filter(|credential| credential.name == requested && !credential.value.is_empty())
         .ok_or(broadcast_world::stashd::plugin::broadcast_host::HttpError::CredentialUnavailable)?;
     if credential.placement == "header" {
+        if requested_headers.iter().any(|header| {
+            header
+                .name
+                .eq_ignore_ascii_case(&credential.query_parameter)
+        }) {
+            return Err(broadcast_world::stashd::plugin::broadcast_host::HttpError::Denied);
+        }
         return Ok((
             url.to_owned(),
-            Some((credential.query_parameter.clone(), credential.value.clone())),
+            requested_headers
+                .iter()
+                .map(|header| (header.name.clone(), header.value.clone()))
+                .chain(std::iter::once((
+                    credential.query_parameter.clone(),
+                    credential.value.clone(),
+                )))
+                .collect(),
         ));
     }
     let mut parsed = url::Url::parse(url).map_err(|_| {
@@ -936,7 +1010,13 @@ fn authenticated_broadcast_request(
     parsed
         .query_pairs_mut()
         .append_pair(&credential.query_parameter, &credential.value);
-    Ok((parsed.to_string(), None))
+    Ok((
+        parsed.to_string(),
+        requested_headers
+            .iter()
+            .map(|header| (header.name.clone(), header.value.clone()))
+            .collect(),
+    ))
 }
 
 fn into_http_grants(requests: Option<Vec<HttpGrantRequest>>) -> Vec<HttpGrant> {
@@ -1218,12 +1298,17 @@ fn invoke_broadcast(
     wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
     broadcast_world::BroadcastWorld::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state)?;
     let plugin = broadcast_world::BroadcastWorld::instantiate(&mut store, component, &linker)?;
+    let BroadcastPublishRequest {
+        reference,
+        settings,
+        items,
+        publication,
+    } = request;
     let request =
         broadcast_world::exports::stashd::plugin::broadcast_plugin::PublishRequest {
-            reference: request.reference,
-            settings: request.settings.into_iter().map(broadcast_option).collect(),
-            items: request
-                .items
+            reference,
+            settings: settings.into_iter().map(broadcast_option).collect(),
+            items: items
                 .into_iter()
                 .map(|item| {
                     broadcast_world::exports::stashd::plugin::broadcast_plugin::Item {
@@ -1262,7 +1347,7 @@ fn invoke_broadcast(
                 "size_bytes": artifact.size_bytes,
             })).collect::<Vec<_>>(),
         })
-    } else {
+    } else if operation == "publish" {
         let result = component
             .call_publish(&mut store, &request)?
             .map_err(|error| anyhow::anyhow!("broadcast plugin error: {error:?}"))?;
@@ -1285,6 +1370,41 @@ fn invoke_broadcast(
                 },
             })).collect::<Vec<_>>(),
         })
+    } else {
+        let publication = publication.context("broadcast finalization requires publication")?;
+        let publication = broadcast_world::exports::stashd::plugin::broadcast_plugin::Publication {
+            artifact: broadcast_world::exports::stashd::plugin::broadcast_plugin::Artifact {
+                reference: publication.artifact.reference,
+                media_type: publication.artifact.media_type,
+                size_bytes: publication.artifact.size_bytes,
+            },
+            files: publication
+                .files
+                .into_iter()
+                .map(
+                    |file| broadcast_world::stashd::plugin::broadcast_host::PublishedFile {
+                        item_id: file.item_id,
+                        source_reference: file.source_reference,
+                        relative_path: file.relative_path,
+                    },
+                )
+                .collect(),
+            published_metadata: publication
+                .published_metadata
+                .into_iter()
+                .map(broadcast_option)
+                .collect(),
+        };
+        component
+            .call_finalize(
+                &mut store,
+                &broadcast_world::exports::stashd::plugin::broadcast_plugin::FinalizationRequest {
+                    request,
+                    publication,
+                },
+            )?
+            .map_err(|error| anyhow::anyhow!("broadcast plugin error: {error:?}"))?;
+        serde_json::json!({})
     };
     Ok((result, store.into_data()))
 }
@@ -1678,7 +1798,7 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                 },
             )?;
         }
-        "broadcast-prepare" | "broadcast-publish" => {
+        "broadcast-prepare" | "broadcast-publish" | "broadcast-finalize" => {
             let component_path = request
                 .component_path
                 .as_deref()
@@ -1698,8 +1818,10 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                 request.broadcast.context("broadcast request is required")?,
                 if request.op == "broadcast-prepare" {
                     "prepare"
-                } else {
+                } else if request.op == "broadcast-publish" {
                     "publish"
+                } else {
+                    "finalize"
                 },
                 request.helper_name,
                 request.helper_executable,
@@ -1746,12 +1868,20 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                         preparation: publication,
                     },
                 )?;
-            } else {
+            } else if request.op == "broadcast-publish" {
                 send(
                     stream,
                     Response::BroadcastPublished {
                         id: request.id,
                         publication,
+                    },
+                )?;
+            } else {
+                send(
+                    stream,
+                    Response::BroadcastFinalized {
+                        id: request.id,
+                        finalization: publication,
                     },
                 )?;
             }
@@ -1960,19 +2090,21 @@ mod tests {
         let (url, header) = authenticated_broadcast_request(
             "https://service.invalid/resource",
             Some("api-token"),
+            &[],
             &grants,
         )
         .expect("approved header grant should succeed");
         assert_eq!(url, "https://service.invalid/resource");
         assert_eq!(
             header,
-            Some(("X-Api-Key".to_owned(), "fixture-secret".to_owned()))
+            vec![("X-Api-Key".to_owned(), "fixture-secret".to_owned())]
         );
         assert!(!url.contains("fixture-secret"));
         assert!(matches!(
             authenticated_broadcast_request(
                 "https://other.invalid/resource",
                 Some("api-token"),
+                &[],
                 &grants,
             ),
             Err(broadcast_host::HttpError::Denied)
