@@ -1,0 +1,999 @@
+{
+  "contracts": [
+    {
+      "file": "plugin-api/wit/input.wit",
+      "interfaces": {
+        "input-host": {
+          "enums": {
+            "artifact-role": {
+              "values": [
+                "primary",
+                "captions",
+                "artwork",
+                "metadata"
+              ]
+            }
+          },
+          "functions": [
+            {
+              "arguments": [],
+              "name": "open-http-client",
+              "result": {
+                "kind": "named",
+                "name": "http-client"
+              }
+            },
+            {
+              "arguments": [],
+              "name": "open-staging-area",
+              "result": {
+                "kind": "named",
+                "name": "staging-area"
+              }
+            },
+            {
+              "arguments": [
+                {
+                  "name": "progress",
+                  "type": {
+                    "kind": "named",
+                    "name": "progress"
+                  }
+                }
+              ],
+              "name": "report-progress",
+              "result": null
+            },
+            {
+              "arguments": [
+                {
+                  "name": "message",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                }
+              ],
+              "name": "log",
+              "result": null
+            }
+          ],
+          "records": {
+            "helper-result": {
+              "fields": [
+                {
+                  "name": "exit-code",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "s32"
+                  }
+                },
+                {
+                  "name": "stdout",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "stderr",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "files",
+                  "type": {
+                    "kind": "list",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "string"
+                    }
+                  }
+                }
+              ]
+            },
+            "http-request": {
+              "fields": [
+                {
+                  "name": "url",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "credential",
+                  "type": {
+                    "kind": "option",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "string"
+                    }
+                  }
+                }
+              ]
+            },
+            "http-response": {
+              "fields": [
+                {
+                  "name": "status",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "u16"
+                  }
+                },
+                {
+                  "name": "body",
+                  "type": {
+                    "kind": "list",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "u8"
+                    }
+                  }
+                }
+              ]
+            },
+            "progress": {
+              "fields": [
+                {
+                  "name": "stage",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                }
+              ]
+            },
+            "staged-artifact": {
+              "fields": [
+                {
+                  "name": "reference",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "role",
+                  "type": {
+                    "kind": "named",
+                    "name": "artifact-role"
+                  }
+                },
+                {
+                  "name": "media-type",
+                  "type": {
+                    "kind": "option",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "string"
+                    }
+                  }
+                },
+                {
+                  "name": "size-bytes",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "u64"
+                  }
+                }
+              ]
+            }
+          },
+          "resources": [
+            {
+              "functions": [
+                {
+                  "arguments": [
+                    {
+                      "name": "request",
+                      "type": {
+                        "kind": "named",
+                        "name": "http-request"
+                      }
+                    }
+                  ],
+                  "name": "get",
+                  "result": {
+                    "error": {
+                      "kind": "named",
+                      "name": "http-error"
+                    },
+                    "kind": "result",
+                    "ok": {
+                      "kind": "named",
+                      "name": "http-response"
+                    }
+                  }
+                }
+              ],
+              "name": "http-client"
+            },
+            {
+              "functions": [
+                {
+                  "arguments": [
+                    {
+                      "name": "name",
+                      "type": {
+                        "kind": "scalar",
+                        "name": "string"
+                      }
+                    },
+                    {
+                      "name": "args",
+                      "type": {
+                        "kind": "list",
+                        "value": {
+                          "kind": "scalar",
+                          "name": "string"
+                        }
+                      }
+                    }
+                  ],
+                  "name": "run-helper",
+                  "result": {
+                    "error": {
+                      "kind": "named",
+                      "name": "helper-error"
+                    },
+                    "kind": "result",
+                    "ok": {
+                      "kind": "named",
+                      "name": "helper-result"
+                    }
+                  }
+                },
+                {
+                  "arguments": [
+                    {
+                      "name": "relative-path",
+                      "type": {
+                        "kind": "scalar",
+                        "name": "string"
+                      }
+                    },
+                    {
+                      "name": "role",
+                      "type": {
+                        "kind": "named",
+                        "name": "artifact-role"
+                      }
+                    },
+                    {
+                      "name": "media-type",
+                      "type": {
+                        "kind": "option",
+                        "value": {
+                          "kind": "scalar",
+                          "name": "string"
+                        }
+                      }
+                    }
+                  ],
+                  "name": "stage",
+                  "result": {
+                    "error": {
+                      "kind": "named",
+                      "name": "staging-error"
+                    },
+                    "kind": "result",
+                    "ok": {
+                      "kind": "named",
+                      "name": "staged-artifact"
+                    }
+                  }
+                }
+              ],
+              "name": "staging-area"
+            }
+          ],
+          "uses": {},
+          "variants": {
+            "helper-error": {
+              "values": [
+                {
+                  "name": "denied",
+                  "type": null
+                },
+                {
+                  "name": "unavailable",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "failed",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                }
+              ]
+            },
+            "http-error": {
+              "values": [
+                {
+                  "name": "denied",
+                  "type": null
+                },
+                {
+                  "name": "credential-unavailable",
+                  "type": null
+                },
+                {
+                  "name": "authentication-rejected",
+                  "type": null
+                },
+                {
+                  "name": "rate-limited",
+                  "type": null
+                },
+                {
+                  "name": "unavailable",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "failed",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                }
+              ]
+            },
+            "staging-error": {
+              "values": [
+                {
+                  "name": "invalid-reference",
+                  "type": null
+                },
+                {
+                  "name": "missing",
+                  "type": null
+                },
+                {
+                  "name": "failed",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "input-plugin": {
+          "enums": {
+            "discovery-intent": {
+              "values": [
+                "refresh",
+                "complete"
+              ]
+            },
+            "media-kind": {
+              "values": [
+                "video",
+                "audio"
+              ]
+            }
+          },
+          "functions": [
+            {
+              "arguments": [
+                {
+                  "name": "source",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                }
+              ],
+              "name": "resolve",
+              "result": {
+                "error": {
+                  "kind": "named",
+                  "name": "plugin-error"
+                },
+                "kind": "result",
+                "ok": {
+                  "kind": "named",
+                  "name": "resolved-input"
+                }
+              }
+            },
+            {
+              "arguments": [
+                {
+                  "name": "input-id",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "intent",
+                  "type": {
+                    "kind": "named",
+                    "name": "discovery-intent"
+                  }
+                },
+                {
+                  "name": "options",
+                  "type": {
+                    "kind": "list",
+                    "value": {
+                      "kind": "named",
+                      "name": "input-option"
+                    }
+                  }
+                }
+              ],
+              "name": "discover",
+              "result": {
+                "error": {
+                  "kind": "named",
+                  "name": "plugin-error"
+                },
+                "kind": "result",
+                "ok": {
+                  "kind": "list",
+                  "value": {
+                    "kind": "named",
+                    "name": "discovered-item"
+                  }
+                }
+              }
+            },
+            {
+              "arguments": [
+                {
+                  "name": "item",
+                  "type": {
+                    "kind": "named",
+                    "name": "discovered-item"
+                  }
+                },
+                {
+                  "name": "options",
+                  "type": {
+                    "kind": "named",
+                    "name": "acquisition-options"
+                  }
+                }
+              ],
+              "name": "acquire",
+              "result": {
+                "error": {
+                  "kind": "named",
+                  "name": "plugin-error"
+                },
+                "kind": "result",
+                "ok": {
+                  "kind": "named",
+                  "name": "acquisition-result"
+                }
+              }
+            }
+          ],
+          "records": {
+            "acquisition-options": {
+              "fields": [
+                {
+                  "name": "media-kind",
+                  "type": {
+                    "kind": "named",
+                    "name": "media-kind"
+                  }
+                },
+                {
+                  "name": "options",
+                  "type": {
+                    "kind": "list",
+                    "value": {
+                      "kind": "named",
+                      "name": "input-option"
+                    }
+                  }
+                }
+              ]
+            },
+            "acquisition-result": {
+              "fields": [
+                {
+                  "name": "artifacts",
+                  "type": {
+                    "kind": "list",
+                    "value": {
+                      "kind": "named",
+                      "name": "staged-artifact"
+                    }
+                  }
+                }
+              ]
+            },
+            "discovered-item": {
+              "fields": [
+                {
+                  "name": "id",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "reference",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "title",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "description",
+                  "type": {
+                    "kind": "option",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "string"
+                    }
+                  }
+                },
+                {
+                  "name": "published-at",
+                  "type": {
+                    "kind": "option",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "string"
+                    }
+                  }
+                },
+                {
+                  "name": "artwork-reference",
+                  "type": {
+                    "kind": "option",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "string"
+                    }
+                  }
+                },
+                {
+                  "name": "duration-seconds",
+                  "type": {
+                    "kind": "option",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "u32"
+                    }
+                  }
+                },
+                {
+                  "name": "kind",
+                  "type": {
+                    "kind": "option",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "string"
+                    }
+                  }
+                }
+              ]
+            },
+            "error": {
+              "fields": [
+                {
+                  "name": "message",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "retryable",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "bool"
+                  }
+                }
+              ]
+            },
+            "input-option": {
+              "fields": [
+                {
+                  "name": "key",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "value",
+                  "type": {
+                    "kind": "named",
+                    "name": "option-value"
+                  }
+                }
+              ]
+            },
+            "resolved-input": {
+              "fields": [
+                {
+                  "name": "id",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "canonical-reference",
+                  "type": {
+                    "kind": "option",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "string"
+                    }
+                  }
+                },
+                {
+                  "name": "kind",
+                  "type": {
+                    "kind": "option",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "string"
+                    }
+                  }
+                },
+                {
+                  "name": "title",
+                  "type": {
+                    "kind": "option",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "string"
+                    }
+                  }
+                },
+                {
+                  "name": "artwork-reference",
+                  "type": {
+                    "kind": "option",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "string"
+                    }
+                  }
+                },
+                {
+                  "name": "estimated-item-count",
+                  "type": {
+                    "kind": "option",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "u32"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "resources": [],
+          "uses": {
+            "staged-artifact": "input-host"
+          },
+          "variants": {
+            "option-value": {
+              "values": [
+                {
+                  "name": "boolean",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "bool"
+                  }
+                },
+                {
+                  "name": "text",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                }
+              ]
+            },
+            "plugin-error": {
+              "values": [
+                {
+                  "name": "unsupported",
+                  "type": {
+                    "kind": "named",
+                    "name": "error"
+                  }
+                },
+                {
+                  "name": "not-found",
+                  "type": {
+                    "kind": "named",
+                    "name": "error"
+                  }
+                },
+                {
+                  "name": "authentication",
+                  "type": {
+                    "kind": "named",
+                    "name": "error"
+                  }
+                },
+                {
+                  "name": "rate-limited",
+                  "type": {
+                    "kind": "named",
+                    "name": "error"
+                  }
+                },
+                {
+                  "name": "unavailable",
+                  "type": {
+                    "kind": "named",
+                    "name": "error"
+                  }
+                },
+                {
+                  "name": "invalid-data",
+                  "type": {
+                    "kind": "named",
+                    "name": "error"
+                  }
+                },
+                {
+                  "name": "failed",
+                  "type": {
+                    "kind": "named",
+                    "name": "error"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "package": "stashd:plugin@0.1.0",
+      "worlds": {
+        "input-world": {
+          "exports": [
+            "input-plugin"
+          ],
+          "imports": [
+            "input-host"
+          ]
+        }
+      }
+    },
+    {
+      "file": "plugin-api/wit/broadcast.wit",
+      "interfaces": {
+        "broadcast-host": {
+          "enums": {
+            "http-method": {
+              "values": [
+                "get",
+                "post",
+                "put",
+                "patch",
+                "delete"
+              ]
+            }
+          },
+          "functions": [
+            {
+              "arguments": [],
+              "name": "open-http-client",
+              "result": {
+                "kind": "named",
+                "name": "http-client"
+              }
+            },
+            {
+              "arguments": [],
+              "name": "open-staging-area",
+              "result": {
+                "kind": "named",
+                "name": "staging-area"
+              }
+            },
+            {
+              "arguments": [
+                {
+                  "name": "stage",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                }
+              ],
+              "name": "report-progress",
+              "result": null
+            },
+            {
+              "arguments": [
+                {
+                  "name": "message",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                }
+              ],
+              "name": "log",
+              "result": null
+            }
+          ],
+          "records": {
+            "helper-result": {
+              "fields": [
+                {
+                  "name": "exit-code",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "s32"
+                  }
+                },
+                {
+                  "name": "stdout",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "stderr",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "files",
+                  "type": {
+                    "kind": "list",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "string"
+                    }
+                  }
+                }
+              ]
+            },
+            "http-header": {
+              "fields": [
+                {
+                  "name": "name",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "value",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                }
+              ]
+            },
+            "http-request": {
+              "fields": [
+                {
+                  "name": "method",
+                  "type": {
+                    "kind": "named",
+                    "name": "http-method"
+                  }
+                },
+                {
+                  "name": "url",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "credential",
+                  "type": {
+                    "kind": "option",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "string"
+                    }
+                  }
+                },
+                {
+                  "name": "headers",
+                  "type": {
+                    "kind": "list",
+                    "value": {
+                      "kind": "named",
+                      "name": "http-header"
+                    }
+                  }
+                },
+                {
+                  "name": "body",
+                  "type": {
+                    "kind": "list",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "u8"
+                    }
+                  }
+                }
+              ]
+            },
+            "http-response": {
+              "fields": [
+                {
+                  "name": "status",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "u16"
+                  }
+                },
+                {
+                  "name": "body",
+                  "type": {
+                    "kind": "list",
+                    "value": {
+                      "kind": "scalar",
+                      "name": "u8"
+                    }
+                  }
+                }
+              ]
+            },
+            "published-file": {
+              "fields": [
+                {
+                  "name": "item-id",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "source-reference",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                },
+                {
+                  "name": "relative-path",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"
+                  }
+                }
+              ]
+            },
+            "staged-artifact": {
+              "fields": [
+                {
+                  "name": "reference",
+                  "type": {
+                    "kind": "scalar",
+                    "name": "string"

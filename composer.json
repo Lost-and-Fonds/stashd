@@ -20,8 +20,18 @@
   },
   "autoload": {
     "psr-4": {
-      "App\\": "app/"
-    }
+      "App\\": "app/",
+      "Stashd\\NativeRuntime\\": "packages/native-plugin-runtime/src/"
+    },
+    "files": [
+      "packages/plugin-sdk/src/Values.php",
+      "packages/plugin-sdk/src/Errors.php",
+      "packages/plugin-sdk/src/Operations.php",
+      "packages/plugin-sdk/src/Input.php",
+      "packages/plugin-sdk/src/Capabilities.php",
+      "packages/plugin-sdk/src/Bootstrap.php",
+      "packages/plugin-sdk/src/WireMapper.php"
+    ]
   },
   "autoload-dev": {
     "psr-4": {
@@ -50,7 +60,8 @@
     "test:docker-upgrade:no-build": "STASHD_SMOKE_SKIP_BUILD=1 tests/docker/upgrade-smoke.sh",
     "lint": "vendor/bin/pint --test",
     "format": "vendor/bin/pint",
-    "test:static": "vendor/bin/phpstan analyse --memory-limit=1G"
+    "test:static": "vendor/bin/phpstan analyse --memory-limit=1G",
+    "test:native-runtime": "packages/native-plugin-runtime/tests/run.sh"
   },
   "minimum-stability": "dev",
   "prefer-stable": true,

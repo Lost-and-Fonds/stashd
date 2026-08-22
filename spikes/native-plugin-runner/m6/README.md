@@ -1,4 +1,9 @@
-# M6 — Package validation and local linking
+# M6 — Package validation and local linking (historical)
+
+The executable M6 spike was superseded by the productionized package manager
+at `packages/native-plugin-runtime/src/Package/PackageManager.php`. The
+original notes remain as historical evidence; use the maintained runtime test
+for package lifecycle coverage.
 
 M6 is a provider-neutral package lifecycle spike. It uses `tar.gz` fixture
 archives and a small PHP tar reader that validates every entry before writing

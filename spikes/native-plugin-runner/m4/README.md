@@ -1,4 +1,8 @@
-# M4 — PHP SDK and provider-neutral example
+# M4 — PHP SDK and provider-neutral example (historical)
+
+The executable M4 spike was superseded by the productionized package at
+`packages/plugin-sdk/`. The original notes remain as historical evidence;
+run `packages/plugin-sdk/tests/run.sh` for the maintained SDK checks.
 
 This is the first author-facing shape of `stashd/plugin-sdk`. It is a
 spike-local, dependency-free PHP 8.5 API; it is not a Composer package and is

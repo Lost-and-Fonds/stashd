@@ -1,4 +1,9 @@
-# M5 — Generic broker capabilities
+# M5 — Generic broker capabilities (historical)
+
+The executable M5 spike was superseded by the productionized runtime package
+at `packages/native-plugin-runtime/`. The original notes remain as historical
+evidence; the maintained assembled checks are in
+`packages/native-plugin-runtime/tests/run.sh`.
 
 M5 connects the M4-shaped SDK to a fixture-only, invocation-scoped host
 broker. It remains a spike: there is no production integration, WIT change,
