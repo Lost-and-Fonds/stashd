@@ -171,6 +171,91 @@ authoritative staging/promotion rules as current Wasmtime plugins.
 **Hard stop:** pause if native execution changes core authority or requires a
 provider-specific exception.
 
+## M7.5 — Productionize and freeze the native runtime
+
+**Goal:** turn the proven M1–M7 native-plugin implementation from spike-quality code into maintainable production-quality code before any first-party provider depends on it.
+
+**Scope:** move the native runner, RPC, WIT bridge, PHP SDK, capability broker, package lifecycle, and conformance infrastructure out of spike-only structure and into deliberate production package/module boundaries. Refactor for readability, typing, testability, naming, ownership clarity, and long-term maintenance without changing the established behavior or architectural contract.
+
+This milestone should include:
+
+- establish final production namespaces/directories/package boundaries;
+- split oversized spike files into coherent classes/modules;
+- create the real independent PHP SDK package structure;
+- separate generated code from handwritten SDK ergonomics;
+- remove duplicated spike/test infrastructure;
+- replace fixture-only glue with clean interfaces where production code now needs them;
+- tighten PHP types, DTO invariants, and exception boundaries;
+- establish the production RPC/runner abstractions without changing RPC v1 semantics;
+- review process/resource lifetime ownership and cleanup paths;
+- review all path validation and sandbox policy code for clarity and centralization;
+- ensure capability enforcement has one obvious authoritative implementation;
+- normalize naming across WIT, RPC, SDK, runner, resources, and manifests;
+- remove temporary APIs that should not become public compatibility commitments;
+- add/organize unit, integration, sandbox, and conformance tests around the production structure;
+- apply PSR-12/Pint and useful PHPStan/static-analysis coverage;
+- document the public PHP SDK surface and internal runtime boundaries;
+- update architecture/roadmap docs where the final production structure differs from the spikes;
+- delete or clearly archive obsolete spike code only after equivalent production tests exist.
+
+**Explicit exclusions:**
+
+- no new plugin capabilities;
+- no WIT semantic redesign unless an actual productionization bug makes the existing contract impossible;
+- no RPC v2 or alternate transport;
+- no new runtime/language support;
+- no plugin marketplace/registry work;
+- no Jellyfin/Plex/Podcast/YouTube porting;
+- no RSS Input;
+- no Wasmtime removal;
+- no provider-specific behavior in core;
+- no speculative abstractions for future plugins.
+
+This is a refactoring and production-hardening milestone, not feature work.
+
+**Behavioral invariant:** everything that passed M7 must continue to pass after productionization. If behavior changes, the change must fix a demonstrated bug or ambiguity rather than “improve” the architecture speculatively.
+
+**Tests:**
+
+- full M1–M7 native runner/conformance regression suite against the productionized implementation;
+- PHP SDK unit tests;
+- RPC framing/version/error/cancellation tests;
+- sandbox isolation and timeout/cleanup tests;
+- capability allow/deny and secret-redaction tests;
+- package install/activation/rollback/link tests;
+- provider-neutral Input and Broadcast conformance;
+- PostgreSQL and fresh-container operational smoke from M7;
+- PHPStan;
+- Pint/PSR-12;
+- `git diff --check`;
+- verify no first-party provider has been migrated as part of this milestone.
+
+Where useful, compare spike and production implementations to ensure no proven security or lifecycle behavior was accidentally lost during cleanup.
+
+**Success:**
+
+- native runtime no longer depends on `spikes/` for production behavior;
+- public PHP SDK has a small, coherent, documented surface;
+- generated and handwritten code have clear ownership;
+- runner/RPC/broker/package responsibilities are separated cleanly;
+- sandbox and capability policy each have one obvious authoritative implementation;
+- no temporary spike API has accidentally become public without deliberate review;
+- static analysis and formatting are clean;
+- full native conformance and operational smoke remain green;
+- code is in a state we are willing to maintain before real provider ports begin.
+
+At completion, explicitly identify which public surfaces are now considered stable enough for the Jellyfin port:
+
+```text
+plugin manifest semantics
+RPC v1 framing/envelopes
+WIT/native mapping
+PHP SDK lifecycle interfaces
+PluginContext capability surface
+resource-handle semantics used by v1
+package/runtime activation model
+```
+
 ## M8 — Port Jellyfin Broadcast
 
 **Goal:** port the already-understood, low-risk real lifecycle first.
@@ -279,4 +364,3 @@ first real native-provider parity gate. At that point the runtime has a tested
 generic contract, PHP authoring path, package rollback, staging/capabilities,
 and one real provider migration. RSS can then be designed against the stable
 native contract without being used to discover basic runner behavior.
-
