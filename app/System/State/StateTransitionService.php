@@ -16,8 +16,6 @@ use App\Commands\CommandRecord;
 use App\Commands\CommandState;
 use App\Jobs\JobRecord;
 use App\Jobs\JobState;
-use App\MediaServers\MediaServerConnectionRecord;
-use App\MediaServers\MediaServerConnectionState;
 use App\Stashes\StashInputRecord;
 use App\Stashes\StashInputState;
 use App\Stashes\StashItemRecord;
@@ -87,13 +85,6 @@ final readonly class StateTransitionService
     public function transitionBroadcastItem(BroadcastItemRecord $record, BroadcastItemState $next): BroadcastItemRecord
     {
         return $this->apply($record, $record->state, $next, 'Broadcast item');
-    }
-
-    public function transitionMediaServerConnection(
-        MediaServerConnectionRecord $record,
-        MediaServerConnectionState $next,
-    ): MediaServerConnectionRecord {
-        return $this->apply($record, $record->state, $next, 'Media server connection');
     }
 
     public function transitionBroadcastTrigger(

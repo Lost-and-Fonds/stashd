@@ -11,9 +11,6 @@ use App\Support\PrefixedUlid;
 use App\System\Secret\SecretRepository;
 use App\System\Secret\SecretsService;
 use App\System\Secret\SecretType;
-use App\System\State\StateTransitionService;
-use Tempest\DateTime\DateTime;
-use Tempest\DateTime\Timezone;
 
 final readonly class MediaServerConnectionService
 {
@@ -24,7 +21,6 @@ final readonly class MediaServerConnectionService
         private PluginHttpGrantFactory $grants,
         private SecretsService $secrets,
         private SecretRepository $secretRecords,
-        private StateTransitionService $transitions,
     ) {
     }
 
@@ -57,7 +53,6 @@ final readonly class MediaServerConnectionService
         ?string $baseUri = null,
         ?array $settings = null,
         #[\SensitiveParameter] ?string $token = null,
-        ?MediaServerConnectionState $state = null,
     ): MediaServerConnectionRecord {
         $record = $this->connections->find($id)
             ?? throw MediaServerException::withCode('media_server_not_found', 'Media server connection not found.');
@@ -80,74 +75,20 @@ final readonly class MediaServerConnectionService
             $this->storeToken($record, trim($token));
         }
 
-        if ($state !== null && $record->state !== $state) {
-            $this->transitions->transitionMediaServerConnection($record, $state);
-        }
-
         return $this->connections->save($record);
     }
 
-    /** @return array<string, mixed> */
-    public function testConnection(PrefixedUlid $id): array
+    /**
+     * @param array<string, scalar> $payload
+     * @return array<string, mixed>
+     */
+    public function invokeOperation(PrefixedUlid $id, string $operationKey, array $payload = []): array
     {
         $record = $this->connections->find($id)
             ?? throw MediaServerException::withCode('media_server_not_found', 'Media server connection not found.');
 
         $token = $this->requireToken($record);
-        $status = ['ok' => false, 'message' => 'Connection test failed.', 'server_name' => null, 'version' => null];
-        try {
-            $result = $this->invoke($record, 'test_connection', $token);
-            $values = $this->values($result);
-            $status = [
-                'ok' => ($values['ok'] ?? 'false') === 'true',
-                'message' => $values['message'] ?? 'External connection test completed.',
-                'server_name' => $values['server_name'] ?? null,
-                'version' => $values['version'] ?? null,
-            ];
-        } catch (MediaServerException $exception) {
-            $status = ['ok' => false, 'message' => $exception->getMessage(), 'server_name' => null, 'version' => null];
-        }
-
-        $record->lastCheckedAt = DateTime::now(Timezone::UTC);
-        $record->lastError = $status['ok'] ? null : $status['message'];
-
-        if ($status['ok']) {
-            if ($record->state !== MediaServerConnectionState::Ready) {
-                $this->transitions->transitionMediaServerConnection($record, MediaServerConnectionState::Ready);
-            } else {
-                $this->connections->save($record);
-            }
-        } elseif ($record->state !== MediaServerConnectionState::Failed) {
-            $this->transitions->transitionMediaServerConnection($record, MediaServerConnectionState::Failed);
-        } else {
-            $this->connections->save($record);
-        }
-
-        return $status;
-    }
-
-    /** @return list<array{id: string, name: string, type: ?string}> */
-    public function listLibraries(PrefixedUlid $id): array
-    {
-        $record = $this->connections->find($id)
-            ?? throw MediaServerException::withCode('media_server_not_found', 'Media server connection not found.');
-
-        $token = $this->requireToken($record);
-
-        $result = $this->invoke($record, 'list_libraries', $token);
-        $choices = $result['choices'] ?? null;
-        if (! is_array($choices)) {
-            throw MediaServerException::withCode('media_server_list_libraries_failed', 'External library discovery returned invalid choices.');
-        }
-
-        $libraries = [];
-        foreach ($choices as $choice) {
-            if (is_array($choice) && is_string($choice['value'] ?? null) && is_string($choice['label'] ?? null)) {
-                $libraries[] = ['id' => $choice['value'], 'name' => $choice['label'], 'type' => null];
-            }
-        }
-
-        return $libraries;
+        return $this->invoke($record, $operationKey, $token, $payload);
     }
 
     /** @return array<string, mixed> */
@@ -179,8 +120,11 @@ final readonly class MediaServerConnectionService
         return $token;
     }
 
-    /** @return array<string, mixed> */
-    private function invoke(MediaServerConnectionRecord $connection, string $operationKey, string $token): array
+    /**
+     * @param array<string, scalar> $payload
+     * @return array<string, mixed>
+     */
+    private function invoke(MediaServerConnectionRecord $connection, string $operationKey, string $token, array $payload = []): array
     {
         $definition = $this->plugins->findByLogicalKey($connection->type);
         $operation = $definition?->operations[$operationKey] ?? null;
@@ -203,6 +147,7 @@ final readonly class MediaServerConnectionService
                         ['key' => 'server_url', 'value' => ['kind' => 'text', 'value' => $connection->baseUri]],
                         ['key' => 'credential_name', 'value' => ['kind' => 'text', 'value' => $definition->credentialName ?? '']],
                         ...$this->settingEntries($connection->settings ?? []),
+                        ...$this->settingEntries($payload),
                     ],
                     'items' => [],
                 ],
@@ -220,24 +165,6 @@ final readonly class MediaServerConnectionService
             }
             @rmdir($stage);
         }
-    }
-
-    /**
-     * @param array<string, mixed> $result
-     * @return array<string, string>
-     */
-    private function values(array $result): array
-    {
-        /** @var array<string, string> $values */
-        $values = [];
-        /** @var list<array<string, mixed>> $settings */
-        $settings = is_array($result['values'] ?? null) ? $result['values'] : [];
-        foreach ($settings as $setting) {
-            if (is_string($setting['key'] ?? null) && is_scalar($setting['value'] ?? null)) {
-                $values[$setting['key']] = (string) $setting['value'];
-            }
-        }
-        return $values;
     }
 
     /**

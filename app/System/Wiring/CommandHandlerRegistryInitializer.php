@@ -13,8 +13,6 @@ use App\Commands\CommandType;
 use App\Downloads\AssetDownloadCaptionsCommandHandler;
 use App\Downloads\ItemDownloadCommandHandler;
 use App\Jobs\JobRepository;
-use App\MediaServers\MediaServerCommandHandler;
-use App\MediaServers\MediaServerConnectionRepository;
 use App\Stashes\StashAddInputCommandHandler;
 use App\Stashes\StashPreflightCommandHandler;
 use App\Stashes\StashRetryFailedCommandHandler;
@@ -33,7 +31,6 @@ final class CommandHandlerRegistryInitializer implements Initializer
         $jobs = $container->get(JobRepository::class);
         $broadcasts = $container->get(BroadcastRepository::class);
         $broadcastItems = $container->get(BroadcastItemRepository::class);
-        $connections = $container->get(MediaServerConnectionRepository::class);
 
         return new CommandHandlerRegistry([
             $container->get(StashPreflightCommandHandler::class),
@@ -53,8 +50,6 @@ final class CommandHandlerRegistryInitializer implements Initializer
             new BroadcastCommandHandler($commands, $jobs, $broadcasts, $broadcastItems, CommandType::BroadcastDelete),
             new BroadcastCommandHandler($commands, $jobs, $broadcasts, $broadcastItems, CommandType::BroadcastTrigger),
             new BroadcastCommandHandler($commands, $jobs, $broadcasts, $broadcastItems, CommandType::BroadcastRotateToken),
-            new MediaServerCommandHandler($commands, $jobs, $connections, CommandType::MediaServerTestConnection),
-            new MediaServerCommandHandler($commands, $jobs, $connections, CommandType::MediaServerListLibraries),
         ]);
     }
 }

@@ -129,11 +129,18 @@ final readonly class MediaServerController
         return new Json(['deleted' => true]);
     }
 
-    #[Get('/api/v1/media-servers/{id}/libraries')]
-    public function libraries(string $id): Json
+    #[Post('/api/v1/connections/{id}/operations/{operation}')]
+    public function operation(string $id, string $operation, Request $request): Json
     {
         try {
-            $libraries = $this->service->listLibraries(PrefixedUlid::parse($id));
+            $body = ApiJson::normalizeRequest($request->body);
+            $payload = [];
+            foreach (is_array($body['payload'] ?? null) ? $body['payload'] : [] as $key => $value) {
+                if (is_string($key) && is_scalar($value)) {
+                    $payload[$key] = $value;
+                }
+            }
+            $result = $this->service->invokeOperation(PrefixedUlid::parse($id), $operation, $payload);
         } catch (MediaServerException $exception) {
             if ($exception->errorCode === 'media_server_not_found') {
                 return $this->notFound('Media server connection not found.');
@@ -147,30 +154,7 @@ final readonly class MediaServerController
             ], Status::BAD_REQUEST);
         }
 
-        return new Json([
-            'libraries' => $libraries,
-        ]);
-    }
-
-    #[Post('/api/v1/media-servers/{id}/test')]
-    public function test(string $id): Json
-    {
-        try {
-            $status = $this->service->testConnection(PrefixedUlid::parse($id));
-        } catch (MediaServerException $exception) {
-            if ($exception->errorCode === 'media_server_not_found') {
-                return $this->notFound('Media server connection not found.');
-            }
-
-            return new Json([
-                'error' => [
-                    'code' => $exception->errorCode,
-                    'message' => $exception->getMessage(),
-                ],
-            ], Status::BAD_REQUEST);
-        }
-
-        return new Json(['status' => ApiJson::encode($status)]);
+        return new Json(ApiJson::encode($result));
     }
 
     private function notFound(string $message): Json

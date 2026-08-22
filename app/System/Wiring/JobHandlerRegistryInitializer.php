@@ -9,7 +9,6 @@ use App\Jobs\Handlers\BootJobHandler;
 use App\Jobs\Handlers\BroadcastJobHandler;
 use App\Jobs\Handlers\DownloadCaptionsJobHandler;
 use App\Jobs\Handlers\DownloadJobHandler;
-use App\Jobs\Handlers\MediaServerJobHandler;
 use App\Jobs\Handlers\PreflightJobHandler;
 use App\Jobs\Handlers\RetryFailedDownloadsJobHandler;
 use App\Jobs\Handlers\StorageCheckJobHandler;
@@ -34,7 +33,6 @@ final class JobHandlerRegistryInitializer implements Initializer
             $container->get(StorageCheckJobHandler::class),
             $container->get(VerifyVaultJobHandler::class),
             $container->get(BroadcastJobHandler::class),
-            $container->get(MediaServerJobHandler::class),
         ]);
     }
 }

@@ -20,7 +20,6 @@ enum JobIntent: string
     case RetryFailedDownloads = 'retry_failed_downloads';
     case Boot = 'boot';
     case VerifyVault = 'verify_vault';
-    case MediaServer = 'media_server';
     case DownloadCaptions = 'download_captions';
 
     public function lane(): JobLane

@@ -23,7 +23,5 @@ enum CommandType: string
     case ItemDownload = 'item.download';
     case AssetVerify = 'asset.verify';
     case SystemVerifyVault = 'system.verify_vault';
-    case MediaServerTestConnection = 'media_server.test_connection';
-    case MediaServerListLibraries = 'media_server.list_libraries';
     case AssetDownloadCaptions = 'asset.download_captions';
 }

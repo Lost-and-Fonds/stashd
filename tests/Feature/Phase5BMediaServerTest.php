@@ -9,7 +9,6 @@ use App\Broadcasts\BroadcastItemId;
 use App\Broadcasts\BroadcastLifecycleService;
 use App\MediaServers\MediaServerConnectionRecord;
 use App\Stashes\StashInputRepository;
-use App\System\Activity\ActivityEventRecord;
 use App\System\Secret\SecretRecord;
 use App\System\Secret\SecretsService;
 use App\Vault\AssetKind;
@@ -242,7 +241,7 @@ test('connection stores plugin-defined settings without a library domain object'
     ]);
 });
 
-test('media server test connection command succeeds with fixtures', function (): void {
+test('generic connection operation returns plugin values', function (): void {
     $headers = $this->authHeaders();
 
     $server = $this->http->post('/api/v1/media-servers', [
@@ -252,19 +251,12 @@ test('media server test connection command succeeds with fixtures', function ():
         'token' => 'fixture-token',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $command = $this->http->post('/api/v1/commands', [
-        'type' => 'media_server.test_connection',
-        'options' => ['media_server_connection_id' => $server->body['media_server']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $show = $this->http->get('/api/v1/commands/' . $command->body['command_id'], headers: $headers);
-    expect($show->body['command']['state'])->toBe('completed')
-        ->and($show->body['command']['result']['status']['ok'])->toBeTrue()
-        ->and($show->body['command']['result']['status']['server_name'])->toBe('Fixture Jellyfin');
+    $result = $this->http->post('/api/v1/connections/' . $server->body['media_server']['id'] . '/operations/test_connection', headers: $headers)
+        ->assertOk();
+    expect($result->body['values'])->toContain(['key' => 'ok', 'value' => 'true']);
 });
 
-test('media server test connection reports failure without leaking token', function (): void {
+test('generic connection operation failure does not leak token', function (): void {
     $headers = $this->authHeaders();
 
     $server = $this->http->post('/api/v1/media-servers', [
@@ -274,15 +266,12 @@ test('media server test connection reports failure without leaking token', funct
         'token' => 'leaked-token-should-not-appear',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $sync = $this->http->post('/api/v1/media-servers/' . $server->body['media_server']['id'] . '/test', headers: $headers);
-    $sync->assertOk();
-    expect($sync->body['status']['ok'])->toBeFalse();
-
-    $activity = ActivityEventRecord::select()->orderBy('createdAt', \Tempest\Database\Direction::DESC)->first();
-    expect(json_encode($activity))->not->toContain('leaked-token-should-not-appear');
+    $sync = $this->http->post('/api/v1/connections/' . $server->body['media_server']['id'] . '/operations/test_connection', headers: $headers);
+    $sync->assertStatus(Status::BAD_REQUEST);
+    expect(json_encode($sync->body))->not->toContain('leaked-token-should-not-appear');
 });
 
-test('media server list libraries returns snake_case fixture libraries', function (): void {
+test('generic connection operation returns opaque choices', function (): void {
     $headers = $this->authHeaders();
 
     $server = $this->http->post('/api/v1/media-servers', [
@@ -292,14 +281,10 @@ test('media server list libraries returns snake_case fixture libraries', functio
         'token' => 'fixture-token',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $libraries = $this->http->get(
-        '/api/v1/media-servers/' . $server->body['media_server']['id'] . '/libraries',
-        headers: $headers,
-    );
+    $libraries = $this->http->post('/api/v1/connections/' . $server->body['media_server']['id'] . '/operations/list_libraries', headers: $headers);
     $libraries->assertOk();
 
-    expect($libraries->body['libraries'][0]['id'])->toBe('1')
-        ->and($libraries->body['libraries'][0]['name'])->toBe('TV Shows');
+    expect($libraries->body['choices'][0])->toBe(['value' => '1', 'label' => 'TV Shows']);
 });
 
 test('external media server operations return generic library choices', function (): void {
@@ -312,14 +297,10 @@ test('external media server operations return generic library choices', function
         'token' => 'fixture-token',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $libraries = $this->http->get(
-        '/api/v1/media-servers/' . $server->body['media_server']['id'] . '/libraries',
-        headers: $headers,
-    );
+    $libraries = $this->http->post('/api/v1/connections/' . $server->body['media_server']['id'] . '/operations/list_libraries', headers: $headers);
     $libraries->assertOk();
 
-    expect($libraries->body['libraries'][0]['id'])->toBe('shows-lib')
-        ->and($libraries->body['libraries'][0]['name'])->toBe('TV Shows');
+    expect($libraries->body['choices'][0])->toBe(['value' => 'shows-lib', 'label' => 'TV Shows']);
 });
 
 test('external jellyfin rebuild refreshes through the Component with POST after publication', function (): void {

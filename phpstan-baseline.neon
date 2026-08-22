@@ -57,7 +57,7 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$body of static method App\\Http\\Api\\ApiJson\:\:normalizeRequest\(\) expects array\<string, mixed\>, array given\.$#'
 			identifier: argument.type
-			count: 2
+			count: 3
 			path: app/Broadcasts/BroadcastController.php
 
 		-
@@ -480,7 +480,7 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$body of static method App\\Http\\Api\\ApiJson\:\:normalizeRequest\(\) expects array\<string, mixed\>, array given\.$#'
 			identifier: argument.type
-			count: 2
+			count: 3
 			path: app/MediaServers/MediaServerController.php
 
 		-

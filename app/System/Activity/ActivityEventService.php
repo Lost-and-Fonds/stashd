@@ -8,7 +8,6 @@ use App\Broadcasts\BroadcastId;
 use App\Commands\CommandRecord;
 use App\Jobs\JobRecord;
 use App\Stashes\StashRecord;
-use App\Support\PrefixedUlid;
 use App\System\Event\EventPublisher;
 use App\System\Secret\SecretsService;
 
@@ -408,26 +407,6 @@ final readonly class ActivityEventService
             commandId: (string) $command->id,
             groupKey: 'command:' . (string) $command->id,
             metadata: ['removed_count' => (int) ($prune['removed_count'] ?? 0)],
-        );
-    }
-
-    /** @param array<string, mixed> $status */
-    public function mediaServerTestCompleted(
-        CommandRecord $command,
-        JobRecord $job,
-        PrefixedUlid $connectionId,
-        array $status,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ($status['ok'] ?? false) ? ActivityLevel::Success : ActivityLevel::Warning,
-            type: 'media_server.test_completed',
-            message: $this->secrets->redact((string) ($status['message'] ?? 'Media server test completed.')),
-            entityType: 'media_server_connection',
-            entityId: $connectionId->toString(),
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: ['ok' => (bool) ($status['ok'] ?? false)],
         );
     }
 
