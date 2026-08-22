@@ -475,7 +475,8 @@ app/
     ...
 ```
 
-Inspect existing Stashd structure and `.claude/rules` / `AGENTS.md` before choosing exact paths.
+Inspect existing Stashd structure and `AGENTS.md` plus the relevant canonical
+architecture documents before choosing exact paths.
 
 ---
 

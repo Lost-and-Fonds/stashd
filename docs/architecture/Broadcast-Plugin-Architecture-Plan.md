@@ -49,7 +49,8 @@ the UI, which drives its create-broadcast dropdown from it.
 **Phases 2-3 (separate `stashd/plugin-podcast` / `stashd/plugin-media-server`
 Composer packages, `bootstrap.php`) are deferred, not scheduled.** This
 contradicts the repo rule "v1 is plugin-ready but does not ship a third-party
-plugin runtime" (`.claude/rules/stashd-architecture.md`). Plugins stay in-tree
+plugin runtime" (see `AGENTS.md` and the canonical architecture documents).
+Plugins stay in-tree
 under `app/Broadcasts/Plugins/`, discovered the same way — the packaging
 boundary was never actually needed for a single-binary self-hosted app; revisit
 only if a real third-party plugin ecosystem becomes a goal.

@@ -43,22 +43,20 @@ prompts/01-FIRST-SCAFFOLD.md
 ## Important files
 
 ```text
-CLAUDE.md                     UI-v2 agent guardrails
 planning/NOW.md               current phase + hard stopping point
 planning/ROADMAP.md           phased rebuild plan
 planning/PAGE-INVENTORY.md    pages/surfaces to work through
 planning/STATE-MATRIX.md      states discovered but not necessarily built yet
 planning/INTEGRATION-GAPS.md  missing backend/API capabilities discovered by design
 planning/DECISIONS.md         durable UI decisions
-prompts/01-FIRST-SCAFFOLD.md  initial prompt for Claude
-prompts/TASK-TEMPLATE.md      reusable prompt shape for later tiny iterations
 src/fixtures/                 page-boundary fixture data
 src/pages/                    route-level UI
 ```
 
 ## Working rhythm
 
-A good Claude session should usually produce **one thing you can look at and react to**.
+A good development session should usually produce **one thing you can look at
+and react to**.
 
 Examples:
 

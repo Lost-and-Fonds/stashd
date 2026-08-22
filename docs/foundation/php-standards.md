@@ -22,7 +22,13 @@ PSRs we do **not** implement directly today: PSR-6/16 (cache), PSR-18 (HTTP clie
 ```bash
 composer lint      # check PER-CS 3.0 and PSR-1/PSR-4 structure (CI gate)
 composer format    # auto-fix style
+composer dump-autoload --optimize --strict-psr --dry-run
 ```
+
+`composer lint` runs the strict autoload check alongside PHP CS Fixer,
+PHPCS, and PHPStan. PHP CS Fixer enforces PER Coding Style 3.0; PHPCS covers
+the PSR-1 structural rules, including one named type per file; Composer checks
+the actual PSR-4 namespace-to-path mappings.
 
 ## Non-negotiables
 
@@ -31,6 +37,13 @@ composer format    # auto-fix style
 3. **Import types** — no `\Fully\Qualified\Class` in method bodies when a `use` statement suffices.
 4. **Alphabetical `use` imports** — Pint enforces `ordered_imports`.
 5. **No closing `?>`** in pure PHP files.
+
+## Namespace imports
+
+Prefer individual imports when only a few symbols from a namespace are used.
+When many symbols come from one coherent namespace, import that namespace once
+with a short, meaningful alias when `Alias\\Type` remains clear and reduces
+noise. Apply this judgmentally; it is not a lint rule.
 
 ## API vs PHP naming
 

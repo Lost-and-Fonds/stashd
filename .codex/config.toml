@@ -25,5 +25,3 @@ approvals_reviewer = "auto_review"
 # GitHub, API calls, and similar network access.
 [sandbox_workspace_write]
 network_access = true
-
-project_doc_fallback_filenames = ["CLAUDE.md"]

@@ -64,7 +64,9 @@ This is a diagnosis-first task. Reproduce and characterize before changing code 
 The active Stashd custom container is healthy. The reproducible faults are in Lerd's host services:
 
 - nginx is configured to write every access record to `unix:/home/hazel/.local/share/lerd/run/lerd-access.sock`, but that socket is absent. This emits an alert and a failed send for every proxied request.
-- the Lerd watcher repeatedly installs dependencies in `.claude/worktrees/composed-seeking-wombat`; that environment has neither its expected npm binary nor the active Stashd database path.
+- the Lerd watcher repeatedly installs dependencies in a stale worktree; that
+  environment has neither its expected npm binary nor the active Stashd
+  database path.
 
 Neither fault proves a Mercure failure. The earlier `invalid transport: timeout` did not recur after the full site restart, so no Stashd/Mercure code change is justified from this evidence.
 

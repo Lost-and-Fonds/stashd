@@ -5,29 +5,16 @@ declare(strict_types=1);
 namespace JellyfinNative;
 
 use RuntimeException;
-use Stashd\PluginSdk\Artifact;
-use Stashd\PluginSdk\BroadcastPlugin;
-use Stashd\PluginSdk\Choice;
-use Stashd\PluginSdk\FinalizationRequest;
-use Stashd\PluginSdk\Item;
-use Stashd\PluginSdk\OperationRequest;
-use Stashd\PluginSdk\OperationResult;
-use Stashd\PluginSdk\OptionValue;
-use Stashd\PluginSdk\PluginContext;
-use Stashd\PluginSdk\Preparation;
-use Stashd\PluginSdk\Publication;
-use Stashd\PluginSdk\PublishedFile;
-use Stashd\PluginSdk\PublishRequest;
-use Stashd\PluginSdk\Setting;
+use Stashd\PluginSdk as Sdk;
 
-final class JellyfinBroadcast implements BroadcastPlugin
+final class JellyfinBroadcast implements Sdk\BroadcastPlugin
 {
-    public function prepare(PublishRequest $request): Preparation
+    public function prepare(Sdk\PublishRequest $request): Sdk\Preparation
     {
-        return new Preparation();
+        return new Sdk\Preparation();
     }
 
-    public function publish(PublishRequest $request): Publication
+    public function publish(Sdk\PublishRequest $request): Sdk\Publication
     {
         $files = [];
         foreach ($request->items as $item) {
@@ -36,17 +23,17 @@ final class JellyfinBroadcast implements BroadcastPlugin
                 continue;
             }
             $index = $this->itemIndex($item, $request->items);
-            $files[] = new PublishedFile(
+            $files[] = new Sdk\PublishedFile(
                 $item->id,
                 $resource->reference,
                 'Season 01/S01E' . str_pad((string) $index, 2, '0', STR_PAD_LEFT) . ' - ' . $this->sanitize($item->title) . '.mp4',
             );
         }
 
-        return new Publication(new Artifact(''), $files);
+        return new Sdk\Publication(new Sdk\Artifact(''), $files);
     }
 
-    public function finalize(FinalizationRequest $request, PluginContext $context): Publication
+    public function finalize(Sdk\FinalizationRequest $request, Sdk\PluginContext $context): Sdk\Publication
     {
         $server = $this->setting($request->request->settings, 'server_url');
         if ($server === null) {
@@ -59,7 +46,7 @@ final class JellyfinBroadcast implements BroadcastPlugin
         return $request->publication;
     }
 
-    public function operation(OperationRequest $request, PluginContext $context): OperationResult
+    public function operation(Sdk\OperationRequest $request, Sdk\PluginContext $context): Sdk\OperationResult
     {
         $server = $this->setting($request->settings, 'server_url');
         if ($server === null) {
@@ -75,7 +62,7 @@ final class JellyfinBroadcast implements BroadcastPlugin
         $response = $context->http->request($method, rtrim($server, '/') . $path, [], null, $this->credential($request->settings));
         $this->requireSuccess($response->status, 'Jellyfin request');
         if ($request->name === 'refresh-library') {
-            return new OperationResult(values: [new Setting('ok', OptionValue::text('true'))]);
+            return new Sdk\OperationResult(values: [new Sdk\Setting('ok', Sdk\OptionValue::text('true'))]);
         }
         try {
             $data = json_decode($response->body(), true, 512, JSON_THROW_ON_ERROR);
@@ -86,24 +73,24 @@ final class JellyfinBroadcast implements BroadcastPlugin
             throw new RuntimeException('Jellyfin returned invalid JSON');
         }
         if ($request->name === 'test-connection') {
-            return new OperationResult(values: [
-                new Setting('ok', OptionValue::text('true')),
-                new Setting('message', OptionValue::text('Jellyfin connection OK.')),
-                new Setting('server_name', OptionValue::text((string) ($data['ServerName'] ?? 'Jellyfin'))),
-                new Setting('version', OptionValue::text((string) ($data['Version'] ?? ''))),
+            return new Sdk\OperationResult(values: [
+                new Sdk\Setting('ok', Sdk\OptionValue::text('true')),
+                new Sdk\Setting('message', Sdk\OptionValue::text('Jellyfin connection OK.')),
+                new Sdk\Setting('server_name', Sdk\OptionValue::text((string) ($data['ServerName'] ?? 'Jellyfin'))),
+                new Sdk\Setting('version', Sdk\OptionValue::text((string) ($data['Version'] ?? ''))),
             ]);
         }
         $choices = [];
         foreach (is_array($data['Items'] ?? null) ? $data['Items'] : [] as $item) {
             if (is_array($item) && isset($item['Id'])) {
-                $choices[] = new Choice((string) $item['Id'], (string) ($item['Name'] ?? 'Library'));
+                $choices[] = new Sdk\Choice((string) $item['Id'], (string) ($item['Name'] ?? 'Library'));
             }
         }
 
-        return new OperationResult($choices);
+        return new Sdk\OperationResult($choices);
     }
 
-    /** @param list<Setting> $settings */
+    /** @param list<Sdk\Setting> $settings */
     private function setting(array $settings, string $key): ?string
     {
         foreach ($settings as $setting) {
@@ -115,7 +102,7 @@ final class JellyfinBroadcast implements BroadcastPlugin
         return null;
     }
 
-    /** @param list<Setting> $settings */
+    /** @param list<Sdk\Setting> $settings */
     private function credential(array $settings): string
     {
         return $this->setting($settings, 'credential_name') ?? 'jellyfin-api-token';
@@ -128,7 +115,7 @@ final class JellyfinBroadcast implements BroadcastPlugin
         }
     }
 
-    private function videoResource(Item $item): ?\Stashd\PluginSdk\ItemResource
+    private function videoResource(Sdk\Item $item): ?Sdk\ItemResource
     {
         foreach ($item->resources as $resource) {
             if ($resource->kind === 'video') {
@@ -139,8 +126,8 @@ final class JellyfinBroadcast implements BroadcastPlugin
         return null;
     }
 
-    /** @param list<Item> $items */
-    private function itemIndex(Item $item, array $items): int
+    /** @param list<Sdk\Item> $items */
+    private function itemIndex(Sdk\Item $item, array $items): int
     {
         foreach ($items as $index => $candidate) {
             if ($candidate->id === $item->id) {

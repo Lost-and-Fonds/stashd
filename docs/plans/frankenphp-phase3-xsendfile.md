@@ -83,7 +83,7 @@ itself and neither header is needed.
 ## Non-goals / unchanged
 
 - Token auth, non-revealing-404 behavior, path-token-not-query-token rule:
-  untouched (`.claude/rules/security-tokens-secrets.md`).
+  untouched (see `docs/development/security.md`).
 - `PodcastEpisodeUrlBuilder`, feed XML generation: untouched.
 - Video broadcasts / other media kinds using the same controller: same
   treatment, no kind-specific branching needed.

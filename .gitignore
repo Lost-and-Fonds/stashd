@@ -10,14 +10,9 @@
 /.idea/
 .phpunit.result.cache
 composer.phar
-.aider*
-CLAUDE.local.md
 /test-results/
 /target/
 __pycache__/
 /playwright-report/
 /.env.lerd_override
-.claude/settings.local.json
-.claude/transcripts/
-.claude/checkpoints/
 /.pi-lens/

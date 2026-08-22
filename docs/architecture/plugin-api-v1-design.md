@@ -701,7 +701,7 @@ Do not begin with Jellyfin/Plex because their current shared series engine could
 
 Only this Markdown document was added. The archaeology inspected:
 
-- `AGENTS.md` and every Markdown rule under `.claude/rules/`;
+- `AGENTS.md` and the relevant canonical development/architecture documents;
 - [PLUGIN-SPIKE.md](PLUGIN-SPIKE.md);
 - [Broadcast-Plugin-Architecture-Plan.md](Broadcast-Plugin-Architecture-Plan.md);
 - provider, download, Stash Input, Vault, Broadcast, and media-server documentation;

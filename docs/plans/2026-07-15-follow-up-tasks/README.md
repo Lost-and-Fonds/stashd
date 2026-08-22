@@ -16,7 +16,8 @@ on unstated decisions.
 
 ## Shared rules
 
-- Read `AGENTS.md` and every `.claude/rules/*.md` file before working.
+- Read `AGENTS.md` and the relevant canonical development/architecture docs
+  before working.
 - Use the Lerd/custom-container workflow from `AGENTS.md`; do not run host PHP tooling.
 - Preserve the `Stash -> Vault -> Broadcasts` boundary. Vault assets are canonical; broadcasts are
   disposable generated views.
