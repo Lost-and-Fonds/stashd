@@ -62,7 +62,7 @@ parent_output=$(sh -c '
     sleep 0.5
     kill -TERM "$runner"
     wait "$runner" || true
-    sleep 1
+    sleep 5.5
     if find "$2" -name alive -print -quit | grep -q .; then
         echo parent-death-failed
         exit 1
@@ -72,3 +72,5 @@ parent_output=$(sh -c '
 [ "$parent_output" = parent-death-pass ] || { echo "FAIL: $parent_output" >&2; exit 1; }
 echo "M1 parent death: PASS"
 echo "M1 native runner skeleton: PASS"
+
+sh "$ROOT/rpc/test.sh"

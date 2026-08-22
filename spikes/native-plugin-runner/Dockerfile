@@ -1,7 +1,7 @@
 FROM php:8.5-cli-bookworm
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bubblewrap ca-certificates \
+    && apt-get install -y --no-install-recommends bubblewrap ca-certificates python3 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 1000 --shell /bin/sh plugin
 
