@@ -18,7 +18,11 @@ Podcast, Jellyfin, and Plex remain in this repository while the contract is
 validated. Their remote connection records are transitional reusable endpoint,
 secret, and library-selection storage. A generic Plugin Connection object is
 deferred until another remote-service plugin demonstrates a need beyond this
-configuration.
+configuration. The old PHP media-server client/scan-trigger path is no longer
+an active Broadcast lifecycle path: external Components own remote operations
+in `finalize`/opaque operations. Historical connection API/storage remains
+only as a compatibility surface until it can be migrated without recreating
+connections.
 
 ## Status (historical plan; current implementation updated 2026-08-21)
 

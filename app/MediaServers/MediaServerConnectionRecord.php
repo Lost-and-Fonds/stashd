@@ -18,7 +18,8 @@ final class MediaServerConnectionRecord
     public PrimaryKey $id;
 
     public function __construct(
-        public MediaServerType $type,
+        /** Logical plugin key retained in the legacy connection table for upgrade compatibility. */
+        public string $type,
         public string $name,
         public string $baseUri,
         public MediaServerConnectionState $state,

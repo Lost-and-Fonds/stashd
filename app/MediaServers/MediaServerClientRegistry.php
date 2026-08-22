@@ -19,25 +19,25 @@ final readonly class MediaServerClientRegistry
 
     public function clientFor(MediaServerConnectionRecord $connection): MediaServerClient
     {
-        $external = $this->externalPlugins->findByLogicalKey($connection->type->value);
+        $external = $this->externalPlugins->findByLogicalKey($connection->type);
         if ($external !== null && $external->available()) {
             return new ExternalMediaServerClient($external, new PluginHostClient($external->socketPath), $this->grants);
         }
 
-        return $this->fallback($connection->type);
+        return $this->fallback();
     }
 
-    public function clientForType(MediaServerType $type): MediaServerClient
+    public function clientForType(string $type): MediaServerClient
     {
-        $external = $this->externalPlugins->findByLogicalKey($type->value);
+        $external = $this->externalPlugins->findByLogicalKey($type);
         if ($external !== null && $external->available()) {
             return new ExternalMediaServerClient($external, new PluginHostClient($external->socketPath), $this->grants);
         }
 
-        return $this->fallback($type);
+        return $this->fallback();
     }
 
-    private function fallback(MediaServerType $type): MediaServerClient
+    private function fallback(): MediaServerClient
     {
         return new UnavailableMediaServerClient();
     }

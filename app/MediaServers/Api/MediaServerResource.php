@@ -24,7 +24,7 @@ final readonly class MediaServerResource
     {
         return ApiJson::encode([
             'id' => (string) $this->connection->id,
-            'type' => $this->connection->type->value,
+            'type' => $this->connection->type,
             'name' => $this->connection->name,
             'baseUri' => $this->connection->baseUri,
             'state' => $this->connection->state->value,

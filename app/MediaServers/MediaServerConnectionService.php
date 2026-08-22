@@ -25,7 +25,7 @@ final readonly class MediaServerConnectionService
     }
 
     public function create(
-        MediaServerType $type,
+        string $type,
         string $name,
         string $baseUri,
         #[\SensitiveParameter] ?string $token = null,

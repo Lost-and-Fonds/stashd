@@ -21,7 +21,7 @@ final class MediaServerConnectionRepository
     }
 
     public function create(
-        MediaServerType $type,
+        string $type,
         string $name,
         string $baseUri,
         MediaServerConnectionState $state = MediaServerConnectionState::Ready,

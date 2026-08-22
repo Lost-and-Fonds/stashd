@@ -8,6 +8,7 @@ use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\MediaServers\Api\MediaServerResource;
+use App\Plugins\ExternalBroadcastPluginRegistry;
 use App\Support\PrefixedUlid;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
@@ -25,6 +26,7 @@ final readonly class MediaServerController
     public function __construct(
         private MediaServerConnectionRepository $connections,
         private MediaServerConnectionService $service,
+        private ExternalBroadcastPluginRegistry $plugins,
     ) {
     }
 
@@ -51,9 +53,7 @@ final readonly class MediaServerController
             return $this->validationError('type, name, and base_uri are required.');
         }
 
-        $type = MediaServerType::tryFrom($typeRaw);
-
-        if ($type === null) {
+        if ($this->plugins->findByLogicalKey($typeRaw) === null) {
             return $this->validationError('Unsupported media server type.');
         }
 
@@ -61,7 +61,7 @@ final readonly class MediaServerController
         $settings = is_array($body['settings'] ?? null) ? ApiJson::encode($body['settings']) : null;
 
         $connection = $this->service->create(
-            type: $type,
+            type: $typeRaw,
             name: $name,
             baseUri: $baseUri,
             token: $token,
