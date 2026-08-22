@@ -17,7 +17,7 @@ interface BroadcastPlugin
      * Unique keys identifying broadcasts this plugin can produce.
      *
      * Each key maps to a broadcast format identifier. For example,
-     * a Jellyfin plugin might return ['jellyfin_tv', 'jellyfin_movie'].
+     * a series plugin might return ['series_tv', 'series_movie'].
      *
      * @return list<string>
      */

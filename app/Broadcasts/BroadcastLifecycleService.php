@@ -172,7 +172,7 @@ final readonly class BroadcastLifecycleService
 
         $trigger = null;
 
-        if ($verify->ok && $this->shouldAutoTrigger($broadcast)) {
+        if ($verify->ok && $this->shouldAutoTrigger($broadcast) && ! ($plugin instanceof \App\Plugins\ExternalBroadcastPlugin)) {
             if ($onProgress !== null) {
                 $onProgress('Triggering media server scan');
             }
@@ -235,7 +235,7 @@ final readonly class BroadcastLifecycleService
 
         $trigger = null;
 
-        if ($verify->ok && $this->shouldAutoTrigger($broadcast)) {
+        if ($verify->ok && $this->shouldAutoTrigger($broadcast) && ! ($plugin->plugin instanceof \App\Plugins\ExternalBroadcastPlugin)) {
             if ($onProgress !== null) {
                 $onProgress('Triggering media server scan');
             }

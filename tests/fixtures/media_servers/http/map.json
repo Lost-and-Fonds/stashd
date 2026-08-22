@@ -1,11 +1,16 @@
 {
   "http://jellyfin.test/System/Info/Public": "jellyfin/system-info.json",
   "http://jellyfin.test/Library/MediaFolders": "jellyfin/libraries.json",
+  "https://jellyfin.test/System/Info/Public": "jellyfin/system-info.json",
+  "https://jellyfin.test/Library/MediaFolders": "jellyfin/libraries.json",
   "http://jellyfin.test/Library/Refresh": "jellyfin/refresh-ok.json",
+  "https://jellyfin.test/Library/Refresh": "jellyfin/refresh-ok.json",
   "http://plex.test/identity": "plex/identity.json",
   "http://plex.test/library/sections": "plex/sections.json",
   "http://plex.test/library/sections/1/refresh": "plex/refresh-ok.json",
   "http://jellyfin-fail.test/System/Info/Public": "status:401",
   "http://jellyfin-fail.test/Library/Refresh": "status:500",
+  "https://jellyfin-fail.test/System/Info/Public": "status:401",
+  "https://jellyfin-fail.test/Library/Refresh": "status:500",
   "http://plex-fail.test/identity": "status:401"
 }

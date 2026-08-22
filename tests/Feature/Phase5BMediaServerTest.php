@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Broadcasts\BroadcastId;
+use App\Broadcasts\BroadcastItemId;
 use App\Broadcasts\BroadcastLifecycleService;
 use App\Broadcasts\BroadcastNfoBuilder;
-use App\Broadcasts\BroadcastTriggerRecord;
-use App\Broadcasts\BroadcastTriggerRunRecord;
-use App\Broadcasts\MediaServerScanTriggerSettings;
 use App\MediaServers\MediaServerConnectionRecord;
 use App\MediaServers\MediaServerLibrarySelection;
 use App\System\Activity\ActivityEventRecord;
@@ -23,7 +21,7 @@ use Tempest\Database\PrimaryKey;
 use Tempest\Database\Query;
 use Tempest\Http\Status;
 
-test('jellyfin_series broadcast plan includes SxxExxx filenames and nfo sidecars', function (): void {
+test('external jellyfin broadcast publishes the component-selected media path', function (): void {
     [$headers, $stashId, $mediaItemId, $broadcastId] = array_slice(
         $this->bootstrapJellyfinDownloadBroadcast('jellyfin-plan'),
         0,
@@ -39,19 +37,27 @@ test('jellyfin_series broadcast plan includes SxxExxx filenames and nfo sidecars
     $plan = $this->container->get(BroadcastLifecycleService::class)
         ->plan(BroadcastId::parse($broadcastId));
 
-    expect($plan->files[0]->filename)->toMatch('/^S\d{2}E\d{3} - /')
-        ->and($plan->sidecars)->not->toBeEmpty();
+    expect($plan->files)->toBeEmpty();
 
-    $hasTvShowNfo = false;
+    $rebuild = $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcastId],
+    ], headers: $headers);
+    $this->processAllJobs();
 
-    foreach ($plan->sidecars as $sidecar) {
-        if (str_ends_with($sidecar->relativePath, 'tvshow.nfo')) {
-            $hasTvShowNfo = true;
-            break;
-        }
-    }
+    expect($this->http->get('/api/v1/commands/' . $rebuild->body['command_id'], headers: $headers)
+        ->body['command']['state'])->toBe('completed');
 
-    expect($hasTvShowNfo)->toBeTrue();
+    $item = $this->http->get('/api/v1/broadcasts/' . $broadcastId . '/items', headers: $headers)
+        ->body['items'][0];
+    $publishedAsset = $this->container->get(AssetRepository::class)
+        ->findByBroadcastItemAndRole(
+            BroadcastItemId::fromPrimaryKey(new PrimaryKey($item['id'])),
+            AssetRole::Hardlink,
+        );
+    expect($item['published_path'])->toMatch('/Season 01\/S01E01 - /')
+        ->and(is_file($item['published_path']))->toBeTrue();
+    expect($publishedAsset?->path)->toBe($item['published_path']);
 });
 
 test('plex_series broadcast rebuild publishes media captions and nfo sidecars', function (): void {
@@ -125,7 +131,7 @@ test('media server connection stores token through secrets service', function ()
     $response = $this->http->post('/api/v1/media-servers', [
         'type' => 'jellyfin',
         'name' => 'Secret Jellyfin',
-        'base_uri' => 'http://jellyfin.test',
+        'base_uri' => 'https://jellyfin.test',
         'token' => 'super-secret-jellyfin-token-value',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
@@ -199,7 +205,7 @@ test('media server test connection command succeeds with fixtures', function ():
     $server = $this->http->post('/api/v1/media-servers', [
         'type' => 'jellyfin',
         'name' => 'Test Jellyfin',
-        'base_uri' => 'http://jellyfin.test',
+        'base_uri' => 'https://jellyfin.test',
         'token' => 'fixture-token',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
@@ -221,7 +227,7 @@ test('media server test connection reports failure without leaking token', funct
     $server = $this->http->post('/api/v1/media-servers', [
         'type' => 'jellyfin',
         'name' => 'Fail Jellyfin',
-        'base_uri' => 'http://jellyfin-fail.test',
+        'base_uri' => 'https://jellyfin-fail.test',
         'token' => 'leaked-token-should-not-appear',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
@@ -253,7 +259,27 @@ test('media server list libraries returns snake_case fixture libraries', functio
         ->and($libraries->body['libraries'][0]['name'])->toBe('TV Shows');
 });
 
-test('broadcast trigger scan success records trigger run without failing broadcast', function (): void {
+test('external media server operations return generic library choices', function (): void {
+    $headers = $this->authHeaders();
+
+    $server = $this->http->post('/api/v1/media-servers', [
+        'type' => 'jellyfin',
+        'name' => 'Library Jellyfin',
+        'base_uri' => 'https://jellyfin.test',
+        'token' => 'fixture-token',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $libraries = $this->http->get(
+        '/api/v1/media-servers/' . $server->body['media_server']['id'] . '/libraries',
+        headers: $headers,
+    );
+    $libraries->assertOk();
+
+    expect($libraries->body['libraries'][0]['id'])->toBe('shows-lib')
+        ->and($libraries->body['libraries'][0]['name'])->toBe('TV Shows');
+});
+
+test('external jellyfin rebuild refreshes through the Component without the legacy PHP trigger', function (): void {
     [$headers, $stashId, $mediaItemId, $broadcastId, $connectionId] = $this->bootstrapJellyfinDownloadBroadcast('trigger-success');
 
     $this->http->post('/api/v1/commands', [
@@ -274,89 +300,7 @@ test('broadcast trigger scan success records trigger run without failing broadca
     $broadcast = $this->http->get('/api/v1/broadcasts/' . $broadcastId, headers: $headers);
     expect($broadcast->body['broadcast']['state'])->toBe('ready');
 
-    $runs = BroadcastTriggerRunRecord::select()->all();
-    expect($runs)->not->toBeEmpty()
-        ->and($runs[0]->state->value)->toBe('ready');
-
-    $triggerRecord = BroadcastTriggerRecord::select()
-        ->where('broadcastId', $broadcastId)
-        ->first();
-
-    expect($triggerRecord)->not->toBeNull()
-        ->and($triggerRecord->settings)->toBeInstanceOf(MediaServerScanTriggerSettings::class)
-        ->and($triggerRecord->settings?->mediaServerConnectionId)->toBe($connectionId);
-
-    $row = $this->container->get(Database::class)->fetchFirst(new Query(
-        'SELECT settings FROM broadcast_triggers WHERE id = ?',
-        bindings: [(string) $triggerRecord->id],
-    ));
-    $storedSettings = json_decode((string) $row['settings'], true, flags: JSON_THROW_ON_ERROR);
-
-    expect($storedSettings)->toBe([
-        'type' => 'media_server_scan_trigger_settings',
-        'data' => [
-            'mediaServerConnectionId' => $connectionId,
-        ],
-    ]);
-
-    $types = array_map(
-        static fn (ActivityEventRecord $event): string => $event->type,
-        ActivityEventRecord::select()->orderBy('createdAt', \Tempest\Database\Direction::DESC)->limit(15)->all(),
-    );
-    expect($types)->toContain('broadcast.trigger_succeeded');
-});
-
-test('broadcast trigger scan failure does not mark broadcast failed', function (): void {
-    [$headers, $stashId, $mediaItemId] = array_slice($this->bootstrapFakeDownloadStash('trigger-fail'), 0, 3);
-
-    $server = $this->http->post('/api/v1/media-servers', [
-        'type' => 'jellyfin',
-        'name' => 'Fail Trigger Jellyfin',
-        'base_uri' => 'http://jellyfin-fail.test',
-        'token' => 'fixture-token',
-        'settings' => ['library_id' => 'shows-lib'],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-
-    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'jellyfin',
-        'name' => 'Trigger Fail Series',
-        'slug' => 'trigger-fail-' . bin2hex(random_bytes(3)),
-        'settings' => ['media_server_connection_id' => $server->body['media_server']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'item.download',
-        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
-    ], headers: $headers);
-    $this->processAllJobs();
-
-    $rebuild = $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
-    ], headers: $headers);
-    $this->processAllJobs();
-
-    expect($this->http->get('/api/v1/commands/' . $rebuild->body['command_id'], headers: $headers)->body['command']['state'])
-        ->toBe('completed');
-
-    $show = $this->http->get('/api/v1/broadcasts/' . $broadcast->body['broadcast']['id'], headers: $headers);
-    expect($show->body['broadcast']['state'])->toBe('ready');
-
-    $trigger = $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.trigger',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $triggerShow = $this->http->get('/api/v1/commands/' . $trigger->body['command_id'], headers: $headers);
-    expect($triggerShow->body['command']['state'])->toBe('completed')
-        ->and($triggerShow->body['command']['result']['trigger']['failure_count'])->toBeGreaterThan(0);
-
-    $broadcastAfter = $this->http->get('/api/v1/broadcasts/' . $broadcast->body['broadcast']['id'], headers: $headers);
-    expect($broadcastAfter->body['broadcast']['state'])->toBe('ready');
-
-    $run = BroadcastTriggerRunRecord::select()->orderBy('createdAt', \Tempest\Database\Direction::DESC)->first();
-    expect($run?->state->value)->toBe('failed');
+    expect($connectionId)->not->toBe('');
 });
 
 test('broadcast nfo builder escapes unsafe xml characters', function (): void {

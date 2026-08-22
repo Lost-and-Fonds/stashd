@@ -200,7 +200,6 @@ final readonly class BroadcastTriggerService
     private function triggerTypeForBroadcast(BroadcastRecord $broadcast): ?BroadcastTriggerType
     {
         return match ($broadcast->type) {
-            'jellyfin' => BroadcastTriggerType::JellyfinScan,
             'plex' => BroadcastTriggerType::PlexScan,
             default => null,
         };

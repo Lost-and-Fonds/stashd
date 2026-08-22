@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 test('container resolves broadcast and media server services', function (): void {
     expect($this->container->get(\App\Broadcasts\BroadcastLifecycleService::class))->not->toBeNull()
-        ->and($this->container->get(\App\Broadcasts\Plugins\JellyfinBroadcastPlugin::class))->not->toBeNull()
         ->and($this->container->get(\App\MediaServers\MediaServerConnectionService::class))->not->toBeNull()
         ->and($this->container->get(\App\Commands\CommandHandlerRegistry::class)->handlerFor(\App\Commands\CommandType::BroadcastRebuild))->not->toBeNull()
         ->and($this->container->get(\App\Commands\CommandHandlerRegistry::class)->handlerFor(\App\Commands\CommandType::BroadcastRebuildItem))->not->toBeNull();

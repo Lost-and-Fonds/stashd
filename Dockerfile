@@ -42,16 +42,21 @@ COPY plugin-host ./plugin-host
 COPY plugins/example ./plugins/example
 COPY plugins/youtube ./plugins/youtube
 COPY plugins/podcast ./plugins/podcast
+COPY plugins/jellyfin ./plugins/jellyfin
 RUN cargo build -p stashd-plugin-host --release \
     && cargo build -p stashd-youtube-plugin --target wasm32-wasip2 --release \
     && cargo build -p stashd-podcast-plugin --target wasm32-wasip2 --release \
+    && cargo build -p stashd-jellyfin-plugin --target wasm32-wasip2 --release \
     && mkdir -p /plugin-output \
     && target/release/stashd-plugin-host build-component \
         target/wasm32-wasip2/release/stashd_youtube_plugin.wasm \
         /plugin-output/youtube.wasm \
     && target/release/stashd-plugin-host build-component \
         target/wasm32-wasip2/release/stashd_podcast_plugin.wasm \
-        /plugin-output/podcast.wasm
+        /plugin-output/podcast.wasm \
+    && target/release/stashd-plugin-host build-component \
+        target/wasm32-wasip2/release/stashd_jellyfin_plugin.wasm \
+        /plugin-output/jellyfin.wasm
 
 FROM node AS assets
 WORKDIR /app
@@ -136,7 +141,8 @@ ENV STASHD_HTTP_PORT=8474 \
     STASHD_PUBLIC_URL=http://localhost:8474 \
     STASHD_PLUGIN_HOST_SOCKET=/tmp/stashd-plugin-host.sock \
     STASHD_PLUGIN_COMPONENT=/usr/local/share/stashd/plugins/youtube.wasm \
-    STASHD_BROADCAST_PLUGIN_COMPONENT=/usr/local/share/stashd/plugins/podcast.wasm
+    STASHD_BROADCAST_PLUGIN_COMPONENT=/usr/local/share/stashd/plugins/podcast.wasm \
+    STASHD_BROADCAST_PLUGIN_COMPONENT_JELLYFIN=/usr/local/share/stashd/plugins/jellyfin.wasm
 
 EXPOSE 8474
 
@@ -174,7 +180,8 @@ COPY docker/php-dev.ini /usr/local/etc/php/conf.d/zz-stashd-dev.ini
 ENV XDEBUG_MODE=off
 ENV PATH="/usr/local/cargo/bin:${PATH}" \
     CARGO_HOME=/usr/local/cargo \
-    RUSTUP_HOME=/usr/local/rustup
+    RUSTUP_HOME=/usr/local/rustup \
+    STASHD_BROADCAST_PLUGIN_COMPONENT_JELLYFIN=/usr/local/share/stashd/plugins/jellyfin.wasm
 
 FROM base AS prod
 

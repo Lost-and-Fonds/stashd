@@ -43,6 +43,7 @@ mod broadcast_world {
         world: "broadcast-world",
         with: {
             "stashd:plugin/broadcast-host/staging-area": super::BroadcastStagingAreaResource,
+            "stashd:plugin/broadcast-host/http-client": super::BroadcastHttpClientResource,
         },
     });
 }
@@ -68,6 +69,7 @@ pub struct StagingOutputResource {
 }
 
 pub struct BroadcastStagingAreaResource;
+pub struct BroadcastHttpClientResource;
 
 struct HostState {
     table: ResourceTable,
@@ -94,12 +96,15 @@ struct BroadcastState {
     logs: Vec<String>,
     staging_dir: PathBuf,
     helper: Option<HelperGrant>,
+    http_grants: Vec<HttpGrant>,
+    fixture_dir: Option<PathBuf>,
 }
 
 struct CredentialGrant {
     name: String,
     value: String,
     query_parameter: String,
+    placement: String,
 }
 
 struct HttpGrant {
@@ -178,12 +183,13 @@ enum InputOptionValueRequest {
     Text(String),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct HttpGrantRequest {
     allowed_prefixes: Vec<String>,
     credential_name: Option<String>,
     credential_value: Option<String>,
     credential_parameter: Option<String>,
+    credential_placement: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -267,6 +273,11 @@ enum Response {
     BroadcastPrepared {
         id: String,
         preparation: serde_json::Value,
+    },
+    #[serde(rename = "broadcast_operation")]
+    BroadcastOperation {
+        id: String,
+        result: serde_json::Value,
     },
     #[serde(rename = "error")]
     Error {
@@ -361,6 +372,12 @@ impl HostStagingOutput for HostState {
 }
 
 impl broadcast_world::stashd::plugin::broadcast_host::Host for BroadcastState {
+    fn open_http_client(&mut self) -> Resource<BroadcastHttpClientResource> {
+        self.table
+            .push(BroadcastHttpClientResource)
+            .expect("resource table is available")
+    }
+
     fn open_staging_area(&mut self) -> Resource<BroadcastStagingAreaResource> {
         self.table
             .push(BroadcastStagingAreaResource)
@@ -373,6 +390,89 @@ impl broadcast_world::stashd::plugin::broadcast_host::Host for BroadcastState {
 
     fn log(&mut self, message: String) {
         self.logs.push(message);
+    }
+}
+
+impl broadcast_world::stashd::plugin::broadcast_host::HostHttpClient for BroadcastState {
+    fn get(
+        &mut self,
+        client: Resource<BroadcastHttpClientResource>,
+        request: broadcast_world::stashd::plugin::broadcast_host::HttpRequest,
+    ) -> Result<
+        broadcast_world::stashd::plugin::broadcast_host::HttpResponse,
+        broadcast_world::stashd::plugin::broadcast_host::HttpError,
+    > {
+        let _ = self.table.get(&client).map_err(|_| {
+            broadcast_world::stashd::plugin::broadcast_host::HttpError::Failed(
+                "HTTP capability expired".to_owned(),
+            )
+        })?;
+        let (url, header) = authenticated_broadcast_request(
+            &request.url,
+            request.credential.as_deref(),
+            &self.http_grants,
+        )?;
+
+        if let Some(directory) = &self.fixture_dir {
+            let map_path = directory.join("map.json");
+            let map: std::collections::HashMap<String, String> =
+                serde_json::from_slice(&fs::read(&map_path).map_err(|error| {
+                    broadcast_world::stashd::plugin::broadcast_host::HttpError::Failed(
+                        error.to_string(),
+                    )
+                })?)
+                .map_err(|error| {
+                    broadcast_world::stashd::plugin::broadcast_host::HttpError::Failed(
+                        error.to_string(),
+                    )
+                })?;
+            let filename = map
+                .get(&url)
+                .or_else(|| {
+                    map.iter()
+                        .find(|(pattern, _)| url.starts_with(pattern.as_str()))
+                        .map(|(_, filename)| filename)
+                })
+                .ok_or_else(|| {
+                    broadcast_world::stashd::plugin::broadcast_host::HttpError::Unavailable(
+                        "fixture not found".to_owned(),
+                    )
+                })?;
+            let body = fs::read(directory.join(filename)).map_err(|error| {
+                broadcast_world::stashd::plugin::broadcast_host::HttpError::Failed(
+                    error.to_string(),
+                )
+            })?;
+            return Ok(
+                broadcast_world::stashd::plugin::broadcast_host::HttpResponse {
+                    status: fixture_status(filename),
+                    body,
+                },
+            );
+        }
+
+        let agent = ureq::AgentBuilder::new().redirects(0).build();
+        let mut request_builder = agent.get(&url);
+        if let Some((name, value)) = header {
+            request_builder = request_builder.set(&name, &value);
+        }
+        let response = request_builder.call().map_err(|_| {
+            broadcast_world::stashd::plugin::broadcast_host::HttpError::Unavailable(
+                "approved HTTP request unavailable".to_owned(),
+            )
+        })?;
+        let status = response.status();
+        let mut body = Vec::new();
+        response.into_reader().read_to_end(&mut body).map_err(|_| {
+            broadcast_world::stashd::plugin::broadcast_host::HttpError::Failed(
+                "approved HTTP response could not be read".to_owned(),
+            )
+        })?;
+        Ok(broadcast_world::stashd::plugin::broadcast_host::HttpResponse { status, body })
+    }
+
+    fn drop(&mut self, client: Resource<BroadcastHttpClientResource>) -> wasmtime::Result<()> {
+        Ok(self.table.delete(client).map(|_| ())?)
     }
 }
 
@@ -720,6 +820,12 @@ fn workspace_files(root: &Path) -> Result<std::collections::BTreeSet<String>, St
 }
 
 fn fixture_status(filename: &str) -> u16 {
+    if let Some(status) = filename
+        .strip_prefix("status:")
+        .and_then(|value| value.parse().ok())
+    {
+        return status;
+    }
     match filename {
         "unavailable.txt" => 404,
         "auth_rejected.json" => 401,
@@ -784,6 +890,55 @@ fn authenticated_url(
     Err(input_host::HttpError::CredentialUnavailable)
 }
 
+fn authenticated_broadcast_request(
+    url: &str,
+    requested_credential: Option<&str>,
+    grants: &[HttpGrant],
+) -> Result<
+    (String, Option<(String, String)>),
+    broadcast_world::stashd::plugin::broadcast_host::HttpError,
+> {
+    if !url.starts_with("https://") {
+        return Err(broadcast_world::stashd::plugin::broadcast_host::HttpError::Denied);
+    }
+    let grant = grants.iter().find(|grant| {
+        grant
+            .allowed_prefixes
+            .iter()
+            .any(|prefix| url.starts_with(prefix))
+    });
+    let Some(grant) = grant else {
+        return Err(broadcast_world::stashd::plugin::broadcast_host::HttpError::Denied);
+    };
+    let Some(requested) = requested_credential else {
+        return if grant.credential.is_none() {
+            Ok((url.to_owned(), None))
+        } else {
+            Err(broadcast_world::stashd::plugin::broadcast_host::HttpError::CredentialUnavailable)
+        };
+    };
+    let credential = grant
+        .credential
+        .as_ref()
+        .filter(|credential| credential.name == requested && !credential.value.is_empty())
+        .ok_or(broadcast_world::stashd::plugin::broadcast_host::HttpError::CredentialUnavailable)?;
+    if credential.placement == "header" {
+        return Ok((
+            url.to_owned(),
+            Some((credential.query_parameter.clone(), credential.value.clone())),
+        ));
+    }
+    let mut parsed = url::Url::parse(url).map_err(|_| {
+        broadcast_world::stashd::plugin::broadcast_host::HttpError::Failed(
+            "invalid approved URL".to_owned(),
+        )
+    })?;
+    parsed
+        .query_pairs_mut()
+        .append_pair(&credential.query_parameter, &credential.value);
+    Ok((parsed.to_string(), None))
+}
+
 fn into_http_grants(requests: Option<Vec<HttpGrantRequest>>) -> Vec<HttpGrant> {
     requests
         .unwrap_or_default()
@@ -798,6 +953,9 @@ fn into_http_grants(requests: Option<Vec<HttpGrantRequest>>) -> Vec<HttpGrant> {
                     name,
                     value,
                     query_parameter,
+                    placement: request
+                        .credential_placement
+                        .unwrap_or_else(|| "query".to_owned()),
                 }),
         })
         .collect()
@@ -1029,6 +1187,8 @@ fn invoke_broadcast(
     engine: &Engine,
     component: &Component,
     staging_dir: PathBuf,
+    fixture_dir: Option<PathBuf>,
+    http_grant_requests: Option<Vec<HttpGrantRequest>>,
     request: BroadcastPublishRequest,
     operation: &str,
     helper_name: Option<String>,
@@ -1050,6 +1210,8 @@ fn invoke_broadcast(
                     executable,
                     package_root: helper_package_root,
                 }),
+            http_grants: into_http_grants(http_grant_requests),
+            fixture_dir,
         },
     );
     let mut linker = Linker::new(engine);
@@ -1110,6 +1272,11 @@ fn invoke_broadcast(
                 "media_type": result.artifact.media_type,
                 "size_bytes": result.artifact.size_bytes,
             },
+            "files": result.files.iter().map(|file| serde_json::json!({
+                "item_id": file.item_id,
+                "source_reference": file.source_reference,
+                "relative_path": file.relative_path,
+            })).collect::<Vec<_>>(),
             "published_metadata": result.published_metadata.iter().map(|setting| serde_json::json!({
                 "key": setting.key,
                 "value": match &setting.value {
@@ -1120,6 +1287,63 @@ fn invoke_broadcast(
         })
     };
     Ok((result, store.into_data()))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn invoke_broadcast_operation(
+    engine: &Engine,
+    component: &Component,
+    staging_dir: PathBuf,
+    fixture_dir: Option<PathBuf>,
+    http_grant_requests: Option<Vec<HttpGrantRequest>>,
+    request: BroadcastPublishRequest,
+    operation: String,
+) -> Result<(serde_json::Value, BroadcastState)> {
+    let mut store = Store::new(
+        engine,
+        BroadcastState {
+            table: ResourceTable::new(),
+            wasi: WasiCtxBuilder::new().build(),
+            progress: Vec::new(),
+            logs: Vec::new(),
+            staging_dir,
+            helper: None,
+            http_grants: into_http_grants(http_grant_requests),
+            fixture_dir,
+        },
+    );
+    let mut linker = Linker::new(engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
+    broadcast_world::BroadcastWorld::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state)?;
+    let plugin = broadcast_world::BroadcastWorld::instantiate(&mut store, component, &linker)?;
+    let settings = request.settings.into_iter().map(broadcast_option).collect();
+    let result = plugin
+        .stashd_plugin_broadcast_plugin()
+        .call_operation(
+            &mut store,
+            &broadcast_world::exports::stashd::plugin::broadcast_plugin::OperationRequest {
+                name: operation,
+                settings,
+                payload: vec![],
+            },
+        )?
+        .map_err(|error| anyhow::anyhow!("broadcast plugin error: {error:?}"))?;
+    Ok((
+        serde_json::json!({
+            "choices": result.choices.iter().map(|choice| serde_json::json!({
+                "value": choice.value,
+                "label": choice.label,
+            })).collect::<Vec<_>>(),
+            "values": result.values.iter().map(|setting| serde_json::json!({
+                "key": setting.key,
+                "value": match &setting.value {
+                    broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Boolean(value) => serde_json::json!(value),
+                    broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Text(value) => serde_json::json!(value),
+                },
+            })).collect::<Vec<_>>(),
+        }),
+        store.into_data(),
+    ))
 }
 
 fn invoke(
@@ -1391,6 +1615,69 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                 )?;
             }
         }
+        "broadcast-operation" => {
+            let component_path = request
+                .component_path
+                .as_deref()
+                .context("broadcast operation requires component_path")?;
+            let staging_dir = request
+                .staging_dir
+                .clone()
+                .context("broadcast operation requires staging_dir")?;
+            let component = Component::from_file(engine, component_path)
+                .with_context(|| format!("loading component {}", component_path.display()))?;
+            let (result, state) = match invoke_broadcast_operation(
+                engine,
+                &component,
+                staging_dir,
+                request.fixture_dir.clone(),
+                request.http_grants.clone(),
+                request.broadcast.context("broadcast request is required")?,
+                request
+                    .operation
+                    .context("broadcast operation is required")?,
+            ) {
+                Ok(result) => result,
+                Err(error) => {
+                    let message = error.to_string();
+                    send(
+                        stream,
+                        Response::Error {
+                            id: request.id,
+                            code: plugin_error_code(&message).to_owned(),
+                            message,
+                        },
+                    )?;
+                    return Ok(());
+                }
+            };
+            for stage in state.progress {
+                send(
+                    stream,
+                    Response::Progress {
+                        id: request.id.clone(),
+                        fraction: 0.0,
+                        stage,
+                    },
+                )?;
+            }
+            for message in state.logs {
+                send(
+                    stream,
+                    Response::Log {
+                        id: request.id.clone(),
+                        message,
+                    },
+                )?;
+            }
+            send(
+                stream,
+                Response::BroadcastOperation {
+                    id: request.id,
+                    result,
+                },
+            )?;
+        }
         "broadcast-prepare" | "broadcast-publish" => {
             let component_path = request
                 .component_path
@@ -1406,6 +1693,8 @@ fn handle_request(engine: &Engine, stream: &mut UnixStream, request: Request) ->
                 engine,
                 &component,
                 staging_dir,
+                request.fixture_dir.clone(),
+                request.http_grants.clone(),
                 request.broadcast.context("broadcast request is required")?,
                 if request.op == "broadcast-prepare" {
                     "prepare"
@@ -1570,7 +1859,10 @@ fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CredentialGrant, HttpGrant, authenticated_url, input_host};
+    use super::broadcast_world::stashd::plugin::broadcast_host;
+    use super::{
+        CredentialGrant, HttpGrant, authenticated_broadcast_request, authenticated_url, input_host,
+    };
 
     #[test]
     fn input_http_capability_uses_invocation_supplied_prefix_grants() {
@@ -1597,6 +1889,7 @@ mod tests {
                 name: "provider-key".to_owned(),
                 value: "fixture-secret".to_owned(),
                 query_parameter: "token".to_owned(),
+                placement: "query".to_owned(),
             }),
         }];
         let url = authenticated_url(
@@ -1644,11 +1937,45 @@ mod tests {
                 name: "provider-key".to_owned(),
                 value: "fixture-secret".to_owned(),
                 query_parameter: "token".to_owned(),
+                placement: "query".to_owned(),
             }),
         }];
         assert!(matches!(
             authenticated_url("https://api.invalid/v1/items?id=x", None, &grants),
             Err(input_host::HttpError::CredentialUnavailable)
+        ));
+    }
+
+    #[test]
+    fn broadcast_header_credentials_are_invocation_scoped() {
+        let grants = [HttpGrant {
+            allowed_prefixes: vec!["https://service.invalid/".to_owned()],
+            credential: Some(CredentialGrant {
+                name: "api-token".to_owned(),
+                value: "fixture-secret".to_owned(),
+                query_parameter: "X-Api-Key".to_owned(),
+                placement: "header".to_owned(),
+            }),
+        }];
+        let (url, header) = authenticated_broadcast_request(
+            "https://service.invalid/resource",
+            Some("api-token"),
+            &grants,
+        )
+        .expect("approved header grant should succeed");
+        assert_eq!(url, "https://service.invalid/resource");
+        assert_eq!(
+            header,
+            Some(("X-Api-Key".to_owned(), "fixture-secret".to_owned()))
+        );
+        assert!(!url.contains("fixture-secret"));
+        assert!(matches!(
+            authenticated_broadcast_request(
+                "https://other.invalid/resource",
+                Some("api-token"),
+                &grants,
+            ),
+            Err(broadcast_host::HttpError::Denied)
         ));
     }
 }

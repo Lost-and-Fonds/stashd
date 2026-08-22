@@ -148,9 +148,11 @@ final readonly class ExternalInputPluginDefinition
 
                 if ($value !== null && trim($value) !== '') {
                     $name = self::stringValue($credentialDefinition, 'name');
-                    $parameter = self::stringValue($credentialDefinition, 'query_parameter');
-                    if ($name !== '' && $parameter !== '') {
-                        $credential = new PluginCredentialGrant(trim($name), trim($value), trim($parameter));
+                    $parameter = self::stringValue($credentialDefinition, 'parameter')
+                        ?: self::stringValue($credentialDefinition, 'query_parameter');
+                    $placement = self::stringValue($credentialDefinition, 'placement') ?: 'query';
+                    if ($name !== '' && $parameter !== '' && in_array($placement, ['query', 'header'], true)) {
+                        $credential = new PluginCredentialGrant(trim($name), trim($value), trim($parameter), $placement);
                     }
                 }
             }

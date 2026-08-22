@@ -13,6 +13,7 @@ final readonly class ExternalBroadcastPluginDefinition
      *  @param array<int, array<string, mixed>> $actions
      *  @param array<int, string> $supportedFileKinds
      *  @param array<string, string> $helpers
+     *  @param array<string, string> $operations
      */
     public function __construct(
         public string $id,
@@ -24,13 +25,18 @@ final readonly class ExternalBroadcastPluginDefinition
         public array $uiOptions,
         public array $actions,
         public array $supportedFileKinds,
-        public string $outputPath,
+        public ?string $outputPath,
         public string $outputMediaType,
         public bool $supportsItemRebuild,
         public bool $prunesAfterPublish,
         public array $helpers,
+        public array $operations,
         public string $packageRoot,
         public ?string $prepareHelper,
+        public ?string $connectionSettingKey,
+        public ?string $credentialName,
+        public ?string $credentialParameter,
+        public string $credentialPlacement,
     ) {
     }
 
@@ -102,6 +108,15 @@ final readonly class ExternalBroadcastPluginDefinition
                 $helpers[$name] = $candidate;
             }
         }
+        /** @var array<string, string> $operations */
+        $operations = [];
+        if (is_array($raw['operations'] ?? null)) {
+            foreach ($raw['operations'] as $name => $operation) {
+                if (is_string($name) && is_string($operation) && trim($operation) !== '') {
+                    $operations[$name] = trim($operation);
+                }
+            }
+        }
 
         return new self(
             id: $required('id'),
@@ -113,13 +128,18 @@ final readonly class ExternalBroadcastPluginDefinition
             uiOptions: $uiOptions,
             actions: $actions,
             supportedFileKinds: $supportedFileKinds,
-            outputPath: is_string($raw['output_path'] ?? null) && trim($raw['output_path']) !== '' ? trim($raw['output_path']) : 'output.bin',
+            outputPath: is_string($raw['output_path'] ?? null) && trim($raw['output_path']) !== '' ? trim($raw['output_path']) : null,
             outputMediaType: is_string($raw['output_media_type'] ?? null) && trim($raw['output_media_type']) !== '' ? trim($raw['output_media_type']) : 'application/octet-stream',
             supportsItemRebuild: ($raw['supports_item_rebuild'] ?? false) === true,
             prunesAfterPublish: ($raw['prunes_after_publish'] ?? false) === true,
             helpers: $helpers,
+            operations: $operations,
             packageRoot: $runtimePackageRoot,
             prepareHelper: is_string($raw['prepare_helper'] ?? null) && trim($raw['prepare_helper']) !== '' ? trim($raw['prepare_helper']) : null,
+            connectionSettingKey: is_string($raw['connection_setting_key'] ?? null) && trim($raw['connection_setting_key']) !== '' ? trim($raw['connection_setting_key']) : null,
+            credentialName: is_array($raw['credential'] ?? null) && is_string($raw['credential']['name'] ?? null) ? trim($raw['credential']['name']) : null,
+            credentialParameter: is_array($raw['credential'] ?? null) && is_string($raw['credential']['parameter'] ?? null) ? trim($raw['credential']['parameter']) : null,
+            credentialPlacement: is_array($raw['credential'] ?? null) && in_array($raw['credential']['placement'] ?? null, ['query', 'header'], true) ? $raw['credential']['placement'] : 'query',
         );
     }
 

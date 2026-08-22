@@ -1,6 +1,29 @@
 package stashd:plugin@0.1.0;
 
 interface broadcast-host {
+    record http-request {
+        url: string,
+        credential: option<string>,
+    }
+
+    record http-response {
+        status: u16,
+        body: list<u8>,
+    }
+
+    variant http-error {
+        denied,
+        credential-unavailable,
+        unavailable(string),
+        failed(string),
+    }
+
+    resource http-client {
+        get: func(request: http-request) -> result<http-response, http-error>;
+    }
+
+    open-http-client: func() -> http-client;
+
     record helper-result {
         exit-code: s32,
         stdout: string,
@@ -18,6 +41,12 @@ interface broadcast-host {
         reference: string,
         media-type: option<string>,
         size-bytes: u64,
+    }
+
+    record published-file {
+        item-id: string,
+        source-reference: string,
+        relative-path: string,
     }
 
     variant staging-error {
@@ -38,6 +67,7 @@ interface broadcast-host {
 }
 
 interface broadcast-plugin {
+    use broadcast-host.{published-file};
     variant option-value {
         boolean(bool),
         text(string),
@@ -80,7 +110,24 @@ interface broadcast-plugin {
 
     record publication {
         artifact: artifact,
+        files: list<published-file>,
         published-metadata: list<setting>,
+    }
+
+    record operation-request {
+        name: string,
+        settings: list<setting>,
+        payload: list<setting>,
+    }
+
+    record choice {
+        value: string,
+        label: string,
+    }
+
+    record operation-result {
+        choices: list<choice>,
+        values: list<setting>,
     }
 
     record derived-artifact {
@@ -112,6 +159,7 @@ interface broadcast-plugin {
 
     prepare: func(request: publish-request) -> result<preparation, plugin-error>;
     publish: func(request: publish-request) -> result<publication, plugin-error>;
+    operation: func(request: operation-request) -> result<operation-result, plugin-error>;
 }
 
 world broadcast-world {

@@ -106,7 +106,7 @@ final readonly class RelocateBroadcastPathsCommand
         $this->console->success("Relocated {$relocated} broadcast(s), skipped {$skipped} (already migrated, never built, or unset).");
 
         if ($relocated > 0) {
-            $this->console->warning('If any of these broadcasts are already scanned by an external Jellyfin/Plex library, update that library\'s path and re-run a scan.');
+            $this->console->warning('If any of these broadcasts are already scanned by an external media library, update that library\'s path and re-run a scan.');
         }
 
         return ExitCode::SUCCESS;

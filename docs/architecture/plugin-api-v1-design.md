@@ -126,9 +126,9 @@ Download progress forwards yt-dlp's bytes/percent/ETA/speed. `DownloadProgressSm
 
 Useful preflight facts include optional resolved source identity, generic discovery completeness/estimate-quality facts, item count or range, candidate sample/list, duration total, filter choices, credential/configuration requirements, and a warning when discovery is incomplete. Useful sync facts include new/reused/ignored counts, upstream disappearance or unavailability, cursor/continuation state, and retryability.
 
-### 4.2 Jellyfin
+### 4.2 Jellyfin (migration evidence)
 
-The current `JellyfinBroadcastPlugin` uses the shared `AbstractSeriesBroadcastPlugin` with the key `jellyfin`. It produces a rebuildable series filesystem view from eligible Vault originals. The shared engine:
+The external Jellyfin Component uses the logical key `jellyfin` and produces a rebuildable filesystem view from eligible Vault originals. The former PHP implementation is retained here only as migration evidence; the shared engine details below are not part of the external contract:
 
 - selects active Stash Items with ready Vault originals;
 - orders seasons and episodes using Stash metadata, optional season mapping, publication time, position, and stable IDs;
@@ -142,9 +142,9 @@ The current `JellyfinBroadcastPlugin` uses the shared `AbstractSeriesBroadcastPl
 
 The broadcast destination is core-resolved and ownership-marked. A configured `destination_path` is currently a literal host/container path, but that is an implementation detail that a future plugin API should not expose to an untrusted plugin.
 
-Jellyfin's external behaviour is separate from publish validity. `MediaServerConnectionRecord` stores type, display name, base URI, encrypted token reference, selected library settings, state, and health timestamps/errors. A Jellyfin plugin knows the Jellyfin protocol: it tests `/System/Info/Public`, lists `/Library/MediaFolders`, and refreshes with `POST /Library/Refresh`. Stashd owns the Connection record and invocation grant, but core should not grow a generic `refresh-jellyfin-library` operation. A post-rebuild scan failure is recorded as a trigger failure and does not invalidate verified files.
+Jellyfin's external behaviour is separate from publish validity. `MediaServerConnectionRecord` stores the configured endpoint, encrypted credential reference, and selected library settings. The Component knows the protocol: it tests `/System/Info/Public`, lists `/Library/MediaFolders`, and refreshes with `POST /Library/Refresh`. Stashd supplies the selected endpoint and credential-use grant; core does not interpret those protocol operations.
 
-The Jellyfin plugin itself does not need arbitrary network access to publish files. The scan trigger needs a configured media-server Connection and constrained network/credential capabilities for the plugin's Jellyfin protocol calls. Credentials are used without exposing their raw value to plugin code.
+The Component does not receive arbitrary network access. It uses a configured connection and constrained network/credential capabilities for its protocol calls. Credentials are used without exposing their raw value to plugin code.
 
 ### 4.3 Plex
 

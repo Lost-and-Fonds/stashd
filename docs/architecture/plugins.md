@@ -590,6 +590,15 @@ Plugins remain in this repository while Podcast, Jellyfin, and Plex are
 converted. Package/repository separation and OCI distribution remain future
 work.
 
+Jellyfin extends the same boundary with three demonstrated generic pieces:
+the Component uses an invocation-supplied HTTPS/credential grant for its
+remote protocol, returns dynamic `value`/`label` choices for library selection,
+and returns relative publication descriptors that core materializes with
+hardlinks under the Broadcast-owned root. The operation names and response
+parsing are plugin-owned; core does not contain a Jellyfin client or scan
+policy. A reusable Connections abstraction remains intentionally deferred
+until Plex provides a second external implementation.
+
 Plugins may describe UI, but they do not ship arbitrary frontend code. The
 Stashd frontend remains first-party and renders plugin declarations with its
 own components.
@@ -605,6 +614,6 @@ fixed fields, and credential configuration. Dynamic metadata may require a
 plugin invocation for remote choices, status, actions, or discovered options.
 
 The first version must not accept arbitrary Vue, plugin JavaScript, plugin CSS,
-custom routes, navigation entries, or iframe mini-apps. Podcast is the next
-real stress test for a declarative Broadcast UI contract; this Input milestone
-does not implement that migration.
+custom routes, navigation entries, or iframe mini-apps. Dynamic choices are
+returned as generic values and labels from an opaque plugin operation; the
+frontend does not interpret the operation name.

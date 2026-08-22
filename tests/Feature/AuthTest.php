@@ -459,7 +459,7 @@ test('a media-server-write token can mutate media servers but cannot administer 
     $this->http->post('/api/v1/media-servers', [
         'type' => 'jellyfin',
         'name' => 'Scoped Jellyfin',
-        'base_uri' => 'http://jellyfin.test',
+        'base_uri' => 'https://jellyfin.test',
         'token' => 'fixture-secret',
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->http->get('/api/v1/auth/tokens', headers: $headers)->assertStatus(Status::FORBIDDEN);

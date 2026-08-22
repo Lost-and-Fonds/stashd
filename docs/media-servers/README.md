@@ -45,7 +45,7 @@ JSON uses snake_case. Secrets are redacted from errors, activity, and command re
 
 | Class | Surface |
 |---|---|
-| `JellyfinMediaServerClient` | `GET /System/Info/Public`, `GET /Library/MediaFolders`, `POST /Library/Refresh` |
+| External Broadcast Component | The installed plugin performs its protocol calls through the bounded host HTTP capability |
 | `PlexMediaServerClient` | `GET /identity`, `GET /library/sections`, `POST /library/sections/{id}/refresh` |
 
 Both implement `MediaServerClient` and use `MediaServerHttpClient` (`CurlMediaServerHttpClient` in production; `FixtureMediaServerHttpClient` when `ENVIRONMENT=testing`).

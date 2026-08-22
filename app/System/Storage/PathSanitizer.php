@@ -51,7 +51,7 @@ final class PathSanitizer
         return $sanitized;
     }
 
-    /** Allows spaces for readable Jellyfin/Plex folder and episode names. */
+    /** Allows spaces for readable external-library folder and episode names. */
     public static function sanitizeBroadcastSegment(string $value): string
     {
         $decoded = rawurldecode($value);

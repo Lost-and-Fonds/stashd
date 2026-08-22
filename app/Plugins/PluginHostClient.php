@@ -156,27 +156,102 @@ final class PluginHostClient
 
     /**
      * @param array<string, mixed> $broadcast
+     * @param list<PluginHttpGrant>|null $httpGrants
      */
     public function publishBroadcast(
         string $componentPath,
         string $stagingDirectory,
         array $broadcast,
         ?PluginHelperGrant $helper = null,
+        ?array $httpGrants = null,
+        ?string $fixtureDirectory = null,
     ): PluginBroadcastResult {
-        return $this->invokeBroadcast('broadcast-publish', 'broadcast_published', $componentPath, $stagingDirectory, $broadcast, $helper);
+        return $this->invokeBroadcast('broadcast-publish', 'broadcast_published', $componentPath, $stagingDirectory, $broadcast, $helper, $httpGrants, $fixtureDirectory);
     }
 
-    /** @param array<string, mixed> $broadcast */
+    /** @param array<string, mixed> $broadcast
+     * @param list<PluginHttpGrant>|null $httpGrants
+     */
     public function prepareBroadcast(
         string $componentPath,
         string $stagingDirectory,
         array $broadcast,
         ?PluginHelperGrant $helper = null,
+        ?array $httpGrants = null,
+        ?string $fixtureDirectory = null,
     ): PluginBroadcastResult {
-        return $this->invokeBroadcast('broadcast-prepare', 'broadcast_prepared', $componentPath, $stagingDirectory, $broadcast, $helper);
+        return $this->invokeBroadcast('broadcast-prepare', 'broadcast_prepared', $componentPath, $stagingDirectory, $broadcast, $helper, $httpGrants, $fixtureDirectory);
     }
 
-    /** @param array<string, mixed> $broadcast */
+    /** @param array<string, mixed> $broadcast
+     *  @param list<PluginHttpGrant>|null $httpGrants
+     *  @return array<string, mixed>
+     */
+    public function broadcastOperation(
+        string $componentPath,
+        string $stagingDirectory,
+        array $broadcast,
+        string $operation,
+        ?array $httpGrants = null,
+        ?string $fixtureDirectory = null,
+    ): array {
+        $error = null;
+        $socket = stream_socket_client('unix://' . $this->socketPath, $errorNumber, $error, 5);
+        if (! is_resource($socket)) {
+            throw new RuntimeException('Unable to connect to stashd-plugin-host: ' . ($error ?: 'unknown error'));
+        }
+        $requestId = bin2hex(random_bytes(8));
+        $request = [
+            'id' => $requestId,
+            'op' => 'broadcast-operation',
+            'operation' => $operation,
+            'component_path' => $componentPath,
+            'staging_dir' => $stagingDirectory,
+            'fixture_dir' => $fixtureDirectory,
+            'http_grants' => $httpGrants === null ? null : array_map(
+                static fn (PluginHttpGrant $grant): array => [
+                    'allowed_prefixes' => $grant->allowedPrefixes,
+                    'credential_name' => $grant->credential?->name,
+                    'credential_value' => $grant->credential?->value,
+                    'credential_parameter' => $grant->credential?->parameter,
+                    'credential_placement' => $grant->credential?->placement,
+                ],
+                $httpGrants,
+            ),
+            'broadcast' => $broadcast,
+        ];
+        $request = array_filter($request, static fn (mixed $value): bool => $value !== null);
+        try {
+            fwrite($socket, json_encode($request, JSON_THROW_ON_ERROR) . "\n");
+            while (($line = fgets($socket)) !== false) {
+                $event = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+                if (! is_array($event) || ($event['id'] ?? null) !== $requestId) {
+                    throw new RuntimeException('Plugin host returned an invalid broadcast operation event.');
+                }
+                if (($event['event'] ?? null) === 'error') {
+                    /** @var array<string, mixed> $event */
+                    $this->throwExecutionError($event);
+                }
+                if (($event['event'] ?? null) === 'broadcast_operation') {
+                    $result = $event['result'] ?? null;
+                    if (! is_array($result) || array_keys($result) !== array_filter(array_keys($result), 'is_string')) {
+                        throw new RuntimeException('Plugin host returned an invalid broadcast operation result.');
+                    }
+                    /** @var array<string, mixed> $result */
+                    return $result;
+                }
+            }
+        } catch (JsonException $exception) {
+            throw new RuntimeException('Plugin host returned malformed JSON.', previous: $exception);
+        } finally {
+            fclose($socket);
+        }
+        throw new RuntimeException('Plugin host closed the IPC connection without a broadcast operation result.');
+    }
+
+    /** @param array<string, mixed> $broadcast
+     * @param list<PluginHttpGrant>|null $httpGrants
+     */
     private function invokeBroadcast(
         string $operation,
         string $eventName,
@@ -184,6 +259,8 @@ final class PluginHostClient
         string $stagingDirectory,
         array $broadcast,
         ?PluginHelperGrant $helper,
+        ?array $httpGrants,
+        ?string $fixtureDirectory,
     ): PluginBroadcastResult {
         $error = null;
         $socket = stream_socket_client('unix://' . $this->socketPath, $errorNumber, $error, 5);
@@ -200,6 +277,17 @@ final class PluginHostClient
             'helper_name' => $helper?->name,
             'helper_executable' => $helper?->executable,
             'helper_package_root' => $helper?->packageRoot,
+            'fixture_dir' => $fixtureDirectory,
+            'http_grants' => $httpGrants === null ? null : array_map(
+                static fn (PluginHttpGrant $grant): array => [
+                    'allowed_prefixes' => $grant->allowedPrefixes,
+                    'credential_name' => $grant->credential?->name,
+                    'credential_value' => $grant->credential?->value,
+                    'credential_parameter' => $grant->credential?->parameter,
+                    'credential_placement' => $grant->credential?->placement,
+                ],
+                $httpGrants,
+            ),
             'broadcast' => $broadcast,
         ];
         $request = array_filter($request, static fn (mixed $value): bool => $value !== null);
@@ -284,7 +372,8 @@ final class PluginHostClient
                     'allowed_prefixes' => $grant->allowedPrefixes,
                     'credential_name' => $grant->credential?->name,
                     'credential_value' => $grant->credential?->value,
-                    'credential_parameter' => $grant->credential?->queryParameter,
+                    'credential_parameter' => $grant->credential?->parameter,
+                    'credential_placement' => $grant->credential?->placement,
                 ],
                 $httpGrants,
             ),

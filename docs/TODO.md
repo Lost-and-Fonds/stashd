@@ -163,7 +163,7 @@
 - [x] Media-server-friendly layout (`Season 01/`, `S01E001 - Title.ext`) + minimal NFO sidecars
 - [x] Hardlink-first publish unchanged; optional poster hardlink when safe
 - [x] `media_server_connections` CRUD API + token storage via `SecretsService` (`token_secret_id` → `secrets.id`)
-- [x] Small Stashd-owned HTTP clients: `JellyfinMediaServerClient`, `PlexMediaServerClient` (no broad PHP libraries)
+- [x] External Jellyfin Component HTTP integration; Plex remains the transitional built-in client until its migration
 - [x] Commands: `broadcast.trigger`, `media_server.test_connection`, `media_server.list_libraries`
 - [x] Scan triggers separate from broadcast validity (`broadcast_trigger_runs`; failures do not invalidate files)
 - [x] Activity/SSE: `broadcast.trigger_succeeded`, `broadcast.trigger_failed`, `media_server.test_completed`
@@ -318,7 +318,7 @@ Full task breakdown (T1-T20) in `docs/plans/phase-6-slice-6/plan.md`; `docs/plan
   - **Second latent bug found once the image finally built and booted for real**: `tests/docker/smoke.sh`
     POSTs `{"type":"jellyfin_series",...}` for its NFO/SxxExxx-naming assertions, but the
     broadcast-plugin-architecture migration (`6d5607c`) unified that under the single key
-    `"jellyfin"` (`JellyfinBroadcastPlugin::broadcastKey()`) — the smoke test was never updated
+    `"jellyfin"` (now served by the external Broadcast Component) — the smoke test was never updated
     and has been failing at that step ever since, just never noticed because the build never got
     that far before. Fixed the stale type string.
   - **New**: `.github/workflows/docker-image.yml` — first CI in the repo. PRs build both

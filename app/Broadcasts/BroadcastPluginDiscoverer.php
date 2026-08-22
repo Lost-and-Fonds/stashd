@@ -53,6 +53,10 @@ final class BroadcastPluginDiscoverer implements Discovery
         $externalPlugins = $this->container->get(ExternalBroadcastPluginRegistry::class);
 
         foreach ($externalPlugins->all() as $definition) {
+            if (! $definition->available()) {
+                continue;
+            }
+
             try {
                 $host = new \App\Plugins\PluginHostClient($definition->socketPath);
                 /** @var BroadcastContextFactory $contexts */
@@ -73,6 +77,12 @@ final class BroadcastPluginDiscoverer implements Discovery
                 $mover = $this->container->get(MoveFileIntoVault::class);
                 /** @var VaultPathBuilder $vaultPaths */
                 $vaultPaths = $this->container->get(VaultPathBuilder::class);
+                /** @var \App\MediaServers\MediaServerConnectionRepository $connections */
+                $connections = $this->container->get(\App\MediaServers\MediaServerConnectionRepository::class);
+                /** @var \App\MediaServers\MediaServerConnectionSecrets $connectionSecrets */
+                $connectionSecrets = $this->container->get(\App\MediaServers\MediaServerConnectionSecrets::class);
+                /** @var \App\Broadcasts\HardlinkPublisher $hardlinks */
+                $hardlinks = $this->container->get(\App\Broadcasts\HardlinkPublisher::class);
                 $instance = new ExternalBroadcastPlugin(
                     definition: $definition,
                     host: $host,
@@ -85,6 +95,9 @@ final class BroadcastPluginDiscoverer implements Discovery
                     assets: $assets,
                     mover: $mover,
                     vaultPaths: $vaultPaths,
+                    connections: $connections,
+                    connectionSecrets: $connectionSecrets,
+                    hardlinks: $hardlinks,
                 );
             } catch (\Throwable $e) {
                 error_log("[stashd] BroadcastPluginDiscoverer: failed to resolve external {$definition->id}: {$e->getMessage()}");

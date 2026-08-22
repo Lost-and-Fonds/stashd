@@ -269,7 +269,7 @@ final readonly class BroadcastController
         }
 
         if (! $this->isSeriesBroadcast($broadcast->type)) {
-            return $this->validationError('Season mapping only applies to Jellyfin/Plex series broadcasts.');
+            return $this->validationError('Season mapping is not supported by this Broadcast.');
         }
 
         // Read 'mapping' from the raw body, not ApiJson::normalizeRequest()'s

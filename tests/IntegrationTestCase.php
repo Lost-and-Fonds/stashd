@@ -166,7 +166,7 @@ abstract class IntegrationTestCase extends IntegrationTest
         $server = $this->http->post('/api/v1/media-servers', [
             'type' => 'jellyfin',
             'name' => 'Fixture Jellyfin',
-            'base_uri' => 'http://jellyfin.test',
+            'base_uri' => 'https://jellyfin.test',
             'token' => 'fixture-jellyfin-token',
             'settings' => [
                 'library_id' => 'shows-lib',
