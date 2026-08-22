@@ -9,17 +9,17 @@ use Tempest\Http\Status;
 
 use function Tempest\Mapper\map;
 
-test('media server resources do not expose token secrets', function (): void {
+test('connection resources do not expose token secrets', function (): void {
     $headers = $this->authHeaders();
     $rawToken = 'resource-secret-token-' . bin2hex(random_bytes(6));
 
-    $create = $this->http->post('/api/v1/media-servers', [
-        'type' => 'jellyfin',
+    $create = $this->http->post('/api/v1/connections', [
+        'plugin_key' => 'jellyfin',
         'name' => 'Resource Jellyfin',
-        'base_uri' => 'http://jellyfin.resource.test',
+        'endpoint' => 'http://jellyfin.resource.test',
         'token' => $rawToken,
     ], headers: $headers)->assertStatus(Status::CREATED);
-    $show = $this->http->get('/api/v1/media-servers/' . $create->body['media_server']['id'], headers: $headers)
+    $show = $this->http->get('/api/v1/connections/' . $create->body['connection']['id'], headers: $headers)
         ->assertStatus(Status::OK);
     $json = json_encode([$create->body, $show->body], JSON_THROW_ON_ERROR);
 

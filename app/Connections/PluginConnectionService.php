@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\MediaServers;
+namespace App\Connections;
 
+use App\MediaServers\MediaServerConnectionRecord;
+use App\MediaServers\MediaServerConnectionRepository;
+use App\MediaServers\MediaServerConnectionSecrets;
 use App\Plugins\ExternalBroadcastPluginRegistry;
 use App\Plugins\PluginHostClient;
 use App\Plugins\PluginHttpGrantFactory;
@@ -12,7 +15,7 @@ use App\System\Secret\SecretRepository;
 use App\System\Secret\SecretsService;
 use App\System\Secret\SecretType;
 
-final readonly class MediaServerConnectionService
+final readonly class PluginConnectionService
 {
     public function __construct(
         private MediaServerConnectionRepository $connections,
@@ -55,7 +58,7 @@ final readonly class MediaServerConnectionService
         #[\SensitiveParameter] ?string $token = null,
     ): MediaServerConnectionRecord {
         $record = $this->connections->find($id)
-            ?? throw MediaServerException::withCode('media_server_not_found', 'Media server connection not found.');
+            ?? throw ConnectionException::withCode('connection_not_found', 'Connection not found.');
 
         if ($name !== null) {
             $record->name = $name;
@@ -85,7 +88,7 @@ final readonly class MediaServerConnectionService
     public function invokeOperation(PrefixedUlid $id, string $operationKey, array $payload = []): array
     {
         $record = $this->connections->find($id)
-            ?? throw MediaServerException::withCode('media_server_not_found', 'Media server connection not found.');
+            ?? throw ConnectionException::withCode('connection_not_found', 'Connection not found.');
 
         $token = $this->requireToken($record);
         return $this->invoke($record, $operationKey, $token, $payload);
@@ -103,7 +106,7 @@ final readonly class MediaServerConnectionService
         $this->secrets->put($secretKey, SecretType::MediaServerToken, $token);
 
         $secret = $this->secretRecords->findByKey($secretKey)
-            ?? throw MediaServerException::withCode('media_server_token_store_failed', 'Failed to store media server token.');
+            ?? throw ConnectionException::withCode('connection_credential_store_failed', 'Failed to store connection credential.');
 
         $record->tokenSecretId = (string) $secret->id;
         $this->connections->save($record);
@@ -114,7 +117,7 @@ final readonly class MediaServerConnectionService
         $token = $this->tokens->resolve($record);
 
         if ($token === null || trim($token) === '') {
-            throw MediaServerException::withCode('media_server_token_missing', 'Media server token is not configured.');
+            throw ConnectionException::withCode('connection_credential_missing', 'Connection credential is not configured.');
         }
 
         return $token;
@@ -129,12 +132,12 @@ final readonly class MediaServerConnectionService
         $definition = $this->plugins->findByLogicalKey($connection->type);
         $operation = $definition?->operations[$operationKey] ?? null;
         if ($definition === null || ! $definition->available() || $operation === null) {
-            throw MediaServerException::withCode('media_server_operation_unsupported', 'External connection operation is unavailable.');
+            throw ConnectionException::withCode('connection_operation_unavailable', 'Connection operation is unavailable.');
         }
 
         $stage = sys_get_temp_dir() . '/stashd-external-connection-' . bin2hex(random_bytes(6));
         if (! mkdir($stage, 0o775, true) && ! is_dir($stage)) {
-            throw MediaServerException::withCode('media_server_unavailable', 'Could not create operation staging directory.');
+            throw ConnectionException::withCode('connection_unavailable', 'Could not create operation staging directory.');
         }
 
         try {
@@ -155,10 +158,10 @@ final readonly class MediaServerConnectionService
                 $this->grants->forConnection($definition, $connection, $token),
                 getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR') ?: null,
             );
-        } catch (MediaServerException $exception) {
+        } catch (ConnectionException $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
-            throw MediaServerException::withCode('media_server_unavailable', 'External connection operation failed.', $exception);
+            throw ConnectionException::withCode('connection_unavailable', 'Connection operation failed.', $exception);
         } finally {
             foreach (glob($stage . '/*') ?: [] as $path) {
                 @unlink($path);

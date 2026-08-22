@@ -71,64 +71,6 @@
 					</div>
 				</section>
 
-				<section class="rounded-lg border border-line bg-panel/60">
-					<h2 class="border-b border-line px-4 py-3 text-[13px] font-semibold text-cream">Media servers</h2>
-
-					<ul class="divide-y divide-line/60" x-show="mediaServers.length > 0">
-						<template x-for="server in mediaServers" x-bind:key="server.id">
-							<li class="px-4 py-3">
-								<div class="flex items-center justify-between gap-3">
-									<div>
-										<p class="text-[13px] font-semibold text-cream" x-text="server.name"></p>
-										<p class="text-[12px] text-muted" x-text="server.type + ' · ' + server.base_uri"></p>
-									</div>
-									<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(server.state).text">
-										<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(server.state).dot, statusBadge(server.state).pulse ? 'pulse-dot' : '']"></span>
-										<span x-text="server.state"></span>
-									</span>
-								</div>
-
-								<p class="mt-1 text-[12px] text-error" x-show="server.last_error" x-text="server.last_error"></p>
-								<p class="mt-1 text-[12px]" x-show="testResults[server.id]"
-									x-bind:class="testResults[server.id]?.ok ? 'text-success' : 'text-error'"
-									x-text="testResults[server.id]?.message"></p>
-
-								<div class="mt-2 flex flex-wrap gap-2">
-									<button type="button"
-										class="rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-50"
-										x-bind:disabled="testingId === server.id"
-										x-on:click="testMediaServer(server.id)">test</button>
-									<button type="button"
-										class="rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-error"
-										x-on:click="deleteMediaServer(server.id)">delete</button>
-								</div>
-							</li>
-						</template>
-					</ul>
-					<p class="px-4 py-3 text-[13px] text-muted" x-show="mediaServers.length === 0">No media servers yet.</p>
-
-					<div class="space-y-2 border-t border-line p-4">
-						<div class="flex gap-2">
-							<select x-model="newMediaServerType"
-								class="rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
-								<option value="jellyfin">Jellyfin</option>
-								<option value="plex">Plex</option>
-							</select>
-							<input type="text" x-model="newMediaServerName" placeholder="Name"
-								class="flex-1 rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
-						</div>
-						<input type="text" x-model="newMediaServerBaseUri" placeholder="http://jellyfin.local:8096"
-							class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
-						<input type="password" x-model="newMediaServerToken" placeholder="API token (optional)"
-							class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
-						<button type="button" x-on:click="createMediaServer()"
-							x-bind:disabled="creatingMediaServer || newMediaServerName.trim() === '' || newMediaServerBaseUri.trim() === ''"
-							class="w-full rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">
-							Add media server
-						</button>
-					</div>
-				</section>
-
 				<section class="rounded-lg border border-line bg-panel/60 p-4">
 					<h2 class="text-sm font-semibold text-cream">System</h2>
 					<p class="mt-1 text-[13px] text-muted">

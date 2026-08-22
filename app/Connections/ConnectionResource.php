@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\MediaServers\Api;
+namespace App\Connections;
 
 use App\Http\Api\ApiJson;
 use App\MediaServers\MediaServerConnectionRecord;
 
-final readonly class MediaServerResource
+final readonly class ConnectionResource
 {
     public function __construct(
         private MediaServerConnectionRecord $connection,
@@ -24,13 +24,10 @@ final readonly class MediaServerResource
     {
         return ApiJson::encode([
             'id' => (string) $this->connection->id,
-            'type' => $this->connection->type,
+            'plugin_key' => $this->connection->type,
             'name' => $this->connection->name,
-            'baseUri' => $this->connection->baseUri,
-            'state' => $this->connection->state->value,
+            'endpoint' => $this->connection->baseUri,
             'settings' => $this->connection->settings,
-            'lastCheckedAt' => $this->connection->lastCheckedAt,
-            'lastError' => $this->connection->lastError,
             'createdAt' => $this->connection->createdAt,
             'updatedAt' => $this->connection->updatedAt,
         ]);

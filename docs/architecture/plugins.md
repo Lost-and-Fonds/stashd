@@ -631,10 +631,13 @@ installation smokes, but assertions about a provider's protocol or output
 belong beside that provider. Removing a provider package must not leave the
 generic core suite asserting its behavior.
 
-The legacy `MediaServerConnection*` storage is currently retained as a
-provider-neutral compatibility layer for reusable endpoint, opaque settings,
-and encrypted credentials. Connection operations are dispatched by opaque
-plugin key through generic plugin operations; core does not parse library
-responses or execute provider scan triggers. A broader `PluginConnection`
-framework remains deliberately deferred until a concrete product need exceeds
-this minimum persistence layer.
+The active connection API is generic:
+`/api/v1/connections/{id}/operations/{operation}`. It dispatches by opaque
+plugin key and returns opaque operation values/choices. The historical
+`media_server_connections` table and `MediaServerConnection*` persistence
+classes remain only as an upgrade-compatible storage layer for reusable
+endpoint, settings, and encrypted credentials. Core does not parse library
+responses or execute provider scan triggers, and does not expose a first-class
+library or media-server operation. A broader `PluginConnection` framework
+remains deliberately deferred until a concrete product need exceeds this
+minimum persistence layer.

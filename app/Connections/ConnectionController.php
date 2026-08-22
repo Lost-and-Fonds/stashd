@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\MediaServers;
+namespace App\Connections;
 
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
-use App\MediaServers\Api\MediaServerResource;
+use App\MediaServers\MediaServerConnectionRepository;
 use App\Plugins\ExternalBroadcastPluginRegistry;
 use App\Support\PrefixedUlid;
 use Tempest\Http\Request;
@@ -21,43 +21,43 @@ use Tempest\Router\WithMiddleware;
 
 #[AllowApiClients]
 #[WithMiddleware(RequireAuthMiddleware::class)]
-final readonly class MediaServerController
+final readonly class ConnectionController
 {
     public function __construct(
         private MediaServerConnectionRepository $connections,
-        private MediaServerConnectionService $service,
+        private PluginConnectionService $service,
         private ExternalBroadcastPluginRegistry $plugins,
     ) {
     }
 
-    #[Get('/api/v1/media-servers')]
+    #[Get('/api/v1/connections')]
     public function index(): Json
     {
         return new Json([
-            'media_servers' => array_map(
-                static fn ($connection): array => MediaServerResource::fromRecord($connection)->toArray(),
+            'connections' => array_map(
+                static fn ($connection): array => ConnectionResource::fromRecord($connection)->toArray(),
                 $this->connections->listAll(),
             ),
         ]);
     }
 
-    #[Post('/api/v1/media-servers')]
+    #[Post('/api/v1/connections')]
     public function create(Request $request): Json
     {
-        $body = ApiJson::normalizeRequest($request->body);
-        $typeRaw = trim((string) ($body['type'] ?? ''));
-        $name = trim((string) ($body['name'] ?? ''));
-        $baseUri = trim((string) ($body['base_uri'] ?? $body['baseUri'] ?? ''));
+        $body = $this->requestBody($request);
+        $typeRaw = trim($this->stringValue($body['plugin_key'] ?? $body['type'] ?? null));
+        $name = trim($this->stringValue($body['name'] ?? null));
+        $baseUri = trim($this->stringValue($body['endpoint'] ?? $body['base_uri'] ?? $body['baseUri'] ?? null));
 
         if ($typeRaw === '' || $name === '' || $baseUri === '') {
-            return $this->validationError('type, name, and base_uri are required.');
+            return $this->validationError('plugin_key, name, and endpoint are required.');
         }
 
         if ($this->plugins->findByLogicalKey($typeRaw) === null) {
-            return $this->validationError('Unsupported media server type.');
+            return $this->validationError('Unsupported plugin key.');
         }
 
-        $token = isset($body['token']) ? (string) $body['token'] : null;
+        $token = isset($body['token']) ? $this->stringValue($body['token']) : null;
         $settings = is_array($body['settings'] ?? null) ? ApiJson::encode($body['settings']) : null;
 
         $connection = $this->service->create(
@@ -69,59 +69,59 @@ final readonly class MediaServerController
         );
 
         return new Json([
-            'media_server' => MediaServerResource::fromRecord($connection)->toArray(),
+            'connection' => ConnectionResource::fromRecord($connection)->toArray(),
         ], Status::CREATED);
     }
 
-    #[Get('/api/v1/media-servers/{id}')]
+    #[Get('/api/v1/connections/{id}')]
     public function show(string $id): Json
     {
         $connection = $this->connections->find(PrefixedUlid::parse($id));
 
         if ($connection === null) {
-            return $this->notFound('Media server connection not found.');
+            return $this->notFound('Connection not found.');
         }
 
         return new Json([
-            'media_server' => MediaServerResource::fromRecord($connection)->toArray(),
+            'connection' => ConnectionResource::fromRecord($connection)->toArray(),
         ]);
     }
 
-    #[Patch('/api/v1/media-servers/{id}')]
+    #[Patch('/api/v1/connections/{id}')]
     public function update(string $id, Request $request): Json
     {
-        $body = ApiJson::normalizeRequest($request->body);
+        $body = $this->requestBody($request);
 
         try {
             $connection = $this->service->update(
                 id: PrefixedUlid::parse($id),
-                name: isset($body['name']) ? trim((string) $body['name']) : null,
-                baseUri: isset($body['base_uri']) || isset($body['baseUri'])
-                    ? trim((string) ($body['base_uri'] ?? $body['baseUri']))
+                name: isset($body['name']) ? trim($this->stringValue($body['name'])) : null,
+                baseUri: isset($body['endpoint']) || isset($body['base_uri']) || isset($body['baseUri'])
+                    ? trim($this->stringValue($body['endpoint'] ?? $body['base_uri'] ?? $body['baseUri']))
                     : null,
                 settings: is_array($body['settings'] ?? null) ? ApiJson::encode($body['settings']) : null,
-                token: isset($body['token']) ? (string) $body['token'] : null,
+                token: isset($body['token']) ? $this->stringValue($body['token']) : null,
             );
-        } catch (MediaServerException $exception) {
-            if ($exception->errorCode === 'media_server_not_found') {
-                return $this->notFound('Media server connection not found.');
+        } catch (ConnectionException $exception) {
+            if ($exception->errorCode === 'connection_not_found') {
+                return $this->notFound('Connection not found.');
             }
 
             throw $exception;
         }
 
         return new Json([
-            'media_server' => MediaServerResource::fromRecord($connection)->toArray(),
+            'connection' => ConnectionResource::fromRecord($connection)->toArray(),
         ]);
     }
 
-    #[Delete('/api/v1/media-servers/{id}')]
+    #[Delete('/api/v1/connections/{id}')]
     public function delete(string $id): Json
     {
         $connection = $this->connections->find(PrefixedUlid::parse($id));
 
         if ($connection === null) {
-            return $this->notFound('Media server connection not found.');
+            return $this->notFound('Connection not found.');
         }
 
         $this->connections->delete($connection);
@@ -133,7 +133,7 @@ final readonly class MediaServerController
     public function operation(string $id, string $operation, Request $request): Json
     {
         try {
-            $body = ApiJson::normalizeRequest($request->body);
+            $body = $this->requestBody($request);
             $payload = [];
             foreach (is_array($body['payload'] ?? null) ? $body['payload'] : [] as $key => $value) {
                 if (is_string($key) && is_scalar($value)) {
@@ -141,9 +141,9 @@ final readonly class MediaServerController
                 }
             }
             $result = $this->service->invokeOperation(PrefixedUlid::parse($id), $operation, $payload);
-        } catch (MediaServerException $exception) {
-            if ($exception->errorCode === 'media_server_not_found') {
-                return $this->notFound('Media server connection not found.');
+        } catch (ConnectionException $exception) {
+            if ($exception->errorCode === 'connection_not_found') {
+                return $this->notFound('Connection not found.');
             }
 
             return new Json([
@@ -175,5 +175,34 @@ final readonly class MediaServerController
                 'message' => $message,
             ],
         ], Status::BAD_REQUEST);
+    }
+
+    /** @return array<string, mixed> */
+    private function requestBody(Request $request): array
+    {
+        $body = $request->body;
+        /** @var array<string, mixed> $filtered */
+        $filtered = [];
+        foreach ($body as $key => $value) {
+            if (is_string($key)) {
+                $filtered[$key] = $value;
+            }
+        }
+
+        $normalized = ApiJson::normalizeRequest($filtered);
+        /** @var array<string, mixed> $result */
+        $result = [];
+        foreach ($normalized as $key => $value) {
+            if (is_string($key)) {
+                $result[$key] = $value;
+            }
+        }
+
+        return $result;
+    }
+
+    private function stringValue(mixed $value): string
+    {
+        return is_scalar($value) ? (string) $value : '';
     }
 }
