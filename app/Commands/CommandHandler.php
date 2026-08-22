@@ -14,8 +14,7 @@ interface CommandHandler
     public function validate(array $options): void;
 
     /**
-     * @param array<string, mixed> $options
-     *
+     * @param  array<string, mixed>  $options
      * @return list<JobRecord>
      */
     public function createJobs(CommandRecord $command, array $options): array;

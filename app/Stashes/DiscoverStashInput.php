@@ -20,8 +20,7 @@ final readonly class DiscoverStashInput
     public function __construct(
         private ProviderRegistry $providers,
         private ProviderStrategySelector $strategySelector,
-    ) {
-    }
+    ) {}
 
     /** @param array<string, mixed> $payload */
     public function execute(array $payload, JobIntent $intent = JobIntent::Preflight): PreflightExecutionResult
@@ -86,7 +85,7 @@ final readonly class DiscoverStashInput
 
         $estimatedItemCount = count($discovered);
         $estimatedDuration = array_sum(array_map(
-            static fn (DiscoveredItem $item): int => $item->durationSeconds ?? 0,
+            static fn(DiscoveredItem $item): int => $item->durationSeconds ?? 0,
             $discovered,
         ));
 

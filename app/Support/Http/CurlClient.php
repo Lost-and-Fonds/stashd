@@ -7,10 +7,9 @@ namespace App\Support\Http;
 final class CurlClient
 {
     /**
-     * @param non-empty-string $method
-     * @param array<string, string> $headers
-     * @param non-empty-string|null $userAgent
-     *
+     * @param  non-empty-string  $method
+     * @param  array<string, string>  $headers
+     * @param  non-empty-string|null  $userAgent
      * @return array{status: int, body: string}|null null when curl_init fails
      */
     public static function send(

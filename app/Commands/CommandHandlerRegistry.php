@@ -9,8 +9,7 @@ final readonly class CommandHandlerRegistry
     /** @param list<CommandHandler> $handlers */
     public function __construct(
         private array $handlers,
-    ) {
-    }
+    ) {}
 
     public function handlerFor(CommandType $type): CommandHandler
     {

@@ -18,6 +18,5 @@ final readonly class DiscoveredPlugin
         public string $description,
         public array $broadcastKeys,
         public BroadcastPlugin $plugin,
-    ) {
-    }
+    ) {}
 }

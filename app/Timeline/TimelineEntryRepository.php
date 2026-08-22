@@ -18,8 +18,7 @@ final class TimelineEntryRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     /** @return list<TimelineEntryRecord> */
     public function listForMediaItem(MediaItemId $mediaItemId): array
@@ -30,7 +29,7 @@ final class TimelineEntryRepository
             ->orderBy('endSeconds', Direction::ASC)
             ->all();
 
-        return array_values(array_filter($entries, static fn (mixed $entry): bool => $entry instanceof TimelineEntryRecord));
+        return array_values(array_filter($entries, static fn(mixed $entry): bool => $entry instanceof TimelineEntryRecord));
     }
 
     public function findBySourceAndExternalId(

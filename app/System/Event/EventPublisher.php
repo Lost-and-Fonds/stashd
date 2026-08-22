@@ -15,8 +15,7 @@ final readonly class EventPublisher
     public function __construct(
         private MercurePublisher $mercure,
         private SecretsService $secrets,
-    ) {
-    }
+    ) {}
 
     public function jobCreated(JobRecord $job): void
     {

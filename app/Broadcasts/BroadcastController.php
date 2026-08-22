@@ -43,8 +43,7 @@ final readonly class BroadcastController
         private MediaItemRepository $mediaItems,
         private BroadcastPathBuilder $paths,
         private CommandDispatchService $commands,
-    ) {
-    }
+    ) {}
 
     #[Get('/api/v1/broadcast-plugins')]
     public function plugins(): Json
@@ -74,7 +73,7 @@ final readonly class BroadcastController
 
         return new Json([
             'broadcasts' => array_map(
-                fn ($broadcast): array => $this->mapBroadcast($broadcast, $context),
+                fn($broadcast): array => $this->mapBroadcast($broadcast, $context),
                 $broadcasts,
             ),
         ]);
@@ -278,7 +277,7 @@ final readonly class BroadcastController
             return $this->validationError('source_reference and settings are required.');
         }
 
-        $validSources = array_map(static fn ($input): string => (string) $input->id, $this->stashInputs->listForStash($broadcast->stashId));
+        $validSources = array_map(static fn($input): string => (string) $input->id, $this->stashInputs->listForStash($broadcast->stashId));
         if (! in_array($source, $validSources, true)) {
             return $this->validationError('Unknown source for this Broadcast.');
         }
@@ -378,10 +377,10 @@ final readonly class BroadcastController
             'broadcast_type' => $type,
             'message' => "This stash's \"{$policy->value}\" download policy won't produce media for a \"{$type}\" broadcast.",
             'compatible_download_policies' => array_values(array_map(
-                fn (DownloadPolicy $candidate): string => $candidate->value,
+                fn(DownloadPolicy $candidate): string => $candidate->value,
                 array_filter(
                     DownloadPolicy::cases(),
-                    fn (DownloadPolicy $candidate): bool => $plugin instanceof BroadcastPluginPolicy
+                    fn(DownloadPolicy $candidate): bool => $plugin instanceof BroadcastPluginPolicy
                         ? $plugin->acceptsDownloadPolicy($broadcast, $candidate)
                         : $candidate !== DownloadPolicy::MetadataOnly,
                 ),
@@ -441,7 +440,7 @@ final readonly class BroadcastController
             'plugin_actions' => $actions,
             'plugin_source_options' => $plugin instanceof BroadcastPluginSourceOptions
                 ? array_map(
-                    static fn (UiControl $control): array => [
+                    static fn(UiControl $control): array => [
                         'name' => $control->name,
                         'label' => $control->label,
                         'type' => $control->type,
@@ -457,18 +456,18 @@ final readonly class BroadcastController
     }
 
     /**
-     * @param list<BroadcastItemRecord> $items
+     * @param  list<BroadcastItemRecord>  $items
      * @return list<array<string, mixed>>
      */
     private function mapBroadcastItems(array $items): array
     {
         $mediaItemsById = $this->mediaItems->listByIds(array_values(array_unique(array_map(
-            static fn (BroadcastItemRecord $item): string => (string) $item->mediaItemId,
+            static fn(BroadcastItemRecord $item): string => (string) $item->mediaItemId,
             $items,
         ))));
 
         return array_map(
-            static fn (BroadcastItemRecord $item): array => BroadcastItemResource::fromRecord(
+            static fn(BroadcastItemRecord $item): array => BroadcastItemResource::fromRecord(
                 $item,
                 $mediaItemsById[(string) $item->mediaItemId] ?? null,
             )->toArray(),
@@ -483,11 +482,11 @@ final readonly class BroadcastController
             'label' => $discovered->name,
             'description' => $discovered->description,
             'supportedFileKinds' => array_map(
-                static fn (FileKind $kind): string => $kind->value,
+                static fn(FileKind $kind): string => $kind->value,
                 $discovered->plugin->supportedFileKinds(),
             ),
             'uiControls' => array_map(
-                static fn (UiControl $control): array => [
+                static fn(UiControl $control): array => [
                     'name' => $control->name,
                     'label' => $control->label,
                     'type' => $control->type,
@@ -500,7 +499,7 @@ final readonly class BroadcastController
             ),
             'sourceOptions' => $discovered->plugin instanceof BroadcastPluginSourceOptions
                 ? array_map(
-                    static fn (UiControl $control): array => [
+                    static fn(UiControl $control): array => [
                         'name' => $control->name,
                         'label' => $control->label,
                         'type' => $control->type,

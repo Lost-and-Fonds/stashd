@@ -20,8 +20,7 @@ final readonly class StashSyncInputCommandHandler implements CommandHandler
         private CommandRepository $commands,
         private JobRepository $jobs,
         private StashInputRepository $stashInputs,
-    ) {
-    }
+    ) {}
 
     public function type(): CommandType
     {
@@ -80,7 +79,7 @@ final readonly class StashSyncInputCommandHandler implements CommandHandler
     }
 
     /**
-     * @param array<string, mixed> $options
+     * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
     public function extras(CommandRecord $command, array $options): array

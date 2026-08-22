@@ -40,11 +40,10 @@ final readonly class CreateStashFromDiscovery
         private DiscoverStashInput $discovery,
         private BroadcastRepository $broadcasts,
         private Database $database,
-    ) {
-    }
+    ) {}
 
     /**
-     * @param array<string, mixed> $options
+     * @param  array<string, mixed>  $options
      */
     public function commitInput(StashRecord $stash, CommandRecord $preflightCommand, array $options = []): StashInputCommitResult
     {

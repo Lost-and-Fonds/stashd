@@ -12,37 +12,6 @@ use SplFileInfo;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
-final readonly class BroadcastLifecycleResult
-{
-    /**
-     * @param array<string, mixed>|null $plan
-     * @param array<string, mixed>|null $publish
-     * @param array<string, mixed>|null $verify
-     * @param array<string, mixed>|null $prune
-     * @param array<string, mixed>|null $trigger
-     */
-    public function __construct(
-        public ?array $plan = null,
-        public ?array $publish = null,
-        public ?array $verify = null,
-        public ?array $prune = null,
-        public ?array $trigger = null,
-    ) {
-    }
-
-    /** @return array<string, mixed> */
-    public function toArray(): array
-    {
-        return array_filter([
-            'plan' => $this->plan,
-            'publish' => $this->publish,
-            'verify' => $this->verify,
-            'prune' => $this->prune,
-            'trigger' => $this->trigger,
-        ], static fn ($value): bool => $value !== null);
-    }
-}
-
 final readonly class BroadcastLifecycleService
 {
     public function __construct(
@@ -54,8 +23,7 @@ final readonly class BroadcastLifecycleService
         private StateTransitionService $transitions,
         private BroadcastPathBuilder $paths,
         private PublishedResourceService $publications,
-    ) {
-    }
+    ) {}
 
     public function plan(BroadcastId $broadcastId): BroadcastPlan
     {
@@ -138,7 +106,7 @@ final readonly class BroadcastLifecycleService
     public function rebuild(BroadcastId $broadcastId, ?callable $onProgress = null): BroadcastLifecycleResult
     {
         $broadcast = $this->broadcasts->find($broadcastId)
-            ?? throw \App\Broadcasts\BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
+            ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
 
         $this->transitionToProcessing($broadcast);
 
@@ -306,7 +274,7 @@ final readonly class BroadcastLifecycleService
     }
 
     /** @param array<string, mixed> $payload
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     public function invokePluginAction(BroadcastId $broadcastId, string $intent, array $payload = []): array
     {
@@ -329,7 +297,7 @@ final readonly class BroadcastLifecycleService
         return $plugin->plugin->plan($context);
     }
 
-    private function publishOnly(BroadcastRecord $broadcast, ?BroadcastPlan $plan = null): \App\Broadcasts\BroadcastPublishResult
+    private function publishOnly(BroadcastRecord $broadcast, ?BroadcastPlan $plan = null): BroadcastPublishResult
     {
         $context = $this->contextFactory->build($broadcast);
         $plugin = $this->resolvePlugin($context->broadcast->type);
@@ -345,15 +313,15 @@ final readonly class BroadcastLifecycleService
             broadcastRoot: $plan->broadcastRoot,
             files: array_values(array_filter(
                 $plan->files,
-                static fn (BroadcastPlannedFile $file): bool => $file->stashItemId === $stashItemId,
+                static fn(BroadcastPlannedFile $file): bool => $file->stashItemId === $stashItemId,
             )),
             sidecars: array_values(array_filter(
                 $plan->sidecars,
-                static fn (BroadcastPlannedSidecar $sidecar): bool => $sidecar->stashItemId === null || $sidecar->stashItemId === $stashItemId,
+                static fn(BroadcastPlannedSidecar $sidecar): bool => $sidecar->stashItemId === null || $sidecar->stashItemId === $stashItemId,
             )),
             skippedStashItemIds: array_values(array_filter(
                 $plan->skippedStashItemIds,
-                static fn (string $id): bool => $id === $stashItemId,
+                static fn(string $id): bool => $id === $stashItemId,
             )),
             estimatedCopyBytes: $plan->estimatedCopyBytes,
         );
@@ -367,7 +335,7 @@ final readonly class BroadcastLifecycleService
         return $plugin->plugin->verify($context);
     }
 
-    private function transitionToProcessing(\App\Broadcasts\BroadcastRecord $broadcast): void
+    private function transitionToProcessing(BroadcastRecord $broadcast): void
     {
         if ($broadcast->state === BroadcastState::Processing) {
             return;
@@ -388,7 +356,7 @@ final readonly class BroadcastLifecycleService
     }
 
     private function applyVerifyState(
-        \App\Broadcasts\BroadcastRecord $broadcast,
+        BroadcastRecord $broadcast,
         BroadcastVerifyResult $verify,
     ): void {
         if ($verify->ok) {

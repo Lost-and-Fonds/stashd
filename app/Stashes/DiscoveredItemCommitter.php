@@ -31,12 +31,11 @@ final readonly class DiscoveredItemCommitter
         private MediaItemSourceRepository $mediaItemSources,
         private StashItemRepository $stashItems,
         private StashInputFilter $inputFilter,
-    ) {
-    }
+    ) {}
 
     /**
-     * @param list<array<string, mixed>> $discoveredItems
-     * @param list<InputOption> $declaredInputOptions
+     * @param  list<array<string, mixed>>  $discoveredItems
+     * @param  list<InputOption>  $declaredInputOptions
      */
     public function commit(
         StashId $stashId,

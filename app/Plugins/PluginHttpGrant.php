@@ -10,6 +10,5 @@ final readonly class PluginHttpGrant
     public function __construct(
         public array $allowedPrefixes,
         public ?PluginCredentialGrant $credential = null,
-    ) {
-    }
+    ) {}
 }

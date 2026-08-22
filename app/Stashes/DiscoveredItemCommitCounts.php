@@ -14,6 +14,5 @@ final readonly class DiscoveredItemCommitCounts
         public int $stashItemsCreated = 0,
         public int $stashItemsReused = 0,
         public array $downloadableMediaItemIds = [],
-    ) {
-    }
+    ) {}
 }

@@ -42,6 +42,5 @@ final class MediaItemRecord
         public ?DateTime $lastSeenUpstreamAt = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
-    ) {
-    }
+    ) {}
 }

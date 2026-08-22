@@ -60,7 +60,7 @@ test('every /api/v1 route registered in app/ has a matching openapi.yaml path en
 
     $missing = array_values(array_filter(
         discoverApiV1RoutesFromSource(),
-        static fn (string $route): bool => ! in_array($route, $documentedPaths, true),
+        static fn(string $route): bool => ! in_array($route, $documentedPaths, true),
     ));
 
     expect($missing)->toBe([]);

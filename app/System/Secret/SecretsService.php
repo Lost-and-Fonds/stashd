@@ -17,14 +17,14 @@ final readonly class SecretsService
     public function __construct(
         private Encrypter $encrypter,
         private SecretRepository $secrets,
-    ) {
-    }
+    ) {}
 
     /** @param array<string, mixed>|null $metadata */
     public function put(
         string $key,
         SecretType $type,
-        #[SensitiveParameter] string $plaintext,
+        #[SensitiveParameter]
+        string $plaintext,
         ?array $metadata = null,
     ): void {
         $encrypted = $this->encrypt($plaintext);

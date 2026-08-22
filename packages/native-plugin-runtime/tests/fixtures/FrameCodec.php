@@ -2,13 +2,9 @@
 
 declare(strict_types=1);
 
-final class FrameTimeout extends RuntimeException
-{
-}
+final class FrameTimeout extends RuntimeException {}
 
-final class FrameProtocolError extends RuntimeException
-{
-}
+final class FrameProtocolError extends RuntimeException {}
 
 final class FrameCodec
 {

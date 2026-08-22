@@ -18,15 +18,14 @@ final readonly class JobController
 {
     public function __construct(
         private JobRepository $jobs,
-    ) {
-    }
+    ) {}
 
     #[Get('/api/v1/jobs')]
     public function index(): Json
     {
         return new Json([
             'jobs' => array_map(
-                static fn ($job): array => JobResource::fromRecord($job)->toArray(),
+                static fn($job): array => JobResource::fromRecord($job)->toArray(),
                 $this->jobs->listRecent(),
             ),
         ]);

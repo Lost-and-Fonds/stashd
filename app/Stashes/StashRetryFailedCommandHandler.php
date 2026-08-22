@@ -10,13 +10,14 @@ use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
 use App\Commands\InvalidCommandPayload;
+use App\Jobs\Handlers\RetryFailedDownloadsJobHandler;
 use App\Jobs\JobIntent;
 use App\Jobs\JobRepository;
 use App\Support\PrefixedUlid;
 
 /**
  * Looks up every failed item in the stash server-side (see
- * {@see \App\Jobs\Handlers\RetryFailedDownloadsJobHandler}) rather than
+ * {@see RetryFailedDownloadsJobHandler}) rather than
  * retrying whatever the caller happened to have loaded client-side --
  * correct regardless of pagination.
  */
@@ -26,8 +27,7 @@ final readonly class StashRetryFailedCommandHandler implements CommandHandler
         private CommandRepository $commands,
         private JobRepository $jobs,
         private StashRepository $stashes,
-    ) {
-    }
+    ) {}
 
     public function type(): CommandType
     {

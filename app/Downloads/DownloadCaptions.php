@@ -22,9 +22,7 @@ use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemExceptio
 
 final readonly class DownloadCaptions
 {
-    public function __construct(private ExternalInputPluginRegistry $plugins, private MediaItemRepository $mediaItems, private AssetRepository $assets, private VaultPathBuilder $paths, private MoveFileIntoVault $mover)
-    {
-    }
+    public function __construct(private ExternalInputPluginRegistry $plugins, private MediaItemRepository $mediaItems, private AssetRepository $assets, private VaultPathBuilder $paths, private MoveFileIntoVault $mover) {}
 
     public function execute(MediaItemId $mediaItemId, PrefixedUlid $jobId, string $languages, bool $includeAuto): void
     {
@@ -56,7 +54,7 @@ final readonly class DownloadCaptions
             mediaKind: 'video',
             options: ['include_captions' => true, 'caption_languages' => $languages, 'include_auto' => $includeAuto],
         );
-        $source = array_values(array_filter($files, static fn ($file): bool => $file->role === AssetRole::Subtitle))[0] ?? null;
+        $source = array_values(array_filter($files, static fn($file): bool => $file->role === AssetRole::Subtitle))[0] ?? null;
         if ($source === null) {
             throw DownloadException::withCode('captions_unavailable', 'No requested caption track is available.');
         }

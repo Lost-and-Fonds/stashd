@@ -18,6 +18,5 @@ final readonly class StashdBroadcast
         public string $name,
         /** Short description of what this plugin does. */
         public string $description = '',
-    ) {
-    }
+    ) {}
 }

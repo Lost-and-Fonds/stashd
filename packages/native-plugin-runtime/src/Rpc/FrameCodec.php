@@ -5,15 +5,6 @@ declare(strict_types=1);
 namespace Stashd\NativeRuntime\Rpc;
 
 use JsonException;
-use RuntimeException;
-
-final class FrameTimeout extends RuntimeException
-{
-}
-
-final class FrameProtocolError extends RuntimeException
-{
-}
 
 final class FrameCodec
 {
@@ -21,8 +12,8 @@ final class FrameCodec
 
     /** @param resource $stream */
     /**
-     * @param resource $stream
-     * @param array<string, mixed> $message
+     * @param  resource  $stream
+     * @param  array<string, mixed>  $message
      */
     public static function write($stream, array $message): void
     {
@@ -37,7 +28,7 @@ final class FrameCodec
 
     /** @param resource $stream */
     /**
-     * @param resource $stream
+     * @param  resource  $stream
      * @return array<string, mixed>|null
      */
     public static function read($stream, ?float $timeout = null): ?array
@@ -72,6 +63,7 @@ final class FrameCodec
                 $normalized[$key] = $value;
             }
         }
+
         return $normalized;
     }
 

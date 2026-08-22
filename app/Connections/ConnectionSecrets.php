@@ -10,9 +10,7 @@ use Tempest\Database\PrimaryKey;
 
 final readonly class ConnectionSecrets
 {
-    public function __construct(private SecretsService $secrets)
-    {
-    }
+    public function __construct(private SecretsService $secrets) {}
 
     public function resolve(ConnectionRecord $connection): ?string
     {

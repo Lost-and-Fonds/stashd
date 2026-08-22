@@ -19,8 +19,7 @@ final class MediaItemRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     public function create(
         string $providerKey,
@@ -102,8 +101,7 @@ final class MediaItemRepository
     }
 
     /**
-     * @param list<string> $ids
-     *
+     * @param  list<string>  $ids
      * @return array<string, MediaItemRecord> keyed by id
      */
     public function listByIds(array $ids): array

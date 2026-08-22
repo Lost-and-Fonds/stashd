@@ -37,10 +37,10 @@ test('derived asset identity keeps different opaque derivations separate', funct
 
     $derived = array_values(array_filter(
         $assets->listForMediaItem(MediaItemId::parse($mediaItemId)),
-        static fn ($asset): bool => $asset->role === AssetRole::Derived,
+        static fn($asset): bool => $asset->role === AssetRole::Derived,
     ));
 
     expect($derived)->toHaveCount(2)
-        ->and(array_map(static fn ($asset): ?string => $asset->derivationKey, $derived))
+        ->and(array_map(static fn($asset): ?string => $asset->derivationKey, $derived))
         ->toEqualCanonicalizing(['mp3-128-v1', 'opus-64-v1']);
 });

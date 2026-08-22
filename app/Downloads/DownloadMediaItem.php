@@ -50,10 +50,8 @@ final readonly class DownloadMediaItem
         private MoveFileIntoVault $fileMover,
         private StateTransitionService $transitions,
         private StashdConfig $config,
-    ) {
-    }
+    ) {}
 
-    /** @param ?callable $onProgress */
     public function execute(
         MediaItemId $mediaItemId,
         StashId $stashId,
@@ -266,7 +264,7 @@ final readonly class DownloadMediaItem
     }
 
     /**
-     * @param list<AssetRecord> $pendingAssets
+     * @param  list<AssetRecord>  $pendingAssets
      */
     private function ingestAllFiles(
         MediaItemRecord $mediaItem,

@@ -26,13 +26,13 @@ use Tempest\DateTime\Timezone;
 
 final readonly class DownloadCaptionsJobHandler implements JobHandler
 {
-    public function __construct(private DownloadCaptions $captions, private CommandRepository $commands, private JobRepository $jobs, private StateTransitionService $transitions, private BroadcastItemRepository $broadcastItems, private CommandDispatchService $dispatch, private EventPublisher $publisher)
-    {
-    }
+    public function __construct(private DownloadCaptions $captions, private CommandRepository $commands, private JobRepository $jobs, private StateTransitionService $transitions, private BroadcastItemRepository $broadcastItems, private CommandDispatchService $dispatch, private EventPublisher $publisher) {}
+
     public function intent(): JobIntent
     {
         return JobIntent::DownloadCaptions;
     }
+
     public function handle(JobRecord $job, JobHandlerContext $context): void
     {
         if ($job->commandId === null) {

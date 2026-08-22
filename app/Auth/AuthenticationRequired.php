@@ -6,6 +6,4 @@ namespace App\Auth;
 
 use RuntimeException;
 
-final class AuthenticationRequired extends RuntimeException
-{
-}
+final class AuthenticationRequired extends RuntimeException {}

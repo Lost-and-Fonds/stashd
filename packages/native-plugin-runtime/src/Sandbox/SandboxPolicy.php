@@ -21,6 +21,7 @@ final readonly class SandboxPolicy
             '--ro-bind', '/bin', '/bin', '--ro-bind', '/lib', '/lib', '--ro-bind', '/lib64', '/lib64',
             '--ro-bind', '/sbin', '/sbin', '--dir', '/home', '--dir', '/root',
         ];
+
         return array_merge($command, $etcMount, [
             '--dir', '/run', '--chdir', '/plugin', '--setenv', 'HOME', '/tmp', '--setenv',
             'PATH', '/usr/local/bin:/usr/bin:/bin', '--', 'php', '/plugin/' . $entrypoint,

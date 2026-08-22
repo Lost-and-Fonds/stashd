@@ -11,9 +11,7 @@ use Tempest\Container\Singleton;
 final class ExternalInputPluginRegistry
 {
     /** @param list<ExternalInputPlugin> $plugins */
-    public function __construct(private array $plugins)
-    {
-    }
+    public function __construct(private array $plugins) {}
 
     public function get(string $id): ExternalInputPlugin
     {
@@ -42,7 +40,7 @@ final class ExternalInputPluginRegistry
     {
         return array_values(array_filter(
             $this->plugins,
-            static fn (ExternalInputPlugin $plugin): bool => $plugin->isRuntimeAvailable(),
+            static fn(ExternalInputPlugin $plugin): bool => $plugin->isRuntimeAvailable(),
         ));
     }
 }

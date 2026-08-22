@@ -15,8 +15,7 @@ final readonly class StorageCapabilityChecker
         private StorageLocationRepository $locations,
         private StorageCheckRepository $checks,
         private FilesystemProbe $probe,
-    ) {
-    }
+    ) {}
 
     public function checkAll(): FilesystemProbeResult
     {

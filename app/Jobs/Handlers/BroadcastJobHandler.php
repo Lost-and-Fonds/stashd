@@ -36,8 +36,7 @@ final readonly class BroadcastJobHandler implements JobHandler
         private StateTransitionService $transitions,
         private ActivityEventService $activity,
         private EventPublisher $publisher,
-    ) {
-    }
+    ) {}
 
     public function intent(): JobIntent
     {
@@ -138,7 +137,7 @@ final readonly class BroadcastJobHandler implements JobHandler
 
         $result = $this->lifecycle->rebuild(
             $broadcastId,
-            fn (string $label) => $context->progress($job, JobProgressUpdate::indeterminate($label)),
+            fn(string $label) => $context->progress($job, JobProgressUpdate::indeterminate($label)),
         );
         $this->activity->broadcastPublished($command, $job, $broadcastId, $result->publish ?? []);
 
@@ -166,7 +165,7 @@ final readonly class BroadcastJobHandler implements JobHandler
         $this->activity->broadcastRebuildStarted($command, $job, $broadcastId);
         $result = $this->lifecycle->rebuildItem(
             $broadcastItemId,
-            fn (string $label) => $context->progress($job, JobProgressUpdate::indeterminate($label)),
+            fn(string $label) => $context->progress($job, JobProgressUpdate::indeterminate($label)),
         );
         $this->activity->broadcastPublished($command, $job, $broadcastId, $result->publish ?? []);
 

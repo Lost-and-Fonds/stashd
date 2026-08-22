@@ -13,8 +13,7 @@ final readonly class BroadcastItemResource
     public function __construct(
         private BroadcastItemRecord $item,
         private ?MediaItemRecord $mediaItem = null,
-    ) {
-    }
+    ) {}
 
     public static function fromRecord(BroadcastItemRecord $item, ?MediaItemRecord $mediaItem = null): self
     {

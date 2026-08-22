@@ -31,6 +31,5 @@ final class ActivityEventRecord
         public ?string $groupKey = null,
         public ?array $metadata = null,
         public ?DateTime $createdAt = null,
-    ) {
-    }
+    ) {}
 }

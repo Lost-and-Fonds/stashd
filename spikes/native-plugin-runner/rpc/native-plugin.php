@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/FrameCodec.php';
+require __DIR__.'/FrameCodec.php';
 
 $mode = $argv[1] ?? 'normal';
 if ($mode === 'malformed') {
-    fwrite(STDOUT, pack('N', 5) . 'oops!');
+    fwrite(STDOUT, pack('N', 5).'oops!');
     exit(0);
 }
 if ($mode === 'crash') {

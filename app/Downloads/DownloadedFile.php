@@ -18,6 +18,5 @@ final readonly class DownloadedFile
         public ?string $container = null,
         public ?int $sizeBytes = null,
         public ?int $durationSeconds = null,
-    ) {
-    }
+    ) {}
 }

@@ -89,7 +89,7 @@ test('importer refuses to merge into a database that already holds rows', functi
     $importer = $this->container->get(SqliteImporter::class);
     $importer->import($this->legacyPath);
 
-    expect(fn () => $importer->import($this->legacyPath))
+    expect(fn() => $importer->import($this->legacyPath))
         ->toThrow(\RuntimeException::class, 'Refusing to merge');
 
     // The first import's rows are still intact after the refusal.
@@ -97,6 +97,6 @@ test('importer refuses to merge into a database that already holds rows', functi
 });
 
 test('importer rejects a missing legacy database', function (): void {
-    expect(fn () => $this->container->get(SqliteImporter::class)->import('/nonexistent/stashd.sqlite'))
+    expect(fn() => $this->container->get(SqliteImporter::class)->import('/nonexistent/stashd.sqlite'))
         ->toThrow(\RuntimeException::class, 'does not exist or is not readable');
 });

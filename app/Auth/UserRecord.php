@@ -25,6 +25,5 @@ final class UserRecord implements Authenticatable
         public UserRole $role,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
-    ) {
-    }
+    ) {}
 }

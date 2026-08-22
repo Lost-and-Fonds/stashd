@@ -25,8 +25,7 @@ final readonly class WorkerTickCommand
         private JobWorkerService $worker,
         private SqliteConfigurator $sqlite,
         private DatabaseConfig $databaseConfig,
-    ) {
-    }
+    ) {}
 
     #[ConsoleCommand(
         name: 'stashd:worker-tick',

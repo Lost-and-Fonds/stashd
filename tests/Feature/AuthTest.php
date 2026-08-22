@@ -72,7 +72,7 @@ test('separate setup connections cannot create two owners after both observe an 
          VALUES (:id, :username, :passwordHash, :role, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
     );
 
-    expect(fn () => $insert->execute([
+    expect(fn() => $insert->execute([
         'id' => 'user_01J00000000000000000000000',
         'username' => 'other',
         'passwordHash' => password_hash('other-password', PASSWORD_DEFAULT),
@@ -85,7 +85,7 @@ test('the user repository reports the database single-owner constraint as setup 
     $users = $this->container->get(UserRepository::class);
     $users->createAdmin('owner', password_hash('secret-password', PASSWORD_DEFAULT));
 
-    expect(fn () => $users->createAdmin('other', password_hash('other-password', PASSWORD_DEFAULT)))
+    expect(fn() => $users->createAdmin('other', password_hash('other-password', PASSWORD_DEFAULT)))
         ->toThrow(InvalidArgumentException::class, 'Admin account already exists.')
         ->and(UserRecord::count()->execute())->toBe(1);
 });
@@ -408,7 +408,7 @@ test('api token scopes are stored as a typed value object', function (): void {
 
     $scopedToken = array_values(array_filter(
         $tokenList->body['tokens'],
-        static fn (array $token): bool => $token['id'] === $created->body['id'],
+        static fn(array $token): bool => $token['id'] === $created->body['id'],
     ))[0] ?? null;
 
     expect($scopedToken)->not->toBeNull()

@@ -27,8 +27,7 @@ final readonly class CommandController
         private CommandRepository $commands,
         private JobRepository $jobs,
         private AuthContext $context,
-    ) {
-    }
+    ) {}
 
     #[Post('/api/v1/commands')]
     public function create(Request $request): Json
@@ -89,7 +88,7 @@ final readonly class CommandController
         return new Json([
             'command' => CommandResource::fromRecord($command)->toArray(),
             'jobs' => array_map(
-                static fn ($job): array => JobResource::fromRecord($job)->toArray(),
+                static fn($job): array => JobResource::fromRecord($job)->toArray(),
                 $this->jobs->listForCommand(CommandId::fromPrimaryKey($command->id)),
             ),
         ]);

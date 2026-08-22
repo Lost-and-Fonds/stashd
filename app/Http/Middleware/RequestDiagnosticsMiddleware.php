@@ -24,8 +24,7 @@ final readonly class RequestDiagnosticsMiddleware implements HttpMiddleware
 
     public function __construct(
         private Logger $logger,
-    ) {
-    }
+    ) {}
 
     public function __invoke(Request $request, HttpMiddlewareCallable $next): Response
     {

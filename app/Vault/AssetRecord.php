@@ -49,6 +49,5 @@ final class AssetRecord
         public ?string $derivationKey = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
-    ) {
-    }
+    ) {}
 }

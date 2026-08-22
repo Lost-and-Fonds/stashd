@@ -6,6 +6,4 @@ namespace App\Auth;
 
 use RuntimeException;
 
-final class LoginThrottled extends RuntimeException
-{
-}
+final class LoginThrottled extends RuntimeException {}

@@ -242,7 +242,7 @@ This milestone should include:
 - normalize naming across WIT, RPC, SDK, runner, resources, and manifests;
 - remove temporary APIs that should not become public compatibility commitments;
 - add/organize unit, integration, sandbox, and conformance tests around the production structure;
-- apply PSR-12/Pint and useful PHPStan/static-analysis coverage;
+- apply PER Coding Style 3.0/Pint and useful PHPStan/static-analysis coverage;
 - document the public PHP SDK surface and internal runtime boundaries;
 - update architecture/roadmap docs where the final production structure differs from the spikes;
 - delete or clearly archive obsolete spike code only after equivalent production tests exist.
@@ -275,7 +275,7 @@ This is a refactoring and production-hardening milestone, not feature work.
 - provider-neutral Input and Broadcast conformance;
 - PostgreSQL and fresh-container operational smoke from M7;
 - PHPStan;
-- Pint/PSR-12;
+- Pint/PER Coding Style 3.0;
 - `git diff --check`;
 - verify no first-party provider has been migrated as part of this milestone.
 

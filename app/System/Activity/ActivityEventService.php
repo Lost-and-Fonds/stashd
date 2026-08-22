@@ -6,7 +6,11 @@ namespace App\System\Activity;
 
 use App\Broadcasts\BroadcastId;
 use App\Commands\CommandRecord;
+use App\Downloads\DownloadExecutionResult;
 use App\Jobs\JobRecord;
+use App\Stashes\StashInputCommitResult;
+use App\Stashes\StashInputRecord;
+use App\Stashes\StashInputSyncResult;
 use App\Stashes\StashRecord;
 use App\System\Event\EventPublisher;
 use App\System\Secret\SecretsService;
@@ -17,8 +21,7 @@ final readonly class ActivityEventService
         private ActivityEventRepository $events,
         private SecretsService $secrets,
         private EventPublisher $publisher,
-    ) {
-    }
+    ) {}
 
     public function commandAccepted(CommandRecord $command, bool $publish = true): ActivityEventRecord
     {
@@ -130,9 +133,9 @@ final readonly class ActivityEventService
     }
 
     public function stashInputCommitted(
-        CommandRecord                       $command,
-        JobRecord                           $job,
-        \App\Stashes\StashInputCommitResult $result,
+        CommandRecord $command,
+        JobRecord $job,
+        StashInputCommitResult $result,
     ): ActivityEventRecord {
         return $this->emit(
             level: ActivityLevel::Success,
@@ -152,10 +155,10 @@ final readonly class ActivityEventService
     }
 
     public function stashInputSynced(
-        CommandRecord                     $command,
-        JobRecord                         $job,
-        \App\Stashes\StashInputRecord     $input,
-        \App\Stashes\StashInputSyncResult $result,
+        CommandRecord $command,
+        JobRecord $job,
+        StashInputRecord $input,
+        StashInputSyncResult $result,
     ): ActivityEventRecord {
         $label = $input->title ?? $input->sourceUri;
 
@@ -197,7 +200,7 @@ final readonly class ActivityEventService
     public function downloadCompleted(
         CommandRecord $command,
         JobRecord $job,
-        \App\Downloads\DownloadExecutionResult $result,
+        DownloadExecutionResult $result,
     ): ActivityEventRecord {
         return $this->emit(
             level: ActivityLevel::Success,

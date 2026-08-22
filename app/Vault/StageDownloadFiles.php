@@ -16,8 +16,7 @@ final readonly class StageDownloadFiles
 {
     public function __construct(
         private StashdConfig $config,
-    ) {
-    }
+    ) {}
 
     public function createWorkDirectory(PrefixedUlid $jobId): string
     {

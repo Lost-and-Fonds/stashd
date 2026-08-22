@@ -10,7 +10,7 @@ use App\Providers\InputOptionType;
 final class StashInputFilter
 {
     /**
-     * @param list<InputOption> $declaredOptions
+     * @param  list<InputOption>  $declaredOptions
      */
     public function ignoredReason(string $title, ?string $contentType, ?StashInputOptions $options, array $declaredOptions): ?string
     {

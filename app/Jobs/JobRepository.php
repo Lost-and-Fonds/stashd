@@ -27,8 +27,7 @@ final class JobRepository
         private PrefixedUlidGenerator $ids,
         private Connection $connection,
         private Database $database,
-    ) {
-    }
+    ) {}
 
     /** @param array<string, mixed>|null $payload */
     public function create(
@@ -105,7 +104,7 @@ final class JobRepository
 
         $query = JobRecord::select()
             ->where('state', JobState::Pending)
-            ->andWhereGroup(fn (WhereGroupBuilder $group) => $group
+            ->andWhereGroup(fn(WhereGroupBuilder $group) => $group
                 ->whereNull('scheduledAt')
                 ->orWhere('scheduledAt', DateTime::now(Timezone::UTC), WhereOperator::LESS_THAN_OR_EQUAL))
             ->orderBy('priority', Direction::ASC)
@@ -114,7 +113,7 @@ final class JobRepository
 
         if ($lane !== null) {
             $query = $query->whereIn('intent', array_map(
-                static fn (JobIntent $intent): string => $intent->value,
+                static fn(JobIntent $intent): string => $intent->value,
                 $lane->intents(),
             ));
         }
@@ -293,8 +292,7 @@ final class JobRepository
      * listRecent()'s bounded window, which a media item's download job can
      * easily fall out of by the time someone looks at a long-failed item.
      *
-     * @param list<string> $mediaItemIds
-     *
+     * @param  list<string>  $mediaItemIds
      * @return array<string, string> lastError keyed by media item id
      */
     public function latestDownloadFailureByMediaItem(array $mediaItemIds): array

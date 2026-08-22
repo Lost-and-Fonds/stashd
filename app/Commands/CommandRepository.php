@@ -19,8 +19,7 @@ final class CommandRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     /** @param array<string, mixed>|null $options */
     public function create(

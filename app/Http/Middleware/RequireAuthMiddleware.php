@@ -8,6 +8,7 @@ use App\Auth\ApiScopePolicy;
 use App\Auth\AuthContext;
 use App\Auth\AuthService;
 use Tempest\Http\Request;
+use Tempest\Http\Response;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
 use Tempest\Router\HttpMiddleware;
@@ -26,10 +27,9 @@ final readonly class RequireAuthMiddleware implements HttpMiddleware
         private AuthService $auth,
         private AuthContext $context,
         private ApiScopePolicy $scopes,
-    ) {
-    }
+    ) {}
 
-    public function __invoke(Request $request, HttpMiddlewareCallable $next): Json|\Tempest\Http\Response
+    public function __invoke(Request $request, HttpMiddlewareCallable $next): Json|Response
     {
         try {
             $path = parse_url($request->path, PHP_URL_PATH) ?: $request->path;

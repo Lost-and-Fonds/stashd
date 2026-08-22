@@ -10,6 +10,5 @@ final readonly class PluginHelperGrant
         public string $name,
         public string $executable,
         public ?string $packageRoot = null,
-    ) {
-    }
+    ) {}
 }

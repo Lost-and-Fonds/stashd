@@ -13,8 +13,7 @@ final readonly class DelegatingDownloader implements DownloaderInterface
     public function __construct(
         private FakeDownloader $fake,
         private ?ExternalInputPluginRegistry $externalPlugins = null,
-    ) {
-    }
+    ) {}
 
     public function implementationName(): string
     {

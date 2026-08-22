@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Commands\CommandId;
+use App\Commands\CommandRecord;
+use App\Commands\CommandRepository;
+use App\Stashes\CreateStashFromDiscovery;
+use App\Stashes\StashId;
 use App\Stashes\StashInputRecord;
 use App\Stashes\StashItemRecord;
+use App\Stashes\StashRepository;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
 use App\Vault\MediaItemRecord;
+use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemSourceRecord;
 use App\Vault\MediaItemState;
 use Tempest\Database\Builder\QueryBuilders\BuildsQuery;
@@ -74,13 +81,11 @@ test('add-input persistence rolls back completely and retries cleanly after a tr
     $database = new class ($realDatabase) implements Database {
         public bool $fail = true;
 
-        public function __construct(private Database $inner)
-        {
-        }
+        public function __construct(private Database $inner) {}
 
         public DatabaseDialect $dialect { get => $this->inner->dialect; }
 
-        public null|string|UnitEnum $tag { get => $this->inner->tag; }
+        public string|UnitEnum|null $tag { get => $this->inner->tag; }
 
         public function execute(BuildsQuery|Query $query): void
         {
@@ -120,13 +125,13 @@ test('add-input persistence rolls back completely and retries cleanly after a tr
     };
     $this->container->singleton(Database::class, $database);
 
-    $service = $this->container->get(\App\Stashes\CreateStashFromDiscovery::class);
-    $stashRecord = $this->container->get(\App\Stashes\StashRepository::class)
-        ->find(\App\Stashes\StashId::parse($stash->body['stash']['id']));
-    $preflightCommand = $this->container->get(\App\Commands\CommandRepository::class)
-        ->find(\App\Commands\CommandId::parse($preflight->body['command_id']));
+    $service = $this->container->get(CreateStashFromDiscovery::class);
+    $stashRecord = $this->container->get(StashRepository::class)
+        ->find(StashId::parse($stash->body['stash']['id']));
+    $preflightCommand = $this->container->get(CommandRepository::class)
+        ->find(CommandId::parse($preflight->body['command_id']));
 
-    expect(fn () => $service->commitInput($stashRecord, $preflightCommand))
+    expect(fn() => $service->commitInput($stashRecord, $preflightCommand))
         ->toThrow(\RuntimeException::class, 'Failed to commit stash input.');
 
     expect(StashInputRecord::count()->execute())->toBe(0)
@@ -143,17 +148,17 @@ test('add-input persistence rolls back completely and retries cleanly after a tr
         ->and(StashItemRecord::count()->execute())->toBe(3)
         ->and(MediaItemSourceRecord::count()->execute())->toBe(3);
 
-    $downloadCommands = \App\Commands\CommandRecord::select()->where('type', 'item.download')->all();
+    $downloadCommands = CommandRecord::select()->where('type', 'item.download')->all();
 
     $service->commitInput($stashRecord, $preflightCommand);
 
-    expect(\App\Commands\CommandRecord::select()->where('type', 'item.download')->all())
+    expect(CommandRecord::select()->where('type', 'item.download')->all())
         ->toHaveCount(count($downloadCommands));
 });
 
 test('add input reuses existing media items by provider identity', function (): void {
     $headers = $this->authHeaders();
-    $mediaItems = $this->container->get(\App\Vault\MediaItemRepository::class);
+    $mediaItems = $this->container->get(MediaItemRepository::class);
 
     $mediaItems->create(
         providerKey: 'fake',
@@ -244,7 +249,7 @@ test('add input persists discovered descriptions onto new media items', function
 
 test('add input leaves existing media item description unchanged when reused', function (): void {
     $headers = $this->authHeaders();
-    $mediaItems = $this->container->get(\App\Vault\MediaItemRepository::class);
+    $mediaItems = $this->container->get(MediaItemRepository::class);
 
     $mediaItems->create(
         providerKey: 'fake',
@@ -340,7 +345,7 @@ test('add input with metadata_only policy enqueues no downloads', function (): v
         expect($media?->state)->toBe(MediaItemState::Discovered);
     }
 
-    expect(\App\Commands\CommandRecord::select()->where('type', 'item.download')->all())->toHaveCount(0);
+    expect(CommandRecord::select()->where('type', 'item.download')->all())->toHaveCount(0);
 });
 
 test('add input commits a second input from a different source into the same stash', function (): void {

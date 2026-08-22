@@ -33,8 +33,7 @@ final readonly class SqliteImporter
     public function __construct(
         private Database $database,
         private TransactionManager $transactions,
-    ) {
-    }
+    ) {}
 
     /**
      * @return array<string, int> table name => rows copied, in the order copied
@@ -160,9 +159,9 @@ final readonly class SqliteImporter
         while ($remaining !== []) {
             $ready = array_values(array_filter(
                 $remaining,
-                static fn (string $table): bool => array_all(
+                static fn(string $table): bool => array_all(
                     $dependencies[$table],
-                    static fn (string $referenced): bool => in_array($referenced, $ordered, true),
+                    static fn(string $referenced): bool => in_array($referenced, $ordered, true),
                 ),
             ));
 

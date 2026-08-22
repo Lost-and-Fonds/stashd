@@ -27,8 +27,7 @@ final readonly class StreamingResponseSender implements ResponseSender
 {
     public function __construct(
         private ResponseSender $inner,
-    ) {
-    }
+    ) {}
 
     public function send(Response $response): Response
     {

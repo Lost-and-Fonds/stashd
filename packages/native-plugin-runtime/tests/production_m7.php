@@ -12,9 +12,16 @@ use Stashd\NativeRuntime\Package\PackageManager;
 use Stashd\NativeRuntime\Rpc\FrameCodec;
 use Stashd\NativeRuntime\Runner\NativePluginRunner;
 use Stashd\NativeRuntime\Sandbox\SandboxPolicy;
+use Stashd\PluginSdk\ReadableResource;
+
+foreach (['BroadcastPlugin.php', 'InputPlugin.php', 'Logger.php', 'ProgressReporter.php', 'ReadableResource.php', 'HttpClient.php', 'StagingArea.php'] as $interface) {
+    require_once __DIR__ . '/../../plugin-sdk/src/' . $interface;
+}
 
 foreach (glob(__DIR__ . '/../../plugin-sdk/src/*.php') ?: [] as $sdkFile) {
-    require_once $sdkFile;
+    if (! in_array(basename($sdkFile), ['BroadcastPlugin.php', 'InputPlugin.php', 'Logger.php', 'ProgressReporter.php', 'ReadableResource.php', 'HttpClient.php', 'StagingArea.php'], true)) {
+        require_once $sdkFile;
+    }
 }
 require_once __DIR__ . '/../src/Capabilities/Invocation.php';
 require_once __DIR__ . '/../src/Package/PackageManager.php';
@@ -26,9 +33,10 @@ require_once __DIR__ . '/../src/Runner/NativePluginRunner.php';
 function m7Temp(string $prefix): string
 {
     $path = sys_get_temp_dir() . '/' . $prefix . '-' . bin2hex(random_bytes(8));
-    if (!mkdir($path, 0700, true)) {
+    if (! mkdir($path, 0700, true)) {
         throw new RuntimeException('temporary directory could not be created');
     }
+
     return $path;
 }
 
@@ -36,9 +44,10 @@ function m7Remove(string $path): void
 {
     if (is_link($path) || is_file($path)) {
         @unlink($path);
+
         return;
     }
-    if (!is_dir($path)) {
+    if (! is_dir($path)) {
         return;
     }
     foreach (scandir($path) ?: [] as $entry) {
@@ -51,7 +60,7 @@ function m7Remove(string $path): void
 
 function m7Assert(bool $condition, string $message): void
 {
-    if (!$condition) {
+    if (! $condition) {
         throw new RuntimeException($message);
     }
 }
@@ -63,7 +72,7 @@ function m7Archive(string $source, string $archive): void
         $files[] = 'sdk/' . basename($sdkFile);
     }
     $process = proc_open(array_merge(['tar', '-czf', $archive, '-C', $source], $files), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-    if (!is_resource($process) || proc_close($process) !== 0) {
+    if (! is_resource($process) || proc_close($process) !== 0) {
         throw new RuntimeException('fixture archive failed');
     }
 }
@@ -71,11 +80,17 @@ function m7Archive(string $source, string $archive): void
 final class M7Metrics
 {
     public int $invocations = 0;
+
     public int $capabilityCalls = 0;
+
     public int $resourceBytes = 0;
+
     public int $logs = 0;
+
     public int $progress = 0;
+
     public int $failures = 0;
+
     public array $events = [];
 }
 
@@ -83,10 +98,13 @@ final class M7HostProcess
 {
     /** @var resource */
     private $process;
+
     /** @var array<int, resource> */
     private array $pipes;
+
     private int $nextHostId = 1;
-    /** @var array<string, \Stashd\PluginSdk\ReadableResource> */
+
+    /** @var array<string, ReadableResource> */
     private array $resources = [];
 
     public function __construct(
@@ -98,7 +116,7 @@ final class M7HostProcess
         $command = (new SandboxPolicy())->command($packageRoot, $this->invocationRoot(), 'plugin.php');
         $this->pipes = [];
         $this->process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $this->pipes);
-        if (!is_resource($this->process)) {
+        if (! is_resource($this->process)) {
             throw new RuntimeException('native fixture process could not start');
         }
         stream_set_blocking($this->pipes[2], false);
@@ -117,6 +135,7 @@ final class M7HostProcess
             if (($message['kind'] ?? null) !== 'request') {
                 if (($message['id'] ?? null) === $id && isset($message['error'])) {
                     $this->metrics->failures++;
+
                     return ['error' => $message['error']];
                 }
                 if (($message['id'] ?? null) === $id) {
@@ -132,6 +151,7 @@ final class M7HostProcess
     public function stderr(): string
     {
         $value = stream_get_contents($this->pipes[2]);
+
         return is_string($value) ? $value : '';
     }
 
@@ -142,6 +162,7 @@ final class M7HostProcess
         }
         $exit = proc_close($this->process);
         $this->invocation->close();
+
         return $exit;
     }
 
@@ -194,6 +215,7 @@ final class M7HostProcess
         }
         $reference = 'resource-' . count($this->resources) . '-' . bin2hex(random_bytes(4));
         $this->resources[$reference] = $response->resource;
+
         return ['status' => $response->status, 'headers' => $response->headers, 'resource' => $reference];
     }
 
@@ -203,6 +225,7 @@ final class M7HostProcess
         $resource = $this->resources[$reference] ?? throw new CapabilityDenied('resource is not granted');
         $data = $resource->read(max(1, (int) ($params['maximum_bytes'] ?? 65536)));
         $this->metrics->resourceBytes += strlen($data);
+
         return ['data' => base64_encode($data), 'eof' => $resource->isEof()];
     }
 
@@ -211,6 +234,7 @@ final class M7HostProcess
         $resource = $this->invocation->readAsset((string) ($params['reference'] ?? ''));
         $reference = 'asset-' . bin2hex(random_bytes(4));
         $this->resources[$reference] = $resource;
+
         return $this->resourceRead(['reference' => $reference, 'maximum_bytes' => 65536]);
     }
 
@@ -221,12 +245,14 @@ final class M7HostProcess
             throw new CapabilityDenied('staging content is invalid');
         }
         $artifact = $this->invocation->staging()->write((string) ($params['relative_path'] ?? ''), $content, $params['media_type'] ?? null);
+
         return ['reference' => $artifact->reference, 'media_type' => $artifact->mediaType, 'size_bytes' => $artifact->sizeBytes];
     }
 
     private function helper(array $params): array
     {
         $result = $this->invocation->runHelper((string) ($params['name'] ?? ''), $params['arguments'] ?? []);
+
         return ['exit_code' => $result->exitCode, 'stdout' => $result->stdout, 'stderr' => $result->stderr];
     }
 
@@ -234,6 +260,7 @@ final class M7HostProcess
     {
         $this->metrics->{$kind === 'log' ? 'logs' : 'progress'}++;
         $this->metrics->events[] = ['kind' => $kind, 'value' => $value];
+
         return ['accepted' => true];
     }
 
@@ -254,16 +281,17 @@ function promote(string $stagingRoot, string $relativePath, string $promotionRoo
     }
     $source = realpath($stagingRoot . '/' . $relativePath);
     $staging = realpath($stagingRoot);
-    if ($source === false || $staging === false || !is_file($source) || !str_starts_with($source, $staging . '/')) {
+    if ($source === false || $staging === false || ! is_file($source) || ! str_starts_with($source, $staging . '/')) {
         throw new RuntimeException('publication source is outside staging');
     }
     $destination = $promotionRoot . '/' . $relativePath;
-    if (!is_dir(dirname($destination)) && !mkdir(dirname($destination), 0700, true) && !is_dir(dirname($destination))) {
+    if (! is_dir(dirname($destination)) && ! mkdir(dirname($destination), 0700, true) && ! is_dir(dirname($destination))) {
         throw new RuntimeException('promotion directory could not be created');
     }
-    if (!copy($source, $destination)) {
+    if (! copy($source, $destination)) {
         throw new RuntimeException('promotion failed');
     }
+
     return $destination;
 }
 
@@ -295,7 +323,7 @@ try {
     $runnerSmokeStage = m7Temp('stashd-production-runner');
     $productionRunner = new NativePluginRunner($manager);
     $productionProcess = $productionRunner->start('m7-example', $runnerSmokeStage);
-    $operation = $productionProcess->invoke('broadcast.operation', ['name' => 'runner-smoke'], static fn (array $message): array => []);
+    $operation = $productionProcess->invoke('broadcast.operation', ['name' => 'runner-smoke'], static fn(array $message): array => []);
     m7Assert(($operation['choices'][0]['value'] ?? null) === 'fixture', 'production runner invocation failed');
     $productionProcess->close();
     m7Remove($runnerSmokeStage);
@@ -311,6 +339,7 @@ try {
         m7Assert($method === 'GET', 'fixture request method mismatch');
         if ($url === 'https://allowed.test/small') {
             m7Assert(($headers['X-Fixture-Token'] ?? null) === 'fixture-secret', 'credential was not injected');
+
             return new TransportResponse(200, ['content-type' => 'text/plain'], ['small-response']);
         }
         if ($url === 'https://allowed.test/large') {
@@ -337,16 +366,16 @@ try {
     m7Assert(($publication['files'][0]['relative-path'] ?? null) === 'published/item-1.bin', 'Broadcast publication failed: ' . json_encode($publication, JSON_THROW_ON_ERROR));
     $helperReport = json_decode((string) file_get_contents($staging . '/helper-report.json'), true, 512, JSON_THROW_ON_ERROR);
     m7Assert($helperReport === ['vault' => 'denied', 'network' => 'denied', 'secret' => 'absent'], 'helper sandbox invariant failed');
-    m7Assert(!file_exists($package . '/HELPER_MUTATION'), 'plugin package was writable');
+    m7Assert(! file_exists($package . '/HELPER_MUTATION'), 'plugin package was writable');
     $published = promote($staging, 'published/item-1.bin', $promotion);
     $finalized = $runner->invoke('broadcast.finalize');
     m7Assert(isset($finalized['artifact']), 'Broadcast finalize failed');
     m7Assert(is_file($published) && file_get_contents($published) === 'authoritative fixture output', 'promotion output mismatch');
     m7Assert($metrics->logs > 0 && $metrics->progress > 0, 'structured events were not recorded');
-    m7Assert(!str_contains(json_encode($metrics->events, JSON_THROW_ON_ERROR), 'fixture-secret'), 'credential leaked into events');
+    m7Assert(! str_contains(json_encode($metrics->events, JSON_THROW_ON_ERROR), 'fixture-secret'), 'credential leaked into events');
     $exit = $runner->close();
     m7Assert($exit === 0, 'successful plugin did not exit cleanly');
-    m7Assert(!is_dir($staging), 'invocation staging was not cleaned');
+    m7Assert(! is_dir($staging), 'invocation staging was not cleaned');
 
     $retryStage = m7Temp('stashd-m7-retry');
     $retryInvocation = new Invocation($package, $retryStage, ['https://allowed.test'], [new CredentialGrant('fixture-token', 'https://allowed.test', 'X-Fixture-Token', 'fixture-secret')], $assetRoot, [new HelperGrant('fixture-helper', 'helpers/fixture-helper.php')], $transport, 64);
@@ -355,9 +384,9 @@ try {
     $retryRunner = new M7HostProcess($package, $retryStage, $retryInvocation, $retryMetrics);
     $failed = $retryRunner->invoke('broadcast.publish', ['mode' => 'fail']);
     m7Assert(isset($failed['error']), 'retry failure was not returned');
-    m7Assert(!is_file($promotion . '/failed/item-1.bin'), 'failed publication was promoted');
+    m7Assert(! is_file($promotion . '/failed/item-1.bin'), 'failed publication was promoted');
     $retryRunner->close();
-    m7Assert(!is_dir($retryStage), 'failed invocation staging was not cleaned');
+    m7Assert(! is_dir($retryStage), 'failed invocation staging was not cleaned');
 
     $retryStage = m7Temp('stashd-m7-rebuild');
     $retryInvocation = new Invocation($package, $retryStage, ['https://allowed.test'], [new CredentialGrant('fixture-token', 'https://allowed.test', 'X-Fixture-Token', 'fixture-secret')], $assetRoot, [new HelperGrant('fixture-helper', 'helpers/fixture-helper.php')], $transport, 64);

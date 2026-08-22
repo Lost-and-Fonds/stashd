@@ -13,7 +13,7 @@ namespace App\Broadcasts;
 interface BroadcastPluginActions
 {
     /** @param array<string, mixed> $payload
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     public function invokeAction(BroadcastRecord $broadcast, string $intent, array $payload = []): array;
 }

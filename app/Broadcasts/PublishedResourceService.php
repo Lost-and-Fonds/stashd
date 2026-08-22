@@ -9,6 +9,7 @@ use App\Support\PrefixedUlid;
 use App\System\Secret\SecretRepository;
 use App\System\Secret\SecretsService;
 use App\System\Secret\SecretType;
+use App\Vault\AssetId;
 use App\Vault\AssetRecord;
 use RuntimeException;
 use SensitiveParameter;
@@ -22,8 +23,7 @@ final readonly class PublishedResourceService
         private SecretsService $secrets,
         private SecretRepository $secretRecords,
         private PublicationCredentialDigest $digests,
-    ) {
-    }
+    ) {}
 
     public function publishAsset(
         BroadcastRecord $broadcast,
@@ -202,7 +202,7 @@ final readonly class PublishedResourceService
 
         $resource = $this->resources->create(new PublishedResourceRecord(
             broadcastId: BroadcastId::fromPrimaryKey($broadcast->id),
-            assetId: $assetId === null ? null : \App\Vault\AssetId::parse($assetId),
+            assetId: $assetId === null ? null : AssetId::parse($assetId),
             relativePath: $relativePath,
             mediaType: $mediaType,
             downloadName: $downloadName,

@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastPathBuilder;
 use App\Broadcasts\BroadcastRepository;
+use App\Broadcasts\PublishedResourceController;
 use App\Broadcasts\PublishedResourceService;
+use App\Support\PrefixedUlid;
 use App\System\Secret\SecretRepository;
 use App\Vault\AssetRepository;
 use Tempest\Http\Status;
@@ -65,7 +67,7 @@ test('publishes a generated file with protected access and rotates its credentia
     $this->http->get('/published/' . $resource->id, headers: $headers)->assertStatus(Status::NOT_FOUND);
     $this->http->get('/published/' . $resource->id . '/access/wrong', headers: $headers)
         ->assertStatus(Status::NOT_FOUND);
-    $protected = $this->container->get(\App\Broadcasts\PublishedResourceController::class)
+    $protected = $this->container->get(PublishedResourceController::class)
         ->serveProtected((string) $resource->id, (string) $credential);
     expect($protected->getHeader('Content-Type')?->values)->toContain('application/json');
     expect($protected->getHeader('Content-Disposition')?->values)->toContain('inline; filename="index.json"');
@@ -86,7 +88,7 @@ test('rejects unsafe generated publication paths', function (): void {
     [, , , $broadcastId] = $this->bootstrapFakeDownloadBroadcast('published-path');
     $broadcast = $this->container->get(BroadcastRepository::class)->find(BroadcastId::parse($broadcastId));
 
-    expect(fn () => $this->container->get(PublishedResourceService::class)->publishFile(
+    expect(fn() => $this->container->get(PublishedResourceService::class)->publishFile(
         $broadcast,
         '../outside.json',
         'application/json',
@@ -107,7 +109,7 @@ test('deleting a broadcast revokes its publication credential', function (): voi
         ->assertStatus(Status::NOT_FOUND);
 
     $secret = $this->container->get(SecretRepository::class)->find(
-        \App\Support\PrefixedUlid::parse((string) $resource->credentialSecretId),
+        PrefixedUlid::parse((string) $resource->credentialSecretId),
     );
     expect($secret?->revokedAt)->not->toBeNull();
 });

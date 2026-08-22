@@ -15,8 +15,7 @@ final readonly class BroadcastPlannedFile
         public string $relativePath,
         public string $absolutePath,
         public string $filename,
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function toArray(): array

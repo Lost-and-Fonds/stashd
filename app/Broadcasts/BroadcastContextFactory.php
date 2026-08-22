@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use App\Stashes\StashInputRepository;
+use App\Stashes\StashItemRecord;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashItemState;
 use App\Stashes\StashRepository;
@@ -17,11 +19,10 @@ final readonly class BroadcastContextFactory
         private BroadcastRepository $broadcasts,
         private StashRepository $stashes,
         private StashItemRepository $stashItems,
-        private \App\Stashes\StashInputRepository $stashInputs,
+        private StashInputRepository $stashInputs,
         private MediaItemRepository $mediaItems,
         private AssetRepository $assets,
-    ) {
-    }
+    ) {}
 
     public function build(BroadcastRecord $broadcast): BroadcastContext
     {
@@ -93,7 +94,7 @@ final readonly class BroadcastContextFactory
         $this->broadcasts->save($broadcast);
     }
 
-    /** @return list<\App\Stashes\StashItemRecord> */
+    /** @return list<StashItemRecord> */
     public function publishableStashItems(BroadcastContext $context): array
     {
         $items = [];

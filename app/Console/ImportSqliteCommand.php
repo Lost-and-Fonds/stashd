@@ -16,8 +16,7 @@ final readonly class ImportSqliteCommand
 
     public function __construct(
         private SqliteImporter $importer,
-    ) {
-    }
+    ) {}
 
     #[ConsoleCommand(
         name: 'stashd:import-sqlite',

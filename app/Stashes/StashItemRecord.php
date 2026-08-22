@@ -40,6 +40,5 @@ final class StashItemRecord
         public ?string $ignoredReason = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
-    ) {
-    }
+    ) {}
 }

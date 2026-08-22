@@ -12,8 +12,7 @@ final readonly class BroadcastCreationPreview
         public int $vaultSizeBytes,
         public int $hardlinkedItemCount,
         public int $transcodeItemCount,
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function toArray(): array

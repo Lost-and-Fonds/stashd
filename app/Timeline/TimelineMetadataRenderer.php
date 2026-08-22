@@ -8,9 +8,7 @@ use App\Vault\MediaItemId;
 
 final readonly class TimelineMetadataRenderer
 {
-    public function __construct(private TimelineEntryRepository $entries)
-    {
-    }
+    public function __construct(private TimelineEntryRepository $entries) {}
 
     public function render(MediaItemId $mediaItemId): ?string
     {
@@ -36,6 +34,6 @@ final readonly class TimelineMetadataRenderer
 
     private function escape(string $value): string
     {
-        return str_replace(["\\", "\n", "\r", '=', ';', '#'], ['\\\\', '\\n', '', '\\=', '\\;', '\\#'], $value);
+        return str_replace(['\\', "\n", "\r", '=', ';', '#'], ['\\\\', '\\n', '', '\\=', '\\;', '\\#'], $value);
     }
 }

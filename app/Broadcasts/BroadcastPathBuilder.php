@@ -18,8 +18,7 @@ final readonly class BroadcastPathBuilder
 
     public function __construct(
         private StashdConfig $config,
-    ) {
-    }
+    ) {}
 
     public function broadcastRoot(BroadcastRecord $broadcast): string
     {

@@ -22,8 +22,7 @@ final readonly class StashInputOptions
         public ?string $titleRegexInclude = null,
         public ?string $titleRegexExclude = null,
         public array $provider = [],
-    ) {
-    }
+    ) {}
 
     /** @param array<string, mixed>|null $options */
     public static function fromArray(?array $options): ?self
@@ -71,7 +70,7 @@ final readonly class StashInputOptions
      */
     public static function matches(string $pattern, string $subject): ?bool
     {
-        set_error_handler(static fn (): bool => true);
+        set_error_handler(static fn(): bool => true);
 
         try {
             $result = preg_match(self::delimitedPattern($pattern), $subject);
@@ -98,8 +97,7 @@ final readonly class StashInputOptions
     }
 
     /**
-     * @param array<mixed, mixed> $values
-     *
+     * @param  array<mixed, mixed>  $values
      * @return array<string, bool|string>
      */
     private static function boolOrStringMap(array $values): array

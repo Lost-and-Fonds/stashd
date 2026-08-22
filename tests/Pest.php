@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Auth\AuthService;
+use App\System\Boot\SqliteConfigurator;
 use Tempest\Database\Config\DatabaseDialect;
+use Tempest\Database\Config\SQLiteConfig;
 use Tempest\Database\Database;
 use Tempest\Database\Query;
 use Tempest\Framework\Testing\Http\TestResponseHelper;
@@ -211,8 +213,8 @@ pest()->extend(IntegrationTestCase::class)
         $this->database->reset();
 
         if ($databaseConnection === 'sqlite') {
-            $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
-            $this->container->get(\App\System\Boot\SqliteConfigurator::class)->configure($sqlite);
+            $sqlite = $this->container->get(SQLiteConfig::class);
+            $this->container->get(SqliteConfigurator::class)->configure($sqlite);
         }
     })
     ->in('Feature', '../plugins/podcast/tests');

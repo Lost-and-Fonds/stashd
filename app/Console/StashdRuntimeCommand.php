@@ -19,8 +19,7 @@ final readonly class StashdRuntimeCommand
     public function __construct(
         private ProcessExecutor $processes,
         private FrankenPhpProcessLauncher $frankenPhp,
-    ) {
-    }
+    ) {}
 
     #[ConsoleCommand(
         name: 'stashd',

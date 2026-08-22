@@ -32,6 +32,5 @@ final class ApiTokenRecord
         public ?DateTime $expiresAt = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $revokedAt = null,
-    ) {
-    }
+    ) {}
 }

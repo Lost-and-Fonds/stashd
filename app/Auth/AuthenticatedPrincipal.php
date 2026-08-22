@@ -10,8 +10,7 @@ final readonly class AuthenticatedPrincipal
         public UserRecord $user,
         public bool $session,
         public ?ApiTokenScopes $scopes = null,
-    ) {
-    }
+    ) {}
 
     public function allows(?ApiScope $required): bool
     {

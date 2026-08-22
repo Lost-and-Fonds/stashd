@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Commands\CommandRecord;
+use App\Config\StashdConfig;
 use App\Jobs\JobRecord;
+use App\Providers\ProviderRegistry;
+use App\Providers\StashdUri;
 use App\System\Boot\BootstrapService;
 use App\System\Boot\MigrationRunner;
 use App\System\Boot\SqliteConfigurator;
@@ -18,10 +21,12 @@ use App\System\Storage\StorageRootService;
 use Tempest\Database\Config\DatabaseConfig;
 use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Config\PostgresConfig;
+use Tempest\Database\Config\SQLiteConfig;
 use Tempest\Database\Database;
 use Tempest\Database\Migrations\Migration;
 use Tempest\Database\Migrations\RunnableMigrations;
 use Tempest\Database\PrimaryKey;
+use Tempest\Database\Query;
 
 test('boot creates schema command and job records', function (): void {
     $bootstrap = $this->container->get(BootstrapService::class);
@@ -65,16 +70,16 @@ test('health endpoint returns ok after boot', function (): void {
 });
 
 test('provider registry resolves fake uris', function (): void {
-    $registry = $this->container->get(\App\Providers\ProviderRegistry::class);
-    $provider = $registry->resolveForUri(\App\Providers\StashdUri::parse('fake://channel/demo'));
+    $registry = $this->container->get(ProviderRegistry::class);
+    $provider = $registry->resolveForUri(StashdUri::parse('fake://channel/demo'));
 
     expect($provider->key())->toBe('fake');
 });
 
 test('provider registry resolves youtube uris', function (): void {
     requireExternalInputPluginRuntime($this);
-    $registry = $this->container->get(\App\Providers\ProviderRegistry::class);
-    $provider = $registry->resolveForUri(\App\Providers\StashdUri::parse('https://www.youtube.com/watch?v=demoVideo01'));
+    $registry = $this->container->get(ProviderRegistry::class);
+    $provider = $registry->resolveForUri(StashdUri::parse('https://www.youtube.com/watch?v=demoVideo01'));
 
     expect($provider->key())->toBe('youtube');
 });
@@ -84,7 +89,7 @@ test('sqlite pragmas are enabled on the tempest connection', function (): void {
         $this->markTestSkipped('SQLite-specific: pragmas, WAL, and file backups have no PostgreSQL equivalent.');
     }
 
-    $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
+    $sqlite = $this->container->get(SQLiteConfig::class);
     $configurator = $this->container->get(SqliteConfigurator::class);
 
     $configurator->configure($sqlite);
@@ -104,16 +109,16 @@ test('enabling WAL does not retain a SQLite statement that blocks schema migrati
         $this->markTestSkipped('SQLite-specific: pragmas, WAL, and file backups have no PostgreSQL equivalent.');
     }
 
-    $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
+    $sqlite = $this->container->get(SQLiteConfig::class);
     $configurator = $this->container->get(SqliteConfigurator::class);
-    $database = $this->container->get(\Tempest\Database\Database::class);
+    $database = $this->container->get(Database::class);
 
     $configurator->configure($sqlite);
-    $database->execute(new \Tempest\Database\Query('CREATE INDEX `stashes_slug` ON `stashes` (`name`)'));
+    $database->execute(new Query('CREATE INDEX `stashes_slug` ON `stashes` (`name`)'));
     $configurator->enableWriteAheadLogging($sqlite);
-    $database->execute(new \Tempest\Database\Query('DROP INDEX IF EXISTS `stashes_slug`'));
+    $database->execute(new Query('DROP INDEX IF EXISTS `stashes_slug`'));
 
-    expect($database->fetchFirst(new \Tempest\Database\Query(
+    expect($database->fetchFirst(new Query(
         "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'stashes_slug'",
     )))->toBeNull();
 });
@@ -124,7 +129,7 @@ test('migration runner skips backup when no pending migrations remain', function
     }
 
     $runner = $this->container->get(MigrationRunner::class);
-    $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
+    $sqlite = $this->container->get(SQLiteConfig::class);
     $data = getenv('STASHD_DATA_PATH') ?: '/tmp/stashd-test/data';
     $backupGlob = $data . '/backups/stashd-before-migration-*.sqlite';
 
@@ -146,8 +151,8 @@ test('migration runner detects pending migrations when a record is missing', fun
 
     expect($runner->hasPendingMigrations())->toBeFalse();
 
-    $database = $this->container->get(\Tempest\Database\Database::class);
-    $database->execute(new \Tempest\Database\Query(
+    $database = $this->container->get(Database::class);
+    $database->execute(new Query(
         'DELETE FROM migrations WHERE name = ?',
         bindings: ['2026_06_16_create_foundation_schema'],
     ));
@@ -161,7 +166,7 @@ test('migration runner creates a timestamped backup file before applying migrati
     }
 
     $runner = $this->container->get(MigrationRunner::class);
-    $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
+    $sqlite = $this->container->get(SQLiteConfig::class);
     $data = getenv('STASHD_DATA_PATH') ?: '/tmp/stashd-test/data';
     $backupGlob = $data . '/backups/stashd-before-migration-*.sqlite';
 
@@ -181,7 +186,7 @@ test('migration runner creates a timestamped backup file before applying migrati
 
 test('storage roots are created and writable', function (): void {
     $roots = $this->container->get(StorageRootService::class);
-    $config = $this->container->get(\App\Config\StashdConfig::class);
+    $config = $this->container->get(StashdConfig::class);
 
     $roots->ensureDirectories();
 

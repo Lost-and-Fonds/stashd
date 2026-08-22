@@ -16,8 +16,7 @@ final class BroadcastTriggerRunRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     public function create(
         BroadcastTriggerId $triggerId,
@@ -38,5 +37,4 @@ final class BroadcastTriggerRunRepository
 
         return $record;
     }
-
 }

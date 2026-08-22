@@ -15,8 +15,7 @@ final readonly class BootJobHandler implements JobHandler
 {
     public function __construct(
         private StateTransitionService $transitions,
-    ) {
-    }
+    ) {}
 
     public function intent(): JobIntent
     {

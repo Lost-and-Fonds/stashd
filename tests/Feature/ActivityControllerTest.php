@@ -23,7 +23,7 @@ test('creating a stash records a stash.created activity event surfaced via the a
     $response->assertOk();
 
     $events = $response->body['events'];
-    $created = array_values(array_filter($events, static fn (array $event): bool => $event['type'] === 'stash.created'
+    $created = array_values(array_filter($events, static fn(array $event): bool => $event['type'] === 'stash.created'
         && $event['stash_id'] === $stash->body['stash']['id']));
 
     expect($created)->toHaveCount(1)
@@ -41,8 +41,8 @@ test('activity events are returned newest first', function (): void {
     $events = $response->body['events'];
 
     $stashCreatedMessages = array_values(array_map(
-        static fn (array $event): string => $event['message'],
-        array_filter($events, static fn (array $event): bool => $event['type'] === 'stash.created'),
+        static fn(array $event): string => $event['message'],
+        array_filter($events, static fn(array $event): bool => $event['type'] === 'stash.created'),
     ));
 
     expect($stashCreatedMessages[0])->toBe('Stash "Second Stash" created.')

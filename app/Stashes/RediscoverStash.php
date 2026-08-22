@@ -17,8 +17,7 @@ final readonly class RediscoverStash
         private StashInputRepository $inputs,
         private DiscoverStashInput $discovery,
         private MediaItemRepository $mediaItems,
-    ) {
-    }
+    ) {}
 
     /** @return array{inputs: int, discovered: int, matched: int, updated: int, fields: int} */
     public function execute(string $stashId): array

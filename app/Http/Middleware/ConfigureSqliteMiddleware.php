@@ -28,8 +28,7 @@ final readonly class ConfigureSqliteMiddleware implements HttpMiddleware
     public function __construct(
         private SqliteConfigurator $sqlite,
         private DatabaseConfig $databaseConfig,
-    ) {
-    }
+    ) {}
 
     public function __invoke(Request $request, HttpMiddlewareCallable $next): Response
     {

@@ -10,7 +10,9 @@ paths:
 # PHP / Tempest rules
 
 - Target PHP `^8.5` as declared by the project.
-- Follow the repo's Pint/PSR-12 configuration.
+- Follow the repo's PER Coding Style 3.0 configuration. Pint remains an
+  automatic formatter; PHP CS Fixer is the authoritative PER-CS 3.0 style
+  check, with PHPCS enforcing the PSR-1/PSR-4 structural contract.
 - Prefer explicit types, enums for bounded state, small DTOs/value objects, and readable constructor property promotion.
 - Do not add `@param`/`@return` docblocks for typed signatures.
 - Class docblocks are welcome only when they explain purpose, boundary, or assumptions.

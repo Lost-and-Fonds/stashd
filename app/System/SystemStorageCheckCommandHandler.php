@@ -16,17 +16,14 @@ final readonly class SystemStorageCheckCommandHandler implements CommandHandler
 {
     public function __construct(
         private JobRepository $jobs,
-    ) {
-    }
+    ) {}
 
     public function type(): CommandType
     {
         return CommandType::SystemStorageCheck;
     }
 
-    public function validate(array $options): void
-    {
-    }
+    public function validate(array $options): void {}
 
     public function createJobs(CommandRecord $command, array $options): array
     {

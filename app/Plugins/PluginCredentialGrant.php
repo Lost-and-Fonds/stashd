@@ -11,6 +11,5 @@ final readonly class PluginCredentialGrant
         public string $value,
         public string $parameter,
         public string $placement = 'query',
-    ) {
-    }
+    ) {}
 }

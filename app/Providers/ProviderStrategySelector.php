@@ -28,13 +28,13 @@ final readonly class ProviderStrategySelector
 
         $strategies = array_values(array_filter(
             $strategies,
-            static fn (ProviderStrategy $strategy): bool => $provider->isStrategyAvailable($strategy),
+            static fn(ProviderStrategy $strategy): bool => $provider->isStrategyAvailable($strategy),
         ));
 
         if (! $options->allowLastResort) {
             $strategies = array_values(array_filter(
                 $strategies,
-                static fn (ProviderStrategy $strategy): bool => $strategy->cost !== StrategyCost::LastResort,
+                static fn(ProviderStrategy $strategy): bool => $strategy->cost !== StrategyCost::LastResort,
             ));
         }
 
@@ -45,7 +45,7 @@ final readonly class ProviderStrategySelector
         if ($options->preferIncremental) {
             $incremental = array_values(array_filter(
                 $strategies,
-                static fn (ProviderStrategy $strategy): bool => $strategy->supportsIncremental,
+                static fn(ProviderStrategy $strategy): bool => $strategy->supportsIncremental,
             ));
             if ($incremental !== []) {
                 $strategies = $incremental;

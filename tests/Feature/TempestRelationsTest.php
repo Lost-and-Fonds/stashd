@@ -67,7 +67,7 @@ test('BelongsTo eager-loads the owning stash from an item', function (): void {
 
 test('whereHas filters stashes by related items', function (): void {
     $matching = StashRecord::select()
-        ->whereHas('items', fn ($query) => $query->where('stashId', $this->stashId->toString()))
+        ->whereHas('items', fn($query) => $query->where('stashId', $this->stashId->toString()))
         ->all();
 
     expect($matching)->toHaveCount(1)

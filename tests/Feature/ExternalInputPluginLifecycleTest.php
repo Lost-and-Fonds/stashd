@@ -6,16 +6,19 @@ namespace Tests\Feature;
 
 use App\Providers\StashdUri;
 use App\Stashes\StashId;
+use App\Stashes\StashInputId;
 use App\Stashes\StashInputOptions;
 use App\Stashes\StashInputRecord;
 use App\Stashes\StashInputRepository;
 use App\Stashes\StashInputType;
 use App\Stashes\StashItemRecord;
+use App\Stashes\StashItemRepository;
 use App\Stashes\StashItemState;
 use App\Stashes\SyncMode;
 use App\Vault\AssetRecord;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemSourceRepository;
@@ -63,7 +66,7 @@ test('an external Input Component uses the normal Stash discovery and Vault life
 
     $items = StashItemRecord::select()->where('stashId', $stashId)->all();
     expect($items)->toHaveCount(18)
-        ->and(array_values(array_filter($items, static fn (StashItemRecord $item): bool => $item->state->value === 'active')))->toHaveCount(1);
+        ->and(array_values(array_filter($items, static fn(StashItemRecord $item): bool => $item->state->value === 'active')))->toHaveCount(1);
 
     $this->http->post('/api/v1/stashes/' . $stashId . '/sync', [], headers: $headers)->assertStatus(Status::ACCEPTED);
     $this->processAllJobs();
@@ -74,7 +77,7 @@ test('an external Input Component uses the normal Stash discovery and Vault life
 
     $active = array_values(array_filter(
         StashItemRecord::select()->where('stashId', $stashId)->all(),
-        static fn (StashItemRecord $item): bool => $item->state->value === 'active',
+        static fn(StashItemRecord $item): bool => $item->state->value === 'active',
     ))[0];
     $media = MediaItemRecord::findById(new PrimaryKey((string) $active->mediaItemId));
     expect($media)->not->toBeNull();
@@ -100,7 +103,7 @@ test('an external Input Component uses the normal Stash discovery and Vault life
             ->and($asset->path)->not->toBeNull()
             ->and(is_file($asset->path))->toBeTrue();
     }
-    expect(array_map(static fn (AssetRecord $asset): string => $asset->role->value, $assets))
+    expect(array_map(static fn(AssetRecord $asset): string => $asset->role->value, $assets))
         ->toEqualCanonicalizing([AssetRole::VaultOriginal->value, AssetRole::MetadataJson->value, AssetRole::SourceThumbnail->value]);
 });
 
@@ -134,18 +137,18 @@ test('an existing logical YouTube Input routes to the Component without duplicat
         state: MediaItemState::Discovered,
         contentType: 'regular',
     );
-    $inputId = \App\Stashes\StashInputId::fromPrimaryKey($input->id);
+    $inputId = StashInputId::fromPrimaryKey($input->id);
     $sources->create(
-        mediaItemId: \App\Vault\MediaItemId::fromPrimaryKey($media->id),
+        mediaItemId: MediaItemId::fromPrimaryKey($media->id),
         providerKey: 'youtube',
         providerInputId: $input->providerInputId,
         discoveredUri: $media->canonicalUri,
         stashInputId: $inputId,
         position: 1,
     );
-    $this->container->get(\App\Stashes\StashItemRepository::class)->create(
+    $this->container->get(StashItemRepository::class)->create(
         stashId: $stashId,
-        mediaItemId: \App\Vault\MediaItemId::fromPrimaryKey($media->id),
+        mediaItemId: MediaItemId::fromPrimaryKey($media->id),
         stashInputId: $inputId,
         state: StashItemState::Active,
         position: 1,

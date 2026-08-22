@@ -14,10 +14,10 @@ use App\Vault\MediaItemRecord;
 final readonly class BroadcastContext
 {
     /**
-     * @param list<StashItemRecord> $stashItems
-     * @param array<string, MediaItemRecord> $mediaItems keyed by media item id
-     * @param array<string, AssetRecord|null> $vaultOriginals keyed by media item id
-     * @param list<StashInputRecord> $stashInputs
+     * @param  list<StashItemRecord>  $stashItems
+     * @param  array<string, MediaItemRecord>  $mediaItems  keyed by media item id
+     * @param  array<string, AssetRecord|null>  $vaultOriginals  keyed by media item id
+     * @param  list<StashInputRecord>  $stashInputs
      */
     public function __construct(
         public BroadcastRecord $broadcast,
@@ -26,13 +26,11 @@ final readonly class BroadcastContext
         public array $mediaItems,
         public array $vaultOriginals,
         public array $stashInputs = [],
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function settings(): array
     {
         return $this->broadcast->settings ?? [];
     }
-
 }

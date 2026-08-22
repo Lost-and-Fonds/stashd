@@ -19,8 +19,7 @@ final class StashInputRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     public function create(
         StashId $stashId,
@@ -91,7 +90,7 @@ final class StashInputRepository
         return StashInputRecord::select()
             ->where('state', StashInputState::Ready)
             ->where('syncMode', SyncMode::Automatic)
-            ->andWhereGroup(fn (WhereGroupBuilder $group) => $group
+            ->andWhereGroup(fn(WhereGroupBuilder $group) => $group
                 ->whereNull('nextCheckAt')
                 ->orWhere('nextCheckAt', $now, WhereOperator::LESS_THAN_OR_EQUAL))
             ->orderBy('nextCheckAt', Direction::ASC)

@@ -7,8 +7,8 @@ namespace App\Plugins;
 final readonly class PluginInvocationResult
 {
     /**
-     * @param list<array{fraction: float, stage: string}> $progress
-     * @param list<string> $logs
+     * @param  list<array{fraction: float, stage: string}>  $progress
+     * @param  list<string>  $logs
      */
     public function __construct(
         public array $progress,
@@ -16,6 +16,5 @@ final readonly class PluginInvocationResult
         public int $sourceBytes,
         public string $outputId,
         public int $outputBytes,
-    ) {
-    }
+    ) {}
 }

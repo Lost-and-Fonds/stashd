@@ -14,6 +14,7 @@ use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
 use App\Jobs\JobWorkerService;
+use App\Jobs\WorkerProcessProbe;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
@@ -26,8 +27,7 @@ function retryableDownloadWorker(GenericContainer $container, DownloadException 
     $handler = new class ($exception) implements JobHandler {
         public function __construct(
             private DownloadException $exception,
-        ) {
-        }
+        ) {}
 
         public function handle(JobRecord $job, JobHandlerContext $context): void
         {
@@ -47,7 +47,7 @@ function retryableDownloadWorker(GenericContainer $container, DownloadException 
         handlers: new JobHandlerRegistry([$handler]),
         activity: $container->get(ActivityEventService::class),
         publisher: $container->get(EventPublisher::class),
-        probe: $container->get(\App\Jobs\WorkerProcessProbe::class),
+        probe: $container->get(WorkerProcessProbe::class),
     );
 }
 

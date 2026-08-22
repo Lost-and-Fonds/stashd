@@ -4,7 +4,16 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Auth\AuthService;
+use App\Auth\UserRepository;
+use App\Jobs\JobWorkerService;
+use App\Stashes\StashItemRecord;
+use App\Vault\MediaItemRecord;
+use Tempest\Database\Direction;
+use Tempest\Database\PrimaryKey;
+use Tempest\Discovery\DiscoveryLocation;
 use Tempest\Framework\Testing\IntegrationTest;
+use Tempest\Http\Status;
 
 abstract class IntegrationTestCase extends IntegrationTest
 {
@@ -13,8 +22,8 @@ abstract class IntegrationTestCase extends IntegrationTest
     /** @return array{Authorization: string} */
     public function authHeaders(): array
     {
-        $auth = $this->container->get(\App\Auth\AuthService::class);
-        $users = $this->container->get(\App\Auth\UserRepository::class);
+        $auth = $this->container->get(AuthService::class);
+        $users = $this->container->get(UserRepository::class);
 
         if ($auth->isSetupRequired()) {
             $user = $users->createAdmin(
@@ -32,8 +41,7 @@ abstract class IntegrationTestCase extends IntegrationTest
     }
 
     /**
-     * @param list<string> $scopes
-     *
+     * @param  list<string>  $scopes
      * @return array{Authorization: string}
      */
     public function scopedAuthHeaders(array $scopes): array
@@ -41,14 +49,14 @@ abstract class IntegrationTestCase extends IntegrationTest
         $created = $this->http->post('/api/v1/auth/tokens', [
             'name' => 'scoped-' . bin2hex(random_bytes(3)),
             'scopes' => $scopes,
-        ], headers: $this->authHeaders())->assertStatus(\Tempest\Http\Status::CREATED);
+        ], headers: $this->authHeaders())->assertStatus(Status::CREATED);
 
         return ['Authorization' => 'Bearer ' . $created->body['token']];
     }
 
     public function processAllJobs(): void
     {
-        $worker = $this->container->get(\App\Jobs\JobWorkerService::class);
+        $worker = $this->container->get(JobWorkerService::class);
 
         while ($worker->processNextJob()) {
         }
@@ -60,18 +68,18 @@ abstract class IntegrationTestCase extends IntegrationTest
         $headers = $this->authHeaders();
 
         $stash = $this->http->post('/api/v1/stashes', ['name' => 'Stash ' . $channel], headers: $headers)
-            ->assertStatus(\Tempest\Http\Status::CREATED);
+            ->assertStatus(Status::CREATED);
         $stashId = $stash->body['stash']['id'];
 
         $preflight = $this->http->post('/api/v1/commands', [
             'type' => 'stash.preflight',
             'options' => ['source_uri' => 'fake://channel/' . $channel],
-        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        ], headers: $headers)->assertStatus(Status::CREATED);
         $this->processAllJobs();
 
         $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
             'preflight_command_id' => $preflight->body['command_id'],
-        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        ], headers: $headers)->assertStatus(Status::CREATED);
         $this->processAllJobs();
 
         return $stashId;
@@ -85,25 +93,25 @@ abstract class IntegrationTestCase extends IntegrationTest
         $stash = $this->http->post('/api/v1/stashes', [
             'name' => $channel . '-' . bin2hex(random_bytes(3)),
             'download_policy' => 'manual_download',
-        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        ], headers: $headers)->assertStatus(Status::CREATED);
         $stashId = $stash->body['stash']['id'];
 
         $preflight = $this->http->post('/api/v1/commands', [
             'type' => 'stash.preflight',
             'options' => ['source_uri' => 'fake://channel/' . $channel],
-        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        ], headers: $headers)->assertStatus(Status::CREATED);
         $this->processAllJobs();
 
         $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
             'preflight_command_id' => $preflight->body['command_id'],
-        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        ], headers: $headers)->assertStatus(Status::CREATED);
         $this->processAllJobs();
 
-        $stashItem = \App\Stashes\StashItemRecord::select()
+        $stashItem = StashItemRecord::select()
             ->where('stashId', $stashId)
-            ->orderBy('position', \Tempest\Database\Direction::ASC)
+            ->orderBy('position', Direction::ASC)
             ->first();
-        $media = \App\Vault\MediaItemRecord::findById(new \Tempest\Database\PrimaryKey((string) $stashItem->mediaItemId));
+        $media = MediaItemRecord::findById(new PrimaryKey((string) $stashItem->mediaItemId));
 
         return [$headers, $stashId, (string) $media->id];
     }
@@ -116,7 +124,7 @@ abstract class IntegrationTestCase extends IntegrationTest
         $stash = $this->http->post('/api/v1/stashes', [
             'name' => $slug . '-' . bin2hex(random_bytes(3)),
             'download_policy' => 'manual_download',
-        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        ], headers: $headers)->assertStatus(Status::CREATED);
         $stashId = $stash->body['stash']['id'];
 
         $preflight = $this->http->post('/api/v1/commands', [
@@ -125,19 +133,19 @@ abstract class IntegrationTestCase extends IntegrationTest
                 'source_uri' => 'https://www.youtube.com/channel/UCStashdDemoCh0012345678',
                 'source_title' => 'YouTube Download Demo',
             ],
-        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        ], headers: $headers)->assertStatus(Status::CREATED);
         $this->processAllJobs();
 
         $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
             'preflight_command_id' => $preflight->body['command_id'],
-        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        ], headers: $headers)->assertStatus(Status::CREATED);
         $this->processAllJobs();
 
-        $stashItem = \App\Stashes\StashItemRecord::select()
+        $stashItem = StashItemRecord::select()
             ->where('stashId', $stashId)
-            ->orderBy('position', \Tempest\Database\Direction::ASC)
+            ->orderBy('position', Direction::ASC)
             ->first();
-        $media = \App\Vault\MediaItemRecord::findById(new \Tempest\Database\PrimaryKey((string) $stashItem->mediaItemId));
+        $media = MediaItemRecord::findById(new PrimaryKey((string) $stashItem->mediaItemId));
 
         return [$headers, $stashId, (string) $media->id];
     }
@@ -166,7 +174,7 @@ abstract class IntegrationTestCase extends IntegrationTest
                 'library_id' => 'shows-lib',
                 'library_name' => 'TV Shows',
             ],
-        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        ], headers: $headers)->assertStatus(Status::CREATED);
 
         $connectionId = $server->body['connection']['id'];
 
@@ -177,7 +185,7 @@ abstract class IntegrationTestCase extends IntegrationTest
             'settings' => [
                 'media_server_connection_id' => $connectionId,
             ],
-        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        ], headers: $headers)->assertStatus(Status::CREATED);
 
         return [$headers, $stashId, $mediaItemId, $create->body['broadcast']['id'], $connectionId];
     }
@@ -191,7 +199,7 @@ abstract class IntegrationTestCase extends IntegrationTest
         parent::setUp();
     }
 
-    /** @return \Tempest\Discovery\DiscoveryLocation[] */
+    /** @return DiscoveryLocation[] */
     protected function discoverTestLocations(): array
     {
         return [];

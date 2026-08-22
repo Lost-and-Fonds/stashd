@@ -9,8 +9,7 @@ final readonly class TrustedProxyConfig
     /** @param list<string> $addresses */
     public function __construct(
         public array $addresses = [],
-    ) {
-    }
+    ) {}
 
     public function trusts(string $address): bool
     {

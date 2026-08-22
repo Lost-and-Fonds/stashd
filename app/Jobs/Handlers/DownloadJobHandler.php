@@ -35,8 +35,7 @@ final readonly class DownloadJobHandler implements JobHandler
         private StateTransitionService $transitions,
         private ActivityEventService $activity,
         private EventPublisher $publisher,
-    ) {
-    }
+    ) {}
 
     public function intent(): JobIntent
     {

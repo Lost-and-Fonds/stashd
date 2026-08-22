@@ -41,7 +41,7 @@ trait MigrationSchemaHelpers
             array_push($statements, ...$table->trailingStatements);
         }
 
-        return array_values(array_filter($statements, static fn (mixed $statement): bool => $statement instanceof QueryStatement));
+        return array_values(array_filter($statements, static fn(mixed $statement): bool => $statement instanceof QueryStatement));
     }
 
     /** Inline REFERENCES for SQLite (Tempest strips BelongsToStatement on SQLite). */

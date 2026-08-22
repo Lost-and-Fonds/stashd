@@ -30,8 +30,7 @@ final readonly class FakeDownloader implements DownloaderInterface
 
     public function __construct(
         private VaultSidecarBuilder $sidecars,
-    ) {
-    }
+    ) {}
 
     public function implementationName(): string
     {

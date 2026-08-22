@@ -10,8 +10,8 @@ use App\Providers\ResolvedInput;
 final readonly class PreflightExecutionResult
 {
     /**
-     * @param list<array<string, mixed>> $discoveredItems
-     * @param list<InputOption> $inputOptions provider-declared filter toggles for this resolved input
+     * @param  list<array<string, mixed>>  $discoveredItems
+     * @param  list<InputOption>  $inputOptions  provider-declared filter toggles for this resolved input
      */
     public function __construct(
         public string $sourceUri,
@@ -23,8 +23,7 @@ final readonly class PreflightExecutionResult
         public int $estimatedTotalDurationSeconds,
         public array $discoveredItems,
         public array $inputOptions = [],
-    ) {
-    }
+    ) {}
 
     /** @return list<array<string, mixed>> */
     public function sampleItems(int $limit = 5): array
@@ -59,7 +58,7 @@ final readonly class PreflightExecutionResult
             ],
             'universal_filters' => self::universalFilters(),
             'input_options' => array_map(
-                static fn (InputOption $option): array => $option->toArray(),
+                static fn(InputOption $option): array => $option->toArray(),
                 $this->inputOptions,
             ),
         ];

@@ -6,6 +6,7 @@ namespace App\Connections;
 
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
+use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -15,9 +16,7 @@ use Tempest\DateTime\Timezone;
 
 final class ConnectionRepository
 {
-    public function __construct(private PrefixedUlidGenerator $ids)
-    {
-    }
+    public function __construct(private PrefixedUlidGenerator $ids) {}
 
     /** @param array<string, mixed>|null $settings */
     public function create(
@@ -62,7 +61,7 @@ final class ConnectionRepository
     /** @return list<ConnectionRecord> */
     public function listAll(): array
     {
-        return array_values(ConnectionRecord::select()->orderBy('createdAt', \Tempest\Database\Direction::ASC)->all());
+        return array_values(ConnectionRecord::select()->orderBy('createdAt', Direction::ASC)->all());
     }
 
     public function delete(ConnectionRecord $record): void

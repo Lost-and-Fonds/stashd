@@ -10,8 +10,8 @@ use Tempest\DateTime\DateTime;
 final readonly class DownloadResult
 {
     /**
-     * @param list<DownloadedFile> $files
-     * @param array<string, mixed> $provenance
+     * @param  list<DownloadedFile>  $files
+     * @param  array<string, mixed>  $provenance
      */
     public function __construct(
         public array $files,
@@ -20,6 +20,5 @@ final readonly class DownloadResult
         public StashdUri $sourceUri,
         public DateTime $attemptedAt,
         public array $provenance = [],
-    ) {
-    }
+    ) {}
 }

@@ -27,8 +27,7 @@ final readonly class AuthController
         private AuthContext $context,
         private CookieManager $cookies,
         private ClientAddressResolver $clientAddresses,
-    ) {
-    }
+    ) {}
 
     #[Post('/api/v1/auth/setup')]
     public function setup(Request $request): Json
@@ -147,7 +146,9 @@ final readonly class AuthController
             ], Status::BAD_REQUEST);
         }
 
-        if (array_key_exists('scopes', $body) && $body['scopes'] !== null && ! is_array($body['scopes'])) {
+        $rawScopes = $body['scopes'] ?? null;
+
+        if ($rawScopes !== null && ! is_array($rawScopes)) {
             return new Json([
                 'error' => [
                     'code' => 'validation_error',
@@ -156,7 +157,21 @@ final readonly class AuthController
             ], Status::BAD_REQUEST);
         }
 
-        $scopes = isset($body['scopes']) ? $body['scopes'] : null;
+        $scopes = null;
+        if (is_array($rawScopes)) {
+            foreach ($rawScopes as $scope) {
+                if (! is_string($scope)) {
+                    return new Json([
+                        'error' => [
+                            'code' => 'validation_error',
+                            'message' => 'scopes must contain only strings.',
+                        ],
+                    ], Status::BAD_REQUEST);
+                }
+            }
+
+            $scopes = array_values($rawScopes);
+        }
 
         try {
             $expiresAt = isset($body['expires_at']) && is_string($body['expires_at'])

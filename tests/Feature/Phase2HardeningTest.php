@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Auth\ApiTokenId;
 use App\Auth\AuthService;
+use App\Auth\UserRepository;
 use App\Jobs\JobRecord;
 use App\Jobs\JobState;
 use App\System\Event\EventPublisher;
 use Symfony\Component\Mercure\HubInterface;
 use Symfony\Component\Mercure\Jwt\TokenFactoryInterface;
 use Symfony\Component\Mercure\Update;
+use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
 
 test('post commands returns snake_case response keys', function (): void {
@@ -85,7 +88,7 @@ test('invalid command payloads return stable error envelopes', function (): void
 });
 
 test('job failed events publish redacted last_error to the Mercure hub', function (): void {
-    $hub = new class () implements HubInterface {
+    $hub = new class implements HubInterface {
         /** @var list<Update> */
         public array $published = [];
 
@@ -117,7 +120,7 @@ test('job failed events publish redacted last_error to the Mercure hub', functio
             'type' => 'system.storage_check',
             'options' => [],
         ], headers: $headers);
-        $job = JobRecord::findById(new \Tempest\Database\PrimaryKey($created->body['job_ids'][0]));
+        $job = JobRecord::findById(new PrimaryKey($created->body['job_ids'][0]));
     }
 
     $job->state = JobState::Failed;
@@ -138,7 +141,7 @@ test('job failed events publish redacted last_error to the Mercure hub', functio
 });
 
 test('bearer auth takes precedence over session for the same request', function (): void {
-    $users = $this->container->get(\App\Auth\UserRepository::class);
+    $users = $this->container->get(UserRepository::class);
     $auth = $this->container->get(AuthService::class);
 
     $owner = $users->createAdmin(
@@ -162,7 +165,7 @@ test('bearer auth takes precedence over session for the same request', function 
 
 test('revoked bearer token is rejected even when session cookie would authenticate', function (): void {
     $auth = $this->container->get(AuthService::class);
-    $users = $this->container->get(\App\Auth\UserRepository::class);
+    $users = $this->container->get(UserRepository::class);
 
     $owner = $users->createAdmin(
         username: 'owner',
@@ -177,7 +180,7 @@ test('revoked bearer token is rejected even when session cookie would authentica
     $created = $auth->createApiToken($owner, 'revoke-with-session');
     $headers = ['Authorization' => 'Bearer ' . $created['token']];
 
-    $auth->revokeApiToken($owner, \App\Auth\ApiTokenId::parse($created['id']));
+    $auth->revokeApiToken($owner, ApiTokenId::parse($created['id']));
 
     $this->http->get('/api/v1/auth/me', headers: $headers)->assertStatus(Status::UNAUTHORIZED);
 });

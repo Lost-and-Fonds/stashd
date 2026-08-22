@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Auth\UserRecord;
+use Tempest\Database\Exceptions\ValueWasMissing;
 use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
 
@@ -45,7 +47,7 @@ test('#[Hidden] guards a record property from generic array mapping', function (
     $headers = $this->authHeaders();
     $userId = $this->http->get('/api/v1/auth/me', headers: $headers)->assertStatus(Status::OK)->body['user']['id'];
 
-    $user = \App\Auth\UserRecord::findById(new PrimaryKey($userId));
+    $user = UserRecord::findById(new PrimaryKey($userId));
 
     expect(map($user)->toArray())->not->toHaveKey('passwordHash');
 });
@@ -54,9 +56,9 @@ test('#[Hidden] excludes a property from the default record select', function ()
     $headers = $this->authHeaders();
     $userId = $this->http->get('/api/v1/auth/me', headers: $headers)->body['user']['id'];
 
-    $user = \App\Auth\UserRecord::findById(new PrimaryKey($userId));
+    $user = UserRecord::findById(new PrimaryKey($userId));
 
-    expect(fn () => $user->passwordHash)->toThrow(\Tempest\Database\Exceptions\ValueWasMissing::class);
+    expect(fn() => $user->passwordHash)->toThrow(ValueWasMissing::class);
 });
 
 test('stash and vault list resources do not expose secret-shaped fields', function (): void {

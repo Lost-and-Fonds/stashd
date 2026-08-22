@@ -16,6 +16,7 @@ use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
+use App\Stashes\CreateStashFromDiscovery;
 use App\Stashes\StashId;
 use App\Stashes\StashItemRepository;
 use App\System\Activity\ActivityEventService;
@@ -28,7 +29,7 @@ use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
 /**
- * Same fan-out shape as {@see \App\Stashes\CreateStashFromDiscovery}'s
+ * Same fan-out shape as {@see CreateStashFromDiscovery}'s
  * auto-download loop: dispatches one independent item.download command per
  * failed item, each individually tracked/retryable, rather than this job
  * owning their downloads directly (a command's job-completion lifecycle
@@ -46,8 +47,7 @@ final readonly class RetryFailedDownloadsJobHandler implements JobHandler
         private StateTransitionService $transitions,
         private ActivityEventService $activity,
         private EventPublisher $publisher,
-    ) {
-    }
+    ) {}
 
     public function intent(): JobIntent
     {
@@ -67,7 +67,7 @@ final readonly class RetryFailedDownloadsJobHandler implements JobHandler
 
         $stashItems = $this->stashItems->listForStash($stashId);
         $mediaItemIds = array_values(array_unique(array_map(
-            static fn ($item): string => (string) $item->mediaItemId,
+            static fn($item): string => (string) $item->mediaItemId,
             $stashItems,
         )));
         $mediaItemsById = $this->mediaItems->listByIds($mediaItemIds);

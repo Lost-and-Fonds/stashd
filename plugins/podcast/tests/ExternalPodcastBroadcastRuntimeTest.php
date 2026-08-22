@@ -17,6 +17,7 @@ use App\Vault\AssetRole;
 use App\Vault\AssetState;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
+use App\Vault\MediaItemState;
 use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
 
@@ -29,7 +30,7 @@ test('normal broadcast lifecycle invokes the registered external Component', fun
         }
     }
     $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
-    $media->state = \App\Vault\MediaItemState::Ready;
+    $media->state = MediaItemState::Ready;
     $media->save();
     $config = $this->container->get(StashdConfig::class);
     $assets = $this->container->get(AssetRepository::class);
@@ -84,7 +85,7 @@ test('external Podcast derives and reuses audio from a video Asset', function ()
         }
     }
     $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
-    $media->state = \App\Vault\MediaItemState::Ready;
+    $media->state = MediaItemState::Ready;
     $media->save();
     $config = $this->container->get(StashdConfig::class);
     $assets = $this->container->get(AssetRepository::class);
@@ -141,7 +142,7 @@ test('external Podcast derives and reuses audio from a video Asset', function ()
 
     $second = $this->http->post('/api/v1/commands', [
         'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id'],],
+        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
@@ -178,7 +179,7 @@ test('failed Podcast helper does not promote a derived Asset', function (): void
             }
         }
         $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
-        $media->state = \App\Vault\MediaItemState::Ready;
+        $media->state = MediaItemState::Ready;
         $media->save();
         $config = $this->container->get(StashdConfig::class);
         $assets = $this->container->get(AssetRepository::class);

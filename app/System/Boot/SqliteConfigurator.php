@@ -24,8 +24,7 @@ final readonly class SqliteConfigurator
 {
     public function __construct(
         private Database $database,
-    ) {
-    }
+    ) {}
 
     public function configure(DatabaseConfig $databaseConfig): void
     {

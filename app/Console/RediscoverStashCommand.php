@@ -20,8 +20,7 @@ final readonly class RediscoverStashCommand
         private RediscoverStash $rediscover,
         private SqliteConfigurator $sqlite,
         private DatabaseConfig $databaseConfig,
-    ) {
-    }
+    ) {}
 
     #[ConsoleCommand(
         name: 'stashd:rediscover',

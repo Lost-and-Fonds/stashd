@@ -23,7 +23,7 @@ enum JobLane: string
     {
         return array_values(array_filter(
             JobIntent::cases(),
-            fn (JobIntent $intent): bool => $intent->lane() === $this,
+            fn(JobIntent $intent): bool => $intent->lane() === $this,
         ));
     }
 }

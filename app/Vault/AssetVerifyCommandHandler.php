@@ -20,8 +20,7 @@ final readonly class AssetVerifyCommandHandler implements CommandHandler
         private AssetRepository $assets,
         private CommandRepository $commands,
         private JobRepository $jobs,
-    ) {
-    }
+    ) {}
 
     public function type(): CommandType
     {

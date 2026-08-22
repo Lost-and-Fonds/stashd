@@ -25,8 +25,7 @@ final readonly class PrefixedIdCaster implements Caster, ConfigurableCaster, Dyn
     /** @param class-string<PrefixedId> $idClass */
     public function __construct(
         private string $idClass,
-    ) {
-    }
+    ) {}
 
     public static function accepts(PropertyReflector|TypeReflector $input): bool
     {

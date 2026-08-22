@@ -8,5 +8,5 @@ interface JobHandler
 {
     public function handle(JobRecord $job, JobHandlerContext $context): void;
 
-    public function intent(): \App\Jobs\JobIntent;
+    public function intent(): JobIntent;
 }

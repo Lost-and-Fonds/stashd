@@ -11,8 +11,7 @@ final readonly class ClientAddressResolver
 {
     public function __construct(
         private TrustedProxyConfig $proxies,
-    ) {
-    }
+    ) {}
 
     public function resolve(Request $request): string
     {

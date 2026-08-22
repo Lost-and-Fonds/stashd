@@ -12,8 +12,7 @@ final readonly class VaultPathBuilder
 {
     public function __construct(
         private StashdConfig $config,
-    ) {
-    }
+    ) {}
 
     public function itemDirectory(string $providerKey, string $providerItemId): string
     {

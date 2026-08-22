@@ -12,8 +12,7 @@ final readonly class BroadcastResource
     public function __construct(
         private BroadcastRecord $broadcast,
         private ?string $publishedUrl = null,
-    ) {
-    }
+    ) {}
 
     public static function fromRecord(BroadcastRecord $broadcast, ?string $publishedUrl = null): BroadcastResource
     {
@@ -45,5 +44,4 @@ final readonly class BroadcastResource
 
         return ApiJson::encode($payload);
     }
-
 }

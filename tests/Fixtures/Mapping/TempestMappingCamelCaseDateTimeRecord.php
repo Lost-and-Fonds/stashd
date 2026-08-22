@@ -24,6 +24,5 @@ final class TempestMappingCamelCaseDateTimeRecord
         public bool $supportsHardlinks,
         public ?float $progressPercent = null,
         public ?DateTime $lastCheckedAt = null,
-    ) {
-    }
+    ) {}
 }

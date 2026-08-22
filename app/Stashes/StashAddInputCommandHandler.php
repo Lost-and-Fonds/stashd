@@ -21,8 +21,7 @@ final readonly class StashAddInputCommandHandler implements CommandHandler
         private CommandRepository $commands,
         private JobRepository $jobs,
         private StashRepository $stashes,
-    ) {
-    }
+    ) {}
 
     public function type(): CommandType
     {

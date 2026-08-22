@@ -7,7 +7,9 @@ namespace Tests\Feature;
 use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemId;
 use App\Broadcasts\BroadcastLifecycleService;
+use App\Broadcasts\BroadcastPluginRegistry;
 use App\Connections\ConnectionRecord;
+use App\Stashes\StashId;
 use App\Stashes\StashInputRepository;
 use App\System\Secret\SecretRecord;
 use App\System\Secret\SecretsService;
@@ -149,7 +151,7 @@ test('external Broadcast source settings survive the normal lifecycle', function
         'type' => 'plex', 'name' => 'Plex Source Settings', 'slug' => 'plex-source-' . bin2hex(random_bytes(3)),
         'settings' => ['media_server_connection_id' => $server->body['connection']['id']],
     ], headers: $headers)->assertStatus(Status::CREATED);
-    $input = $this->container->get(StashInputRepository::class)->listForStash(\App\Stashes\StashId::parse($stashId))[0];
+    $input = $this->container->get(StashInputRepository::class)->listForStash(StashId::parse($stashId))[0];
     $this->http->patch('/api/v1/broadcasts/' . $broadcast->body['broadcast']['id'] . '/source-settings', [
         'source_reference' => (string) $input->id,
         'settings' => ['season' => 3],
@@ -180,14 +182,14 @@ test('connection stores token through secrets service', function (): void {
 
     $connection = ConnectionRecord::select()
         ->include('tokenSecretId')
-        ->get(new \Tempest\Database\PrimaryKey($response->body['connection']['id']));
+        ->get(new PrimaryKey($response->body['connection']['id']));
 
     expect($connection?->tokenSecretId)->not->toBeNull()
         ->and($connection?->tokenSecretId)->toStartWith('secret_');
 
     $secret = SecretRecord::select()
         ->include('encryptedValue')
-        ->get(new \Tempest\Database\PrimaryKey($connection->tokenSecretId));
+        ->get(new PrimaryKey($connection->tokenSecretId));
     expect($secret)->not->toBeNull()
         ->and($secret->key)->toStartWith('media_server:')
         ->and($secret->encryptedValue)->not->toContain('super-secret-jellyfin-token-value');
@@ -375,7 +377,7 @@ test('external jellyfin refresh failure leaves the published file and reports fa
 });
 
 test('jellyfin and plex broadcast types are registered distinctly', function (): void {
-    $registry = $this->container->get(\App\Broadcasts\BroadcastPluginRegistry::class);
+    $registry = $this->container->get(BroadcastPluginRegistry::class);
 
     $jellyfin = $registry->findByKey('jellyfin');
     $plex = $registry->findByKey('plex');

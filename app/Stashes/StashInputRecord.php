@@ -37,6 +37,5 @@ final class StashInputRecord
         public ?DateTime $lastFailureAt = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
-    ) {
-    }
+    ) {}
 }

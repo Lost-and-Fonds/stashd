@@ -9,9 +9,7 @@ use App\Connections\ConnectionRecord;
 /** Builds generic invocation grants from an existing configured connection. */
 final readonly class PluginHttpGrantFactory
 {
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     /** @return list<PluginHttpGrant> */
     public function forConnection(

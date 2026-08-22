@@ -9,9 +9,7 @@ use RuntimeException;
 
 final class PluginHostClient
 {
-    public function __construct(private readonly string $socketPath)
-    {
-    }
+    public function __construct(private readonly string $socketPath) {}
 
     public function invoke(PluginInvocation $invocation): PluginInvocationResult
     {
@@ -114,7 +112,7 @@ final class PluginHostClient
     }
 
     /** @param list<PluginHttpGrant>|null $httpGrants
-     * @param array<string, bool|string> $options
+     * @param  array<string, bool|string>  $options
      */
     public function discoverInput(
         string $componentPath,
@@ -128,7 +126,7 @@ final class PluginHostClient
     }
 
     /** @param array<string, mixed> $item
-     * @param array<string, bool|string> $options
+     * @param  array<string, bool|string>  $options
      */
     public function acquireInput(
         string $componentPath,
@@ -155,8 +153,8 @@ final class PluginHostClient
     }
 
     /**
-     * @param array<string, mixed> $broadcast
-     * @param list<PluginHttpGrant>|null $httpGrants
+     * @param  array<string, mixed>  $broadcast
+     * @param  list<PluginHttpGrant>|null  $httpGrants
      */
     public function publishBroadcast(
         string $componentPath,
@@ -170,7 +168,7 @@ final class PluginHostClient
     }
 
     /** @param array<string, mixed> $broadcast
-     * @param list<PluginHttpGrant>|null $httpGrants
+     * @param  list<PluginHttpGrant>|null  $httpGrants
      */
     public function prepareBroadcast(
         string $componentPath,
@@ -184,8 +182,8 @@ final class PluginHostClient
     }
 
     /** @param array<string, mixed> $broadcast
-     *  @param array<string, mixed> $publication
-     *  @param list<PluginHttpGrant>|null $httpGrants
+     * @param  array<string, mixed>  $publication
+     * @param  list<PluginHttpGrant>|null  $httpGrants
      */
     public function finalizeBroadcast(
         string $componentPath,
@@ -204,8 +202,8 @@ final class PluginHostClient
     }
 
     /** @param array<string, mixed> $broadcast
-     *  @param list<PluginHttpGrant>|null $httpGrants
-     *  @return array<string, mixed>
+     * @param  list<PluginHttpGrant>|null  $httpGrants
+     * @return array<string, mixed>
      */
     public function broadcastOperation(
         string $componentPath,
@@ -229,7 +227,7 @@ final class PluginHostClient
             'staging_dir' => $stagingDirectory,
             'fixture_dir' => $fixtureDirectory,
             'http_grants' => $httpGrants === null ? null : array_map(
-                static fn (PluginHttpGrant $grant): array => [
+                static fn(PluginHttpGrant $grant): array => [
                     'allowed_prefixes' => $grant->allowedPrefixes,
                     'credential_name' => $grant->credential?->name,
                     'credential_value' => $grant->credential?->value,
@@ -240,7 +238,7 @@ final class PluginHostClient
             ),
             'broadcast' => $broadcast,
         ];
-        $request = array_filter($request, static fn (mixed $value): bool => $value !== null);
+        $request = array_filter($request, static fn(mixed $value): bool => $value !== null);
         try {
             fwrite($socket, json_encode($request, JSON_THROW_ON_ERROR) . "\n");
             while (($line = fgets($socket)) !== false) {
@@ -257,6 +255,7 @@ final class PluginHostClient
                     if (! is_array($result) || array_keys($result) !== array_filter(array_keys($result), 'is_string')) {
                         throw new RuntimeException('Plugin host returned an invalid broadcast operation result.');
                     }
+
                     /** @var array<string, mixed> $result */
                     return $result;
                 }
@@ -270,7 +269,7 @@ final class PluginHostClient
     }
 
     /** @param array<string, mixed> $broadcast
-     * @param list<PluginHttpGrant>|null $httpGrants
+     * @param  list<PluginHttpGrant>|null  $httpGrants
      */
     private function invokeBroadcast(
         string $operation,
@@ -299,7 +298,7 @@ final class PluginHostClient
             'helper_package_root' => $helper?->packageRoot,
             'fixture_dir' => $fixtureDirectory,
             'http_grants' => $httpGrants === null ? null : array_map(
-                static fn (PluginHttpGrant $grant): array => [
+                static fn(PluginHttpGrant $grant): array => [
                     'allowed_prefixes' => $grant->allowedPrefixes,
                     'credential_name' => $grant->credential?->name,
                     'credential_value' => $grant->credential?->value,
@@ -310,7 +309,7 @@ final class PluginHostClient
             ),
             'broadcast' => $broadcast,
         ];
-        $request = array_filter($request, static fn (mixed $value): bool => $value !== null);
+        $request = array_filter($request, static fn(mixed $value): bool => $value !== null);
         $progress = [];
         $logs = [];
 
@@ -329,10 +328,12 @@ final class PluginHostClient
                 /** @var array<string, mixed> $event */
                 if (($event['event'] ?? null) === 'progress') {
                     $progress[] = $this->inputProgress($event);
+
                     continue;
                 }
                 if (($event['event'] ?? null) === 'log') {
                     $logs[] = $this->inputString($event['message'] ?? null, 'message');
+
                     continue;
                 }
                 if (($event['event'] ?? null) === 'error') {
@@ -361,9 +362,9 @@ final class PluginHostClient
     }
 
     /**
-     * @param array<string, mixed>|null $item
-     * @param list<PluginHttpGrant>|null $httpGrants
-     * @param list<array{key:string,value:array{kind:string,value:bool|string}}>|null $options
+     * @param  array<string, mixed>|null  $item
+     * @param  list<PluginHttpGrant>|null  $httpGrants
+     * @param  list<array{key:string,value:array{kind:string,value:bool|string}}>|null  $options
      */
     private function invokeInput(
         string $operation,
@@ -395,7 +396,7 @@ final class PluginHostClient
             'fixture_dir' => $fixtureDirectory,
             'intent' => $intent,
             'http_grants' => $httpGrants === null ? null : array_map(
-                static fn (PluginHttpGrant $grant): array => [
+                static fn(PluginHttpGrant $grant): array => [
                     'allowed_prefixes' => $grant->allowedPrefixes,
                     'credential_name' => $grant->credential?->name,
                     'credential_value' => $grant->credential?->value,
@@ -410,7 +411,7 @@ final class PluginHostClient
             'item' => $item,
             'media_kind' => $mediaKind,
             'options' => $options,
-        ], static fn (mixed $value): bool => $value !== null);
+        ], static fn(mixed $value): bool => $value !== null);
         /** @var list<array{fraction: float, stage: string}> $progress */
         $progress = [];
         $logs = [];
@@ -452,7 +453,7 @@ final class PluginHostClient
     }
 
     /**
-     * @param array<string, mixed> $event
+     * @param  array<string, mixed>  $event
      * @return array{fraction: float, stage: string}
      */
     private function inputProgress(array $event): array
@@ -462,6 +463,7 @@ final class PluginHostClient
         if ((! is_float($fraction) && ! is_int($fraction)) || ! is_string($stage)) {
             throw new RuntimeException('Plugin host returned invalid input progress.');
         }
+
         return ['fraction' => (float) $fraction, 'stage' => $stage];
     }
 
@@ -508,6 +510,7 @@ final class PluginHostClient
                         : ['kind' => 'text', 'value' => $value]),
             ];
         }
+
         return $encoded;
     }
 
@@ -516,6 +519,7 @@ final class PluginHostClient
         if (! is_string($value)) {
             throw new RuntimeException("Plugin host returned invalid input {$field}.");
         }
+
         return $value;
     }
 
@@ -525,6 +529,7 @@ final class PluginHostClient
         if (! is_array($value) || array_keys($value) !== array_filter(array_keys($value), 'is_string')) {
             throw new RuntimeException("Plugin host returned invalid input {$field}.");
         }
+
         /** @var array<string, mixed> $value */
         return $value;
     }
@@ -535,12 +540,13 @@ final class PluginHostClient
         if (! is_array($value) || ! array_is_list($value)) {
             throw new RuntimeException('Plugin host returned invalid input items.');
         }
-        return array_map(fn (mixed $item): array => $this->inputObject($item, 'item'), $value);
+
+        return array_map(fn(mixed $item): array => $this->inputObject($item, 'item'), $value);
     }
 
     /**
-     * @param list<array{fraction: float, stage: string}> $progress
-     * @param array<string, mixed> $event
+     * @param  list<array{fraction: float, stage: string}>  $progress
+     * @param  array<string, mixed>  $event
      */
     private function appendProgress(array &$progress, array $event): void
     {
@@ -555,8 +561,8 @@ final class PluginHostClient
     }
 
     /**
-     * @param list<string> $logs
-     * @param array<string, mixed> $event
+     * @param  list<string>  $logs
+     * @param  array<string, mixed>  $event
      */
     private function appendLog(array &$logs, array $event): void
     {

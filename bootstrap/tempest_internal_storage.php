@@ -17,7 +17,7 @@ function tempest_internal_storage(): ?string
 
     $dataPath = getenv('STASHD_DATA_PATH') ?: getenv('DATA_PATH');
     if (is_string($dataPath) && str_starts_with($dataPath, '/')) {
-        return rtrim($dataPath, '/') . '/.tempest';
+        return rtrim($dataPath, '/').'/.tempest';
     }
 
     return null;

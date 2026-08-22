@@ -16,8 +16,7 @@ final class StorageLocationRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     public function upsert(
         StorageLocationKey $key,

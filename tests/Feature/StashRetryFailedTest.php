@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Jobs\JobWorkerService;
 use App\Stashes\StashItemRecord;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
@@ -44,7 +45,7 @@ test('stash.retry_failed retries every failed item in the stash, ignores non-fai
         'options' => ['stash_id' => $stashIdA],
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $worker = $this->container->get(\App\Jobs\JobWorkerService::class);
+    $worker = $this->container->get(JobWorkerService::class);
     expect($worker->processNextJob())->toBeTrue();
 
     foreach ($failedMediaItemIdsA as $mediaItemId) {

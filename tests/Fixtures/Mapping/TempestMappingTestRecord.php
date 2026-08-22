@@ -28,8 +28,7 @@ final class TempestMappingTestRecord
         public bool $supportsHardlinks,
         public ?float $progressPercent = null,
         public ?string $lastCheckedAt = null,
-    ) {
-    }
+    ) {}
 }
 
 /**
@@ -54,8 +53,7 @@ final class TempestMappingTestRecordWithMapAttributes
         public ?float $progressPercent = null,
         #[MapFrom('last_checked_at'), MapTo('last_checked_at')]
         public ?string $lastCheckedAt = null,
-    ) {
-    }
+    ) {}
 }
 
 /**
@@ -73,8 +71,7 @@ final class TempestMappingSnakeCaseRecord
         public bool $supports_hardlinks,
         public ?float $progress_percent = null,
         public ?string $last_checked_at = null,
-    ) {
-    }
+    ) {}
 }
 
 /**
@@ -92,6 +89,5 @@ final class TempestMappingCamelCaseRecord
         public bool $supportsHardlinks,
         public ?float $progressPercent = null,
         public ?string $lastCheckedAt = null,
-    ) {
-    }
+    ) {}
 }

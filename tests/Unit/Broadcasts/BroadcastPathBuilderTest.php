@@ -71,7 +71,7 @@ test('validateDestinationOverride accepts null and blank as no override', functi
 test('validateDestinationOverride rejects relative paths and traversal', function (string $value): void {
     $paths = new BroadcastPathBuilder(pathBuilderTestConfig(sys_get_temp_dir() . '/stashd-broadcast-path-reject'));
 
-    expect(fn () => $paths->validateDestinationOverride($value))
+    expect(fn() => $paths->validateDestinationOverride($value))
         ->toThrow(InvalidArgumentException::class);
 })->with([
     'relative/path',
@@ -85,15 +85,15 @@ test('validateDestinationOverride rejects paths overlapping a protected storage 
     $paths = new BroadcastPathBuilder(pathBuilderTestConfig($root));
 
     // Exactly the vault root.
-    expect(fn () => $paths->validateDestinationOverride($root . '/media/vault'))
+    expect(fn() => $paths->validateDestinationOverride($root . '/media/vault'))
         ->toThrow(InvalidArgumentException::class);
 
     // A descendant of the vault root.
-    expect(fn () => $paths->validateDestinationOverride($root . '/media/vault/nested'))
+    expect(fn() => $paths->validateDestinationOverride($root . '/media/vault/nested'))
         ->toThrow(InvalidArgumentException::class);
 
     // An ancestor of the vault root (would make Vault a descendant of the broadcast root).
-    expect(fn () => $paths->validateDestinationOverride($root . '/media'))
+    expect(fn() => $paths->validateDestinationOverride($root . '/media'))
         ->toThrow(InvalidArgumentException::class);
 });
 
@@ -126,7 +126,7 @@ test('claimRoot refuses a directory owned by a different broadcast', function ()
     mkdir($paths->broadcastRoot($broadcast), 0775, true);
     file_put_contents($paths->broadcastRoot($broadcast) . '/.stashd-broadcast', 'broadcast_00000000000000000000000000');
 
-    expect(fn () => $paths->claimRoot($broadcast))
+    expect(fn() => $paths->claimRoot($broadcast))
         ->toThrow(BroadcastException::class, 'not managed by this broadcast');
 });
 
@@ -137,7 +137,7 @@ test('claimRoot refuses a pre-existing directory with no marker at all', functio
     mkdir($paths->broadcastRoot($broadcast), 0775, true);
     file_put_contents($paths->broadcastRoot($broadcast) . '/pre-existing-file.txt', 'not stashd content');
 
-    expect(fn () => $paths->claimRoot($broadcast))
+    expect(fn() => $paths->claimRoot($broadcast))
         ->toThrow(BroadcastException::class, 'not managed by this broadcast');
 });
 
@@ -159,6 +159,6 @@ test('assertOwnsRoot throws the same conflict error as claimRoot for a foreign d
     mkdir($paths->broadcastRoot($broadcast), 0775, true);
     file_put_contents($paths->broadcastRoot($broadcast) . '/.stashd-broadcast', 'broadcast_00000000000000000000000000');
 
-    expect(fn () => $paths->assertOwnsRoot($broadcast))
+    expect(fn() => $paths->assertOwnsRoot($broadcast))
         ->toThrow(BroadcastException::class, 'not managed by this broadcast');
 });

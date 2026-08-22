@@ -11,8 +11,7 @@ final readonly class CommandResource
 {
     public function __construct(
         private CommandRecord $command,
-    ) {
-    }
+    ) {}
 
     public static function fromRecord(CommandRecord $command): self
     {
@@ -37,8 +36,7 @@ final readonly class CommandResource
     }
 
     /**
-     * @param array<string, mixed>|null $data
-     *
+     * @param  array<string, mixed>|null  $data
      * @return array<string, mixed>|null
      */
     private function encodeForApi(?array $data): ?array

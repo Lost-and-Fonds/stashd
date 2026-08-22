@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth;
 
 use App\Support\PrefixedUlidGenerator;
+use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -16,8 +17,7 @@ final class ApiTokenRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     public function create(
         UserId $userId,
@@ -59,7 +59,7 @@ final class ApiTokenRepository
         return ApiTokenRecord::select()
             ->where('userId', $userId->toString())
             ->whereNull('revokedAt')
-            ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
+            ->orderBy('createdAt', Direction::DESC)
             ->all();
     }
 

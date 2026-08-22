@@ -7,9 +7,7 @@ namespace App\Plugins;
 final readonly class ExternalBroadcastPluginRegistry
 {
     /** @param list<ExternalBroadcastPluginDefinition> $plugins */
-    public function __construct(private array $plugins)
-    {
-    }
+    public function __construct(private array $plugins) {}
 
     public function findByLogicalKey(string $key): ?ExternalBroadcastPluginDefinition
     {

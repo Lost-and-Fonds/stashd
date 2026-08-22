@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Stashes\StashId;
+use App\Stashes\StashItemId;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashRepository;
 use App\Vault\MediaItemId;
@@ -39,7 +40,7 @@ test('StashItemRecord::stashId/mediaItemId round-trip as typed IDs through inser
     expect($found)->not->toBeNull()
         ->and((string) $found->id)->toBe((string) $created->id);
 
-    $reloaded = $stashItems->find(\App\Stashes\StashItemId::parse((string) $created->id));
+    $reloaded = $stashItems->find(StashItemId::parse((string) $created->id));
     expect($reloaded?->stashId)->toBeInstanceOf(StashId::class)
         ->and($reloaded?->stashId->toString())->toBe($stashId->toString())
         ->and($reloaded?->mediaItemId)->toBeInstanceOf(MediaItemId::class)

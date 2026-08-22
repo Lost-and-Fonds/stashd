@@ -13,8 +13,7 @@ final readonly class MigrationSqlStatement implements QueryStatement
     public function __construct(
         private string|QueryStatement $sqlite,
         private ?string $postgres = null,
-    ) {
-    }
+    ) {}
 
     public function compile(DatabaseDialect $dialect): string
     {

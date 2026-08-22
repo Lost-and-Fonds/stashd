@@ -11,6 +11,5 @@ final readonly class PluginInvocation
         public string $assetPath,
         public string $stagingPath,
         public string $operation = 'copy',
-    ) {
-    }
+    ) {}
 }

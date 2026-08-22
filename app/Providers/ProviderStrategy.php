@@ -14,6 +14,5 @@ final readonly class ProviderStrategy
         public bool $supportsIncremental = false,
         public bool $supportsBackfill = false,
         public int $priority = 100,
-    ) {
-    }
+    ) {}
 }

@@ -13,8 +13,7 @@ final readonly class DownloadExecutionResult
         public bool $skipped,
         public int $assetsReady,
         public array $warnings = [],
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function toArray(): array

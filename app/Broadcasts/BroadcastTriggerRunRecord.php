@@ -29,6 +29,5 @@ final class BroadcastTriggerRunRecord
         public ?string $responseSummary = null,
         public ?string $error = null,
         public ?DateTime $createdAt = null,
-    ) {
-    }
+    ) {}
 }

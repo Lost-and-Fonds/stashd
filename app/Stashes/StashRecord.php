@@ -17,7 +17,7 @@ final class StashRecord
 
     public PrimaryKey $id;
 
-    /** @var \App\Stashes\StashItemRecord[] */
+    /** @var StashItemRecord[] */
     #[HasMany(ownerJoin: 'stashId')]
     public array $items;
 
@@ -33,6 +33,5 @@ final class StashRecord
         public ?string $audioQualityProfileId = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
-    ) {
-    }
+    ) {}
 }

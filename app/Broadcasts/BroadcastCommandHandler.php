@@ -22,8 +22,7 @@ final readonly class BroadcastCommandHandler implements CommandHandler
         private BroadcastRepository $broadcasts,
         private BroadcastItemRepository $broadcastItems,
         private CommandType $commandType,
-    ) {
-    }
+    ) {}
 
     public function type(): CommandType
     {
@@ -94,7 +93,7 @@ final readonly class BroadcastCommandHandler implements CommandHandler
     }
 
     /**
-     * @param array<string, mixed> $options
+     * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
     private function normalizedPayload(array $options): array

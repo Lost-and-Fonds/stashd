@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/FrameCodec.php';
+require __DIR__.'/FrameCodec.php';
 
 $stream = fopen('php://temp', 'w+b');
 try {

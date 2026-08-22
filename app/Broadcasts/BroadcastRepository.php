@@ -8,6 +8,7 @@ use App\Stashes\StashId;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
 use Tempest\Database\Builder\QueryBuilders\WhereGroupBuilder;
+use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -19,8 +20,7 @@ final class BroadcastRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     /** @param array<string, mixed>|null $settings */
     public function create(
@@ -58,7 +58,7 @@ final class BroadcastRepository
     }
 
     /**
-     * @param list<string> $ids
+     * @param  list<string>  $ids
      * @return array<string, BroadcastRecord> keyed by id
      */
     public function listByIds(array $ids): array
@@ -97,7 +97,7 @@ final class BroadcastRepository
     {
         return BroadcastRecord::select()
             ->where('stashId', $stashId->toString())
-            ->orderBy('createdAt', \Tempest\Database\Direction::ASC)
+            ->orderBy('createdAt', Direction::ASC)
             ->all();
     }
 
@@ -117,10 +117,10 @@ final class BroadcastRepository
     public function nextAvailableSlug(StashId $stashId, string $base): string
     {
         $taken = array_map(
-            static fn (BroadcastRecord $broadcast): string => $broadcast->slug,
+            static fn(BroadcastRecord $broadcast): string => $broadcast->slug,
             BroadcastRecord::select()
                 ->where('stashId', $stashId->toString())
-                ->andWhereGroup(fn (WhereGroupBuilder $group) => $group
+                ->andWhereGroup(fn(WhereGroupBuilder $group) => $group
                     ->where('slug', $base)
                     ->orWhereLike('slug', $base . '-%'))
                 ->all(),
@@ -146,5 +146,4 @@ final class BroadcastRepository
 
         return "{$base}-{$ordinal}";
     }
-
 }

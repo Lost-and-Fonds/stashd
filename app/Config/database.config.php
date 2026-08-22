@@ -20,7 +20,7 @@ $stringEnv = static function (string $key, string $default): string {
     $value = env($key, $default);
 
     if (! is_string($value)) {
-        throw new \InvalidArgumentException("Environment variable [{$key}] must be a string.");
+        throw new InvalidArgumentException("Environment variable [{$key}] must be a string.");
     }
 
     return $value;
@@ -39,7 +39,7 @@ if ($connection === 'pgsql') {
 }
 
 if ($connection !== 'sqlite') {
-    throw new \InvalidArgumentException("Unsupported DB_CONNECTION [{$connection}]. Expected sqlite or pgsql.");
+    throw new InvalidArgumentException("Unsupported DB_CONNECTION [{$connection}]. Expected sqlite or pgsql.");
 }
 
 $dataPath = $resolvePath($stringEnv('STASHD_DATA_PATH', $stringEnv('DATA_PATH', 'data')));
@@ -48,7 +48,7 @@ $databasePath = env('DB_DATABASE');
 if ($databasePath === null) {
     $databasePath = rtrim($dataPath, '/') . '/stashd.sqlite';
 } elseif (! is_string($databasePath)) {
-    throw new \InvalidArgumentException('Environment variable [DB_DATABASE] must be a string.');
+    throw new InvalidArgumentException('Environment variable [DB_DATABASE] must be a string.');
 }
 
 if (! str_starts_with($databasePath, '/') && ! str_starts_with($databasePath, ':')) {

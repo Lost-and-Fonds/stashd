@@ -2,13 +2,9 @@
 
 declare(strict_types=1);
 
-final class FrameTimeout extends RuntimeException
-{
-}
+final class FrameTimeout extends RuntimeException {}
 
-final class FrameProtocolError extends RuntimeException
-{
-}
+final class FrameProtocolError extends RuntimeException {}
 
 final class FrameCodec
 {
@@ -23,7 +19,7 @@ final class FrameCodec
             throw new FrameProtocolError('frame exceeds maximum size');
         }
 
-        self::writeAll($stream, pack('N', $length) . $json);
+        self::writeAll($stream, pack('N', $length).$json);
     }
 
     /** @param resource $stream */

@@ -5,6 +5,7 @@ declare(strict_types=1);
 $attempt = static function (callable $callback): string|bool {
     try {
         $value = $callback();
+
         return is_string($value) ? $value : ($value === false ? false : 'readable');
     } catch (Throwable) {
         return false;

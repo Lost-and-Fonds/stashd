@@ -10,7 +10,7 @@ use App\Vault\VaultPathBuilder;
 use InvalidArgumentException;
 
 test('path sanitizer rejects traversal segments', function (string $value): void {
-    expect(fn () => PathSanitizer::sanitizeSegment($value))
+    expect(fn() => PathSanitizer::sanitizeSegment($value))
         ->toThrow(InvalidArgumentException::class);
 })->with([
     '../etc/passwd',
@@ -68,7 +68,7 @@ test('vault path builder rejects traversal provider ids', function (): void {
     );
     $builder = new VaultPathBuilder($config);
 
-    expect(fn () => $builder->vaultFile('fake', '../../etc/passwd', 'original.fake'))
+    expect(fn() => $builder->vaultFile('fake', '../../etc/passwd', 'original.fake'))
         ->toThrow(InvalidArgumentException::class);
 });
 
@@ -85,6 +85,6 @@ test('vault path builder rejects segments that sanitize to empty', function (): 
     );
     $builder = new VaultPathBuilder($config);
 
-    expect(fn () => $builder->vaultFile('fake', '!!!', 'original.fake'))
+    expect(fn() => $builder->vaultFile('fake', '!!!', 'original.fake'))
         ->toThrow(InvalidArgumentException::class);
 });

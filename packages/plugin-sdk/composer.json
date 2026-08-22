@@ -5,14 +5,8 @@
   "license": "MIT",
   "require": {"php": ">=8.5"},
   "autoload": {
-    "files": [
-      "src/Values.php",
-      "src/Errors.php",
-      "src/Operations.php",
-      "src/Input.php",
-      "src/Capabilities.php",
-      "src/Bootstrap.php",
-      "src/WireMapper.php"
-    ]
+    "psr-4": {
+      "Stashd\\PluginSdk\\": "src/"
+    }
   }
 }

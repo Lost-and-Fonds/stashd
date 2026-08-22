@@ -21,8 +21,7 @@ final readonly class PublishedResourceController
         private PublishedResourceRepository $resources,
         private PublishedResourceService $publications,
         private StashdConfig $config,
-    ) {
-    }
+    ) {}
 
     #[Get('/published/{publicationId}', without: [RequireAuthMiddleware::class])]
     public function servePublic(string $publicationId): Response

@@ -13,8 +13,7 @@ final readonly class ApiTokenScopes
     /** @param list<string> $values */
     public function __construct(
         public array $values = [],
-    ) {
-    }
+    ) {}
 
     /** @param array<mixed>|null $values */
     public static function fromArray(?array $values): self

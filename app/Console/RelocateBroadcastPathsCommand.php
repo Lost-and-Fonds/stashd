@@ -37,8 +37,7 @@ final readonly class RelocateBroadcastPathsCommand
         private StashdConfig $config,
         private BroadcastPathBuilder $paths,
         private AssetRepository $assets,
-    ) {
-    }
+    ) {}
 
     #[ConsoleCommand(
         name: 'stashd:relocate-broadcast-paths',

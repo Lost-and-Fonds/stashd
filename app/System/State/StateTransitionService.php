@@ -105,10 +105,9 @@ final readonly class StateTransitionService
      * @template TState of object
      * @template TRecord of object{state: TState, updatedAt?: ?DateTime, save(): void}
      *
-     * @param TRecord $record
-     * @param TState $current
-     * @param TState $next
-     *
+     * @param  TRecord  $record
+     * @param  TState  $current
+     * @param  TState  $next
      * @return TRecord
      */
     private function apply(object $record, object $current, object $next, string $entity): object

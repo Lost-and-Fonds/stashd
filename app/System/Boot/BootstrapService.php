@@ -22,8 +22,7 @@ final readonly class BootstrapService
         private MigrationRunner $migrations,
         private CommandRepository $commands,
         private JobRepository $jobs,
-    ) {
-    }
+    ) {}
 
     /** @return array{directories_created: list<string>, command_id: string, job_id: string} */
     public function boot(DatabaseConfig $databaseConfig): array

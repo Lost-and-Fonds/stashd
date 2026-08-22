@@ -12,8 +12,7 @@ final readonly class MediaItemResource
 {
     public function __construct(
         private MediaItemRecord $item,
-    ) {
-    }
+    ) {}
 
     public static function fromRecord(MediaItemRecord $item): self
     {

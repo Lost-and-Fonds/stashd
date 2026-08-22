@@ -18,8 +18,7 @@ final readonly class LoginAttemptLimiter
 
     public function __construct(
         private Database $database,
-    ) {
-    }
+    ) {}
 
     public function ensureAllowed(string $username, string $clientAddress): void
     {

@@ -11,8 +11,7 @@ final readonly class StashResource
 {
     public function __construct(
         private StashRecord $stash,
-    ) {
-    }
+    ) {}
 
     public static function fromRecord(StashRecord $stash): self
     {

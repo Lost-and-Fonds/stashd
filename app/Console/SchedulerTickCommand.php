@@ -21,8 +21,7 @@ final readonly class SchedulerTickCommand
         private RoutineDiscoveryScheduler $scheduler,
         private SqliteConfigurator $sqlite,
         private DatabaseConfig $databaseConfig,
-    ) {
-    }
+    ) {}
 
     #[ConsoleCommand(
         name: 'stashd:scheduler-tick',

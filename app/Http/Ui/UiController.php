@@ -27,8 +27,7 @@ final readonly class UiController
 {
     public function __construct(
         private AuthService $auth,
-    ) {
-    }
+    ) {}
 
     #[Get('/login', without: [RequireAuthMiddleware::class])]
     public function login(): View

@@ -12,10 +12,10 @@ use RuntimeException;
 final readonly class ExternalInputPluginDefinition
 {
     /**
-     * @param list<string> $sourcePrefixes
-     * @param list<array<string, mixed>> $httpGrants
-     * @param array<string, list<string>> $operations
-     * @param list<InputOption> $inputOptions
+     * @param  list<string>  $sourcePrefixes
+     * @param  list<array<string, mixed>>  $httpGrants
+     * @param  array<string, list<string>>  $operations
+     * @param  list<InputOption>  $inputOptions
      */
     public function __construct(
         public string $id,
@@ -30,8 +30,7 @@ final readonly class ExternalInputPluginDefinition
         public array $inputOptions,
         public ?string $helperName,
         public ?string $helperExecutable,
-    ) {
-    }
+    ) {}
 
     public static function fromManifest(mixed $rawManifest, string $root, string $socketPath): self
     {
@@ -54,7 +53,7 @@ final readonly class ExternalInputPluginDefinition
 
         $sourcePrefixes = array_values(array_filter(
             is_array($manifest['source_prefixes'] ?? null) ? $manifest['source_prefixes'] : [],
-            static fn (mixed $prefix): bool => is_string($prefix) && trim($prefix) !== '',
+            static fn(mixed $prefix): bool => is_string($prefix) && trim($prefix) !== '',
         ));
         $httpGrants = self::mapList($manifest['http_grants'] ?? []);
         $operations = self::operationMap($manifest['operations'] ?? []);
@@ -129,7 +128,7 @@ final readonly class ExternalInputPluginDefinition
 
             $prefixes = array_values(array_filter(
                 is_array($definition['allowed_prefixes'] ?? null) ? $definition['allowed_prefixes'] : [],
-                static fn (mixed $prefix): bool => is_string($prefix) && trim($prefix) !== '',
+                static fn(mixed $prefix): bool => is_string($prefix) && trim($prefix) !== '',
             ));
             if ($prefixes === []) {
                 continue;
@@ -252,10 +251,10 @@ final readonly class ExternalInputPluginDefinition
             }
 
             $choices = is_array($raw['choices'] ?? null)
-                ? array_values(array_filter($raw['choices'], static fn (mixed $choice): bool => is_string($choice)))
+                ? array_values(array_filter($raw['choices'], static fn(mixed $choice): bool => is_string($choice)))
                 : null;
             $applicable = is_array($raw['applicable_input_types'] ?? null)
-                ? array_values(array_filter($raw['applicable_input_types'], static fn (mixed $kind): bool => is_string($kind)))
+                ? array_values(array_filter($raw['applicable_input_types'], static fn(mixed $kind): bool => is_string($kind)))
                 : [];
 
             $options[] = new InputOption(
@@ -336,7 +335,7 @@ final readonly class ExternalInputPluginDefinition
 
             $operations[$operation] = array_values(array_filter(
                 $requirements,
-                static fn (mixed $requirement): bool => is_string($requirement) && trim($requirement) !== '',
+                static fn(mixed $requirement): bool => is_string($requirement) && trim($requirement) !== '',
             ));
         }
 

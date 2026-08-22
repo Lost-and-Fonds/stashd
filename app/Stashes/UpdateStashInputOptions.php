@@ -25,8 +25,7 @@ final readonly class UpdateStashInputOptions
         private StateTransitionService $transitions,
         private CommandDispatchService $commands,
         private DownloadPolicyEvaluator $downloadPolicy,
-    ) {
-    }
+    ) {}
 
     public function execute(StashRecord $stash, StashInputRecord $input, ?StashInputOptions $options): StashInputRecord
     {

@@ -14,8 +14,7 @@ final readonly class AssetResource
     public function __construct(
         private AssetRecord $asset,
         private ?AssetRegenerationGuidance $guidance = null,
-    ) {
-    }
+    ) {}
 
     public static function fromRecord(AssetRecord $asset, ?AssetRegenerationGuidance $guidance = null): self
     {

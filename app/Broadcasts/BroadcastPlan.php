@@ -7,9 +7,9 @@ namespace App\Broadcasts;
 final readonly class BroadcastPlan
 {
     /**
-     * @param list<BroadcastPlannedFile> $files
-     * @param list<BroadcastPlannedSidecar> $sidecars
-     * @param list<string> $skippedStashItemIds
+     * @param  list<BroadcastPlannedFile>  $files
+     * @param  list<BroadcastPlannedSidecar>  $sidecars
+     * @param  list<string>  $skippedStashItemIds
      */
     public function __construct(
         public string $broadcastId,
@@ -18,8 +18,7 @@ final readonly class BroadcastPlan
         public array $sidecars = [],
         public array $skippedStashItemIds = [],
         public int $estimatedCopyBytes = 0,
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function toArray(): array
@@ -31,8 +30,8 @@ final readonly class BroadcastPlan
             'sidecar_count' => count($this->sidecars),
             'skipped_stash_item_ids' => $this->skippedStashItemIds,
             'estimated_copy_bytes' => $this->estimatedCopyBytes,
-            'files' => array_map(static fn (BroadcastPlannedFile $file): array => $file->toArray(), $this->files),
-            'sidecars' => array_map(static fn (BroadcastPlannedSidecar $sidecar): array => $sidecar->toArray(), $this->sidecars),
+            'files' => array_map(static fn(BroadcastPlannedFile $file): array => $file->toArray(), $this->files),
+            'sidecars' => array_map(static fn(BroadcastPlannedSidecar $sidecar): array => $sidecar->toArray(), $this->sidecars),
         ];
     }
 }

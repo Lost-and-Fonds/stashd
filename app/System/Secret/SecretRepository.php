@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\System\Secret;
 
+use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use Tempest\Database\PrimaryKey;
 
@@ -16,8 +17,7 @@ final class SecretRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     public function findByKey(string $key): ?SecretRecord
     {
@@ -28,7 +28,7 @@ final class SecretRepository
             ->first();
     }
 
-    public function find(\App\Support\PrefixedUlid $id): ?SecretRecord
+    public function find(PrefixedUlid $id): ?SecretRecord
     {
         return SecretRecord::findById($id->toPrimaryKey());
     }

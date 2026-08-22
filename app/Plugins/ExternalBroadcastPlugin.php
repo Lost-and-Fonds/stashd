@@ -49,12 +49,7 @@ use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
 /** Generic application adapter for manifest-registered Broadcast Components. */
-final readonly class ExternalBroadcastPlugin implements
-    BroadcastPlugin,
-    BroadcastPluginPresentation,
-    BroadcastPluginActions,
-    BroadcastPluginPolicy,
-    BroadcastPluginSourceOptions
+final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, BroadcastPluginActions, BroadcastPluginPolicy, BroadcastPluginPresentation, BroadcastPluginSourceOptions
 {
     public function __construct(
         private ExternalBroadcastPluginDefinition $definition,
@@ -71,8 +66,7 @@ final readonly class ExternalBroadcastPlugin implements
         private ConnectionRepository $connections,
         private ConnectionSecrets $connectionSecrets,
         private HardlinkPublisher $hardlinks,
-    ) {
-    }
+    ) {}
 
     public function broadcastKeys(): array
     {
@@ -82,7 +76,7 @@ final readonly class ExternalBroadcastPlugin implements
     public function supportedFileKinds(): array
     {
         return array_values(array_filter(array_map(
-            static fn (string $kind): ?FileKind => FileKind::tryFrom($kind),
+            static fn(string $kind): ?FileKind => FileKind::tryFrom($kind),
             $this->definition->supportedFileKinds,
         )));
     }
@@ -169,6 +163,7 @@ final readonly class ExternalBroadcastPlugin implements
             if (! $media instanceof MediaItemRecord) {
                 $this->failItem($item, 'item_unavailable');
                 $failed[] = (string) $stashItem->id;
+
                 continue;
             }
 
@@ -176,6 +171,7 @@ final readonly class ExternalBroadcastPlugin implements
             if ($resources === []) {
                 $this->failItem($item, 'resource_unavailable');
                 $failed[] = (string) $stashItem->id;
+
                 continue;
             }
 
@@ -292,6 +288,7 @@ final readonly class ExternalBroadcastPlugin implements
         $publishedPaths = $this->definition->outputPath === null
             ? []
             : [$this->paths->broadcastFile($context->broadcast, ...explode('/', $this->definition->outputPath))];
+
         return new BroadcastPublishResult(1, count($failed), $publishedPaths, $failed);
     }
 
@@ -315,6 +312,7 @@ final readonly class ExternalBroadcastPlugin implements
                 }
             }
         }
+
         return new BroadcastVerifyResult(count($missing) === 0, count($context->stashItems) - count($missing), count($missing), [], [], $missing);
     }
 
@@ -339,6 +337,7 @@ final readonly class ExternalBroadcastPlugin implements
             }
             $this->removeGeneratedPath($path, $removed);
         }
+
         return new BroadcastPruneResult(count($removed), $removed);
     }
 
@@ -349,6 +348,7 @@ final readonly class ExternalBroadcastPlugin implements
             if (@unlink($path)) {
                 $removed[] = $path;
             }
+
             return;
         }
         if (! is_dir($path)) {
@@ -380,9 +380,11 @@ final readonly class ExternalBroadcastPlugin implements
         foreach ($this->publicationRecords->listForBroadcast(BroadcastId::fromPrimaryKey($broadcast->id)) as $resource) {
             if ($this->definition->outputPath !== null && $resource->relativePath === $this->definition->outputPath) {
                 $url = $this->publications->url($resource);
+
                 return [['id' => 'published-url', 'label' => 'Published URL', 'value' => $url, 'kind' => 'url', 'link' => $url]];
             }
         }
+
         return [];
     }
 
@@ -450,6 +452,7 @@ final readonly class ExternalBroadcastPlugin implements
                     $urls[] = $this->publications->url($resource);
                 }
             }
+
             return ['urls' => $urls];
         }
         throw BroadcastException::withCode('broadcast_action_unsupported', 'Broadcast action is unsupported.');
@@ -497,6 +500,7 @@ final readonly class ExternalBroadcastPlugin implements
         if ($connection === null || $token === null || trim($token) === '') {
             return [];
         }
+
         return [new PluginHttpGrant(
             allowedPrefixes: [rtrim($connection->baseUri, '/') . '/'],
             credential: new PluginCredentialGrant(
@@ -587,6 +591,7 @@ final readonly class ExternalBroadcastPlugin implements
             $asset->broadcastItemId = BroadcastItemId::fromPrimaryKey($item->id);
             $asset->derivedFromAssetId = AssetId::parse((string) $source->id);
             $this->assets->save($asset);
+
             return;
         }
 
@@ -604,7 +609,7 @@ final readonly class ExternalBroadcastPlugin implements
     }
 
     /** @param array<string, AssetRecord> $stagedAssets
-     *  @return list<array{reference: string, kind: string, derivation_key: ?string, url: string, media_type: ?string, size_bytes: int}>
+     * @return list<array{reference: string, kind: string, derivation_key: ?string, url: string, media_type: ?string, size_bytes: int}>
      */
     private function resources(BroadcastRecord $broadcast, MediaItemRecord $media, ?string $stage = null, array &$stagedAssets = []): array
     {
@@ -636,11 +641,12 @@ final readonly class ExternalBroadcastPlugin implements
                 'size_bytes' => (int) ($asset->sizeBytes ?? 0),
             ];
         }
+
         return $resources;
     }
 
     /** @param list<array<string, mixed>> $artifacts
-     *  @param array<string, AssetRecord> $stagedAssets
+     * @param  array<string, AssetRecord>  $stagedAssets
      */
     private function promoteDerivedArtifacts(BroadcastContext $context, string $stage, array $artifacts, array $stagedAssets): void
     {
@@ -689,6 +695,7 @@ final readonly class ExternalBroadcastPlugin implements
                 $existing->derivationKey = $derivationKey;
                 $existing->state = AssetState::Ready;
                 $this->assets->save($existing);
+
                 continue;
             }
             $asset = $this->assets->create(
@@ -717,6 +724,7 @@ final readonly class ExternalBroadcastPlugin implements
                 return (string) $stashItem->mediaItemId;
             }
         }
+
         return '';
     }
 
@@ -742,6 +750,7 @@ final readonly class ExternalBroadcastPlugin implements
                     ? ['kind' => 'number', 'value' => (int) $value]
                     : ['kind' => 'text', 'value' => (string) $value])];
         }
+
         return $settings;
     }
 
@@ -777,12 +786,14 @@ final readonly class ExternalBroadcastPlugin implements
                     ? ['kind' => 'number', 'value' => (int) $value]
                     : ['kind' => 'text', 'value' => $value])];
         }
+
         return $encoded;
     }
 
-    private function findOrCreateItem(BroadcastContext $context, StashItemId $stashItemId, \App\Vault\MediaItemId $mediaItemId): BroadcastItemRecord
+    private function findOrCreateItem(BroadcastContext $context, StashItemId $stashItemId, MediaItemId $mediaItemId): BroadcastItemRecord
     {
         $existing = $this->items->findByBroadcastAndStashItem(BroadcastId::fromPrimaryKey($context->broadcast->id), $stashItemId);
+
         return $existing ?? $this->items->create(BroadcastId::fromPrimaryKey($context->broadcast->id), $stashItemId, $mediaItemId);
     }
 

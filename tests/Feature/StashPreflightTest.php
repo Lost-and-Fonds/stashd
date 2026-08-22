@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Commands\CommandRecord;
 use App\Commands\CommandState;
 use App\Commands\CommandType;
 use App\Jobs\JobIntent;
+use App\Jobs\JobRecord;
 use App\Stashes\PreflightOrigin;
+use Tempest\Database\Direction;
 use Tempest\Http\Status;
 
 test('stash preflight endpoint accepts command and completes after worker processing', function (): void {
@@ -47,9 +50,9 @@ test('preflight persists completed command and ready job after worker run', func
         'origin' => 'api',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $command = \App\Commands\CommandRecord::select()
+    $command = CommandRecord::select()
         ->where('type', CommandType::StashPreflight)
-        ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
+        ->orderBy('createdAt', Direction::DESC)
         ->first();
 
     expect($command)->not->toBeNull()
@@ -57,11 +60,11 @@ test('preflight persists completed command and ready job after worker run', func
 
     $this->processAllJobs();
 
-    $command = \App\Commands\CommandRecord::findById($command->id);
+    $command = CommandRecord::findById($command->id);
     expect($command->state->value)->toBe('completed')
         ->and($command->result)->not->toBeNull();
 
-    $job = \App\Jobs\JobRecord::select()
+    $job = JobRecord::select()
         ->where('commandId', (string) $command->id)
         ->first();
 

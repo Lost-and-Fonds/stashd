@@ -12,8 +12,7 @@ final readonly class StashInputSyncResult
         public int $itemsDiscovered,
         public int $mediaItemsCreated,
         public int $stashItemsCreated,
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function toArray(): array

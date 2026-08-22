@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/FrameCodec.php';
+require __DIR__.'/FrameCodec.php';
 
 $pipes = [];
-$process = proc_open(['php', __DIR__ . '/fixture-server.php'], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+$process = proc_open(['php', __DIR__.'/fixture-server.php'], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
 if (! is_resource($process)) {
     throw new RuntimeException('could not start PHP fixture server');
 }

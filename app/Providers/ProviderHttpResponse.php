@@ -9,8 +9,7 @@ final readonly class ProviderHttpResponse
     public function __construct(
         public int $statusCode,
         public string $body,
-    ) {
-    }
+    ) {}
 
     public function isSuccessful(): bool
     {

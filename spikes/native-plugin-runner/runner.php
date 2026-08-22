@@ -11,19 +11,19 @@ if (PHP_SAPI !== 'cli') {
 $packageRoot = realpath($packageRoot) ?: fail('package root does not exist');
 $stagingRoot = realpath($stagingRoot) ?: fail('staging root does not exist');
 $entrypoint = validateRelativePath($entrypoint, 'entrypoint');
-$entrypointPath = $packageRoot . '/' . $entrypoint;
+$entrypointPath = $packageRoot.'/'.$entrypoint;
 if (! is_file($entrypointPath)) {
     fail('entrypoint does not exist in package root');
 }
 
 $jobDirectory = createJobDirectory($stagingRoot);
-$etcDirectory = $jobDirectory . '/.etc';
+$etcDirectory = $jobDirectory.'/.etc';
 if (! mkdir($etcDirectory, 0700) && ! is_dir($etcDirectory)) {
     removeTree($jobDirectory);
     fail('could not create minimal etc directory');
 }
-file_put_contents($etcDirectory . '/passwd', "root:x:0:0:root:/root:/bin/sh\nplugin:x:1000:1000:plugin:/tmp:/bin/sh\n");
-file_put_contents($etcDirectory . '/group', "root:x:0:\nplugin:x:1000:\n");
+file_put_contents($etcDirectory.'/passwd', "root:x:0:0:root:/root:/bin/sh\nplugin:x:1000:1000:plugin:/tmp:/bin/sh\n");
+file_put_contents($etcDirectory.'/group', "root:x:0:\nplugin:x:1000:\n");
 
 $command = [
     'bwrap',
@@ -52,7 +52,7 @@ $command = [
     '--setenv', 'HOME', '/tmp',
     '--setenv', 'PATH', '/usr/local/bin:/usr/bin:/bin',
     '--',
-    'php', '/plugin/' . $entrypoint,
+    'php', '/plugin/'.$entrypoint,
 ];
 
 $pipes = [];
@@ -106,7 +106,7 @@ try {
     }
 }
 
-$reportPath = $jobDirectory . '/report.json';
+$reportPath = $jobDirectory.'/report.json';
 $report = is_file($reportPath) ? json_decode((string) file_get_contents($reportPath), true) : null;
 $stagingHadReport = is_array($report);
 removeTree($jobDirectory);
@@ -120,7 +120,7 @@ $result = [
     'staging_clean' => ! file_exists($jobDirectory),
     'report_observed_before_cleanup' => $stagingHadReport,
 ];
-fwrite(STDOUT, json_encode($result, JSON_THROW_ON_ERROR) . "\n");
+fwrite(STDOUT, json_encode($result, JSON_THROW_ON_ERROR)."\n");
 exit($timedOut ? 124 : ($exitCode === 0 ? 0 : 20));
 
 /** @return array{0:float,1:string,2:string,3:string} */
@@ -166,7 +166,7 @@ function validateRelativePath(string $path, string $label): string
 function createJobDirectory(string $root): string
 {
     for ($attempt = 0; $attempt < 10; $attempt++) {
-        $path = $root . '/job-' . bin2hex(random_bytes(12));
+        $path = $root.'/job-'.bin2hex(random_bytes(12));
         if (mkdir($path, 0700)) {
             return $path;
         }
@@ -178,6 +178,7 @@ function removeTree(string $path): void
 {
     if (is_link($path) || is_file($path)) {
         @unlink($path);
+
         return;
     }
     if (! is_dir($path)) {
@@ -187,13 +188,13 @@ function removeTree(string $path): void
         if ($entry === '.' || $entry === '..') {
             continue;
         }
-        removeTree($path . '/' . $entry);
+        removeTree($path.'/'.$entry);
     }
     @rmdir($path);
 }
 
 function fail(string $message): never
 {
-    fwrite(STDERR, $message . "\n");
+    fwrite(STDERR, $message."\n");
     exit(2);
 }

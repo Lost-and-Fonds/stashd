@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Config\StashdConfig;
+use App\Downloads\DownloadPolicyEvaluator;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\StashRecord;
 use App\Vault\AssetKind;
@@ -15,12 +16,13 @@ use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use App\Vault\MediaItemState;
 use App\Vault\VerifyVaultAssets;
+use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
 
 test('item.download moves fake media from temp into vault and marks assets ready', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash();
     $config = $this->container->get(StashdConfig::class);
-    $media = MediaItemRecord::findById(new \Tempest\Database\PrimaryKey($mediaItemId));
+    $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
 
     $download = $this->http->post('/api/v1/commands', [
         'type' => 'item.download',
@@ -56,7 +58,7 @@ test('item.download moves fake media from temp into vault and marks assets ready
 test('metadata-only policy rejects item.download', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('metadata-only-demo');
 
-    $stash = StashRecord::findById(new \Tempest\Database\PrimaryKey($stashId));
+    $stash = StashRecord::findById(new PrimaryKey($stashId));
     $stash->downloadPolicy = DownloadPolicy::MetadataOnly;
     $stash->save();
 
@@ -80,7 +82,7 @@ test('metadata-only policy rejects item.download', function (): void {
 test('retry download does not corrupt existing vault assets', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('retry-demo');
     $config = $this->container->get(StashdConfig::class);
-    $media = MediaItemRecord::findById(new \Tempest\Database\PrimaryKey($mediaItemId));
+    $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
 
     foreach ([1, 2] as $attempt) {
         $download = $this->http->post('/api/v1/commands', [
@@ -100,7 +102,7 @@ test('retry download does not corrupt existing vault assets', function (): void 
     $firstChecksum = hash_file('sha256', $originalPath);
     expect($firstChecksum)->not->toBeFalse();
 
-    $assets = $this->container->get(\App\Vault\AssetRepository::class)
+    $assets = $this->container->get(AssetRepository::class)
         ->findByMediaItemAndRole(
             MediaItemId::parse($mediaItemId),
             AssetRole::VaultOriginal,
@@ -125,7 +127,7 @@ test('ready vault assets are traversed in stable pages without duplicate boundar
 
     $firstPage = $assets->listReadyVaultAssetsPage(null, 2);
     $secondPage = $assets->listReadyVaultAssetsPage((string) $firstPage[1]->id, 2);
-    $ids = array_map(static fn ($asset): string => (string) $asset->id, [...$firstPage, ...$secondPage]);
+    $ids = array_map(static fn($asset): string => (string) $asset->id, [...$firstPage, ...$secondPage]);
 
     expect($firstPage)->toHaveCount(2)
         ->and($secondPage)->toHaveCount(1)
@@ -157,7 +159,7 @@ test('vault verification reports progress throughout a multi-asset scan', functi
 
 test('system.verify_vault marks missing files without touching storage-unavailable roots', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('verify-demo');
-    $assets = $this->container->get(\App\Vault\AssetRepository::class);
+    $assets = $this->container->get(AssetRepository::class);
 
     $download = $this->http->post('/api/v1/commands', [
         'type' => 'item.download',
@@ -192,12 +194,12 @@ test('system.verify_vault marks missing files without touching storage-unavailab
     );
     expect($original?->state)->toBe(AssetState::Missing);
 
-    $item = MediaItemRecord::findById(new \Tempest\Database\PrimaryKey($mediaItemId));
+    $item = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
     expect($item?->state)->toBe(MediaItemState::Missing);
 });
 
 test('download policy evaluator blocks automatic scheduling for manual download', function (): void {
-    $evaluator = $this->container->get(\App\Downloads\DownloadPolicyEvaluator::class);
+    $evaluator = $this->container->get(DownloadPolicyEvaluator::class);
 
     expect($evaluator->allowsAutomaticDownload(DownloadPolicy::ManualDownload))->toBeFalse()
         ->and($evaluator->allowsAutomaticDownload(DownloadPolicy::Video))->toBeTrue();

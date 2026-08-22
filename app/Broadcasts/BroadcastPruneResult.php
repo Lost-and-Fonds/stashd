@@ -7,13 +7,12 @@ namespace App\Broadcasts;
 final readonly class BroadcastPruneResult
 {
     /**
-     * @param list<string> $removedPaths
+     * @param  list<string>  $removedPaths
      */
     public function __construct(
         public int $removedCount,
         public array $removedPaths,
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function toArray(): array

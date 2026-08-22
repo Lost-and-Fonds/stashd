@@ -25,18 +25,19 @@ use App\Vault\AssetRole;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
-final readonly class ExternalInputPlugin implements Provider, DownloaderInterface
+final readonly class ExternalInputPlugin implements DownloaderInterface, Provider
 {
     private const string REFRESH = 'plugin.refresh';
+
     private const string COMPLETE = 'plugin.complete';
+
     private const string ACQUIRE = 'plugin.acquire';
 
     public function __construct(
         private ExternalInputPluginDefinition $definition,
         private PluginHostClient $host,
         private SecretsService $secrets,
-    ) {
-    }
+    ) {}
 
     public function key(): string
     {
@@ -107,7 +108,7 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
     }
 
     /**
-     * @param array<string, bool|string> $options
+     * @param  array<string, bool|string>  $options
      * @return list<DiscoveredItem>
      */
     public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = []): array
@@ -126,7 +127,7 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
             $options,
         );
 
-        return array_map(fn (array $item): DiscoveredItem => $this->mapItem($item), $result->items ?? []);
+        return array_map(fn(array $item): DiscoveredItem => $this->mapItem($item), $result->items ?? []);
     }
 
     public function isStrategyAvailable(ProviderStrategy $strategy): bool
@@ -147,7 +148,7 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
     {
         return array_values(array_filter(
             $this->definition->declaredInputOptions(),
-            static fn ($option): bool => $option->applicableInputTypes === [] || in_array($input->inputType, $option->applicableInputTypes, true),
+            static fn($option): bool => $option->applicableInputTypes === [] || in_array($input->inputType, $option->applicableInputTypes, true),
         ));
     }
 
@@ -188,7 +189,7 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
             mediaKind: $request->downloadPolicy->value === 'audio_only' ? 'audio' : 'video',
             options: $request->providerOptions,
         );
-        if (! array_filter($files, static fn (DownloadedFile $file): bool => $file->role === AssetRole::VaultOriginal)) {
+        if (! array_filter($files, static fn(DownloadedFile $file): bool => $file->role === AssetRole::VaultOriginal)) {
             throw DownloadException::withCode('plugin_missing_primary', 'External Input plugin returned no primary artifact.');
         }
 
@@ -210,8 +211,8 @@ final readonly class ExternalInputPlugin implements Provider, DownloaderInterfac
      * Acquire generic staged artifacts for auxiliary application workflows.
      * The caller interprets only generic artifact roles; plugin options remain opaque.
      *
-     * @param array<string, mixed> $item
-     * @param array<string, bool|string> $options
+     * @param  array<string, mixed>  $item
+     * @param  array<string, bool|string>  $options
      * @return list<DownloadedFile>
      */
     public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array

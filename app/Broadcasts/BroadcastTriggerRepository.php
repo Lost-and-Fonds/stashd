@@ -16,8 +16,7 @@ final class BroadcastTriggerRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     public function create(
         BroadcastId $broadcastId,

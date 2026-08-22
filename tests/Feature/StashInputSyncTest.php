@@ -6,6 +6,8 @@ namespace Tests\Feature;
 
 use App\Commands\CommandRecord;
 use App\Commands\CommandType;
+use App\Jobs\JobIntent;
+use App\Jobs\JobRecord;
 use App\Providers\Fake\FakeProvider;
 use App\Providers\ProviderRegistry;
 use App\Stashes\StashId;
@@ -95,7 +97,7 @@ test('a sync records input health and leaves positions a total order', function 
         ->and($input->consecutiveFailures)->toBe(0);
 
     $positions = array_map(
-        static fn (StashItemRecord $item): int => $item->position,
+        static fn(StashItemRecord $item): int => $item->position,
         itemsOf($stashId),
     );
 
@@ -133,7 +135,7 @@ test('a second check while one is still queued does not run twice', function ():
     $this->http->post('/api/v1/stashes/' . $stashId . '/sync', [], headers: $headers)
         ->assertStatus(Status::ACCEPTED);
 
-    $queued = \App\Jobs\JobRecord::select()->where('intent', \App\Jobs\JobIntent::SyncInput)->all();
+    $queued = JobRecord::select()->where('intent', JobIntent::SyncInput)->all();
     expect($queued)->toHaveCount(1);
 
     $this->processAllJobs();

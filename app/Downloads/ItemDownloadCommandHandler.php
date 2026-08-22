@@ -31,8 +31,7 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
         private StashRepository $stashes,
         private StashItemRepository $stashItems,
         private StateTransitionService $transitions,
-    ) {
-    }
+    ) {}
 
     public function type(): CommandType
     {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/FrameCodec.php';
+require __DIR__.'/FrameCodec.php';
 
 while (($message = FrameCodec::read(STDIN)) !== null) {
     if (($message['kind'] ?? null) === 'notification') {

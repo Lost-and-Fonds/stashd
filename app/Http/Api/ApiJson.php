@@ -25,8 +25,7 @@ final class ApiJson
     }
 
     /**
-     * @param array<string, mixed> $data
-     *
+     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     private static function snakeToCamel(array $data): array
@@ -42,8 +41,7 @@ final class ApiJson
     }
 
     /**
-     * @param array<string, mixed> $data
-     *
+     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     private static function camelToSnake(array $data): array
@@ -56,7 +54,7 @@ final class ApiJson
             if (is_array($value)) {
                 $encoded[$encodedKey] = array_is_list($value)
                     ? array_map(
-                        static fn (mixed $item): mixed => is_array($item) ? self::camelToSnake($item) : self::encodeValue($item),
+                        static fn(mixed $item): mixed => is_array($item) ? self::camelToSnake($item) : self::encodeValue($item),
                         $value,
                     )
                     : self::camelToSnake($value);

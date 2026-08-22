@@ -19,8 +19,8 @@ interface DownloaderInterface
     public function probe(): DownloadProbeResult;
 
     /**
-     * @param ?callable $onProgress Invoked with implementation progress where
-     *     the implementation supports it.
+     * @param  ?callable  $onProgress  Invoked with implementation progress where
+     *                                 the implementation supports it.
      */
     public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult;
 }

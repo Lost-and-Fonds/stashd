@@ -21,15 +21,15 @@ final readonly class PluginConnectionService
         private PluginHttpGrantFactory $grants,
         private SecretsService $secrets,
         private SecretRepository $secretRecords,
-    ) {
-    }
+    ) {}
 
     /** @param array<string, mixed>|null $settings */
     public function create(
         string $pluginKey,
         string $name,
         string $endpoint,
-        #[\SensitiveParameter] ?string $token = null,
+        #[\SensitiveParameter]
+        ?string $token = null,
         ?array $settings = null,
     ): ConnectionRecord {
         $record = $this->connections->create(
@@ -52,7 +52,8 @@ final readonly class PluginConnectionService
         ?string $name = null,
         ?string $endpoint = null,
         ?array $settings = null,
-        #[\SensitiveParameter] ?string $token = null,
+        #[\SensitiveParameter]
+        ?string $token = null,
     ): ConnectionRecord {
         $record = $this->connections->find($id)
             ?? throw ConnectionException::withCode('connection_not_found', 'Connection not found.');
@@ -79,7 +80,7 @@ final readonly class PluginConnectionService
     }
 
     /**
-     * @param array<string, scalar> $payload
+     * @param  array<string, scalar>  $payload
      * @return array<string, mixed>
      */
     public function invokeOperation(PrefixedUlid $id, string $operationKey, array $payload = []): array
@@ -88,6 +89,7 @@ final readonly class PluginConnectionService
             ?? throw ConnectionException::withCode('connection_not_found', 'Connection not found.');
 
         $token = $this->requireToken($record);
+
         return $this->invoke($record, $operationKey, $token, $payload);
     }
 
@@ -121,7 +123,7 @@ final readonly class PluginConnectionService
     }
 
     /**
-     * @param array<string, scalar> $payload
+     * @param  array<string, scalar>  $payload
      * @return array<string, mixed>
      */
     private function invoke(ConnectionRecord $connection, string $operationKey, string $token, array $payload = []): array
@@ -168,7 +170,7 @@ final readonly class PluginConnectionService
     }
 
     /**
-     * @param array<string, mixed> $settings
+     * @param  array<string, mixed>  $settings
      * @return list<array{key: string, value: array{kind: 'text', value: string}}>
      */
     private function settingEntries(array $settings): array
@@ -180,6 +182,7 @@ final readonly class PluginConnectionService
                 $entries[] = ['key' => $key, 'value' => ['kind' => 'text', 'value' => (string) $value]];
             }
         }
+
         return $entries;
     }
 }

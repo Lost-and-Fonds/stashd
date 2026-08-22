@@ -11,8 +11,7 @@ final readonly class ActivityEventResource
 {
     public function __construct(
         private ActivityEventRecord $event,
-    ) {
-    }
+    ) {}
 
     public static function fromRecord(ActivityEventRecord $event): self
     {

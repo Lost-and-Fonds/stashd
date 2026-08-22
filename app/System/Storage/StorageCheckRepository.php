@@ -16,8 +16,7 @@ final class StorageCheckRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     /** @param array<string, mixed>|null $details */
     public function record(

@@ -9,8 +9,7 @@ final readonly class JobHandlerRegistry
     /** @param list<JobHandler> $handlers */
     public function __construct(
         private array $handlers,
-    ) {
-    }
+    ) {}
 
     public function handlerFor(JobIntent $intent): ?JobHandler
     {

@@ -37,6 +37,5 @@ final class TimelineEntryRecord
         public ?DateTime $lastCheckedAt = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
-    ) {
-    }
+    ) {}
 }

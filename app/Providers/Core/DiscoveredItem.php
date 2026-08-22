@@ -10,7 +10,7 @@ use Tempest\DateTime\DateTime;
 final readonly class DiscoveredItem
 {
     /**
-     * @param array<string, mixed>|null $rawMetadata
+     * @param  array<string, mixed>|null  $rawMetadata
      */
     public function __construct(
         public string $providerItemId,
@@ -22,8 +22,7 @@ final readonly class DiscoveredItem
         public ?StashdUri $thumbnailUri = null,
         public ?array $rawMetadata = null,
         public ?string $contentType = null,
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public static function toArray(self $item): array
@@ -47,8 +46,7 @@ final readonly class DiscoveredItem
     }
 
     /**
-     * @param list<self> $items
-     *
+     * @param  list<self>  $items
      * @return list<array<string, mixed>>
      */
     public static function manyToArray(array $items): array

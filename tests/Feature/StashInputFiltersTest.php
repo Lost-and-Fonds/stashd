@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Stashes\StashItemRecord;
+use App\Vault\MediaItemRecord;
+use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
 
 test('preflight review exposes the universal title-regex filters for every provider', function (): void {
@@ -159,12 +161,12 @@ test('add input excludes shorts and live items from a youtube channel when toggl
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $items = \App\Stashes\StashItemRecord::select()->where('stashId', $stashId)->all();
+    $items = StashItemRecord::select()->where('stashId', $stashId)->all();
     expect($items)->toHaveCount(18);
 
     $reasonsByMediaItemId = [];
     foreach ($items as $item) {
-        $media = \App\Vault\MediaItemRecord::findById(new \Tempest\Database\PrimaryKey((string) $item->mediaItemId));
+        $media = MediaItemRecord::findById(new PrimaryKey((string) $item->mediaItemId));
         $reasonsByMediaItemId[$media->providerItemId] = [$item->state->value, $item->ignoredReason];
     }
 
@@ -284,7 +286,7 @@ test('PATCH stash input re-filters already-committed items', function (): void {
 
     // All 3 items committed active (no filter was set at add-input time).
     $beforeStates = array_map(
-        static fn (StashItemRecord $item): string => $item->state->value,
+        static fn(StashItemRecord $item): string => $item->state->value,
         StashItemRecord::select()->where('stashId', $stashId)->all(),
     );
     expect($beforeStates)->toBe(['active', 'active', 'active']);
@@ -295,7 +297,7 @@ test('PATCH stash input re-filters already-committed items', function (): void {
 
     // Editing the filter applies to the items already committed from this input.
     $afterStates = array_map(
-        static fn (StashItemRecord $item): string => $item->state->value,
+        static fn(StashItemRecord $item): string => $item->state->value,
         StashItemRecord::select()->where('stashId', $stashId)->all(),
     );
     expect($afterStates)->toBe(['ignored', 'active', 'ignored']);
@@ -329,7 +331,7 @@ test('PATCH stash input reactivates filtered YouTube items and queues their down
     $this->processAllJobs();
 
     $items = StashItemRecord::select()->where('stashId', $stashId)->all();
-    expect(array_map(static fn (StashItemRecord $item): string => $item->state->value, $items))->toBe(array_fill(0, 18, 'active'));
+    expect(array_map(static fn(StashItemRecord $item): string => $item->state->value, $items))->toBe(array_fill(0, 18, 'active'));
 });
 
 test('PATCH stash input returns 404 for an input belonging to a different stash', function (): void {

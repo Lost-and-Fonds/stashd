@@ -43,15 +43,14 @@ final readonly class StashController
         private ActivityEventService $activity,
         private AssetRepository $assets,
         private JobRepository $jobs,
-    ) {
-    }
+    ) {}
 
     #[Get('/api/v1/stashes')]
     public function index(): Json
     {
         return new Json([
             'stashes' => array_map(
-                static fn ($stash): array => StashResource::fromRecord($stash)->toArray(),
+                static fn($stash): array => StashResource::fromRecord($stash)->toArray(),
                 $this->stashes->list(),
             ),
         ]);
@@ -165,7 +164,7 @@ final readonly class StashController
         );
 
         $mediaItemIds = array_values(array_unique(array_map(
-            static fn ($item): string => (string) $item->mediaItemId,
+            static fn($item): string => (string) $item->mediaItemId,
             $stashItems,
         )));
 
@@ -174,7 +173,7 @@ final readonly class StashController
 
         return new Json([
             'items' => array_map(
-                static fn ($item): array => StashItemResource::fromRecord(
+                static fn($item): array => StashItemResource::fromRecord(
                     $item,
                     $item->mediaItem,
                     $totalSizeByMediaItem[(string) $item->mediaItemId] ?? null,
@@ -211,7 +210,7 @@ final readonly class StashController
 
         return new Json([
             'inputs' => array_map(
-                fn ($input): array => StashInputResource::fromRecord($input, $this->inputOptions->declaredOptions($input))->toArray(),
+                fn($input): array => StashInputResource::fromRecord($input, $this->inputOptions->declaredOptions($input))->toArray(),
                 $this->stashInputs->listForStash(StashId::fromPrimaryKey($stash->id)),
             ),
         ]);

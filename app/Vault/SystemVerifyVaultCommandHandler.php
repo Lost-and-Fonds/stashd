@@ -18,17 +18,14 @@ final readonly class SystemVerifyVaultCommandHandler implements CommandHandler
     public function __construct(
         private CommandRepository $commands,
         private JobRepository $jobs,
-    ) {
-    }
+    ) {}
 
     public function type(): CommandType
     {
         return CommandType::SystemVerifyVault;
     }
 
-    public function validate(array $options): void
-    {
-    }
+    public function validate(array $options): void {}
 
     public function createJobs(CommandRecord $command, array $options): array
     {

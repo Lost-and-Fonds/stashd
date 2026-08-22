@@ -13,8 +13,7 @@ final readonly class JobRealtimeResource
 {
     public function __construct(
         private JobRecord $job,
-    ) {
-    }
+    ) {}
 
     public static function fromRecord(JobRecord $job): self
     {

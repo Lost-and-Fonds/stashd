@@ -17,8 +17,7 @@ final class UserRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     public function findByUsername(string $username): ?UserRecord
     {

@@ -32,8 +32,7 @@ final readonly class RebuildCommand
     public function __construct(
         private StashdConfig $config,
         private Environment $environment,
-    ) {
-    }
+    ) {}
 
     #[ConsoleCommand(
         name: 'stashd:rebuild',

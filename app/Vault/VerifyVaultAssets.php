@@ -21,8 +21,7 @@ final readonly class VerifyVaultAssets
         private MediaItemRepository $mediaItems,
         private StorageLocationRepository $storageLocations,
         private StateTransitionService $transitions,
-    ) {
-    }
+    ) {}
 
     /** @param null|Closure(int, int): void $onProgress */
     public function verifyAll(?Closure $onProgress = null): VaultVerifyResult

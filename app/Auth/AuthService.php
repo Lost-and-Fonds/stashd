@@ -35,8 +35,7 @@ final readonly class AuthService
         private ApiTokenRepository $tokens,
         private AuthContext $context,
         private LoginAttemptLimiter $loginAttempts,
-    ) {
-    }
+    ) {}
 
     public function isSetupRequired(): bool
     {
@@ -201,11 +200,11 @@ final readonly class AuthService
     {
         $tokens = array_filter(
             $this->tokens->listForUser(UserId::fromPrimaryKey($user->id)),
-            static fn ($token): bool => $token->name !== self::WEB_SESSION_TOKEN_NAME,
+            static fn($token): bool => $token->name !== self::WEB_SESSION_TOKEN_NAME,
         );
 
         return array_values(array_map(
-            static fn ($token): array => [
+            static fn($token): array => [
                 'id' => (string) $token->id,
                 'name' => $token->name,
                 'token_preview' => $token->tokenPreview,

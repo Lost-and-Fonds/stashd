@@ -15,8 +15,7 @@ final readonly class HealthController
 {
     public function __construct(
         private HealthService $health,
-    ) {
-    }
+    ) {}
 
     #[Get('/health')]
     public function publicHealth(): Json

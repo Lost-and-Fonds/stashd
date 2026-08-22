@@ -24,8 +24,7 @@ final class StashItemRepository
     public function __construct(
         private PrefixedUlidGenerator $ids,
         private Database $database,
-    ) {
-    }
+    ) {}
 
     public function create(
         StashId $stashId,
@@ -212,7 +211,7 @@ final class StashItemRepository
     }
 
     /**
-     * @param list<string> $mediaItemIds
+     * @param  list<string>  $mediaItemIds
      * @return list<StashItemRecord>
      */
     public function listForMediaItemsExcludingStash(array $mediaItemIds, StashId $excludingStashId): array

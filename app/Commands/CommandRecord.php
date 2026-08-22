@@ -18,8 +18,8 @@ final class CommandRecord
     public PrimaryKey $id;
 
     /**
-     * @param array<string, mixed>|null $options
-     * @param array<string, mixed>|null $result
+     * @param  array<string, mixed>|null  $options
+     * @param  array<string, mixed>|null  $result
      */
     public function __construct(
         public CommandType $type,
@@ -31,6 +31,5 @@ final class CommandRecord
         public ?UserId $createdByUserId = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
-    ) {
-    }
+    ) {}
 }

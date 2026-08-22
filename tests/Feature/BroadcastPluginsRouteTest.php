@@ -16,7 +16,7 @@ test('broadcast plugins endpoint lists the discovered plugin keys', function ():
 
     $jellyfin = array_values(array_filter(
         $response->body['plugins'],
-        static fn (array $plugin): bool => $plugin['key'] === 'jellyfin',
+        static fn(array $plugin): bool => $plugin['key'] === 'jellyfin',
     ))[0] ?? null;
 
     expect($jellyfin)->not->toBeNull()

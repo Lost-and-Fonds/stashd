@@ -15,8 +15,7 @@ final readonly class StashdConfig
         public int $pgid,
         public string $umask,
         public string $httpPort,
-    ) {
-    }
+    ) {}
 
     public function databasePath(): string
     {

@@ -30,6 +30,5 @@ final class MediaItemSourceRecord
         public ?StashInputId $stashInputId = null,
         public ?int $position = null,
         public ?int $rawPosition = null,
-    ) {
-    }
+    ) {}
 }

@@ -17,8 +17,7 @@ final class MediaItemSourceRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     public function create(
         MediaItemId $mediaItemId,

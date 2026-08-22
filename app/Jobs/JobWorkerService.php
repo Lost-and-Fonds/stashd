@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Broadcasts\BroadcastException;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
+use App\Downloads\DownloadException;
+use App\Providers\ProviderException;
 use App\Support\DurationSeconds;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
@@ -37,8 +40,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
         private ActivityEventService $activity,
         private EventPublisher $publisher,
         private WorkerProcessProbe $probe,
-    ) {
-    }
+    ) {}
 
     /**
      * A heartbeat-stale job is only re-queued once its owning process is
@@ -110,7 +112,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
 
         try {
             $handler->handle($job, new JobHandlerContext($this));
-        } catch (\App\Downloads\DownloadException $exception) {
+        } catch (DownloadException $exception) {
             $error = $exception->errorCode . ': ' . $exception->getMessage();
 
             if ($exception->retryable && $job->attempts < $job->maxAttempts) {
@@ -119,9 +121,9 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
                 $this->failJob($job, $error);
                 $this->activity->downloadFailed($job, $exception->errorCode, $exception->getMessage());
             }
-        } catch (\App\Broadcasts\BroadcastException $exception) {
+        } catch (BroadcastException $exception) {
             $this->failJob($job, $exception->errorCode . ': ' . $exception->getMessage());
-        } catch (\App\Providers\ProviderException $exception) {
+        } catch (ProviderException $exception) {
             $this->failJob($job, $exception->errorCode . ': ' . $exception->getMessage());
         } catch (\Throwable $throwable) {
             $this->failJob($job, $throwable->getMessage());

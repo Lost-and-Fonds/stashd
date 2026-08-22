@@ -15,8 +15,7 @@ final readonly class AssetRegenerationGuidance
         public ?string $generatedBy,
         public bool $canRegenerate,
         public bool $safeToDelete,
-    ) {
-    }
+    ) {}
 
     /**
      * An asset is "generated" if it's tied to a broadcast or explicitly

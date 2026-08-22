@@ -6,6 +6,4 @@ namespace App\Auth;
 
 use RuntimeException;
 
-final class SetupRequired extends RuntimeException
-{
-}
+final class SetupRequired extends RuntimeException {}

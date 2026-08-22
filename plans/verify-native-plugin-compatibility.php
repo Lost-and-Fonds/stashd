@@ -8,9 +8,8 @@ declare(strict_types=1);
  * This is design verification only. It is not loaded by Stashd and does not
  * implement a native runtime.
  */
-
 $root = dirname(__DIR__);
-$inventoryPath = __DIR__ . '/native-plugin-compatibility.json';
+$inventoryPath = __DIR__.'/native-plugin-compatibility.json';
 $inventory = json_decode((string) file_get_contents($inventoryPath), true, flags: JSON_THROW_ON_ERROR);
 
 if (($inventory['baseline'] ?? null) !== 'b3c393a') {
@@ -28,10 +27,9 @@ function requireString(array $value, string $key): string
     return $result;
 }
 
-/** @return string */
 function readRepoFile(string $root, string $relative): string
 {
-    $path = $root . '/' . $relative;
+    $path = $root.'/'.$relative;
     if (! is_file($path)) {
         throw new RuntimeException("Missing repository file: {$relative}");
     }
@@ -61,16 +59,16 @@ foreach ($contract as $definition) {
 
     $content = readRepoFile($root, requireString($definition, 'file'));
     requireAll($content, [
-        'package ' . requireString($definition, 'package') . ';',
-        'world ' . requireString($definition, 'world'),
-    ], 'WIT contract ' . $definition['file']);
+        'package '.requireString($definition, 'package').';',
+        'world '.requireString($definition, 'world'),
+    ], 'WIT contract '.$definition['file']);
 
     foreach (['imports', 'exports', 'operations'] as $field) {
         $values = $definition[$field] ?? null;
         if (! is_array($values)) {
             throw new RuntimeException("Malformed {$field} inventory for {$definition['file']}.");
         }
-        requireAll($content, array_map(static fn (mixed $value): string => (string) $value, $values), 'WIT contract ' . $definition['file']);
+        requireAll($content, array_map(static fn (mixed $value): string => (string) $value, $values), 'WIT contract '.$definition['file']);
     }
 }
 
@@ -124,6 +122,6 @@ if (($inventory['review']['semantic_gaps'] ?? null) !== []) {
 }
 
 echo "M0 compatibility inventory: PASS\n";
-echo "Active WIT contracts: " . count($contract) . "\n";
-echo "Manifest implementations: " . count($implementations) . "\n";
+echo 'Active WIT contracts: '.count($contract)."\n";
+echo 'Manifest implementations: '.count($implementations)."\n";
 echo "Semantic gaps: 0\n";

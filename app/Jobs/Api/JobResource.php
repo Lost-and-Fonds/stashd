@@ -12,8 +12,7 @@ final readonly class JobResource
 {
     public function __construct(
         private JobRecord $job,
-    ) {
-    }
+    ) {}
 
     public static function fromRecord(JobRecord $job): self
     {
@@ -51,8 +50,7 @@ final readonly class JobResource
     }
 
     /**
-     * @param array<string, mixed>|null $data
-     *
+     * @param  array<string, mixed>|null  $data
      * @return array<string, mixed>|null
      */
     private function encodeForApi(?array $data): ?array

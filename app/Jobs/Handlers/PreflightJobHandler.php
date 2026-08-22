@@ -32,8 +32,7 @@ final readonly class PreflightJobHandler implements JobHandler
         private ActivityEventService $activity,
         private EventPublisher $publisher,
         private StashdConfig $config,
-    ) {
-    }
+    ) {}
 
     public function intent(): JobIntent
     {

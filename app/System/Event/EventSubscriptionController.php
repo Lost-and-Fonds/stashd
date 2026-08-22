@@ -31,8 +31,7 @@ final readonly class EventSubscriptionController
         private AuthService $auth,
         private AppConfig $appConfig,
         private CookieManager $cookies,
-    ) {
-    }
+    ) {}
 
     #[Get('/api/v1/events/subscription')]
     public function __invoke(Request $request): Json

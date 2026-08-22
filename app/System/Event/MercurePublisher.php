@@ -27,8 +27,7 @@ final readonly class MercurePublisher
     public function __construct(
         private HubInterface $hub,
         private Logger $logger,
-    ) {
-    }
+    ) {}
 
     /** @param array<string, mixed> $payload */
     public function publish(string $eventName, array $payload): void

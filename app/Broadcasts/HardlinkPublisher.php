@@ -17,8 +17,7 @@ final readonly class HardlinkPublisher
     public function __construct(
         private StashdConfig $config,
         private FilesystemProbe $probe,
-    ) {
-    }
+    ) {}
 
     public static function sameFile(string $pathA, string $pathB): bool
     {

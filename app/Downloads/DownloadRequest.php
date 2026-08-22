@@ -27,6 +27,5 @@ final readonly class DownloadRequest
         public ?DateTime $publishedAt = null,
         /** @var array<string, bool|string> */
         public array $providerOptions = [],
-    ) {
-    }
+    ) {}
 }

@@ -7,10 +7,10 @@ namespace App\Broadcasts;
 final readonly class BroadcastVerifyResult
 {
     /**
-     * @param list<string> $validItemIds
-     * @param list<string> $staleItemIds
-     * @param list<string> $missingItemIds
-     * @param list<string> $invalidLinkItemIds
+     * @param  list<string>  $validItemIds
+     * @param  list<string>  $staleItemIds
+     * @param  list<string>  $missingItemIds
+     * @param  list<string>  $invalidLinkItemIds
      */
     public function __construct(
         public bool $ok,
@@ -20,8 +20,7 @@ final readonly class BroadcastVerifyResult
         public array $staleItemIds,
         public array $missingItemIds,
         public array $invalidLinkItemIds = [],
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function toArray(): array

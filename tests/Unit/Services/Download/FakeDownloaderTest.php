@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Download;
 
+use App\Downloads\DownloadException;
 use App\Downloads\DownloadRequest;
 use App\Downloads\Fake\FakeDownloader;
 use App\Providers\StashdUri;
@@ -52,4 +53,4 @@ test('fake downloader rejects metadata-only policy', function (): void {
     );
 
     $downloader->download($request);
-})->throws(\App\Downloads\DownloadException::class);
+})->throws(DownloadException::class);

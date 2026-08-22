@@ -25,8 +25,7 @@ final readonly class MigrationRunner
         private MigrationManager $migrations,
         private RunnableMigrations $runnableMigrations,
         private Database $database,
-    ) {
-    }
+    ) {}
 
     public function run(DatabaseConfig $databaseConfig): void
     {
@@ -55,7 +54,7 @@ final readonly class MigrationRunner
     {
         try {
             return array_map(
-                static fn (Migration $migration): string => $migration->name,
+                static fn(Migration $migration): string => $migration->name,
                 Migration::all(),
             );
         } catch (QueryWasInvalid $exception) {

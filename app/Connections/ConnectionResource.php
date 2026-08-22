@@ -10,8 +10,7 @@ final readonly class ConnectionResource
 {
     public function __construct(
         private ConnectionRecord $connection,
-    ) {
-    }
+    ) {}
 
     public static function fromRecord(ConnectionRecord $connection): self
     {
@@ -31,5 +30,4 @@ final readonly class ConnectionResource
             'updatedAt' => $this->connection->updatedAt,
         ]);
     }
-
 }

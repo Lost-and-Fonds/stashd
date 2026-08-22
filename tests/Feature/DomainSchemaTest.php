@@ -5,20 +5,32 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Broadcasts\BroadcastRecord;
+use App\Broadcasts\BroadcastRepository;
+use App\Commands\CommandId;
 use App\Jobs\JobIntent;
 use App\Jobs\JobLane;
 use App\Jobs\JobRecord;
+use App\Jobs\JobRepository;
 use App\Jobs\JobState;
+use App\Stashes\StashId;
+use App\Stashes\StashInputId;
 use App\Stashes\StashInputRecord;
+use App\Stashes\StashInputRepository;
+use App\Stashes\StashInputType;
 use App\Stashes\StashItemRecord;
+use App\Stashes\StashItemRepository;
 use App\Stashes\StashRecord;
+use App\Stashes\StashRepository;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
+use App\Vault\MediaItemRepository;
 use Tempest\Database\Builder\QueryBuilders\BuildsQuery;
 use Tempest\Database\Builder\QueryBuilders\WhereGroupBuilder;
 use Tempest\Database\Builder\WhereOperator;
 use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Database;
 use Tempest\Database\Direction;
+use Tempest\Database\Exceptions\QueryWasInvalid;
 use Tempest\Database\Query;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
@@ -58,7 +70,7 @@ test('domain schema migration creates all v1 tables on a fresh database', functi
 });
 
 test('media item provider identity is unique', function (): void {
-    $repo = $this->container->get(\App\Vault\MediaItemRepository::class);
+    $repo = $this->container->get(MediaItemRepository::class);
 
     $repo->create(
         providerKey: 'fake',
@@ -67,40 +79,40 @@ test('media item provider identity is unique', function (): void {
         title: 'First',
     );
 
-    expect(fn () => $repo->create(
+    expect(fn() => $repo->create(
         providerKey: 'fake',
         providerItemId: 'dup-item',
         canonicalUri: 'fake://item/dup-item-2',
         title: 'Duplicate',
-    ))->toThrow(\Tempest\Database\Exceptions\QueryWasInvalid::class);
+    ))->toThrow(QueryWasInvalid::class);
 });
 
 test('stash item enforces stash and media item relationship uniqueness', function (): void {
-    $stashes = $this->container->get(\App\Stashes\StashRepository::class);
-    $media = $this->container->get(\App\Vault\MediaItemRepository::class);
-    $items = $this->container->get(\App\Stashes\StashItemRepository::class);
+    $stashes = $this->container->get(StashRepository::class);
+    $media = $this->container->get(MediaItemRepository::class);
+    $items = $this->container->get(StashItemRepository::class);
 
     $stash = $stashes->create('Test Stash');
     $mediaItem = $media->create('fake', 'rel-item', 'fake://item/rel-item', 'Rel Item');
 
     $items->create(
-        stashId: \App\Stashes\StashId::parse((string) $stash->id),
-        mediaItemId: \App\Vault\MediaItemId::parse((string) $mediaItem->id),
+        stashId: StashId::parse((string) $stash->id),
+        mediaItemId: MediaItemId::parse((string) $mediaItem->id),
     );
 
-    expect(fn () => $items->create(
-        stashId: \App\Stashes\StashId::parse((string) $stash->id),
-        mediaItemId: \App\Vault\MediaItemId::parse((string) $mediaItem->id),
-    ))->toThrow(\Tempest\Database\Exceptions\QueryWasInvalid::class);
+    expect(fn() => $items->create(
+        stashId: StashId::parse((string) $stash->id),
+        mediaItemId: MediaItemId::parse((string) $mediaItem->id),
+    ))->toThrow(QueryWasInvalid::class);
 });
 
 test('job requires a valid command foreign key', function (): void {
-    $jobs = $this->container->get(\App\Jobs\JobRepository::class);
+    $jobs = $this->container->get(JobRepository::class);
 
-    expect(fn () => $jobs->create(
-        intent: \App\Jobs\JobIntent::Preflight,
-        commandId: \App\Commands\CommandId::parse('cmd_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
-    ))->toThrow(\Tempest\Database\Exceptions\QueryWasInvalid::class);
+    expect(fn() => $jobs->create(
+        intent: JobIntent::Preflight,
+        commandId: CommandId::parse('cmd_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
+    ))->toThrow(QueryWasInvalid::class);
 });
 
 test('job workload indexes support pending, stale, and history queries', function (): void {
@@ -115,7 +127,7 @@ test('job workload indexes support pending, stale, and history queries', functio
     $now = DateTime::now(Timezone::UTC);
     $pending = JobRecord::select()
         ->where('state', JobState::Pending)
-        ->andWhereGroup(fn (WhereGroupBuilder $group) => $group
+        ->andWhereGroup(fn(WhereGroupBuilder $group) => $group
             ->whereNull('scheduledAt')
             ->orWhere('scheduledAt', $now, WhereOperator::LESS_THAN_OR_EQUAL))
         ->orderBy('priority', Direction::ASC)
@@ -123,14 +135,14 @@ test('job workload indexes support pending, stale, and history queries', functio
         ->limit(5);
     $lane = JobRecord::select()
         ->where('state', JobState::Pending)
-        ->andWhereGroup(fn (WhereGroupBuilder $group) => $group
+        ->andWhereGroup(fn(WhereGroupBuilder $group) => $group
             ->whereNull('scheduledAt')
             ->orWhere('scheduledAt', $now, WhereOperator::LESS_THAN_OR_EQUAL))
         ->orderBy('priority', Direction::ASC)
         ->orderBy('createdAt', Direction::ASC)
         ->limit(5)
         ->whereIn('intent', array_map(
-            static fn (JobIntent $intent): string => $intent->value,
+            static fn(JobIntent $intent): string => $intent->value,
             JobLane::Bulk->intents(),
         ));
     $stale = JobRecord::select()
@@ -166,12 +178,12 @@ test('job workload indexes support pending, stale, and history queries', functio
 });
 
 test('broadcast belongs to stash via foreign key', function (): void {
-    $stashes = $this->container->get(\App\Stashes\StashRepository::class);
-    $broadcasts = $this->container->get(\App\Broadcasts\BroadcastRepository::class);
+    $stashes = $this->container->get(StashRepository::class);
+    $broadcasts = $this->container->get(BroadcastRepository::class);
 
     $stash = $stashes->create('Broadcast Stash');
     $broadcast = $broadcasts->create(
-        stashId: \App\Stashes\StashId::parse((string) $stash->id),
+        stashId: StashId::parse((string) $stash->id),
         type: 'podcast',
         name: 'Podcast',
         slug: 'podcast',
@@ -179,28 +191,28 @@ test('broadcast belongs to stash via foreign key', function (): void {
 
     expect((string) $broadcast->stashId)->toBe((string) $stash->id);
 
-    expect(fn () => $broadcasts->create(
-        stashId: \App\Stashes\StashId::parse('stash_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
+    expect(fn() => $broadcasts->create(
+        stashId: StashId::parse('stash_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
         type: 'podcast',
         name: 'Orphan',
         slug: 'orphan',
-    ))->toThrow(\Tempest\Database\Exceptions\QueryWasInvalid::class);
+    ))->toThrow(QueryWasInvalid::class);
 });
 
 test('repository smoke creates stash with input media item stash item and broadcast', function (): void {
-    $stashes = $this->container->get(\App\Stashes\StashRepository::class);
-    $inputs = $this->container->get(\App\Stashes\StashInputRepository::class);
-    $media = $this->container->get(\App\Vault\MediaItemRepository::class);
-    $items = $this->container->get(\App\Stashes\StashItemRepository::class);
-    $broadcasts = $this->container->get(\App\Broadcasts\BroadcastRepository::class);
+    $stashes = $this->container->get(StashRepository::class);
+    $inputs = $this->container->get(StashInputRepository::class);
+    $media = $this->container->get(MediaItemRepository::class);
+    $items = $this->container->get(StashItemRepository::class);
+    $broadcasts = $this->container->get(BroadcastRepository::class);
 
     $stash = $stashes->create('Demo');
-    $stashId = \App\Stashes\StashId::parse((string) $stash->id);
+    $stashId = StashId::parse((string) $stash->id);
 
     $input = $inputs->create(
         stashId: $stashId,
         providerKey: 'fake',
-        inputType: \App\Stashes\StashInputType::Channel,
+        inputType: StashInputType::Channel,
         sourceUri: 'fake://channel/demo',
         providerInputId: 'channel:demo',
         title: 'Demo Channel',
@@ -216,8 +228,8 @@ test('repository smoke creates stash with input media item stash item and broadc
 
     $stashItem = $items->create(
         stashId: $stashId,
-        mediaItemId: \App\Vault\MediaItemId::parse((string) $mediaItem->id),
-        stashInputId: \App\Stashes\StashInputId::parse((string) $input->id),
+        mediaItemId: MediaItemId::parse((string) $mediaItem->id),
+        stashInputId: StashInputId::parse((string) $input->id),
         position: 1,
     );
 

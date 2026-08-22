@@ -87,7 +87,7 @@ test('status filters by joined media item state', function (): void {
 test('sort by title orders on the joined column', function (): void {
     $results = $this->items->listForStash($this->stashId, sort: 'title', direction: Direction::ASC, includeIgnored: false);
 
-    expect(array_map(fn ($item) => $item->mediaItem->title, $results))
+    expect(array_map(fn($item) => $item->mediaItem->title, $results))
         ->toBe(['Alpha Episode', 'Beta Episode', 'Gamma Special']);
 });
 
@@ -95,7 +95,7 @@ test('sort by size orders via the correlated asset-size subquery', function (): 
     $results = $this->items->listForStash($this->stashId, sort: 'size', direction: Direction::ASC, includeIgnored: false);
 
     // Beta has no asset at all (0), Gamma is 100 bytes, Alpha is 300 bytes.
-    expect(array_map(fn ($item) => $item->mediaItem->title, $results))
+    expect(array_map(fn($item) => $item->mediaItem->title, $results))
         ->toBe(['Beta Episode', 'Gamma Special', 'Alpha Episode']);
 });
 
@@ -103,7 +103,7 @@ test('includeIgnored: false excludes ignored stash items', function (): void {
     $results = $this->items->listForStash($this->stashId, includeIgnored: false);
 
     expect($results)->toHaveCount(3)
-        ->and(array_map(fn ($item) => $item->mediaItem->title, $results))->not->toContain('Ignored Premiere');
+        ->and(array_map(fn($item) => $item->mediaItem->title, $results))->not->toContain('Ignored Premiere');
 });
 
 test('countForStash respects the same filters as listForStash', function (): void {

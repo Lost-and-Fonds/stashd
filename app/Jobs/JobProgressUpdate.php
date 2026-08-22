@@ -13,8 +13,7 @@ final readonly class JobProgressUpdate
         public string $label,
         public ?int $etaSeconds = null,
         public ?float $rate = null,
-    ) {
-    }
+    ) {}
 
     public static function ofSteps(int $current, int $total, string $label): self
     {

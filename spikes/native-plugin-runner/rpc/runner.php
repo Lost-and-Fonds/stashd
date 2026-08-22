@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/FrameCodec.php';
+require __DIR__.'/FrameCodec.php';
 
 $mode = $argv[1] ?? 'normal';
 $packageRoot = realpath(__DIR__);
@@ -91,6 +91,7 @@ try {
                 throw new RuntimeException('unexpected host request');
             }
             FrameCodec::write($pipes[0], response($message['id'] ?? null, ['value' => 'host-response']));
+
             continue;
         }
         if (($message['kind'] ?? null) === 'notification') {
@@ -104,6 +105,7 @@ try {
                 ]);
                 $cancelSent = true;
             }
+
             continue;
         }
         if (($message['id'] ?? null) !== 'invoke-1') {
@@ -164,6 +166,6 @@ function finish($process, array $pipes, string &$stderr, array $summary): never
     if (is_resource($pipes[0])) {
         fclose($pipes[0]);
     }
-    fwrite(STDOUT, json_encode($summary, JSON_THROW_ON_ERROR) . "\n");
+    fwrite(STDOUT, json_encode($summary, JSON_THROW_ON_ERROR)."\n");
     exit(($summary['timed_out'] ?? false) ? 124 : 0);
 }

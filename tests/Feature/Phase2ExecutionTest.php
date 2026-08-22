@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Auth\ApiTokenId;
 use App\Auth\AuthContext;
 use App\Auth\AuthService;
+use App\Auth\UserRepository;
 use App\Commands\CommandDispatchService;
 use App\Commands\CommandHandler;
 use App\Commands\CommandHandlerRegistry;
@@ -14,11 +16,19 @@ use App\Commands\CommandRepository;
 use App\Commands\CommandType;
 use App\Jobs\JobIntent;
 use App\Jobs\JobRecord;
+use App\Jobs\JobRepository;
 use App\Jobs\JobState;
 use App\Jobs\JobWorkerService;
+use App\Stashes\StashId;
+use App\Stashes\StashInputRepository;
+use App\Stashes\StashInputType;
+use App\Stashes\StashRepository;
+use App\Stashes\SyncMode;
 use App\System\Activity\ActivityEventRecord;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
+use App\System\Scheduler\RoutineDiscoveryScheduler;
+use App\System\State\StateTransitionService;
 use RuntimeException;
 use Symfony\Component\Mercure\HubInterface;
 use Symfony\Component\Mercure\Jwt\TokenFactoryInterface;
@@ -26,10 +36,13 @@ use Symfony\Component\Mercure\Update;
 use Tempest\Database\Builder\QueryBuilders\BuildsQuery;
 use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Database;
+use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Query;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+use Tempest\Framework\Testing\Http\TestResponseHelper;
+use Tempest\Http\Cookie\Cookie;
 use Tempest\Http\Status;
 use Tempest\Support\Str\ImmutableString;
 use UnitEnum;
@@ -84,15 +97,13 @@ test('command dispatch rolls back command and activity when its handler fails', 
     $commandsBefore = count(CommandRecord::select()->all());
     $jobsBefore = count(JobRecord::select()->all());
     $activitiesBefore = count(ActivityEventRecord::select()->all());
-    $handler = new class () implements CommandHandler {
+    $handler = new class implements CommandHandler {
         public function type(): CommandType
         {
             return CommandType::SystemStorageCheck;
         }
 
-        public function validate(array $options): void
-        {
-        }
+        public function validate(array $options): void {}
 
         public function createJobs(CommandRecord $command, array $options): array
         {
@@ -112,7 +123,7 @@ test('command dispatch rolls back command and activity when its handler fails', 
         database: $this->container->get(Database::class),
     );
 
-    expect(fn () => $dispatch->dispatch(CommandType::SystemStorageCheck, []))
+    expect(fn() => $dispatch->dispatch(CommandType::SystemStorageCheck, []))
         ->toThrow(RuntimeException::class, 'Command dispatch failed.');
 
     expect(CommandRecord::select()->all())->toHaveCount($commandsBefore)
@@ -121,7 +132,7 @@ test('command dispatch rolls back command and activity when its handler fails', 
 });
 
 test('command dispatch publishes nothing when commit fails after creating its durable rows', function (): void {
-    $hub = new class () implements HubInterface {
+    $hub = new class implements HubInterface {
         /** @var list<Update> */
         public array $published = [];
 
@@ -149,13 +160,11 @@ test('command dispatch publishes nothing when commit fails after creating its du
     $activitiesBefore = count(ActivityEventRecord::select()->all());
     $realDatabase = $this->container->get(Database::class);
     $database = new class ($realDatabase) implements Database {
-        public function __construct(private Database $inner)
-        {
-        }
+        public function __construct(private Database $inner) {}
 
         public DatabaseDialect $dialect { get => $this->inner->dialect; }
 
-        public null|string|UnitEnum $tag { get => $this->inner->tag; }
+        public string|UnitEnum|null $tag { get => $this->inner->tag; }
 
         public function execute(BuildsQuery|Query $query): void
         {
@@ -194,7 +203,7 @@ test('command dispatch publishes nothing when commit fails after creating its du
     $this->container->singleton(Database::class, $database);
     $dispatch = $this->container->get(CommandDispatchService::class);
 
-    expect(fn () => $dispatch->dispatch(CommandType::SystemStorageCheck, []))
+    expect(fn() => $dispatch->dispatch(CommandType::SystemStorageCheck, []))
         ->toThrow(RuntimeException::class, 'Command dispatch failed.');
 
     expect(CommandRecord::select()->all())->toHaveCount($commandsBefore)
@@ -240,8 +249,8 @@ test('jobs api lists recent jobs', function (): void {
 
 test('jobs api still surfaces the actively processing job when it is older than the 50 most recent', function (): void {
     $headers = $this->authHeaders();
-    $jobs = $this->container->get(\App\Jobs\JobRepository::class);
-    $transitions = $this->container->get(\App\System\State\StateTransitionService::class);
+    $jobs = $this->container->get(JobRepository::class);
+    $transitions = $this->container->get(StateTransitionService::class);
 
     $oldest = $jobs->create(intent: JobIntent::Enrich, entityType: 'media_item', entityId: null);
     $transitions->transitionJob($oldest, JobState::Processing);
@@ -269,7 +278,7 @@ test('jobs api exposes entity_type and entity_id for a media item download job',
 
     $downloadJobs = array_values(array_filter(
         $jobs->body['jobs'],
-        static fn (array $job): bool => $job['entity_type'] === 'media_item' && $job['entity_id'] === $mediaItemId,
+        static fn(array $job): bool => $job['entity_type'] === 'media_item' && $job['entity_id'] === $mediaItemId,
     ));
 
     expect($downloadJobs)->not->toBeEmpty();
@@ -279,7 +288,7 @@ test('jobs api exposes entity_type and entity_id for a media item download job',
 
 test('job worker records failure with last error', function (): void {
     $headers = $this->authHeaders();
-    $jobs = $this->container->get(\App\Jobs\JobRepository::class);
+    $jobs = $this->container->get(JobRepository::class);
 
     $job = $jobs->create(
         intent: JobIntent::Enrich,
@@ -302,7 +311,7 @@ test('stale processing jobs are recovered or failed based on attempts', function
         'options' => ['source_uri' => 'fake://channel/stale-demo'],
     ], headers: $headers);
 
-    $job = JobRecord::findById(new \Tempest\Database\PrimaryKey($created->body['job_ids'][0]));
+    $job = JobRecord::findById(new PrimaryKey($created->body['job_ids'][0]));
     $job->state = JobState::Processing;
     $job->attempts = 1;
     $job->maxAttempts = 3;
@@ -340,7 +349,7 @@ test('command dispatch writes activity events', function (): void {
     $activities = ActivityEventRecord::select()->all();
     expect($activities)->not->toBeEmpty();
 
-    $types = array_map(static fn ($event): string => $event->type, $activities);
+    $types = array_map(static fn($event): string => $event->type, $activities);
     expect($types)->toContain('command.accepted')
         ->and($types)->toContain('job.started')
         ->and($types)->toContain('storage_check.completed')
@@ -348,7 +357,7 @@ test('command dispatch writes activity events', function (): void {
 });
 
 test('events subscription endpoint requires authentication and sets a scoped cookie', function (): void {
-    $users = $this->container->get(\App\Auth\UserRepository::class);
+    $users = $this->container->get(UserRepository::class);
     $users->createAdmin(
         username: 'owner',
         passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
@@ -418,12 +427,12 @@ test('mercure cookie is not Secure when X-Forwarded-Proto reports http, even beh
     expect(mercureAuthorizationCookieFrom($response)->secure)->toBeFalse();
 });
 
-function mercureAuthorizationCookieFrom(\Tempest\Framework\Testing\Http\TestResponseHelper $response): ?\Tempest\Http\Cookie\Cookie
+function mercureAuthorizationCookieFrom(TestResponseHelper $response): ?Cookie
 {
     $setCookie = $response->response->getHeader('set-cookie')?->values ?? [];
 
     foreach ($setCookie as $value) {
-        $cookie = \Tempest\Http\Cookie\Cookie::createFromString($value);
+        $cookie = Cookie::createFromString($value);
         if ($cookie->key === 'mercureAuthorization') {
             return $cookie;
         }
@@ -451,7 +460,7 @@ test('bearer auth does not leak to subsequent unauthenticated requests', functio
 });
 
 test('api token uses stashd_pat prefix and supports lookup and revoke', function (): void {
-    $users = $this->container->get(\App\Auth\UserRepository::class);
+    $users = $this->container->get(UserRepository::class);
     $auth = $this->container->get(AuthService::class);
     $user = $users->createAdmin(
         username: 'owner',
@@ -465,31 +474,31 @@ test('api token uses stashd_pat prefix and supports lookup and revoke', function
     $headers = ['Authorization' => 'Bearer ' . $created['token']];
     $this->http->get('/api/v1/auth/me', headers: $headers)->assertOk();
 
-    $auth->revokeApiToken($user, \App\Auth\ApiTokenId::parse($created['id']));
+    $auth->revokeApiToken($user, ApiTokenId::parse($created['id']));
     $this->http->get('/api/v1/auth/me', headers: $headers)->assertStatus(Status::UNAUTHORIZED);
 });
 
 test('scheduler creates sync commands for due automatic stash inputs', function (): void {
-    $stashRepo = $this->container->get(\App\Stashes\StashRepository::class);
-    $inputRepo = $this->container->get(\App\Stashes\StashInputRepository::class);
-    $scheduler = $this->container->get(\App\System\Scheduler\RoutineDiscoveryScheduler::class);
+    $stashRepo = $this->container->get(StashRepository::class);
+    $inputRepo = $this->container->get(StashInputRepository::class);
+    $scheduler = $this->container->get(RoutineDiscoveryScheduler::class);
 
     $stash = $stashRepo->create('Scheduler Stash');
     $inputRepo->create(
-        stashId: \App\Stashes\StashId::parse((string) $stash->id),
+        stashId: StashId::parse((string) $stash->id),
         providerKey: 'fake',
-        inputType: \App\Stashes\StashInputType::Channel,
+        inputType: StashInputType::Channel,
         sourceUri: 'fake://channel/scheduler-demo',
         providerInputId: 'scheduler-demo',
         title: 'Scheduler Channel',
-        syncMode: \App\Stashes\SyncMode::Automatic,
+        syncMode: SyncMode::Automatic,
     );
 
     expect($scheduler->runDueChecks())->toBe(1);
 
-    $command = \App\Commands\CommandRecord::select()
+    $command = CommandRecord::select()
         ->where('type', CommandType::StashSyncInput)
-        ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
+        ->orderBy('createdAt', Direction::DESC)
         ->first();
 
     expect($command)->not->toBeNull()

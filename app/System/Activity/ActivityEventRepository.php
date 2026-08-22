@@ -17,8 +17,7 @@ final class ActivityEventRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     /** @param array<string, mixed>|null $metadata */
     public function create(

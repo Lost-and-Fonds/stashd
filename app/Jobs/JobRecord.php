@@ -49,6 +49,5 @@ final class JobRecord
         public ?array $payload = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
-    ) {
-    }
+    ) {}
 }

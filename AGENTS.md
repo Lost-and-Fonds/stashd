@@ -36,7 +36,7 @@ Stashd is not a YouTube frontend, not a recommendation engine, and not a media p
 - FrankenPHP application server (classic mode)
 - PostgreSQL (SQLite only as the `stashd:import-sqlite` upgrade source)
 - Pest for tests
-- Laravel Pint with PSR-12 formatting
+- Laravel Pint plus PHP CS Fixer enforcing PER Coding Style 3.0
 - bundled external Input plugins may use trusted helpers such as `yt-dlp`
 - Docker-first default deployment
 - Default HTTP port: `8474`

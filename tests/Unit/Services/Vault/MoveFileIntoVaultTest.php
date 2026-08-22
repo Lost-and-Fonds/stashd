@@ -50,7 +50,7 @@ test('moveIntoPlace refuses to overwrite an existing destination file', function
     $destination = $destinationDir . '/original.bin';
     file_put_contents($destination, 'already-here');
 
-    expect(fn () => (new MoveFileIntoVault())->moveIntoPlace($source, $destination))
+    expect(fn() => (new MoveFileIntoVault())->moveIntoPlace($source, $destination))
         ->toThrow(\RuntimeException::class);
 
     expect(file_get_contents($destination))->toBe('already-here');

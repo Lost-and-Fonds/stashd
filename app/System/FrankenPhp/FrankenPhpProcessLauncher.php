@@ -11,8 +11,7 @@ final readonly class FrankenPhpProcessLauncher
 {
     public function __construct(
         private ProcessExecutor $processes,
-    ) {
-    }
+    ) {}
 
     public function serve(): ExitCode
     {

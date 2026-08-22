@@ -12,9 +12,7 @@ use function Tempest\Database\query;
 
 final readonly class PublishedResourceRepository
 {
-    public function __construct(private PrefixedUlidGenerator $ids)
-    {
-    }
+    public function __construct(private PrefixedUlidGenerator $ids) {}
 
     public function create(PublishedResourceRecord $resource): PublishedResourceRecord
     {
@@ -66,7 +64,7 @@ final readonly class PublishedResourceRepository
     {
         return array_values(array_filter(
             PublishedResourceRecord::select()->where('broadcastId', $broadcastId->toString())->all(),
-            static fn (mixed $resource): bool => $resource instanceof PublishedResourceRecord,
+            static fn(mixed $resource): bool => $resource instanceof PublishedResourceRecord,
         ));
     }
 }

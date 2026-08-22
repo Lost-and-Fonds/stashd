@@ -8,8 +8,7 @@ final readonly class JobHandlerContext
 {
     public function __construct(
         private JobWorkerCallbacks $callbacks,
-    ) {
-    }
+    ) {}
 
     public function heartbeat(JobRecord $job): void
     {

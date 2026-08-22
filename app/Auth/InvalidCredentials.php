@@ -6,6 +6,4 @@ namespace App\Auth;
 
 use RuntimeException;
 
-final class InvalidCredentials extends RuntimeException
-{
-}
+final class InvalidCredentials extends RuntimeException {}

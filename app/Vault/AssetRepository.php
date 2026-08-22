@@ -20,8 +20,7 @@ final class AssetRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-    ) {
-    }
+    ) {}
 
     public function create(
         MediaItemId $mediaItemId,
@@ -108,7 +107,7 @@ final class AssetRepository
     }
 
     /**
-     * @param list<string> $mediaItemIds
+     * @param  list<string>  $mediaItemIds
      * @return array<string, AssetRecord> keyed by media item id
      */
     public function readyVaultOriginalsByMediaItem(array $mediaItemIds): array
@@ -188,8 +187,7 @@ final class AssetRepository
      * Total on-disk size across every asset for each of the given media
      * items, in one query — avoids an N+1 per stash item on the items list.
      *
-     * @param list<string> $mediaItemIds
-     *
+     * @param  list<string>  $mediaItemIds
      * @return array<string, int> keyed by media item id
      */
     public function totalSizeBytesByMediaItem(array $mediaItemIds): array

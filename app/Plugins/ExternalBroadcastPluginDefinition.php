@@ -10,11 +10,11 @@ use RuntimeException;
 final readonly class ExternalBroadcastPluginDefinition
 {
     /** @param array<int, array<string, mixed>> $uiOptions
-     *  @param array<int, array<string, mixed>> $actions
-     *  @param array<int, string> $supportedFileKinds
-     *  @param array<string, string> $helpers
-     *  @param array<string, string> $operations
-     *  @param array<int, array<string, mixed>> $sourceOptions
+     * @param  array<int, array<string, mixed>>  $actions
+     * @param  array<int, string>  $supportedFileKinds
+     * @param  array<string, string>  $helpers
+     * @param  array<string, string>  $operations
+     * @param  array<int, array<string, mixed>>  $sourceOptions
      */
     public function __construct(
         public string $id,
@@ -39,8 +39,7 @@ final readonly class ExternalBroadcastPluginDefinition
         public ?string $credentialParameter,
         public string $credentialPlacement,
         public array $sourceOptions,
-    ) {
-    }
+    ) {}
 
     public static function fromManifest(mixed $raw, string $root, string $socketPath, ?string $manifestDirectory = null): ?self
     {

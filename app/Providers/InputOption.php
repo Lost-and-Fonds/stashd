@@ -11,11 +11,11 @@ namespace App\Providers;
 final readonly class InputOption
 {
     /**
-     * @param list<string>|null $choices required and meaningful only for `InputOptionType::Enum`
-     * @param list<string> $applicableInputTypes plugin-defined input-kind strings
-     * @param list<string> $excludesContentTypes `DiscoveredItem::$contentType` values this option
-     *   excludes when set to `false` (bool options only). This lets the
-     *   generic commit-time filter remain provider-agnostic.
+     * @param  list<string>|null  $choices  required and meaningful only for `InputOptionType::Enum`
+     * @param  list<string>  $applicableInputTypes  plugin-defined input-kind strings
+     * @param  list<string>  $excludesContentTypes  `DiscoveredItem::$contentType` values this option
+     *                                              excludes when set to `false` (bool options only). This lets the
+     *                                              generic commit-time filter remain provider-agnostic.
      */
     public function __construct(
         public string $key,
@@ -27,8 +27,7 @@ final readonly class InputOption
         public array $excludesContentTypes = [],
         public ?string $description = null,
         public bool $required = false,
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function toArray(): array

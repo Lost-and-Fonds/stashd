@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Database;
 
+use App\System\Activity\ActivityLevel;
 use Tempest\Database\MigratesUp;
 use Tempest\Database\QueryStatement;
 use Tempest\Database\QueryStatements\CompoundStatement;
@@ -29,7 +30,7 @@ final class CreatePhase2ExecutionSchema implements MigratesUp
     private function activityEvents(): CreateTableStatement
     {
         return $this->prefixedIdTableCreatedOnly('activity_events')
-            ->enum('level', \App\System\Activity\ActivityLevel::class)
+            ->enum('level', ActivityLevel::class)
             ->string('type')
             ->text('message')
             ->string('entityType', nullable: true)

@@ -15,8 +15,7 @@ final readonly class StorageRootService
 {
     public function __construct(
         private StashdConfig $config,
-    ) {
-    }
+    ) {}
 
     /** @return list<string> */
     public function ensureDirectories(): array

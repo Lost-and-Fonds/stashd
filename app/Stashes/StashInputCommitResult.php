@@ -14,8 +14,7 @@ final readonly class StashInputCommitResult
         public int $stashItemsCreated,
         public int $stashItemsReused,
         public string $preflightCommandId,
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function toArray(): array

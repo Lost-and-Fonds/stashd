@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use App\Connections\ConnectionRepository;
+use App\Connections\ConnectionSecrets;
 use App\Plugins\ExternalBroadcastPlugin;
 use App\Plugins\ExternalBroadcastPluginRegistry;
+use App\Plugins\PluginHostClient;
+use App\System\State\StateTransitionService;
 use App\Vault\AssetRepository;
 use App\Vault\MoveFileIntoVault;
 use App\Vault\VaultPathBuilder;
@@ -58,15 +62,15 @@ final class BroadcastPluginDiscoverer implements Discovery
             }
 
             try {
-                $host = new \App\Plugins\PluginHostClient($definition->socketPath);
+                $host = new PluginHostClient($definition->socketPath);
                 /** @var BroadcastContextFactory $contexts */
                 $contexts = $this->container->get(BroadcastContextFactory::class);
                 /** @var BroadcastPathBuilder $paths */
                 $paths = $this->container->get(BroadcastPathBuilder::class);
                 /** @var BroadcastItemRepository $items */
                 $items = $this->container->get(BroadcastItemRepository::class);
-                /** @var \App\System\State\StateTransitionService $transitions */
-                $transitions = $this->container->get(\App\System\State\StateTransitionService::class);
+                /** @var StateTransitionService $transitions */
+                $transitions = $this->container->get(StateTransitionService::class);
                 /** @var PublishedResourceService $publications */
                 $publications = $this->container->get(PublishedResourceService::class);
                 /** @var PublishedResourceRepository $publicationRecords */
@@ -77,12 +81,12 @@ final class BroadcastPluginDiscoverer implements Discovery
                 $mover = $this->container->get(MoveFileIntoVault::class);
                 /** @var VaultPathBuilder $vaultPaths */
                 $vaultPaths = $this->container->get(VaultPathBuilder::class);
-                /** @var \App\Connections\ConnectionRepository $connections */
-                $connections = $this->container->get(\App\Connections\ConnectionRepository::class);
-                /** @var \App\Connections\ConnectionSecrets $connectionSecrets */
-                $connectionSecrets = $this->container->get(\App\Connections\ConnectionSecrets::class);
-                /** @var \App\Broadcasts\HardlinkPublisher $hardlinks */
-                $hardlinks = $this->container->get(\App\Broadcasts\HardlinkPublisher::class);
+                /** @var ConnectionRepository $connections */
+                $connections = $this->container->get(ConnectionRepository::class);
+                /** @var ConnectionSecrets $connectionSecrets */
+                $connectionSecrets = $this->container->get(ConnectionSecrets::class);
+                /** @var HardlinkPublisher $hardlinks */
+                $hardlinks = $this->container->get(HardlinkPublisher::class);
                 $instance = new ExternalBroadcastPlugin(
                     definition: $definition,
                     host: $host,

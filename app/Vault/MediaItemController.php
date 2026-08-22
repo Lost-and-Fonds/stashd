@@ -34,8 +34,7 @@ final readonly class MediaItemController
         private StashRepository $stashes,
         private BroadcastItemRepository $broadcastItems,
         private BroadcastRepository $broadcasts,
-    ) {
-    }
+    ) {}
 
     #[Get('/api/v1/items')]
     public function index(Request $request): Json
@@ -44,7 +43,7 @@ final readonly class MediaItemController
 
         return new Json([
             'items' => array_map(
-                static fn ($item): array => MediaItemResource::fromRecord($item)->toArray(),
+                static fn($item): array => MediaItemResource::fromRecord($item)->toArray(),
                 $this->mediaItems->list($limit, $offset),
             ),
             'total' => $this->mediaItems->count(),
@@ -93,7 +92,7 @@ final readonly class MediaItemController
 
         return new Json([
             'assets' => array_map(
-                fn ($asset): array => AssetResource::fromRecord(
+                fn($asset): array => AssetResource::fromRecord(
                     $asset,
                     AssetRegenerationGuidance::forAsset(
                         asset: $asset,
@@ -120,19 +119,19 @@ final readonly class MediaItemController
         $mediaItemId = MediaItemId::fromPrimaryKey($mediaItem->id);
 
         $stashIds = array_values(array_unique(array_map(
-            static fn ($stashItem): string => (string) $stashItem->stashId,
+            static fn($stashItem): string => (string) $stashItem->stashId,
             $this->stashItems->listForMediaItem($mediaItemId),
         )));
 
         $stashesById = $this->stashes->listByIds($stashIds);
         $stashes = array_values(array_filter(array_map(
-            static fn (string $stashId): ?StashRecord => $stashesById[$stashId] ?? null,
+            static fn(string $stashId): ?StashRecord => $stashesById[$stashId] ?? null,
             $stashIds,
         )));
 
         return new Json([
             'stashes' => array_map(
-                static fn ($stash): array => StashResource::fromRecord($stash)->toArray(),
+                static fn($stash): array => StashResource::fromRecord($stash)->toArray(),
                 $stashes,
             ),
         ]);
@@ -151,19 +150,19 @@ final readonly class MediaItemController
         $mediaItemId = MediaItemId::fromPrimaryKey($mediaItem->id);
 
         $broadcastIds = array_values(array_unique(array_map(
-            static fn ($broadcastItem): string => (string) $broadcastItem->broadcastId,
+            static fn($broadcastItem): string => (string) $broadcastItem->broadcastId,
             $this->broadcastItems->listForMediaItem($mediaItemId),
         )));
 
         $broadcastsById = $this->broadcasts->listByIds($broadcastIds);
         $broadcasts = array_values(array_filter(array_map(
-            static fn (string $broadcastId): ?BroadcastRecord => $broadcastsById[$broadcastId] ?? null,
+            static fn(string $broadcastId): ?BroadcastRecord => $broadcastsById[$broadcastId] ?? null,
             $broadcastIds,
         )));
 
         return new Json([
             'broadcasts' => array_map(
-                static fn ($broadcast): array => BroadcastResource::fromRecord($broadcast)->toArray(),
+                static fn($broadcast): array => BroadcastResource::fromRecord($broadcast)->toArray(),
                 $broadcasts,
             ),
         ]);

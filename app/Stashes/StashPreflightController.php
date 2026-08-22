@@ -28,8 +28,7 @@ final readonly class StashPreflightController
         private CommandDispatchService $dispatch,
         private CommandRepository $commands,
         private AuthContext $context,
-    ) {
-    }
+    ) {}
 
     #[Post('/api/v1/stashes/preflight')]
     public function create(Request $request): Json

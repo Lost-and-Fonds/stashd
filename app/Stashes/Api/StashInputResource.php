@@ -14,8 +14,7 @@ final readonly class StashInputResource
     public function __construct(
         private StashInputRecord $input,
         private array $inputOptions = [],
-    ) {
-    }
+    ) {}
 
     /** @param list<InputOption> $inputOptions */
     public static function fromRecord(StashInputRecord $input, array $inputOptions = []): self
@@ -47,7 +46,7 @@ final readonly class StashInputResource
             'title' => $this->input->title,
             'syncMode' => $this->input->syncMode?->value,
             'options' => $options,
-            'inputOptions' => array_map(static fn ($option): array => $option->toArray(), $this->inputOptions),
+            'inputOptions' => array_map(static fn($option): array => $option->toArray(), $this->inputOptions),
             'lastCheckedAt' => $this->input->lastCheckedAt,
             'nextCheckAt' => $this->input->nextCheckAt,
             'lastSuccessAt' => $this->input->lastSuccessAt,

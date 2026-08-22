@@ -9,13 +9,12 @@ final readonly class BroadcastPlannedSidecar
 {
     public function __construct(
         public BroadcastSidecarType $kind,
-        public string               $relativePath,
-        public string               $absolutePath,
-        public string               $content,
-        public ?string              $stashItemId = null,
-        public ?string              $mediaItemId = null,
-    ) {
-    }
+        public string $relativePath,
+        public string $absolutePath,
+        public string $content,
+        public ?string $stashItemId = null,
+        public ?string $mediaItemId = null,
+    ) {}
 
     /** @return array<string, mixed> */
     public function toArray(): array

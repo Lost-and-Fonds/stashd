@@ -21,8 +21,7 @@ final readonly class StashPreflightCommandHandler implements CommandHandler
         private JobRepository $jobs,
         private CommandRepository $commands,
         private StashdConfig $config,
-    ) {
-    }
+    ) {}
 
     public function type(): CommandType
     {

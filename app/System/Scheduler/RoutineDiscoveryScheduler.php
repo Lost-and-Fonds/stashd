@@ -18,8 +18,7 @@ final readonly class RoutineDiscoveryScheduler
     public function __construct(
         private StashInputRepository $inputs,
         private CommandDispatchService $dispatch,
-    ) {
-    }
+    ) {}
 
     public function runDueChecks(): int
     {

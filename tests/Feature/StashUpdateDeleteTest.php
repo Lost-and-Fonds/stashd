@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Stashes\StashInputRecord;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashRecord;
+use App\Vault\MediaItemRecord;
 use App\Vault\MediaItemSourceRecord;
 use RuntimeException;
 use Tempest\Database\Builder\QueryBuilders\BuildsQuery;
@@ -97,7 +98,7 @@ test('DELETE stash cascades to stash items, inputs, and media item sources but l
         ->and(StashInputRecord::select()->where('stashId', $stashId)->all())->toBeEmpty()
         ->and(MediaItemSourceRecord::select()->where('stashInputId', (string) $input->id)->all())->toBeEmpty();
 
-    expect(\App\Vault\MediaItemRecord::findById(new PrimaryKey($mediaItemId)))->not->toBeNull();
+    expect(MediaItemRecord::findById(new PrimaryKey($mediaItemId)))->not->toBeNull();
 });
 
 test('DELETE stash rolls back cleanly instead of partially deleting when the transaction fails', function (): void {
@@ -108,13 +109,11 @@ test('DELETE stash rolls back cleanly instead of partially deleting when the tra
 
     $realDatabase = $this->container->get(Database::class);
     $this->container->singleton(Database::class, new class ($realDatabase) implements Database {
-        public function __construct(private Database $inner)
-        {
-        }
+        public function __construct(private Database $inner) {}
 
         public DatabaseDialect $dialect { get => $this->inner->dialect; }
 
-        public null|string|UnitEnum $tag { get => $this->inner->tag; }
+        public string|UnitEnum|null $tag { get => $this->inner->tag; }
 
         public function execute(BuildsQuery|Query $query): void
         {

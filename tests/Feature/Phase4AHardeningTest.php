@@ -17,6 +17,7 @@ use App\Vault\MediaItemRecord;
 use App\Vault\MediaItemState;
 use App\Vault\VerifyAssetOutcome;
 use App\Vault\VerifyVaultAssets;
+use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
 
 test('item.download command response uses snake_case keys', function (): void {
@@ -89,7 +90,7 @@ test('items and assets API responses use snake_case keys', function (): void {
 test('vault sidecar json files contain normalized metadata and provenance', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('sidecar-json');
     $config = $this->container->get(StashdConfig::class);
-    $media = MediaItemRecord::findById(new \Tempest\Database\PrimaryKey($mediaItemId));
+    $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
 
     $this->http->post('/api/v1/commands', [
         'type' => 'item.download',
@@ -136,7 +137,7 @@ test('force download returns stable unsupported error', function (): void {
 test('second download skips without overwriting vault original bytes', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('idempotent-demo');
     $config = $this->container->get(StashdConfig::class);
-    $media = MediaItemRecord::findById(new \Tempest\Database\PrimaryKey($mediaItemId));
+    $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
     $originalPath = $config->vaultPath() . '/fake/items/' . $media->providerItemId . '/original.fake';
 
     foreach ([1, 2] as $attempt) {
@@ -226,7 +227,7 @@ test('asset verify detects checksum mismatch distinctly from missing files', fun
         ->and($original?->state)->toBe(AssetState::Stale)
         ->and($original?->missingReason)->toBe('checksum_mismatch');
 
-    $item = MediaItemRecord::findById(new \Tempest\Database\PrimaryKey($mediaItemId));
+    $item = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
     expect($item?->state)->toBe(MediaItemState::Ready);
 });
 
@@ -251,7 +252,7 @@ test('missing sidecar metadata does not mark media item missing', function (): v
     unlink((string) $metadata?->path);
 
     $outcome = $verify->verifyAsset(AssetId::parse((string) $metadata?->id));
-    $item = MediaItemRecord::findById(new \Tempest\Database\PrimaryKey($mediaItemId));
+    $item = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
 
     expect($outcome)->toBe(VerifyAssetOutcome::Missing)
         ->and($item?->state)->toBe(MediaItemState::Ready);

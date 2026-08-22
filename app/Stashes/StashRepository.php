@@ -25,8 +25,7 @@ final class StashRepository
         private MediaItemSourceRepository $mediaItemSources,
         private MediaItemRepository $mediaItems,
         private Database $database,
-    ) {
-    }
+    ) {}
 
     public function create(
         string $name,
@@ -62,7 +61,7 @@ final class StashRepository
     }
 
     /**
-     * @param list<string> $ids
+     * @param  list<string>  $ids
      * @return array<string, StashRecord> keyed by id
      */
     public function listByIds(array $ids): array
@@ -170,7 +169,7 @@ final class StashRepository
         $stashId = StashId::fromPrimaryKey($stash->id);
 
         $mediaItemIds = array_values(array_unique(array_map(
-            static fn (StashItemRecord $item): string => (string) $item->mediaItemId,
+            static fn(StashItemRecord $item): string => (string) $item->mediaItemId,
             $this->stashItems->listForStash($stashId),
         )));
 
@@ -191,7 +190,7 @@ final class StashRepository
         }
 
         $stashNamesById = array_map(
-            static fn (StashRecord $stash): string => $stash->name,
+            static fn(StashRecord $stash): string => $stash->name,
             $this->listByIds(array_keys($otherStashIds)),
         );
         $mediaItemsById = $this->mediaItems->listByIds($mediaItemIds);
@@ -213,7 +212,7 @@ final class StashRepository
                 'mediaItemId' => $mediaItemId,
                 'title' => $title,
                 'sharedWithStashes' => array_map(
-                    static fn (string $otherStashId): array => ['id' => $otherStashId, 'name' => $stashNamesById[$otherStashId] ?? 'Unknown stash'],
+                    static fn(string $otherStashId): array => ['id' => $otherStashId, 'name' => $stashNamesById[$otherStashId] ?? 'Unknown stash'],
                     $otherStashIds,
                 ),
             ];

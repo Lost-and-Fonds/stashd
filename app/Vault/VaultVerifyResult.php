@@ -12,8 +12,7 @@ final readonly class VaultVerifyResult
         public int $restored,
         public int $checksumMismatch,
         public bool $storageUnavailable,
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function toArray(): array

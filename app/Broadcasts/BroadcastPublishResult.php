@@ -7,16 +7,15 @@ namespace App\Broadcasts;
 final readonly class BroadcastPublishResult
 {
     /**
-     * @param list<string> $publishedPaths
-     * @param list<string> $failedStashItemIds
+     * @param  list<string>  $publishedPaths
+     * @param  list<string>  $failedStashItemIds
      */
     public function __construct(
         public int $publishedCount,
         public int $skippedCount,
         public array $publishedPaths,
         public array $failedStashItemIds = [],
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function toArray(): array

@@ -20,8 +20,7 @@ final readonly class CommandDispatchService
         private ActivityEventService $activity,
         private EventPublisher $publisher,
         private Database $database,
-    ) {
-    }
+    ) {}
 
     /** @param array<string, mixed> $options */
     public function dispatch(CommandType $type, array $options, ?UserRecord $user = null): CommandDispatchResult

@@ -19,15 +19,14 @@ final readonly class ActivityController
 
     public function __construct(
         private ActivityEventRepository $events,
-    ) {
-    }
+    ) {}
 
     #[Get('/api/v1/activity')]
     public function index(): Json
     {
         return new Json([
             'events' => array_map(
-                static fn (ActivityEventRecord $event): array => ActivityEventResource::fromRecord($event)->toArray(),
+                static fn(ActivityEventRecord $event): array => ActivityEventResource::fromRecord($event)->toArray(),
                 $this->events->listRecent(self::DEFAULT_LIMIT),
             ),
         ]);

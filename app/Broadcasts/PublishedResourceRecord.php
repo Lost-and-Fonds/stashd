@@ -30,6 +30,5 @@ final class PublishedResourceRecord
         public ?string $credentialSecretId = null,
         public string $state = 'ready',
         public ?string $lastError = null,
-    ) {
-    }
+    ) {}
 }

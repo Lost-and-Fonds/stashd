@@ -32,8 +32,7 @@ final readonly class StorageCheckJobHandler implements JobHandler
         private StateTransitionService $transitions,
         private ActivityEventService $activity,
         private EventPublisher $publisher,
-    ) {
-    }
+    ) {}
 
     public function intent(): JobIntent
     {

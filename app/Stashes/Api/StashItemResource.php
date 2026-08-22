@@ -16,8 +16,7 @@ final readonly class StashItemResource
         private ?MediaItemRecord $mediaItem = null,
         private ?int $totalAssetSizeBytes = null,
         private ?string $downloadFailureReason = null,
-    ) {
-    }
+    ) {}
 
     public static function fromRecord(
         StashItemRecord $item,

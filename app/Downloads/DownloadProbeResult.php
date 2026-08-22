@@ -11,6 +11,5 @@ final readonly class DownloadProbeResult
         public string $implementation,
         public ?string $implementationVersion = null,
         public ?string $message = null,
-    ) {
-    }
+    ) {}
 }

@@ -36,8 +36,7 @@ final readonly class SyncStashInput
         private CommandDispatchService $commandDispatch,
         private BroadcastRepository $broadcasts,
         private Database $database,
-    ) {
-    }
+    ) {}
 
     public function execute(StashInputRecord $input): StashInputSyncResult
     {

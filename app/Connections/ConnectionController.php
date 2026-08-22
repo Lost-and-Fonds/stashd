@@ -26,15 +26,14 @@ final readonly class ConnectionController
         private ConnectionRepository $connections,
         private PluginConnectionService $service,
         private ExternalBroadcastPluginRegistry $plugins,
-    ) {
-    }
+    ) {}
 
     #[Get('/api/v1/connections')]
     public function index(): Json
     {
         return new Json([
             'connections' => array_map(
-                static fn ($connection): array => ConnectionResource::fromRecord($connection)->toArray(),
+                static fn($connection): array => ConnectionResource::fromRecord($connection)->toArray(),
                 $this->connections->listAll(),
             ),
         ]);

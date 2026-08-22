@@ -33,6 +33,5 @@ final class StorageLocationRecord
         public ?string $lastError = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
-    ) {
-    }
+    ) {}
 }

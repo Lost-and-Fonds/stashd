@@ -17,8 +17,7 @@ final readonly class BootCommand
     public function __construct(
         private BootstrapService $bootstrap,
         private DatabaseConfig $databaseConfig,
-    ) {
-    }
+    ) {}
 
     #[ConsoleCommand(
         name: 'stashd:boot',

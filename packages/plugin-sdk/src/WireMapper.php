@@ -22,7 +22,7 @@ final class WireMapper
     {
         return [
             'artifact' => ['reference' => $publication->artifact->reference, 'media-type' => $publication->artifact->mediaType, 'size-bytes' => $publication->artifact->sizeBytes],
-            'files' => array_map(static fn (PublishedFile $file): array => ['item-id' => $file->itemId, 'source-reference' => $file->sourceReference, 'relative-path' => $file->relativePath], $publication->files),
+            'files' => array_map(static fn(PublishedFile $file): array => ['item-id' => $file->itemId, 'source-reference' => $file->sourceReference, 'relative-path' => $file->relativePath], $publication->files),
             'published-metadata' => array_map([self::class, 'setting'], $publication->publishedMetadata),
         ];
     }
@@ -39,6 +39,7 @@ final class WireMapper
         if ($artifact === null) {
             throw new InvalidPluginResultException('staging did not return an artifact');
         }
+
         return ['reference' => $artifact->reference, 'media-type' => $artifact->mediaType, 'size-bytes' => $artifact->sizeBytes];
     }
 
@@ -47,11 +48,13 @@ final class WireMapper
     {
         return ['key' => $setting->key, 'value' => $setting->value->toWire()];
     }
+
     /** @return array<string, mixed> */
     private static function source(Source $source): array
     {
         return ['reference' => $source->reference, 'settings' => array_map([self::class, 'setting'], $source->settings)];
     }
+
     /** @return array<string, mixed> */
     private static function item(Item $item): array
     {
@@ -62,7 +65,7 @@ final class WireMapper
             'description' => $item->description,
             'published-at' => $item->publishedAt,
             'duration-seconds' => $item->durationSeconds,
-            'resources' => array_map(static fn (ItemResource $resource): array => [
+            'resources' => array_map(static fn(ItemResource $resource): array => [
                 'reference' => $resource->reference, 'kind' => $resource->kind, 'derivation-key' => $resource->derivationKey,
                 'url' => $resource->url, 'media-type' => $resource->mediaType, 'size-bytes' => $resource->sizeBytes,
             ], $item->resources),
