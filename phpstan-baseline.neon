@@ -514,18 +514,6 @@ parameters:
 			path: app/Jobs/JobRepository.php
 
 		-
-			message: '#^Argument of an invalid type mixed supplied for foreach, only iterables are supported\.$#'
-			identifier: foreach.nonIterable
-			count: 1
-			path: app/MediaServers/JellyfinMediaServerClient.php
-
-		-
-			message: '#^Cannot cast mixed to string\.$#'
-			identifier: cast.string
-			count: 5
-			path: app/MediaServers/JellyfinMediaServerClient.php
-
-		-
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
 			count: 1
