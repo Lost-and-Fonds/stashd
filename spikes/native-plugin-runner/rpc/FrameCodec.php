@@ -29,8 +29,8 @@ final class FrameCodec
     /** @param resource $stream */
     public static function read($stream, ?float $timeout = null): ?array
     {
-        self::waitForRead($stream, $timeout);
-        $header = self::readExact($stream, 4);
+        $deadline = $timeout === null ? null : microtime(true) + $timeout;
+        $header = self::readExact($stream, 4, $deadline);
         if ($header === null) {
             return null;
         }
@@ -40,7 +40,7 @@ final class FrameCodec
             throw new FrameProtocolError('frame exceeds maximum size');
         }
 
-        $json = self::readExact($stream, $length);
+        $json = self::readExact($stream, $length, $deadline);
         if ($json === null) {
             throw new FrameProtocolError('unexpected EOF inside frame');
         }
@@ -78,7 +78,7 @@ final class FrameCodec
     }
 
     /** @param resource $stream */
-    private static function readExact($stream, int $length): ?string
+    private static function readExact($stream, int $length, ?float $deadline): ?string
     {
         if ($length === 0) {
             return '';
@@ -86,6 +86,9 @@ final class FrameCodec
 
         $result = '';
         while (strlen($result) < $length) {
+            if ($deadline !== null) {
+                self::waitForRead($stream, max(0.0, $deadline - microtime(true)));
+            }
             $chunk = fread($stream, $length - strlen($result));
             if ($chunk === false || $chunk === '') {
                 if (feof($stream)) {
