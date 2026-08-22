@@ -175,6 +175,55 @@ provider-specific exception.
 
 **Goal:** turn the proven M1–M7 native-plugin implementation from spike-quality code into maintainable production-quality code before any first-party provider depends on it.
 
+### Prefer existing, well-maintained libraries over bespoke infrastructure
+
+As part of productionization, review the spike implementation for places where
+we have hand-built functionality that is already solved well by a mature,
+appropriately scoped dependency.
+
+Examples may include:
+
+- process execution/supervision;
+- JSON/schema validation;
+- archive extraction and path safety;
+- semantic version/range handling;
+- manifest validation;
+- filesystem/path utilities;
+- generated-code support;
+- protocol framing/stream helpers;
+- retry/timeout primitives.
+
+For each substantial home-grown utility, ask:
+
+1. Is this genuinely Stashd-specific logic?
+2. Is there an existing maintained PHP/package/library that solves it cleanly?
+3. Would using that dependency reduce code, security surface, or maintenance burden?
+4. Is the dependency stable, small enough, actively maintained, and likely to remain available?
+5. Does adopting it preserve the architecture and avoid dragging in a framework-sized dependency for a tiny task?
+
+Prefer an existing package when it materially reduces maintenance or risk.
+
+Prefer our own code when:
+
+- the behavior is genuinely Stashd-specific;
+- the required implementation is tiny and clearer than the dependency;
+- the dependency would introduce disproportionate transitive complexity;
+- the package is poorly maintained, unstable, or narrowly fashionable;
+- wrapping the dependency would be more complicated than the code it replaces.
+
+Do not preserve bespoke spike code merely because it already exists.
+
+Conversely, do not add dependencies merely to reduce line count.
+
+Any new production dependency introduced during M7.5 should be recorded with a
+brief rationale covering:
+
+- what bespoke code it replaces;
+- why the package was chosen;
+- maintenance/activity status;
+- transitive dependency impact;
+- why keeping the implementation in-house would be worse.
+
 **Scope:** move the native runner, RPC, WIT bridge, PHP SDK, capability broker, package lifecycle, and conformance infrastructure out of spike-only structure and into deliberate production package/module boundaries. Refactor for readability, typing, testability, naming, ownership clarity, and long-term maintenance without changing the established behavior or architectural contract.
 
 This milestone should include:
@@ -243,6 +292,8 @@ Where useful, compare spike and production implementations to ensure no proven s
 - static analysis and formatting are clean;
 - full native conformance and operational smoke remain green;
 - code is in a state we are willing to maintain before real provider ports begin.
+- bespoke infrastructure has been reviewed against mature existing libraries, and retained or replaced deliberately rather than by inertia;
+- every newly introduced dependency has a documented maintenance/complexity justification.
 
 At completion, explicitly identify which public surfaces are now considered stable enough for the Jellyfin port:
 
