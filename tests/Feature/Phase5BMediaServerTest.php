@@ -216,9 +216,9 @@ test('connection stores plugin-defined settings without a library domain object'
 
     expect($connection)->not->toBeNull()
         ->and($connection->settings)->toBe([
-            'libraryId' => '1',
-            'libraryName' => 'TV Shows',
-            'libraryType' => 'show',
+            'library_id' => '1',
+            'library_name' => 'TV Shows',
+            'library_type' => 'show',
         ])
         ->and($response->body['media_server']['settings'])->toBe([
             'library_id' => '1',

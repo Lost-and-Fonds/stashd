@@ -617,3 +617,24 @@ The first version must not accept arbitrary Vue, plugin JavaScript, plugin CSS,
 custom routes, navigation entries, or iframe mini-apps. Dynamic choices are
 returned as generic values and labels from an opaque plugin operation; the
 frontend does not interpret the operation name.
+
+## Broadcast ownership and test boundaries
+
+Podcast, Jellyfin, and Plex are external Broadcast Components. Their protocol
+semantics, layout policy, provider options, and provider fixtures belong to
+their plugin packages. Core owns only the generic lifecycle, persistence,
+capabilities, publication, and security boundary.
+
+Core tests should use `plugins/example` or another provider-neutral Component
+when testing generic behavior. Provider tests may remain as application-level
+installation smokes, but assertions about a provider's protocol or output
+belong beside that provider. Removing a provider package must not leave the
+generic core suite asserting its behavior.
+
+The legacy `MediaServerConnection*` storage is currently retained as a
+provider-neutral compatibility layer for reusable endpoint, opaque settings,
+and encrypted credentials. Connection operations are dispatched by opaque
+plugin key through generic plugin operations; core does not parse library
+responses or execute provider scan triggers. A broader `PluginConnection`
+framework remains deliberately deferred until a concrete product need exceeds
+this minimum persistence layer.
