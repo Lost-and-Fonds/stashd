@@ -360,6 +360,14 @@ final class WireMapper
         return ['tag' => $failure->code->value, 'value' => ['message' => $failure->error->message, 'retryable' => $failure->error->retryable]];
     }
 
+    public static function stagedArtifact(?StagedArtifact $artifact): array
+    {
+        if ($artifact === null) {
+            throw new InvalidPluginResultException('staging did not return an artifact');
+        }
+        return ['reference' => $artifact->reference, 'media-type' => $artifact->mediaType, 'size-bytes' => $artifact->sizeBytes];
+    }
+
     private static function setting(Setting $setting): array { return ['key' => $setting->key, 'value' => $setting->value->toWire()]; }
     private static function source(Source $source): array { return ['reference' => $source->reference, 'settings' => array_map([self::class, 'setting'], $source->settings)]; }
     private static function item(Item $item): array
