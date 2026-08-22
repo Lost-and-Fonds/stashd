@@ -33,6 +33,57 @@ security:
   - sessionCookie: []
 
 paths:
+  /api/v1/connections:
+    get:
+      operationId: listConnections
+      tags: [Connections]
+      summary: List configured plugin connections
+      responses:
+        "200": { description: Connections returned }
+    post:
+      operationId: createConnection
+      tags: [Connections]
+      summary: Create a plugin connection
+      responses:
+        "201": { description: Connection created }
+
+  /api/v1/connections/{id}:
+    get:
+      operationId: showConnection
+      tags: [Connections]
+      summary: Show a plugin connection
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Connection returned }
+    patch:
+      operationId: updateConnection
+      tags: [Connections]
+      summary: Update a plugin connection
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Connection updated }
+    delete:
+      operationId: deleteConnection
+      tags: [Connections]
+      summary: Delete a plugin connection
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Connection deleted }
+
+  /api/v1/connections/{id}/operations/{operation}:
+    post:
+      operationId: invokeConnectionOperation
+      tags: [Connections]
+      summary: Invoke an opaque plugin connection operation
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: operation, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Operation result }
+
   /health:
     get:
       operationId: publicHealth
