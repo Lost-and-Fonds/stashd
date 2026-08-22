@@ -227,10 +227,36 @@ interface ProgressReporter
     public function report(string $stage): void;
 }
 
+interface ReadableResource
+{
+    public function read(int $maximumBytes = 65536): string;
+    public function isEof(): bool;
+    public function close(): void;
+}
+
+final readonly class HttpResponse
+{
+    /** @param array<string, string> $headers */
+    public function __construct(
+        public int $status,
+        public array $headers = [],
+        public ?string $inlineBody = null,
+        public ?ReadableResource $resource = null,
+    ) {}
+
+    public function isInline(): bool { return $this->resource === null; }
+    public function body(): string
+    {
+        if ($this->inlineBody !== null) {
+            return $this->inlineBody;
+        }
+        throw new RuntimeException('response body is an opaque resource');
+    }
+}
+
 interface HttpClient
 {
-    /** @return array{status:int, body:string} */
-    public function request(string $method, string $url, array $headers = [], ?string $body = null): array;
+    public function request(string $method, string $url, array $headers = [], ?string $body = null, ?string $credential = null): HttpResponse;
 }
 
 interface StagingArea
@@ -241,7 +267,7 @@ interface StagingArea
 
 final class UnavailableHttpClient implements HttpClient
 {
-    public function request(string $method, string $url, array $headers = [], ?string $body = null): array
+    public function request(string $method, string $url, array $headers = [], ?string $body = null, ?string $credential = null): HttpResponse
     {
         throw new CapabilityUnavailableException('HTTP is a fixture-only capability in M4');
     }
