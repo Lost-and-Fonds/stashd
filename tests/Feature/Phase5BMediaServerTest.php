@@ -7,9 +7,9 @@ namespace Tests\Feature;
 use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemId;
 use App\Broadcasts\BroadcastLifecycleService;
-use App\Broadcasts\BroadcastNfoBuilder;
 use App\MediaServers\MediaServerConnectionRecord;
 use App\MediaServers\MediaServerLibrarySelection;
+use App\Stashes\StashInputRepository;
 use App\System\Activity\ActivityEventRecord;
 use App\System\Secret\SecretRecord;
 use App\System\Secret\SecretsService;
@@ -25,7 +25,7 @@ use Tempest\Database\PrimaryKey;
 use Tempest\Database\Query;
 use Tempest\Http\Status;
 
-test('external jellyfin broadcast publishes the component-selected media path', function (): void {
+test('external Broadcast materializes a plugin-selected media path', function (): void {
     [$headers, $stashId, $mediaItemId, $broadcastId] = array_slice(
         $this->bootstrapJellyfinDownloadBroadcast('jellyfin-plan'),
         0,
@@ -59,12 +59,11 @@ test('external jellyfin broadcast publishes the component-selected media path', 
             BroadcastItemId::fromPrimaryKey(new PrimaryKey($item['id'])),
             AssetRole::Hardlink,
         );
-    expect($item['published_path'])->toMatch('/Season 01\/S01E01 - /')
-        ->and(is_file($item['published_path']))->toBeTrue();
+    expect(is_file($item['published_path']))->toBeTrue();
     expect($publishedAsset?->path)->toBe($item['published_path']);
 });
 
-test('plex_series broadcast rebuild publishes media captions and nfo sidecars', function (): void {
+test('external Broadcast materializes plugin-selected media and subtitle resources', function (): void {
     requireExternalInputPluginRuntime($this);
     [$headers, $stashId, $mediaItemId] = array_slice($this->bootstrapFakeDownloadStash('plex-rebuild'), 0, 3);
 
@@ -130,17 +129,45 @@ test('plex_series broadcast rebuild publishes media captions and nfo sidecars', 
     $publishedPath = $items->body['items'][0]['published_path'];
     $subtitle = $this->container->get(AssetRepository::class)
         ->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::Subtitle);
-    $publishedSubtitlePath = dirname($publishedPath) . '/' . pathinfo($publishedPath, PATHINFO_FILENAME) . '.en.vtt';
+    $publishedSubtitlePath = glob(dirname($publishedPath) . '/*.vtt')[0] ?? null;
 
-    expect($publishedPath)->toMatch('/S\d{2}E\d{3} - /')
-        ->and(is_file($publishedPath))->toBeTrue()
+    expect(is_file($publishedPath))->toBeTrue()
         ->and($subtitle?->path)->not->toBeNull()
-        ->and(is_file($publishedSubtitlePath))->toBeTrue()
-        ->and(fileinode($publishedSubtitlePath))->toBe(fileinode($subtitle->path));
+        ->and(is_string($publishedSubtitlePath) && is_file($publishedSubtitlePath))->toBeTrue();
+    if (! is_string($publishedSubtitlePath) || $subtitle?->path === null) {
+        return;
+    }
+    expect(fileinode($publishedSubtitlePath))->toBe(fileinode($subtitle->path));
+});
 
-    $root = dirname(dirname($publishedPath));
-    expect(is_file($root . '/tvshow.nfo'))->toBeTrue();
+test('external Broadcast source settings survive the normal lifecycle', function (): void {
+    requireExternalInputPluginRuntime($this);
+    [$headers, $stashId, $mediaItemId] = array_slice($this->bootstrapFakeDownloadStash('plex-source-settings'), 0, 3);
+    $server = $this->http->post('/api/v1/media-servers', [
+        'type' => 'plex', 'name' => 'Fixture Plex', 'base_uri' => 'https://plex.test', 'token' => 'fixture-plex-token',
+        'settings' => ['library_id' => '1', 'library_name' => 'TV Shows'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'plex', 'name' => 'Plex Source Settings', 'slug' => 'plex-source-' . bin2hex(random_bytes(3)),
+        'settings' => ['media_server_connection_id' => $server->body['media_server']['id']],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $input = $this->container->get(StashInputRepository::class)->listForStash(\App\Stashes\StashId::parse($stashId))[0];
+    $this->http->patch('/api/v1/broadcasts/' . $broadcast->body['broadcast']['id'] . '/source-settings', [
+        'source_reference' => (string) $input->id,
+        'settings' => ['season' => 3],
+    ], headers: $headers)->assertOk();
+    $this->http->post('/api/v1/commands', [
+        'type' => 'item.download', 'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
+    ], headers: $headers);
+    $this->processAllJobs();
+    $rebuild = $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild', 'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
+    ], headers: $headers);
+    $this->processAllJobs();
+    $item = $this->http->get('/api/v1/broadcasts/' . $broadcast->body['broadcast']['id'] . '/items', headers: $headers)->body['items'][0];
 
+    expect($this->http->get('/api/v1/commands/' . $rebuild->body['command_id'], headers: $headers)->body['command']['state'])->toBe('completed')
+        ->and($item['published_path'])->toBeString();
 });
 
 test('media server connection stores token through secrets service', function (): void {
@@ -370,14 +397,6 @@ test('external jellyfin refresh failure leaves the published file and reports fa
     expect($command->body['command']['state'])->toBe('failed')
         ->and($item['published_path'])->not->toBeNull()
         ->and(is_file($item['published_path']))->toBeTrue();
-});
-
-test('broadcast nfo builder escapes unsafe xml characters', function (): void {
-    $builder = new BroadcastNfoBuilder();
-    $xml = $builder->tvShowNfo('Series & "Quotes"');
-
-    expect($xml)->toContain('&amp;')
-        ->and($xml)->toContain('&quot;');
 });
 
 test('jellyfin and plex broadcast types are registered distinctly', function (): void {

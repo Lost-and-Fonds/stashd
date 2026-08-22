@@ -140,6 +140,29 @@
 									</span>
 								</div>
 
+								<template x-if="(broadcast.plugin_source_options ?? []).length > 0 && inputs.length > 0">
+									<div class="mt-3 rounded border border-line bg-espresso p-2"
+										x-init="ensureSourceSettingsDraft(broadcast)">
+										<p class="text-[11px] uppercase tracking-wide text-muted">Source options</p>
+										<template x-for="input in inputs" x-bind:key="input.id">
+											<div class="mt-2">
+												<p class="truncate text-[12px] text-cream" x-text="input.title ?? input.provider_input_id"></p>
+												<template x-for="option in broadcast.plugin_source_options" x-bind:key="option.name">
+													<label class="mt-1 flex items-center gap-2 text-[12px] text-muted">
+														<span class="w-32" x-text="option.label"></span>
+														<input x-bind:type="option.type === 'number' ? 'number' : 'text'"
+															x-model="sourceSettingsDrafts[broadcast.id][input.id][option.name]"
+															class="flex-1 rounded border border-line bg-panel px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
+													</label>
+												</template>
+											</div>
+										</template>
+										<button type="button" x-on:click="saveSourceSettings(broadcast.id)"
+											x-bind:disabled="savingSourceSettings === broadcast.id"
+											class="mt-2 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-60">Save</button>
+									</div>
+								</template>
+
 								<p class="mt-1 text-[12px] text-error" x-show="broadcast.last_error" x-text="broadcast.last_error"></p>
 
 								<div class="mt-3 rounded border border-line bg-espresso p-3">
@@ -298,28 +321,6 @@
 									</div>
 								</div>
 
-								<template x-if="isSeriesBroadcastType(broadcast.type) && inputs.length > 0">
-									<div class="mt-3 rounded border border-line bg-espresso p-2"
-										x-init="ensureSeasonMappingDraft(broadcast)">
-										<p class="text-[11px] uppercase tracking-wide text-muted">Season mapping</p>
-										<p class="mt-1 text-[12px] text-muted">Assign each input to a season. Leave blank for the default (Season 01).</p>
-										<div class="mt-2 space-y-1">
-											<template x-for="input in inputs" x-bind:key="input.id">
-												<div class="flex items-center gap-2">
-													<span class="flex-1 truncate text-[12px] text-cream" x-text="input.title ?? input.provider_input_id"></span>
-													<input type="number" min="1" placeholder="default"
-														x-model="seasonMappingDrafts[broadcast.id][input.id]"
-														class="w-20 rounded border border-line bg-panel px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
-												</div>
-											</template>
-										</div>
-										<button type="button" x-on:click="saveSeasonMapping(broadcast.id)"
-											x-bind:disabled="savingSeasonMapping === broadcast.id"
-											class="mt-2 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-60">
-											Save season mapping
-										</button>
-									</div>
-								</template>
 								</details>
 							</li>
 						</template>
@@ -347,10 +348,6 @@
 
 						<input type="text" x-model="newBroadcastDestinationPath" placeholder="Destination path (optional) — e.g. /mnt/nas/media/TV"
 							class="mt-2 w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
-
-						<p class="mt-2 text-[12px] text-muted" x-show="isSeriesBroadcastType(newBroadcastType) && inputs.length > 1">
-							Multiple inputs go into Season 01 by default — you can map each one to its own season from this broadcast's card once it's created.
-						</p>
 
 						<div class="mt-3 rounded border border-line bg-espresso p-3" x-show="broadcastPreview">
 							<p class="text-[11px] uppercase tracking-wide text-muted">What this will do</p>

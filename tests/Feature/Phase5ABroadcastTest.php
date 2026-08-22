@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Broadcasts\BroadcastFilenameBuilder;
 use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastLifecycleService;
 use App\Broadcasts\BroadcastPathBuilder;
 use App\Broadcasts\BroadcastRepository;
 use App\Broadcasts\HardlinkPublisher;
 use App\Config\StashdConfig;
-use App\Stashes\StashId;
-use App\Stashes\StashItemRecord;
 use App\System\Activity\ActivityEventRecord;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
@@ -580,29 +577,6 @@ test('broadcast commands emit activity events', function (): void {
     expect($types)->toContain('broadcast.rebuild_started')
         ->and($types)->toContain('broadcast.published')
         ->and($types)->toContain('broadcast.verified');
-});
-
-test('broadcast filename builder rejects path traversal segments', function (): void {
-    $builder = new BroadcastFilenameBuilder();
-    $stashItem = new StashItemRecord(
-        stashId: StashId::parse('stash_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
-        mediaItemId: MediaItemId::parse('media_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
-        state: \App\Stashes\StashItemState::Active,
-        displayTitle: '../../etc/passwd',
-    );
-    $mediaItem = new MediaItemRecord(
-        providerKey: 'fake',
-        providerItemId: 'item-1',
-        canonicalUri: 'fake://item/1',
-        title: '../secret',
-        state: \App\Vault\MediaItemState::Ready,
-        upstreamState: \App\Vault\UpstreamState::Available,
-    );
-
-    $filename = $builder->episodeFilename($stashItem, $mediaItem, '/vault/original.fake', 1);
-
-    expect($filename)->not->toContain('..')
-        ->and($filename)->not->toContain('/');
 });
 
 test('broadcast hardlink assets are recorded with derived vault source', function (): void {

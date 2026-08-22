@@ -836,6 +836,7 @@ interface BroadcastSummary {
 	token_preview?: string
 	plugin_detail_fields?: Array<{ id: string; label: string; value: unknown; kind?: string; link?: string }>
 	plugin_actions?: Array<{ id: string; label: string; intent: string; confirmation?: boolean }>
+	plugin_source_options?: Array<{ name: string; label: string; type: string; default?: unknown }>
 	items: BroadcastItemSummary[]
 	impact: BroadcastCreationPreviewSummary | null
 }
@@ -1500,10 +1501,10 @@ function stashDetailComponent(stashId: string) {
 		creatingBroadcast: false,
 		broadcastPreview: null as BroadcastCreationPreviewSummary | null,
 		loadingBroadcastPreview: false,
+		sourceSettingsDrafts: {} as Record<string, Record<string, Record<string, string>>>,
+		savingSourceSettings: null as string | null,
 		compatibleDownloadPolicyChoice: 'video',
 		updatingDownloadPolicy: false,
-		seasonMappingDrafts: {} as Record<string, Record<string, string>>,
-		savingSeasonMapping: null as string | null,
 		destinationPathDrafts: {} as Record<string, string>,
 		savingDestinationPath: null as string | null,
 		statusBadge,
@@ -1703,15 +1704,6 @@ function stashDetailComponent(stashId: string) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not reach the server.'
 			}
-		},
-
-		// Mirrors App\Broadcasts\Plugins\AbstractSeriesBroadcastPlugin --
-		// series plugins support video only, unlike the podcast plugin (audio
-		// and video). No dedicated "is series" flag on BroadcastPlugin itself
-		// since it'd only ever have one caller.
-		isSeriesBroadcastType(type: string): boolean {
-			const plugin = this.broadcastPlugins.find((candidate) => candidate.key === type)
-			return plugin !== undefined && plugin.supported_file_kinds.length === 1 && plugin.supported_file_kinds[0] === 'video'
 		},
 
 		// Download/metadata jobs record entity_type 'media_item' + entity_id on
@@ -2274,61 +2266,46 @@ function stashDetailComponent(stashId: string) {
 			}
 		},
 
-		// Initializes a broadcast's season-mapping draft from its current
-		// settings the first time it's rendered — never on refresh, so an
-		// in-progress edit isn't clobbered by a background SSE-triggered refresh.
-		ensureSeasonMappingDraft(broadcast: BroadcastSummary) {
-			if (!this.isSeriesBroadcastType(broadcast.type)) return
-
-			const existing = (broadcast.settings?.season_mapping ?? {}) as Record<string, number>
-			const draft = this.seasonMappingDrafts[broadcast.id] ?? {}
-
+		ensureSourceSettingsDraft(broadcast: BroadcastSummary) {
+			if (broadcast.id in this.sourceSettingsDrafts) return
+			const current = (broadcast.settings?.source_settings ?? {}) as Record<string, Record<string, unknown>>
+			const draft: Record<string, Record<string, string>> = {}
 			for (const input of this.inputs) {
-				if (!(input.id in draft)) {
-					draft[input.id] = existing[input.id] !== undefined ? String(existing[input.id]) : ''
+				draft[input.id] = {}
+				for (const option of broadcast.plugin_source_options ?? []) {
+					const value = current[input.id]?.[option.name] ?? option.default ?? ''
+					draft[input.id][option.name] = String(value)
 				}
 			}
-
-			this.seasonMappingDrafts[broadcast.id] = draft
+			this.sourceSettingsDrafts[broadcast.id] = draft
 		},
 
-		async saveSeasonMapping(broadcastId: string) {
-			this.savingSeasonMapping = broadcastId
+		async saveSourceSettings(broadcastId: string) {
+			this.savingSourceSettings = broadcastId
 			try {
-				const draft = this.seasonMappingDrafts[broadcastId] ?? {}
-				const mapping: Record<string, number> = {}
-
-				for (const [inputId, value] of Object.entries(draft)) {
-					const trimmed = value.trim()
-					if (trimmed === '') continue
-					const season = Number.parseInt(trimmed, 10)
-					if (Number.isFinite(season) && season >= 1) {
-						mapping[inputId] = season
+				const draft = this.sourceSettingsDrafts[broadcastId] ?? {}
+				for (const [sourceReference, values] of Object.entries(draft)) {
+					const settings: Record<string, boolean | number | string> = {}
+					for (const [key, value] of Object.entries(values)) {
+						const number = Number(value)
+						settings[key] = value !== '' && Number.isFinite(number) && /^-?\\d+(\\.\\d+)?$/.test(value) ? number : value
 					}
+					const response = await apiFetch(`/api/v1/broadcasts/${broadcastId}/source-settings`, {
+						method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ source_reference: sourceReference, settings }),
+					})
+					if (!response.ok) throw new Error('Could not update source options.')
 				}
-
-				const response = await apiFetch(`/api/v1/broadcasts/${broadcastId}/season-mapping`, {
-					method: 'PATCH',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ mapping }),
-				})
-				if (!response.ok) {
-					const body = (await response.json()) as { error?: { message?: string } }
-					this.error = body.error?.message ?? 'Could not update the season mapping.'
-					return
-				}
-				this.error = null
 				await this.refresh()
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
-				this.error = 'Could not reach the server.'
+				this.error = cause instanceof Error ? cause.message : 'Could not reach the server.'
 			} finally {
-				this.savingSeasonMapping = null
+				this.savingSourceSettings = null
 			}
 		},
 
-		// Same "only initialize once" rule as ensureSeasonMappingDraft — a
-		// background SSE-triggered refresh must not clobber an in-progress edit.
+			// A background SSE-triggered refresh must not clobber an in-progress edit.
 		ensureDestinationPathDraft(broadcast: BroadcastSummary) {
 			if (broadcast.id in this.destinationPathDrafts) return
 

@@ -18,6 +18,7 @@ use App\Broadcasts\BroadcastPlugin;
 use App\Broadcasts\BroadcastPluginActions;
 use App\Broadcasts\BroadcastPluginPolicy;
 use App\Broadcasts\BroadcastPluginPresentation;
+use App\Broadcasts\BroadcastPluginSourceOptions;
 use App\Broadcasts\BroadcastPruneResult;
 use App\Broadcasts\BroadcastPublishResult;
 use App\Broadcasts\BroadcastRecord;
@@ -52,7 +53,8 @@ final readonly class ExternalBroadcastPlugin implements
     BroadcastPlugin,
     BroadcastPluginPresentation,
     BroadcastPluginActions,
-    BroadcastPluginPolicy
+    BroadcastPluginPolicy,
+    BroadcastPluginSourceOptions
 {
     public function __construct(
         private ExternalBroadcastPluginDefinition $definition,
@@ -87,6 +89,18 @@ final readonly class ExternalBroadcastPlugin implements
 
     public function uiControls(): array
     {
+        return $this->controls($this->definition->uiOptions);
+    }
+
+    public function sourceUiControls(): array
+    {
+        return $this->controls($this->definition->sourceOptions);
+    }
+
+    /** @param array<int, array<string, mixed>> $options
+     *  @return list<UiControl> */
+    private function controls(array $options): array
+    {
         return array_values(array_filter(array_map(
             static function (mixed $option): ?UiControl {
                 if (! is_string($option['key'] ?? null) || ! is_string($option['label'] ?? null)) {
@@ -103,7 +117,7 @@ final readonly class ExternalBroadcastPlugin implements
                     required: ($option['required'] ?? false) === true,
                 );
             },
-            $this->definition->uiOptions,
+            $options,
         )));
     }
 
@@ -167,6 +181,7 @@ final readonly class ExternalBroadcastPlugin implements
 
             $items[] = [
                 'id' => (string) $item->id,
+                'source_reference' => $stashItem->stashInputId === null ? null : (string) $stashItem->stashInputId,
                 'title' => $media->title ?? $stashItem->displayTitle ?? 'Untitled',
                 'description' => $media->description ?? $stashItem->displayDescription,
                 'published_at' => ($media->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
@@ -180,6 +195,7 @@ final readonly class ExternalBroadcastPlugin implements
             $request = [
                 'reference' => (string) $context->broadcast->id,
                 'settings' => $settings,
+                'sources' => $this->sources($context),
                 'items' => $items,
             ];
             $prepared = $this->host->prepareBroadcast(
@@ -226,6 +242,7 @@ final readonly class ExternalBroadcastPlugin implements
                 }
                 $items[] = [
                     'id' => (string) $item->id,
+                    'source_reference' => $stashItem->stashInputId === null ? null : (string) $stashItem->stashInputId,
                     'title' => $media->title ?? $stashItem->displayTitle ?? 'Untitled',
                     'description' => $media->description ?? $stashItem->displayDescription,
                     'published_at' => ($media->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
@@ -237,6 +254,7 @@ final readonly class ExternalBroadcastPlugin implements
             $result = $this->host->publishBroadcast($this->definition->componentPath, $stage, [
                 'reference' => (string) $context->broadcast->id,
                 'settings' => $settings,
+                'sources' => $this->sources($context),
                 'items' => $items,
             ], null, $this->httpGrants($context), getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR') ?: null);
             /** @var array{artifact?: array{reference?: mixed}, files?: mixed} $publication */
@@ -256,6 +274,7 @@ final readonly class ExternalBroadcastPlugin implements
                 [
                     'reference' => (string) $context->broadcast->id,
                     'settings' => $settings,
+                    'sources' => $this->sources($context),
                     'items' => $items,
                 ],
                 $publication,
@@ -405,7 +424,7 @@ final readonly class ExternalBroadcastPlugin implements
         throw BroadcastException::withCode('broadcast_action_unsupported', 'Broadcast action is unsupported.');
     }
 
-    /** @param list<array{key: string, value: array{kind: string, value: bool|string}}> $settings */
+    /** @param list<array{key: string, value: array{kind: string, value: bool|int|string}}> $settings */
     private function appendConnectionSettings(BroadcastContext $context, array &$settings): void
     {
         if ($this->definition->connectionSettingKey === null) {
@@ -676,7 +695,7 @@ final readonly class ExternalBroadcastPlugin implements
         @rmdir($stage);
     }
 
-    /** @return list<array{key: string, value: array{kind: string, value: bool|string}}> */
+    /** @return list<array{key: string, value: array{kind: string, value: bool|int|string}}> */
     private function settings(BroadcastContext $context): array
     {
         $settings = [];
@@ -686,9 +705,46 @@ final readonly class ExternalBroadcastPlugin implements
             }
             $settings[] = ['key' => $key, 'value' => is_bool($value)
                 ? ['kind' => 'boolean', 'value' => $value]
-                : ['kind' => 'text', 'value' => (string) $value]];
+                : (is_int($value) || is_float($value)
+                    ? ['kind' => 'number', 'value' => (int) $value]
+                    : ['kind' => 'text', 'value' => (string) $value])];
         }
         return $settings;
+    }
+
+    /** @return list<array{reference: string, settings: list<array{key: string, value: array{kind: string, value: bool|int|string}}>}> */
+    private function sources(BroadcastContext $context): array
+    {
+        $sourceSettings = $context->settings()['source_settings'] ?? [];
+        $sourceSettings = is_array($sourceSettings) ? $sourceSettings : [];
+
+        return array_map(function ($input) use ($sourceSettings): array {
+            $reference = (string) $input->id;
+            $settings = is_array($sourceSettings[$reference] ?? null) ? $sourceSettings[$reference] : [];
+
+            return [
+                'reference' => $reference,
+                'settings' => $this->encodeSettings($settings),
+            ];
+        }, $context->stashInputs);
+    }
+
+    /** @param array<mixed> $settings
+     *  @return list<array{key: string, value: array{kind: string, value: bool|int|string}}> */
+    private function encodeSettings(array $settings): array
+    {
+        $encoded = [];
+        foreach ($settings as $key => $value) {
+            if (! is_bool($value) && ! is_int($value) && ! is_float($value) && ! is_string($value)) {
+                continue;
+            }
+            $encoded[] = ['key' => $key, 'value' => is_bool($value)
+                ? ['kind' => 'boolean', 'value' => $value]
+                : (is_int($value) || is_float($value)
+                    ? ['kind' => 'number', 'value' => (int) $value]
+                    : ['kind' => 'text', 'value' => $value])];
+        }
+        return $encoded;
     }
 
     private function findOrCreateItem(BroadcastContext $context, StashItemId $stashItemId, \App\Vault\MediaItemId $mediaItemId): BroadcastItemRecord

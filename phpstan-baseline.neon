@@ -43,12 +43,6 @@ parameters:
 			path: app/Auth/UserRepository.php
 
 		-
-			message: '#^Property App\\Broadcasts\\BroadcastContextFactory\:\:\$broadcasts is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: app/Broadcasts/BroadcastContextFactory.php
-
-		-
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
 			count: 5
@@ -221,66 +215,6 @@ parameters:
 			identifier: isset.offset
 			count: 2
 			path: app/Broadcasts/HardlinkPublisher.php
-
-		-
-			message: '#^Cannot access property \$derivedFromAssetId on mixed\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Broadcasts/Plugins/AbstractSeriesBroadcastPlugin.php
-
-		-
-			message: '#^Cannot access property \$lastVerifiedAt on mixed\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Broadcasts/Plugins/AbstractSeriesBroadcastPlugin.php
-
-		-
-			message: '#^Cannot access property \$missingAt on mixed\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Broadcasts/Plugins/AbstractSeriesBroadcastPlugin.php
-
-		-
-			message: '#^Cannot access property \$missingReason on mixed\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Broadcasts/Plugins/AbstractSeriesBroadcastPlugin.php
-
-		-
-			message: '#^Cannot access property \$path on mixed\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Broadcasts/Plugins/AbstractSeriesBroadcastPlugin.php
-
-		-
-			message: '#^Cannot access property \$relativePath on mixed\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Broadcasts/Plugins/AbstractSeriesBroadcastPlugin.php
-
-		-
-			message: '#^Cannot access property \$sizeBytes on mixed\.$#'
-			identifier: property.nonObject
-			count: 2
-			path: app/Broadcasts/Plugins/AbstractSeriesBroadcastPlugin.php
-
-		-
-			message: '#^Cannot access property \$state on mixed\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Broadcasts/Plugins/AbstractSeriesBroadcastPlugin.php
-
-		-
-			message: '#^Parameter \#1 \$record of method App\\System\\State\\StateTransitionService\:\:transitionAsset\(\) expects App\\Vault\\AssetRecord, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Broadcasts/Plugins/AbstractSeriesBroadcastPlugin.php
-
-		-
-			message: '#^Parameter \#1 \$record of method App\\Vault\\AssetRepository\:\:save\(\) expects App\\Vault\\AssetRecord, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Broadcasts/Plugins/AbstractSeriesBroadcastPlugin.php
 
 
 

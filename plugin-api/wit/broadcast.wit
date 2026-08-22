@@ -86,6 +86,7 @@ interface broadcast-plugin {
     use broadcast-host.{published-file};
     variant option-value {
         boolean(bool),
+        number(s64),
         text(string),
     }
 
@@ -105,6 +106,7 @@ interface broadcast-plugin {
 
     record item {
         id: string,
+        source-reference: option<string>,
         title: string,
         description: option<string>,
         published-at: option<string>,
@@ -112,9 +114,15 @@ interface broadcast-plugin {
         resources: list<item-resource>,
     }
 
+    record source {
+        reference: string,
+        settings: list<setting>,
+    }
+
     record publish-request {
         reference: string,
         settings: list<setting>,
+        sources: list<source>,
         items: list<item>,
     }
 

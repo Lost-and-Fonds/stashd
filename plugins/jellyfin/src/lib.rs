@@ -187,6 +187,7 @@ fn setting_text(settings: &[Setting], key: &str) -> Option<String> {
         match &setting.value {
             OptionValue::Text(value) => Some(value.clone()),
             OptionValue::Boolean(_) => None,
+            OptionValue::Number(_) => None,
         }
     })
 }

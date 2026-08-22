@@ -751,14 +751,13 @@ paths:
                     items: { $ref: "#/components/schemas/BroadcastItem" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/v1/broadcasts/{id}/season-mapping:
+  /api/v1/broadcasts/{id}/source-settings:
     patch:
-      operationId: updateSeasonMapping
+      operationId: updateBroadcastSourceSettings
       tags: [Broadcasts]
       summary: >
-        Set per-input season overrides for a series broadcast. Replaces
-        the whole mapping (not a merge); omit an input to reset it to the
-        default season derivation. Series broadcast types only.
+        Set plugin-defined settings for one opaque source associated with a
+        Broadcast. The plugin declares the available option keys and types.
       parameters:
         - $ref: "#/components/parameters/BroadcastId"
       requestBody:
@@ -767,13 +766,16 @@ paths:
           application/json:
             schema:
               type: object
-              required: [mapping]
+              required: [source_reference, settings]
               properties:
-                mapping:
+                source_reference:
+                  type: string
+                  description: Opaque source/Input reference.
+                settings:
                   type: object
-                  description: stash_input_id -> season number (positive integer)
-                  additionalProperties: { type: integer, minimum: 1 }
-                  example: { "input_01K...": 2 }
+                  description: Plugin-defined source-scoped settings.
+                  additionalProperties: true
+                  example: { "option_key": "plugin-defined value" }
       responses:
         "200":
           description: Updated broadcast
@@ -1609,7 +1611,7 @@ components:
           type: object
           additionalProperties: true
           nullable: true
-          description: Type-specific settings; series types may include season_mapping keyed by stash_input_id; podcast broadcasts may include media_kind (PodcastMediaKind, defaults to audio).
+          description: Plugin-defined settings. Broadcast plugins may also persist source-scoped settings keyed by opaque source references.
         last_planned_at: { type: string, format: date-time, nullable: true }
         last_built_at: { type: string, format: date-time, nullable: true }
         last_verified_at: { type: string, format: date-time, nullable: true }

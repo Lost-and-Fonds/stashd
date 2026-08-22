@@ -310,6 +310,7 @@ fn setting_text(settings: &[Setting], key: &str) -> Option<String> {
         (setting.key == key).then(|| match &setting.value {
             OptionValue::Text(value) => Some(value.clone()),
             OptionValue::Boolean(_) => None,
+            OptionValue::Number(_) => None,
         })?
     })
 }
@@ -321,6 +322,7 @@ fn setting_bool(settings: &[Setting], key: &str) -> bool {
             (setting.key == key).then_some(match setting.value {
                 OptionValue::Boolean(value) => Some(value),
                 OptionValue::Text(_) => None,
+                OptionValue::Number(_) => None,
             })?
         })
         .unwrap_or(false)

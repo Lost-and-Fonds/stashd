@@ -259,61 +259,52 @@ final readonly class BroadcastController
         ], Status::ACCEPTED);
     }
 
-    #[Patch('/api/v1/broadcasts/{id}/season-mapping')]
-    public function updateSeasonMapping(string $id, Request $request): Json
+    #[Patch('/api/v1/broadcasts/{id}/source-settings')]
+    public function updateSourceSettings(string $id, Request $request): Json
     {
         $broadcast = $this->findBroadcast($id);
-
         if ($broadcast === null) {
             return $this->notFound('Broadcast not found.');
         }
 
-        if (! $this->isSeriesBroadcast($broadcast->type)) {
-            return $this->validationError('Season mapping is not supported by this Broadcast.');
+        $plugin = BroadcastPluginRegistry::findByKey($broadcast->type)?->plugin;
+        if (! $plugin instanceof BroadcastPluginSourceOptions) {
+            return $this->validationError('This Broadcast does not declare source-scoped options.');
         }
 
-        // Read 'mapping' from the raw body, not ApiJson::normalizeRequest()'s
-        // output: its keys are opaque stash_input_id strings, not DTO field
-        // names, and the snake/camel transform would corrupt them.
-        $rawMapping = $request->body['mapping'] ?? null;
-
-        if (! is_array($rawMapping)) {
-            return $this->validationError('mapping is required.');
+        $source = $request->body['source_reference'] ?? null;
+        $values = $request->body['settings'] ?? null;
+        if (! is_string($source) || $source === '' || ! is_array($values)) {
+            return $this->validationError('source_reference and settings are required.');
         }
 
-        $validInputIds = array_map(
-            static fn ($input): string => (string) $input->id,
-            $this->stashInputs->listForStash($broadcast->stashId),
-        );
+        $validSources = array_map(static fn ($input): string => (string) $input->id, $this->stashInputs->listForStash($broadcast->stashId));
+        if (! in_array($source, $validSources, true)) {
+            return $this->validationError('Unknown source for this Broadcast.');
+        }
 
-        $mapping = [];
-
-        foreach ($rawMapping as $stashInputId => $season) {
-            if (! is_string($stashInputId) || ! in_array($stashInputId, $validInputIds, true)) {
-                return $this->validationError("Unknown stash input for this broadcast's stash: {$stashInputId}");
+        $controls = [];
+        foreach ($plugin->sourceUiControls() as $control) {
+            $controls[$control->name] = $control;
+        }
+        foreach ($values as $key => $value) {
+            $control = is_string($key) ? $controls[$key] ?? null : null;
+            if ($control === null || (! is_bool($value) && ! is_int($value) && ! is_float($value) && ! is_string($value))) {
+                return $this->validationError('Invalid source-scoped option.');
             }
-
-            if (! is_int($season) || $season < 1) {
-                return $this->validationError("Season for input {$stashInputId} must be a positive integer.");
+            if ($control->type === 'number' && ! is_int($value) && ! is_float($value)) {
+                return $this->validationError('Invalid source-scoped option.');
             }
-
-            $mapping[$stashInputId] = $season;
         }
 
         $settings = $this->decodeSettings($broadcast);
-
-        if ($mapping === []) {
-            unset($settings['season_mapping']);
-        } else {
-            $settings['season_mapping'] = $mapping;
-        }
-
-        $broadcast->settings = $settings === [] ? null : $settings;
+        $sourceSettings = is_array($settings['source_settings'] ?? null) ? $settings['source_settings'] : [];
+        $sourceSettings[$source] = $values;
+        $settings['source_settings'] = $sourceSettings;
+        $broadcast->settings = $settings;
         $this->broadcasts->save($broadcast);
 
-        return new Json([
-            'broadcast' => $this->mapBroadcast($broadcast),
-        ]);
+        return new Json(['broadcast' => $this->mapBroadcast($broadcast)]);
     }
 
     #[Patch('/api/v1/broadcasts/{id}/destination')]
@@ -398,14 +389,6 @@ final readonly class BroadcastController
         ];
     }
 
-    /** Check if a broadcast type (string key) is a series-type broadcast. */
-    private function isSeriesBroadcast(string $type): bool
-    {
-        $plugin = BroadcastPluginRegistry::findByKey($type);
-
-        return $plugin !== null && $plugin->plugin->supportedFileKinds() === [FileKind::Video];
-    }
-
     private function findStash(string $id): ?StashRecord
     {
         return StashId::isValid($id) ? $this->stashes->find(StashId::parse($id)) : null;
@@ -456,6 +439,20 @@ final readonly class BroadcastController
             ...$extra,
             'plugin_detail_fields' => $metadata,
             'plugin_actions' => $actions,
+            'plugin_source_options' => $plugin instanceof BroadcastPluginSourceOptions
+                ? array_map(
+                    static fn (UiControl $control): array => [
+                        'name' => $control->name,
+                        'label' => $control->label,
+                        'type' => $control->type,
+                        'default' => $control->default,
+                        'options' => $control->options,
+                        'description' => $control->description,
+                        'required' => $control->required,
+                    ],
+                    $plugin->sourceUiControls(),
+                )
+                : [],
         ];
     }
 
@@ -501,6 +498,20 @@ final readonly class BroadcastController
                 ],
                 $discovered->plugin->uiControls(),
             ),
+            'sourceOptions' => $discovered->plugin instanceof BroadcastPluginSourceOptions
+                ? array_map(
+                    static fn (UiControl $control): array => [
+                        'name' => $control->name,
+                        'label' => $control->label,
+                        'type' => $control->type,
+                        'default' => $control->default,
+                        'options' => $control->options,
+                        'description' => $control->description,
+                        'required' => $control->required,
+                    ],
+                    $discovered->plugin->sourceUiControls(),
+                )
+                : [],
         ]);
     }
 }

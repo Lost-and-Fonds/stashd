@@ -43,19 +43,7 @@ final readonly class BroadcastResource
             $payload['publishedUrl'] = $this->publishedUrl;
         }
 
-        // season_mapping is keyed by opaque stash_input_id strings, not DTO
-        // field names — ApiJson::encode()'s snake/camel key transform must not
-        // touch them, so it's pulled out before encoding and reattached
-        // verbatim. See SeasonMapping and BroadcastController::updateSeasonMapping().
-        $seasonMapping = is_array($payload['settings']) ? ($payload['settings']['season_mapping'] ?? null) : null;
-
-        $encoded = ApiJson::encode($payload);
-
-        if (is_array($seasonMapping) && is_array($encoded['settings'] ?? null)) {
-            $encoded['settings']['season_mapping'] = $seasonMapping;
-        }
-
-        return $encoded;
+        return ApiJson::encode($payload);
     }
 
 }

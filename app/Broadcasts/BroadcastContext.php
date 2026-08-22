@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use App\Stashes\StashInputRecord;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashRecord;
 use App\Vault\AssetRecord;
@@ -16,6 +17,7 @@ final readonly class BroadcastContext
      * @param list<StashItemRecord> $stashItems
      * @param array<string, MediaItemRecord> $mediaItems keyed by media item id
      * @param array<string, AssetRecord|null> $vaultOriginals keyed by media item id
+     * @param list<StashInputRecord> $stashInputs
      */
     public function __construct(
         public BroadcastRecord $broadcast,
@@ -23,6 +25,7 @@ final readonly class BroadcastContext
         public array $stashItems,
         public array $mediaItems,
         public array $vaultOriginals,
+        public array $stashInputs = [],
     ) {
     }
 
@@ -32,8 +35,4 @@ final readonly class BroadcastContext
         return $this->broadcast->settings ?? [];
     }
 
-    public function seasonMapping(): SeasonMapping
-    {
-        return SeasonMapping::fromBroadcastSettings($this->settings());
-    }
 }

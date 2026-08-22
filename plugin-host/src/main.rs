@@ -179,6 +179,8 @@ struct InputOptionRequest {
 enum InputOptionValueRequest {
     #[serde(rename = "boolean")]
     Boolean(bool),
+    #[serde(rename = "number")]
+    Number(i64),
     #[serde(rename = "text")]
     Text(String),
 }
@@ -208,9 +210,18 @@ struct AcquireItemRequest {
 struct BroadcastPublishRequest {
     reference: String,
     settings: Vec<InputOptionRequest>,
+    #[serde(default)]
+    sources: Vec<BroadcastSourceRequest>,
     items: Vec<BroadcastItemRequest>,
     #[serde(default)]
     publication: Option<BroadcastPublicationRequest>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BroadcastSourceRequest {
+    reference: String,
+    #[serde(default)]
+    settings: Vec<InputOptionRequest>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -247,6 +258,7 @@ struct BroadcastResourceRequest {
 #[derive(Debug, Deserialize)]
 struct BroadcastItemRequest {
     id: String,
+    source_reference: Option<String>,
     title: String,
     description: Option<String>,
     published_at: Option<String>,
@@ -1184,6 +1196,11 @@ fn into_input_options(
                     InputOptionValueRequest::Text(value) => {
                         input_world::exports::stashd::plugin::input_plugin::OptionValue::Text(value)
                     }
+                    InputOptionValueRequest::Number(value) => {
+                        input_world::exports::stashd::plugin::input_plugin::OptionValue::Text(
+                            value.to_string(),
+                        )
+                    }
                 },
             },
         )
@@ -1255,6 +1272,11 @@ fn broadcast_option(
                     value,
                 )
             }
+            InputOptionValueRequest::Number(value) => {
+                broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Number(
+                    value,
+                )
+            }
             InputOptionValueRequest::Text(value) => {
                 broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Text(value)
             }
@@ -1301,6 +1323,7 @@ fn invoke_broadcast(
     let BroadcastPublishRequest {
         reference,
         settings,
+        sources,
         items,
         publication,
     } = request;
@@ -1308,11 +1331,21 @@ fn invoke_broadcast(
         broadcast_world::exports::stashd::plugin::broadcast_plugin::PublishRequest {
             reference,
             settings: settings.into_iter().map(broadcast_option).collect(),
+            sources: sources
+                .into_iter()
+                .map(
+                    |source| broadcast_world::exports::stashd::plugin::broadcast_plugin::Source {
+                        reference: source.reference,
+                        settings: source.settings.into_iter().map(broadcast_option).collect(),
+                    },
+                )
+                .collect(),
             items: items
                 .into_iter()
                 .map(|item| {
                     broadcast_world::exports::stashd::plugin::broadcast_plugin::Item {
                     id: item.id,
+                    source_reference: item.source_reference,
                     title: item.title,
                     description: item.description,
                     published_at: item.published_at,
@@ -1366,6 +1399,7 @@ fn invoke_broadcast(
                 "key": setting.key,
                 "value": match &setting.value {
                     broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Boolean(value) => serde_json::json!(value),
+                    broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Number(value) => serde_json::json!(value),
                     broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Text(value) => serde_json::json!(value),
                 },
             })).collect::<Vec<_>>(),
@@ -1458,6 +1492,7 @@ fn invoke_broadcast_operation(
                 "key": setting.key,
                 "value": match &setting.value {
                     broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Boolean(value) => serde_json::json!(value),
+                    broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Number(value) => serde_json::json!(value),
                     broadcast_world::exports::stashd::plugin::broadcast_plugin::OptionValue::Text(value) => serde_json::json!(value),
                 },
             })).collect::<Vec<_>>(),

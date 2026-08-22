@@ -14,6 +14,7 @@ final readonly class ExternalBroadcastPluginDefinition
      *  @param array<int, string> $supportedFileKinds
      *  @param array<string, string> $helpers
      *  @param array<string, string> $operations
+     *  @param array<int, array<string, mixed>> $sourceOptions
      */
     public function __construct(
         public string $id,
@@ -37,6 +38,7 @@ final readonly class ExternalBroadcastPluginDefinition
         public ?string $credentialName,
         public ?string $credentialParameter,
         public string $credentialPlacement,
+        public array $sourceOptions,
     ) {
     }
 
@@ -118,6 +120,11 @@ final readonly class ExternalBroadcastPluginDefinition
             }
         }
 
+        /** @var array<int, array<string, mixed>> $sourceOptions */
+        $sourceOptions = is_array($raw['source_options'] ?? null)
+            ? array_values(array_filter($raw['source_options'], 'is_array'))
+            : [];
+
         return new self(
             id: $required('id'),
             logicalKey: trim($raw['broadcast_key']),
@@ -140,6 +147,7 @@ final readonly class ExternalBroadcastPluginDefinition
             credentialName: is_array($raw['credential'] ?? null) && is_string($raw['credential']['name'] ?? null) ? trim($raw['credential']['name']) : null,
             credentialParameter: is_array($raw['credential'] ?? null) && is_string($raw['credential']['parameter'] ?? null) ? trim($raw['credential']['parameter']) : null,
             credentialPlacement: is_array($raw['credential'] ?? null) && in_array($raw['credential']['placement'] ?? null, ['query', 'header'], true) ? $raw['credential']['placement'] : 'query',
+            sourceOptions: $sourceOptions,
         );
     }
 

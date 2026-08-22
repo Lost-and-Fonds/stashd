@@ -1,5 +1,25 @@
 # Broadcast Plugin Architecture — Implementation Plan
 
+## Current contract notes (2026-08)
+
+Broadcast Components receive provider-neutral items plus an opaque source
+reference and source-scoped settings. Core persists those values without
+interpreting their keys; the plugin owns their meaning and layout policy.
+Legacy season mappings are migrated into this generic shape for existing data.
+The old persisted StashItem numbering columns remain inert compatibility data;
+the runtime model and API do not interpret or expose them.
+
+Provider behavior is tested by the provider package. Provider fixtures belong
+with that package. Core tests cover only lifecycle, capability, persistence,
+security, and cross-boundary conformance; removing a plugin must remove its
+semantic tests without breaking generic core tests.
+
+Podcast, Jellyfin, and Plex remain in this repository while the contract is
+validated. Their remote connection records are transitional reusable endpoint,
+secret, and library-selection storage. A generic Plugin Connection object is
+deferred until another remote-service plugin demonstrates a need beyond this
+configuration.
+
 ## Status (historical plan; current implementation updated 2026-08-21)
 
 The implementation plan below is retained as historical design context. The

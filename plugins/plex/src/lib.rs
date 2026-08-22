@@ -49,10 +49,25 @@ impl Guest for PlexBroadcast {
                 .and_then(media_extension)
                 .unwrap_or("mp4");
             let title = sanitize(&item.title);
+            let season = item
+                .source_reference
+                .as_deref()
+                .and_then(|reference| {
+                    request
+                        .sources
+                        .iter()
+                        .find(|source| source.reference == reference)
+                })
+                .and_then(|source| setting_number(&source.settings, "season"))
+                .unwrap_or(1)
+                .max(1);
             files.push(broadcast_host::PublishedFile {
                 item_id: item.id.clone(),
                 source_reference: video.reference.clone(),
-                relative_path: format!("Season 01/S01E{:03} - {title}.{extension}", index + 1),
+                relative_path: format!(
+                    "Season {season:02}/S{season:02}E{:03} - {title}.{extension}",
+                    index + 1
+                ),
             });
 
             if setting_text(&request.settings, "captions").as_deref() != Some("off")
@@ -75,7 +90,7 @@ impl Guest for PlexBroadcast {
                     item_id: item.id.clone(),
                     source_reference: subtitle.reference.clone(),
                     relative_path: format!(
-                        "Season 01/S01E{:03} - {title}.{language}.vtt",
+                        "Season {season:02}/S{season:02}E{:03} - {title}.{language}.vtt",
                         index + 1
                     ),
                 });
@@ -249,6 +264,15 @@ fn setting_text(settings: &[Setting], key: &str) -> Option<String> {
         })
 }
 
+fn setting_number(settings: &[Setting], key: &str) -> Option<i64> {
+    settings
+        .iter()
+        .find_map(|setting| match (&setting.key[..], &setting.value) {
+            (candidate, OptionValue::Number(value)) if candidate == key => Some(*value),
+            _ => None,
+        })
+}
+
 fn setting_text_any(settings: &[Setting], keys: &[&str]) -> Option<String> {
     keys.iter().find_map(|key| setting_text(settings, key))
 }
@@ -268,3 +292,19 @@ fn failed(message: &str, retryable: bool) -> PluginError {
 }
 
 export!(PlexBroadcast);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn source_setting_controls_plugin_owned_season_layout() {
+        let settings = vec![Setting {
+            key: "season".to_owned(),
+            value: OptionValue::Number(3),
+        }];
+
+        assert_eq!(setting_number(&settings, "season"), Some(3));
+        assert_eq!(setting_number(&settings, "other"), None);
+    }
+}

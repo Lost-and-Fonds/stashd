@@ -21,6 +21,9 @@
     {"key": "captions", "label": "Captions", "type": "select", "default": "off", "choices": ["off", "creator_only", "creator_or_auto"]},
     {"key": "caption_languages", "label": "Caption languages", "type": "text", "default": "en"}
   ],
+  "source_options": [
+    {"key": "season", "label": "Season", "type": "number", "default": 1, "required": true}
+  ],
   "actions": [
     {"id": "refresh-library", "label": "Refresh Plex library", "intent": "refresh_library", "operation": "refresh-library"}
   ]
