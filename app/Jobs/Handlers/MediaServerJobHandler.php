@@ -65,7 +65,7 @@ final readonly class MediaServerJobHandler implements JobHandler
 
         $job->progressCurrent = 2;
         $job->progressPercent = 100.0;
-        $job->progressLabel = 'Media server ' . $action . ' complete';
+        $job->progressLabel = 'Plugin operation ' . $action . ' complete';
         $job->finishedAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
         $context->progress($job, JobProgressUpdate::ofSteps(2, 2, $job->progressLabel));
@@ -85,9 +85,9 @@ final readonly class MediaServerJobHandler implements JobHandler
     ): array {
         $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Testing media server connection'));
         $status = $this->connections->testConnection($connectionId);
-        $this->activity->mediaServerTestCompleted($command, $job, $connectionId, $status->toArray());
+        $this->activity->mediaServerTestCompleted($command, $job, $connectionId, $status);
 
-        return ['status' => $status->toArray()];
+        return ['status' => $status];
     }
 
     /** @return array<string, mixed> */
@@ -101,7 +101,7 @@ final readonly class MediaServerJobHandler implements JobHandler
         $libraries = $this->connections->listLibraries($connectionId);
 
         return [
-            'libraries' => array_map(static fn ($library): array => $library->toArray(), $libraries),
+            'libraries' => $libraries,
         ];
     }
 

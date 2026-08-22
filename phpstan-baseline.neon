@@ -466,40 +466,10 @@ parameters:
 			path: app/MediaServers/MediaServerCommandHandler.php
 
 		-
-			message: '#^Method App\\MediaServers\\MediaServerConnectionRepository\:\:create\(\) has parameter \$settings with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/MediaServers/MediaServerConnectionRepository.php
-
-		-
 			message: '#^Method App\\MediaServers\\MediaServerConnectionRepository\:\:listAll\(\) should return list\<App\\MediaServers\\MediaServerConnectionRecord\> but returns array\<App\\MediaServers\\MediaServerConnectionRecord\>\.$#'
 			identifier: return.type
 			count: 1
 			path: app/MediaServers/MediaServerConnectionRepository.php
-
-		-
-			message: '#^Parameter \#1 \$settings of static method App\\MediaServers\\MediaServerLibrarySelection\:\:fromArray\(\) expects array\<string, mixed\>\|null, array\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/MediaServers/MediaServerConnectionRepository.php
-
-		-
-			message: '#^Method App\\MediaServers\\MediaServerConnectionService\:\:create\(\) has parameter \$settings with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/MediaServers/MediaServerConnectionService.php
-
-		-
-			message: '#^Method App\\MediaServers\\MediaServerConnectionService\:\:update\(\) has parameter \$settings with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/MediaServers/MediaServerConnectionService.php
-
-		-
-			message: '#^Parameter \#1 \$settings of static method App\\MediaServers\\MediaServerLibrarySelection\:\:fromArray\(\) expects array\<string, mixed\>\|null, array given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/MediaServers/MediaServerConnectionService.php
 
 		-
 			message: '#^Cannot cast mixed to string\.$#'

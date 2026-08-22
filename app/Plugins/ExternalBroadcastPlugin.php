@@ -439,8 +439,10 @@ final readonly class ExternalBroadcastPlugin implements
             return;
         }
         $settings[] = ['key' => 'server_url', 'value' => ['kind' => 'text', 'value' => $connection->baseUri]];
-        foreach ($connection->settings?->toArray() ?? [] as $key => $value) {
-            $settings[] = ['key' => $key, 'value' => ['kind' => 'text', 'value' => $value]];
+        foreach ($connection->settings ?? [] as $key => $value) {
+            if (is_scalar($value)) {
+                $settings[] = ['key' => $key, 'value' => ['kind' => 'text', 'value' => (string) $value]];
+            }
         }
         if ($this->definition->credentialName !== null) {
             $settings[] = ['key' => 'credential_name', 'value' => ['kind' => 'text', 'value' => $this->definition->credentialName]];

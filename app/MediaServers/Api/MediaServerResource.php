@@ -28,7 +28,7 @@ final readonly class MediaServerResource
             'name' => $this->connection->name,
             'baseUri' => $this->connection->baseUri,
             'state' => $this->connection->state->value,
-            'settings' => $this->connection->settings?->toArray(),
+            'settings' => $this->connection->settings,
             'lastCheckedAt' => $this->connection->lastCheckedAt,
             'lastError' => $this->connection->lastError,
             'createdAt' => $this->connection->createdAt,

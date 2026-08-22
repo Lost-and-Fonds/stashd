@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\MediaServers;
 
+use App\Plugins\ExternalBroadcastPluginRegistry;
+use App\Plugins\PluginHostClient;
+use App\Plugins\PluginHttpGrantFactory;
 use App\Support\PrefixedUlid;
 use App\System\Secret\SecretRepository;
 use App\System\Secret\SecretsService;
@@ -16,14 +19,16 @@ final readonly class MediaServerConnectionService
 {
     public function __construct(
         private MediaServerConnectionRepository $connections,
-        private MediaServerClientRegistry $clients,
         private MediaServerConnectionSecrets $tokens,
+        private ExternalBroadcastPluginRegistry $plugins,
+        private PluginHttpGrantFactory $grants,
         private SecretsService $secrets,
         private SecretRepository $secretRecords,
         private StateTransitionService $transitions,
     ) {
     }
 
+    /** @param array<string, mixed>|null $settings */
     public function create(
         string $type,
         string $name,
@@ -45,6 +50,7 @@ final readonly class MediaServerConnectionService
         return $record;
     }
 
+    /** @param array<string, mixed>|null $settings */
     public function update(
         PrefixedUlid $id,
         ?string $name = null,
@@ -65,7 +71,9 @@ final readonly class MediaServerConnectionService
         }
 
         if ($settings !== null) {
-            $record->settings = MediaServerLibrarySelection::fromArray($settings);
+            /** @var array<string, mixed> $normalizedSettings */
+            $normalizedSettings = $settings;
+            $record->settings = $normalizedSettings;
         }
 
         if ($token !== null && trim($token) !== '') {
@@ -79,18 +87,31 @@ final readonly class MediaServerConnectionService
         return $this->connections->save($record);
     }
 
-    public function testConnection(PrefixedUlid $id): MediaServerStatus
+    /** @return array<string, mixed> */
+    public function testConnection(PrefixedUlid $id): array
     {
         $record = $this->connections->find($id)
             ?? throw MediaServerException::withCode('media_server_not_found', 'Media server connection not found.');
 
         $token = $this->requireToken($record);
-        $status = $this->clients->clientFor($record)->testConnection($record, $token);
+        $status = ['ok' => false, 'message' => 'Connection test failed.', 'server_name' => null, 'version' => null];
+        try {
+            $result = $this->invoke($record, 'test_connection', $token);
+            $values = $this->values($result);
+            $status = [
+                'ok' => ($values['ok'] ?? 'false') === 'true',
+                'message' => $values['message'] ?? 'External connection test completed.',
+                'server_name' => $values['server_name'] ?? null,
+                'version' => $values['version'] ?? null,
+            ];
+        } catch (MediaServerException $exception) {
+            $status = ['ok' => false, 'message' => $exception->getMessage(), 'server_name' => null, 'version' => null];
+        }
 
         $record->lastCheckedAt = DateTime::now(Timezone::UTC);
-        $record->lastError = $status->ok ? null : $status->message;
+        $record->lastError = $status['ok'] ? null : $status['message'];
 
-        if ($status->ok) {
+        if ($status['ok']) {
             if ($record->state !== MediaServerConnectionState::Ready) {
                 $this->transitions->transitionMediaServerConnection($record, MediaServerConnectionState::Ready);
             } else {
@@ -105,7 +126,7 @@ final readonly class MediaServerConnectionService
         return $status;
     }
 
-    /** @return list<MediaServerLibraryRef> */
+    /** @return list<array{id: string, name: string, type: ?string}> */
     public function listLibraries(PrefixedUlid $id): array
     {
         $record = $this->connections->find($id)
@@ -113,18 +134,26 @@ final readonly class MediaServerConnectionService
 
         $token = $this->requireToken($record);
 
-        return $this->clients->clientFor($record)->listLibraries($record, $token);
+        $result = $this->invoke($record, 'list_libraries', $token);
+        $choices = $result['choices'] ?? null;
+        if (! is_array($choices)) {
+            throw MediaServerException::withCode('media_server_list_libraries_failed', 'External library discovery returned invalid choices.');
+        }
+
+        $libraries = [];
+        foreach ($choices as $choice) {
+            if (is_array($choice) && is_string($choice['value'] ?? null) && is_string($choice['label'] ?? null)) {
+                $libraries[] = ['id' => $choice['value'], 'name' => $choice['label'], 'type' => null];
+            }
+        }
+
+        return $libraries;
     }
 
     /** @return array<string, mixed> */
     public function settings(MediaServerConnectionRecord $record): array
     {
-        return $record->settings?->toArray() ?? [];
-    }
-
-    public function libraryFromSettings(MediaServerConnectionRecord $record): ?MediaServerLibraryRef
-    {
-        return $record->settings?->toLibraryRef();
+        return $record->settings ?? [];
     }
 
     private function storeToken(MediaServerConnectionRecord $record, string $token): void
@@ -148,5 +177,82 @@ final readonly class MediaServerConnectionService
         }
 
         return $token;
+    }
+
+    /** @return array<string, mixed> */
+    private function invoke(MediaServerConnectionRecord $connection, string $operationKey, string $token): array
+    {
+        $definition = $this->plugins->findByLogicalKey($connection->type);
+        $operation = $definition?->operations[$operationKey] ?? null;
+        if ($definition === null || ! $definition->available() || $operation === null) {
+            throw MediaServerException::withCode('media_server_operation_unsupported', 'External connection operation is unavailable.');
+        }
+
+        $stage = sys_get_temp_dir() . '/stashd-external-connection-' . bin2hex(random_bytes(6));
+        if (! mkdir($stage, 0o775, true) && ! is_dir($stage)) {
+            throw MediaServerException::withCode('media_server_unavailable', 'Could not create operation staging directory.');
+        }
+
+        try {
+            return (new PluginHostClient($definition->socketPath))->broadcastOperation(
+                $definition->componentPath,
+                $stage,
+                [
+                    'reference' => (string) $connection->id,
+                    'settings' => [
+                        ['key' => 'server_url', 'value' => ['kind' => 'text', 'value' => $connection->baseUri]],
+                        ['key' => 'credential_name', 'value' => ['kind' => 'text', 'value' => $definition->credentialName ?? '']],
+                        ...$this->settingEntries($connection->settings ?? []),
+                    ],
+                    'items' => [],
+                ],
+                $operation,
+                $this->grants->forConnection($definition, $connection, $token),
+                getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR') ?: null,
+            );
+        } catch (MediaServerException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            throw MediaServerException::withCode('media_server_unavailable', 'External connection operation failed.', $exception);
+        } finally {
+            foreach (glob($stage . '/*') ?: [] as $path) {
+                @unlink($path);
+            }
+            @rmdir($stage);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     * @return array<string, string>
+     */
+    private function values(array $result): array
+    {
+        /** @var array<string, string> $values */
+        $values = [];
+        /** @var list<array<string, mixed>> $settings */
+        $settings = is_array($result['values'] ?? null) ? $result['values'] : [];
+        foreach ($settings as $setting) {
+            if (is_string($setting['key'] ?? null) && is_scalar($setting['value'] ?? null)) {
+                $values[$setting['key']] = (string) $setting['value'];
+            }
+        }
+        return $values;
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     * @return list<array{key: string, value: array{kind: 'text', value: string}}>
+     */
+    private function settingEntries(array $settings): array
+    {
+        /** @var list<array{key: string, value: array{kind: 'text', value: string}}> $entries */
+        $entries = [];
+        foreach ($settings as $key => $value) {
+            if (is_scalar($value)) {
+                $entries[] = ['key' => $key, 'value' => ['kind' => 'text', 'value' => (string) $value]];
+            }
+        }
+        return $entries;
     }
 }

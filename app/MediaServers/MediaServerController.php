@@ -148,7 +148,7 @@ final readonly class MediaServerController
         }
 
         return new Json([
-            'libraries' => array_map(static fn ($library): array => $library->toArray(), $libraries),
+            'libraries' => $libraries,
         ]);
     }
 
@@ -170,7 +170,7 @@ final readonly class MediaServerController
             ], Status::BAD_REQUEST);
         }
 
-        return new Json(['status' => ApiJson::encode($status->toArray())]);
+        return new Json(['status' => ApiJson::encode($status)]);
     }
 
     private function notFound(string $message): Json

@@ -20,6 +20,7 @@ final class MediaServerConnectionRepository
     ) {
     }
 
+    /** @param array<string, mixed>|null $settings */
     public function create(
         string $type,
         string $name,
@@ -29,13 +30,15 @@ final class MediaServerConnectionRepository
         ?string $tokenSecretId = null,
     ): MediaServerConnectionRecord {
         $id = $this->ids->generate('mserver')->toString();
+        /** @var array<string, mixed>|null $normalizedSettings */
+        $normalizedSettings = $settings;
         $record = new MediaServerConnectionRecord(
             type: $type,
             name: $name,
             baseUri: $baseUri,
             state: $state,
             tokenSecretId: $tokenSecretId,
-            settings: MediaServerLibrarySelection::fromArray($settings),
+            settings: $normalizedSettings,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);

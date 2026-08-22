@@ -8,7 +8,6 @@ use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemId;
 use App\Broadcasts\BroadcastLifecycleService;
 use App\MediaServers\MediaServerConnectionRecord;
-use App\MediaServers\MediaServerLibrarySelection;
 use App\Stashes\StashInputRepository;
 use App\System\Activity\ActivityEventRecord;
 use App\System\Secret\SecretRecord;
@@ -198,7 +197,7 @@ test('media server connection stores token through secrets service', function ()
     expect($plaintext)->toBe('super-secret-jellyfin-token-value');
 });
 
-test('media server connection stores library selection as a typed value object', function (): void {
+test('connection stores plugin-defined settings without a library domain object', function (): void {
     $headers = $this->authHeaders();
 
     $response = $this->http->post('/api/v1/media-servers', [
@@ -216,8 +215,7 @@ test('media server connection stores library selection as a typed value object',
     $connection = MediaServerConnectionRecord::findById(new PrimaryKey($response->body['media_server']['id']));
 
     expect($connection)->not->toBeNull()
-        ->and($connection->settings)->toBeInstanceOf(MediaServerLibrarySelection::class)
-        ->and($connection->settings?->toArray())->toBe([
+        ->and($connection->settings)->toBe([
             'libraryId' => '1',
             'libraryName' => 'TV Shows',
             'libraryType' => 'show',

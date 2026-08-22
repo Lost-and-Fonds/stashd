@@ -25,7 +25,8 @@ final class MediaServerConnectionRecord
         public MediaServerConnectionState $state,
         #[Hidden]
         public ?string $tokenSecretId = null,
-        public ?MediaServerLibrarySelection $settings = null,
+        /** @var array<string, mixed>|null Plugin-defined connection settings. */
+        public ?array $settings = null,
         public ?DateTime $lastCheckedAt = null,
         public ?string $lastError = null,
         public ?DateTime $createdAt = null,
