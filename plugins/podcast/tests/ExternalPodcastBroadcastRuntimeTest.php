@@ -166,7 +166,7 @@ test('failed Podcast helper does not promote a derived Asset', function (): void
 
     $backup = $helper . '.test-backup';
     rename($helper, $backup);
-    copy(__DIR__ . '/../fixtures/podcast/failing-ffmpeg.sh', $helper);
+    copy(dirname(__DIR__) . '/fixtures/failing-ffmpeg.sh', $helper);
     chmod($helper, 0755);
 
     try {
@@ -231,7 +231,7 @@ function externalPodcastVideoRuntimeAsset(StashdConfig $config, AssetRepository 
     $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
     $path = $config->vaultPath() . '/external-podcast-tests/' . $media->providerItemId . '/video-with-audio.mp4';
     mkdir(dirname($path), 0775, true);
-    copy(__DIR__ . '/../fixtures/podcast/video-with-audio.mp4', $path);
+    copy(dirname(__DIR__) . '/fixtures/video-with-audio.mp4', $path);
     $assets->create(
         mediaItemId: MediaItemId::parse($mediaItemId),
         role: AssetRole::VaultOriginal,

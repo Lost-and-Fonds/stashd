@@ -170,21 +170,12 @@ final readonly class BroadcastLifecycleService
         $this->applyVerifyState($broadcast, $verify);
         $this->broadcasts->save($broadcast);
 
-        $trigger = null;
-
-        if ($verify->ok && $this->shouldAutoTrigger($broadcast) && ! ($plugin instanceof \App\Plugins\ExternalBroadcastPlugin)) {
-            if ($onProgress !== null) {
-                $onProgress('Triggering media server scan');
-            }
-            $trigger = $this->triggers->execute($broadcast, 'post_rebuild')->toArray();
-        }
-
         return new BroadcastLifecycleResult(
             plan: $plan->toArray(),
             publish: $publish->toArray(),
             verify: $verify->toArray(),
             prune: $prune?->toArray(),
-            trigger: $trigger,
+            trigger: null,
         );
     }
 
@@ -233,21 +224,11 @@ final readonly class BroadcastLifecycleService
         $this->applyVerifyState($broadcast, $verify);
         $this->broadcasts->save($broadcast);
 
-        $trigger = null;
-
-        if ($verify->ok && $this->shouldAutoTrigger($broadcast) && ! ($plugin->plugin instanceof \App\Plugins\ExternalBroadcastPlugin)) {
-            if ($onProgress !== null) {
-                $onProgress('Triggering media server scan');
-            }
-
-            $trigger = $this->triggers->execute($broadcast, 'post_rebuild_item')->toArray();
-        }
-
         return new BroadcastLifecycleResult(
             plan: $itemPlan->toArray(),
             publish: $publish->toArray(),
             verify: $verify->toArray(),
-            trigger: $trigger,
+            trigger: null,
         );
     }
 
@@ -384,11 +365,6 @@ final readonly class BroadcastLifecycleService
         $plugin = $this->resolvePlugin($context->broadcast->type);
 
         return $plugin->plugin->verify($context);
-    }
-
-    private function shouldAutoTrigger(\App\Broadcasts\BroadcastRecord $broadcast): bool
-    {
-        return (bool) ($broadcast->settings['auto_trigger_scan'] ?? false);
     }
 
     private function transitionToProcessing(\App\Broadcasts\BroadcastRecord $broadcast): void

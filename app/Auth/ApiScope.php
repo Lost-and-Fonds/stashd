@@ -15,7 +15,11 @@ enum ApiScope: string
     case StashWrite = 'stash:write';
     case BroadcastRead = 'broadcast:read';
     case BroadcastWrite = 'broadcast:write';
+    case ConnectionsRead = 'connections:read';
+    case ConnectionsWrite = 'connections:write';
+    /** @deprecated Historical token scope retained for old credentials. */
     case MediaServerRead = 'media-server:read';
+    /** @deprecated Historical token scope retained for old credentials. */
     case MediaServerWrite = 'media-server:write';
     case CommandsCreate = 'commands:create';
     case TokensManage = 'tokens:manage';

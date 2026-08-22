@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
-use App\MediaServers\MediaServerConnectionRecord;
+use App\Connections\ConnectionRecord;
 
 /** Builds generic invocation grants from an existing configured connection. */
 final readonly class PluginHttpGrantFactory
@@ -16,7 +16,7 @@ final readonly class PluginHttpGrantFactory
     /** @return list<PluginHttpGrant> */
     public function forConnection(
         ExternalBroadcastPluginDefinition $definition,
-        MediaServerConnectionRecord $connection,
+        ConnectionRecord $connection,
         string $token,
     ): array {
         if ($definition->credentialName === null || $definition->credentialParameter === null) {

@@ -114,6 +114,10 @@ if (! is_string(getenv('STASHD_PLUGIN_HELPER_EXECUTABLE')) || trim((string) gete
     putenv('STASHD_PLUGIN_HELPER_EXECUTABLE=' . dirname(__DIR__) . '/tests/fixtures/providers/youtube/fake-yt-dlp.sh');
 }
 
+if (! is_string(getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR')) || trim((string) getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR')) === '') {
+    putenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR=' . dirname(__DIR__) . '/tests/fixtures/media_servers/http');
+}
+
 foreach ([$data, $media] as $directory) {
     if (! is_dir($directory)) {
         mkdir($directory, 0775, true);
@@ -211,4 +215,4 @@ pest()->extend(IntegrationTestCase::class)
             $this->container->get(\App\System\Boot\SqliteConfigurator::class)->configure($sqlite);
         }
     })
-    ->in('Feature');
+    ->in('Feature', '../plugins/podcast/tests');

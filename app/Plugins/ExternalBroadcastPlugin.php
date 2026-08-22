@@ -28,8 +28,8 @@ use App\Broadcasts\HardlinkPublisher;
 use App\Broadcasts\PublishedResourceRepository;
 use App\Broadcasts\PublishedResourceService;
 use App\Broadcasts\UiControl;
-use App\MediaServers\MediaServerConnectionRepository;
-use App\MediaServers\MediaServerConnectionSecrets;
+use App\Connections\ConnectionRepository;
+use App\Connections\ConnectionSecrets;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\StashItemId;
 use App\Support\PrefixedUlid;
@@ -68,8 +68,8 @@ final readonly class ExternalBroadcastPlugin implements
         private AssetRepository $assets,
         private MoveFileIntoVault $mover,
         private VaultPathBuilder $vaultPaths,
-        private MediaServerConnectionRepository $connections,
-        private MediaServerConnectionSecrets $connectionSecrets,
+        private ConnectionRepository $connections,
+        private ConnectionSecrets $connectionSecrets,
         private HardlinkPublisher $hardlinks,
     ) {
     }
@@ -307,6 +307,12 @@ final readonly class ExternalBroadcastPlugin implements
         foreach ($this->items->listForBroadcast(BroadcastId::fromPrimaryKey($context->broadcast->id)) as $item) {
             if ($item->publishedPath !== null && ! is_file($item->publishedPath)) {
                 $missing[] = $item->publishedPath;
+                $item->lastError = 'broadcast_item_output_missing';
+                if ($item->state !== BroadcastItemState::Stale) {
+                    $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Stale);
+                } else {
+                    $this->items->save($item);
+                }
             }
         }
         return new BroadcastVerifyResult(count($missing) === 0, count($context->stashItems) - count($missing), count($missing), [], [], $missing);
@@ -326,7 +332,32 @@ final readonly class ExternalBroadcastPlugin implements
                 $removed[] = $item->publishedPath;
             }
         }
+        $root = $this->paths->claimRoot($context->broadcast);
+        foreach (glob($root . '/*') ?: [] as $path) {
+            if (basename($path) === '.stashd-broadcast') {
+                continue;
+            }
+            $this->removeGeneratedPath($path, $removed);
+        }
         return new BroadcastPruneResult(count($removed), $removed);
+    }
+
+    /** @param list<string> $removed */
+    private function removeGeneratedPath(string $path, array &$removed): void
+    {
+        if (is_link($path) || is_file($path)) {
+            if (@unlink($path)) {
+                $removed[] = $path;
+            }
+            return;
+        }
+        if (! is_dir($path)) {
+            return;
+        }
+        foreach (glob($path . '/*') ?: [] as $child) {
+            $this->removeGeneratedPath($child, $removed);
+        }
+        @rmdir($path);
     }
 
     public function acceptsDownloadPolicy(BroadcastRecord $broadcast, DownloadPolicy $policy): bool

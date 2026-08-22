@@ -195,6 +195,9 @@ final class PluginHostClient
         ?array $httpGrants = null,
         ?string $fixtureDirectory = null,
     ): PluginBroadcastResult {
+        if (is_array($publication['published_metadata'] ?? null)) {
+            $publication['published_metadata'] = $this->encodePublishedMetadata($publication['published_metadata']);
+        }
         $broadcast['publication'] = $publication;
 
         return $this->invokeBroadcast('broadcast-finalize', 'broadcast_finalized', $componentPath, $stagingDirectory, $broadcast, null, $httpGrants, $fixtureDirectory);
@@ -316,7 +319,11 @@ final class PluginHostClient
             while (($line = fgets($socket)) !== false) {
                 $event = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
                 if (! is_array($event) || ($event['id'] ?? null) !== $requestId) {
-                    throw new RuntimeException('Plugin host returned an invalid broadcast event.');
+                    throw new RuntimeException(sprintf(
+                        'Plugin host returned an invalid broadcast event (expected id %s, got %s).',
+                        $requestId,
+                        is_array($event) && is_scalar($event['id'] ?? null) ? (string) $event['id'] : 'missing',
+                    ));
                 }
 
                 /** @var array<string, mixed> $event */
@@ -476,6 +483,31 @@ final class PluginHostClient
             ];
         }
 
+        return $encoded;
+    }
+
+    /** @param array<mixed> $metadata
+     *  @return list<array{key: string, value: array{kind: string, value: bool|int|string}}> */
+    private function encodePublishedMetadata(array $metadata): array
+    {
+        $encoded = [];
+        foreach ($metadata as $setting) {
+            if (! is_array($setting) || ! is_string($setting['key'] ?? null)) {
+                continue;
+            }
+            $value = $setting['value'] ?? null;
+            if (! is_bool($value) && ! is_int($value) && ! is_float($value) && ! is_string($value)) {
+                continue;
+            }
+            $encoded[] = [
+                'key' => $setting['key'],
+                'value' => is_bool($value)
+                    ? ['kind' => 'boolean', 'value' => $value]
+                    : (is_int($value) || is_float($value)
+                        ? ['kind' => 'number', 'value' => (int) $value]
+                        : ['kind' => 'text', 'value' => $value]),
+            ];
+        }
         return $encoded;
     }
 

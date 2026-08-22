@@ -22,7 +22,7 @@ final readonly class ApiScopePolicy
             str_starts_with($path, '/api/v1/commands') => ApiScope::CommandsCreate,
             $path === '/api/v1/events/subscription', str_starts_with($path, '/api/v1/activity') => ApiScope::ActivityRead,
             str_starts_with($path, '/api/v1/items') => ApiScope::MediaRead,
-            str_starts_with($path, '/api/v1/connections') => $read ? ApiScope::MediaServerRead : ApiScope::MediaServerWrite,
+            str_starts_with($path, '/api/v1/connections') => $read ? ApiScope::ConnectionsRead : ApiScope::ConnectionsWrite,
             str_starts_with($path, '/api/v1/broadcast'), str_contains($path, '/broadcasts') => $read ? ApiScope::BroadcastRead : ApiScope::BroadcastWrite,
             str_starts_with($path, '/api/v1/stashes') => $read ? ApiScope::StashRead : ApiScope::StashWrite,
             default => null,

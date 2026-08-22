@@ -77,10 +77,10 @@ final class BroadcastPluginDiscoverer implements Discovery
                 $mover = $this->container->get(MoveFileIntoVault::class);
                 /** @var VaultPathBuilder $vaultPaths */
                 $vaultPaths = $this->container->get(VaultPathBuilder::class);
-                /** @var \App\MediaServers\MediaServerConnectionRepository $connections */
-                $connections = $this->container->get(\App\MediaServers\MediaServerConnectionRepository::class);
-                /** @var \App\MediaServers\MediaServerConnectionSecrets $connectionSecrets */
-                $connectionSecrets = $this->container->get(\App\MediaServers\MediaServerConnectionSecrets::class);
+                /** @var \App\Connections\ConnectionRepository $connections */
+                $connections = $this->container->get(\App\Connections\ConnectionRepository::class);
+                /** @var \App\Connections\ConnectionSecrets $connectionSecrets */
+                $connectionSecrets = $this->container->get(\App\Connections\ConnectionSecrets::class);
                 /** @var \App\Broadcasts\HardlinkPublisher $hardlinks */
                 $hardlinks = $this->container->get(\App\Broadcasts\HardlinkPublisher::class);
                 $instance = new ExternalBroadcastPlugin(

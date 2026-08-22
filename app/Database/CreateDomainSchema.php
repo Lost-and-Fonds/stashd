@@ -9,9 +9,7 @@ use App\Broadcasts\BroadcastItemState;
 use App\Broadcasts\BroadcastState;
 use App\Broadcasts\BroadcastTriggerRunState;
 use App\Broadcasts\BroadcastTriggerState;
-use App\Broadcasts\BroadcastTriggerType;
-use App\MediaServers\MediaServerConnectionState;
-use App\MediaServers\MediaServerType;
+use App\Connections\ConnectionState;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\OrganizationMode;
 use App\Stashes\StashInputState;
@@ -107,12 +105,12 @@ final class CreateDomainSchema implements MigratesUp
     private function mediaServerConnections(): CreateTableStatement
     {
         return $this->prefixedIdTable('media_server_connections')
-            ->enum('type', MediaServerType::class)
+            ->string('type')
             ->string('name')
             ->text('baseUri')
             ->raw($this->fkColumn('tokenSecretId', 40, 'secrets', OnDelete::SET_NULL, nullable: true))
             ->text('settingsJson', nullable: true)
-            ->enum('state', MediaServerConnectionState::class, default: MediaServerConnectionState::Ready)
+            ->enum('state', ConnectionState::class, default: ConnectionState::Ready)
             ->datetime('lastCheckedAt', nullable: true)
             ->text('lastError', nullable: true)
             ->index('type')
@@ -256,7 +254,7 @@ final class CreateDomainSchema implements MigratesUp
     {
         return $this->prefixedIdTable('broadcast_triggers')
             ->raw($this->fkColumn('broadcastId', 40, 'broadcasts', OnDelete::CASCADE))
-            ->enum('type', BroadcastTriggerType::class)
+            ->string('type')
             ->boolean('enabled', default: true)
             ->text('settingsJson', nullable: true)
             ->enum('state', BroadcastTriggerState::class, default: BroadcastTriggerState::Ready)

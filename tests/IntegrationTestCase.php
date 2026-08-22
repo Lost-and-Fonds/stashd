@@ -147,15 +147,9 @@ abstract class IntegrationTestCase extends IntegrationTest
      */
     public function bootstrapFakeDownloadBroadcast(string $channel = 'broadcast-demo'): array
     {
-        [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash($channel);
+        [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapJellyfinDownloadBroadcast($channel);
 
-        $create = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-            'type' => 'jellyfin',
-            'name' => 'Broadcast Demo',
-            'slug' => $channel . '-broadcast-' . bin2hex(random_bytes(3)),
-        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
-
-        return [$headers, $stashId, $mediaItemId, $create->body['broadcast']['id']];
+        return [$headers, $stashId, $mediaItemId, $broadcastId];
     }
 
     /** @return array{0: array{Authorization: string}, 1: string, 2: string, 3: string, 4: string} */
@@ -163,10 +157,10 @@ abstract class IntegrationTestCase extends IntegrationTest
     {
         [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash($channel);
 
-        $server = $this->http->post('/api/v1/media-servers', [
-            'type' => 'jellyfin',
+        $server = $this->http->post('/api/v1/connections', [
+            'plugin_key' => 'jellyfin',
             'name' => 'Fixture Jellyfin',
-            'base_uri' => 'https://jellyfin.test',
+            'endpoint' => 'https://jellyfin.test',
             'token' => 'fixture-jellyfin-token',
             'settings' => [
                 'library_id' => 'shows-lib',
@@ -174,7 +168,7 @@ abstract class IntegrationTestCase extends IntegrationTest
             ],
         ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
 
-        $connectionId = $server->body['media_server']['id'];
+        $connectionId = $server->body['connection']['id'];
 
         $create = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
             'type' => 'jellyfin',
@@ -182,7 +176,6 @@ abstract class IntegrationTestCase extends IntegrationTest
             'slug' => $channel . '-jellyfin-' . bin2hex(random_bytes(3)),
             'settings' => [
                 'media_server_connection_id' => $connectionId,
-                'auto_trigger_scan' => true,
             ],
         ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
 

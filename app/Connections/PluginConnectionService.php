@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace App\Connections;
 
-use App\MediaServers\MediaServerConnectionRecord;
-use App\MediaServers\MediaServerConnectionRepository;
-use App\MediaServers\MediaServerConnectionSecrets;
 use App\Plugins\ExternalBroadcastPluginRegistry;
 use App\Plugins\PluginHostClient;
 use App\Plugins\PluginHttpGrantFactory;
@@ -18,8 +15,8 @@ use App\System\Secret\SecretType;
 final readonly class PluginConnectionService
 {
     public function __construct(
-        private MediaServerConnectionRepository $connections,
-        private MediaServerConnectionSecrets $tokens,
+        private ConnectionRepository $connections,
+        private ConnectionSecrets $tokens,
         private ExternalBroadcastPluginRegistry $plugins,
         private PluginHttpGrantFactory $grants,
         private SecretsService $secrets,
@@ -29,16 +26,16 @@ final readonly class PluginConnectionService
 
     /** @param array<string, mixed>|null $settings */
     public function create(
-        string $type,
+        string $pluginKey,
         string $name,
-        string $baseUri,
+        string $endpoint,
         #[\SensitiveParameter] ?string $token = null,
         ?array $settings = null,
-    ): MediaServerConnectionRecord {
+    ): ConnectionRecord {
         $record = $this->connections->create(
-            type: $type,
+            pluginKey: $pluginKey,
             name: $name,
-            baseUri: rtrim(trim($baseUri), '/'),
+            endpoint: rtrim(trim($endpoint), '/'),
             settings: $settings,
         );
 
@@ -53,10 +50,10 @@ final readonly class PluginConnectionService
     public function update(
         PrefixedUlid $id,
         ?string $name = null,
-        ?string $baseUri = null,
+        ?string $endpoint = null,
         ?array $settings = null,
         #[\SensitiveParameter] ?string $token = null,
-    ): MediaServerConnectionRecord {
+    ): ConnectionRecord {
         $record = $this->connections->find($id)
             ?? throw ConnectionException::withCode('connection_not_found', 'Connection not found.');
 
@@ -64,8 +61,8 @@ final readonly class PluginConnectionService
             $record->name = $name;
         }
 
-        if ($baseUri !== null) {
-            $record->baseUri = rtrim(trim($baseUri), '/');
+        if ($endpoint !== null) {
+            $record->baseUri = rtrim(trim($endpoint), '/');
         }
 
         if ($settings !== null) {
@@ -95,12 +92,12 @@ final readonly class PluginConnectionService
     }
 
     /** @return array<string, mixed> */
-    public function settings(MediaServerConnectionRecord $record): array
+    public function settings(ConnectionRecord $record): array
     {
         return $record->settings ?? [];
     }
 
-    private function storeToken(MediaServerConnectionRecord $record, string $token): void
+    private function storeToken(ConnectionRecord $record, string $token): void
     {
         $secretKey = 'media_server:' . (string) $record->id . ':token';
         $this->secrets->put($secretKey, SecretType::MediaServerToken, $token);
@@ -112,7 +109,7 @@ final readonly class PluginConnectionService
         $this->connections->save($record);
     }
 
-    private function requireToken(MediaServerConnectionRecord $record): string
+    private function requireToken(ConnectionRecord $record): string
     {
         $token = $this->tokens->resolve($record);
 
@@ -127,7 +124,7 @@ final readonly class PluginConnectionService
      * @param array<string, scalar> $payload
      * @return array<string, mixed>
      */
-    private function invoke(MediaServerConnectionRecord $connection, string $operationKey, string $token, array $payload = []): array
+    private function invoke(ConnectionRecord $connection, string $operationKey, string $token, array $payload = []): array
     {
         $definition = $this->plugins->findByLogicalKey($connection->type);
         $operation = $definition?->operations[$operationKey] ?? null;

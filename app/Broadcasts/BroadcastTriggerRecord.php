@@ -22,10 +22,11 @@ final class BroadcastTriggerRecord
 
     public function __construct(
         public BroadcastId $broadcastId,
-        public BroadcastTriggerType $type,
+        public string $type,
         public bool $enabled,
         public BroadcastTriggerState $state,
-        public ?MediaServerScanTriggerSettings $settings = null,
+        /** @var array<string, scalar|null>|null */
+        public ?array $settings = null,
         public ?DateTime $lastTriggeredAt = null,
         public ?DateTime $lastSuccessAt = null,
         public ?DateTime $lastFailureAt = null,

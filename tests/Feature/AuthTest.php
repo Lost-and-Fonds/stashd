@@ -453,13 +453,13 @@ test('a stash-write token can mutate stashes but cannot read unrelated media', f
     $this->http->get('/api/v1/items', headers: $headers)->assertStatus(Status::FORBIDDEN);
 });
 
-test('a media-server-write token can mutate media servers but cannot administer tokens', function (): void {
-    $headers = $this->scopedAuthHeaders(['media-server:write']);
+test('a connection-write token can mutate connections but cannot administer tokens', function (): void {
+    $headers = $this->scopedAuthHeaders(['connections:write']);
 
-    $this->http->post('/api/v1/media-servers', [
-        'type' => 'jellyfin',
+    $this->http->post('/api/v1/connections', [
+        'plugin_key' => 'jellyfin',
         'name' => 'Scoped Jellyfin',
-        'base_uri' => 'https://jellyfin.test',
+        'endpoint' => 'https://jellyfin.test',
         'token' => 'fixture-secret',
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->http->get('/api/v1/auth/tokens', headers: $headers)->assertStatus(Status::FORBIDDEN);

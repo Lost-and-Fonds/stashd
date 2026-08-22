@@ -7,7 +7,6 @@ namespace App\Connections;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
-use App\MediaServers\MediaServerConnectionRepository;
 use App\Plugins\ExternalBroadcastPluginRegistry;
 use App\Support\PrefixedUlid;
 use Tempest\Http\Request;
@@ -24,7 +23,7 @@ use Tempest\Router\WithMiddleware;
 final readonly class ConnectionController
 {
     public function __construct(
-        private MediaServerConnectionRepository $connections,
+        private ConnectionRepository $connections,
         private PluginConnectionService $service,
         private ExternalBroadcastPluginRegistry $plugins,
     ) {
@@ -45,11 +44,11 @@ final readonly class ConnectionController
     public function create(Request $request): Json
     {
         $body = $this->requestBody($request);
-        $typeRaw = trim($this->stringValue($body['plugin_key'] ?? $body['type'] ?? null));
+        $typeRaw = trim($this->stringValue($body['plugin_key'] ?? $body['pluginKey'] ?? $body['type'] ?? null));
         $name = trim($this->stringValue($body['name'] ?? null));
-        $baseUri = trim($this->stringValue($body['endpoint'] ?? $body['base_uri'] ?? $body['baseUri'] ?? null));
+        $endpoint = trim($this->stringValue($body['endpoint'] ?? $body['base_uri'] ?? $body['baseUri'] ?? null));
 
-        if ($typeRaw === '' || $name === '' || $baseUri === '') {
+        if ($typeRaw === '' || $name === '' || $endpoint === '') {
             return $this->validationError('plugin_key, name, and endpoint are required.');
         }
 
@@ -61,9 +60,9 @@ final readonly class ConnectionController
         $settings = is_array($body['settings'] ?? null) ? ApiJson::encode($body['settings']) : null;
 
         $connection = $this->service->create(
-            type: $typeRaw,
+            pluginKey: $typeRaw,
             name: $name,
-            baseUri: $baseUri,
+            endpoint: $endpoint,
             token: $token,
             settings: $settings,
         );
@@ -96,7 +95,7 @@ final readonly class ConnectionController
             $connection = $this->service->update(
                 id: PrefixedUlid::parse($id),
                 name: isset($body['name']) ? trim($this->stringValue($body['name'])) : null,
-                baseUri: isset($body['endpoint']) || isset($body['base_uri']) || isset($body['baseUri'])
+                endpoint: isset($body['endpoint']) || isset($body['base_uri']) || isset($body['baseUri'])
                     ? trim($this->stringValue($body['endpoint'] ?? $body['base_uri'] ?? $body['baseUri']))
                     : null,
                 settings: is_array($body['settings'] ?? null) ? ApiJson::encode($body['settings']) : null,

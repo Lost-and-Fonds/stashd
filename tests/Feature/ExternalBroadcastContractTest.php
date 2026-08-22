@@ -7,7 +7,7 @@ namespace Tests\Feature;
 use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemId;
 use App\Broadcasts\BroadcastLifecycleService;
-use App\MediaServers\MediaServerConnectionRecord;
+use App\Connections\ConnectionRecord;
 use App\Stashes\StashInputRepository;
 use App\System\Secret\SecretRecord;
 use App\System\Secret\SecretsService;
@@ -65,10 +65,10 @@ test('external Broadcast materializes plugin-selected media and subtitle resourc
     requireExternalInputPluginRuntime($this);
     [$headers, $stashId, $mediaItemId] = array_slice($this->bootstrapFakeDownloadStash('plex-rebuild'), 0, 3);
 
-    $server = $this->http->post('/api/v1/media-servers', [
-        'type' => 'plex',
+    $server = $this->http->post('/api/v1/connections', [
+        'plugin_key' => 'plex',
         'name' => 'Fixture Plex',
-        'base_uri' => 'https://plex.test',
+        'endpoint' => 'https://plex.test',
         'token' => 'fixture-plex-token',
         'settings' => ['library_id' => '1', 'library_name' => 'TV Shows'],
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -78,7 +78,7 @@ test('external Broadcast materializes plugin-selected media and subtitle resourc
         'name' => 'Plex Demo',
         'slug' => 'plex-demo-' . bin2hex(random_bytes(3)),
         'settings' => [
-            'media_server_connection_id' => $server->body['media_server']['id'],
+            'media_server_connection_id' => $server->body['connection']['id'],
             'captions' => 'creator_only',
             'caption_languages' => 'en',
         ],
@@ -141,13 +141,13 @@ test('external Broadcast materializes plugin-selected media and subtitle resourc
 test('external Broadcast source settings survive the normal lifecycle', function (): void {
     requireExternalInputPluginRuntime($this);
     [$headers, $stashId, $mediaItemId] = array_slice($this->bootstrapFakeDownloadStash('plex-source-settings'), 0, 3);
-    $server = $this->http->post('/api/v1/media-servers', [
-        'type' => 'plex', 'name' => 'Fixture Plex', 'base_uri' => 'https://plex.test', 'token' => 'fixture-plex-token',
+    $server = $this->http->post('/api/v1/connections', [
+        'plugin_key' => 'plex', 'name' => 'Fixture Plex', 'endpoint' => 'https://plex.test', 'token' => 'fixture-plex-token',
         'settings' => ['library_id' => '1', 'library_name' => 'TV Shows'],
     ], headers: $headers)->assertStatus(Status::CREATED);
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
         'type' => 'plex', 'name' => 'Plex Source Settings', 'slug' => 'plex-source-' . bin2hex(random_bytes(3)),
-        'settings' => ['media_server_connection_id' => $server->body['media_server']['id']],
+        'settings' => ['media_server_connection_id' => $server->body['connection']['id']],
     ], headers: $headers)->assertStatus(Status::CREATED);
     $input = $this->container->get(StashInputRepository::class)->listForStash(\App\Stashes\StashId::parse($stashId))[0];
     $this->http->patch('/api/v1/broadcasts/' . $broadcast->body['broadcast']['id'] . '/source-settings', [
@@ -168,19 +168,19 @@ test('external Broadcast source settings survive the normal lifecycle', function
         ->and($item['published_path'])->toBeString();
 });
 
-test('media server connection stores token through secrets service', function (): void {
+test('connection stores token through secrets service', function (): void {
     $headers = $this->authHeaders();
 
-    $response = $this->http->post('/api/v1/media-servers', [
-        'type' => 'jellyfin',
+    $response = $this->http->post('/api/v1/connections', [
+        'plugin_key' => 'jellyfin',
         'name' => 'Secret Jellyfin',
-        'base_uri' => 'https://jellyfin.test',
+        'endpoint' => 'https://jellyfin.test',
         'token' => 'super-secret-jellyfin-token-value',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $connection = \App\MediaServers\MediaServerConnectionRecord::select()
+    $connection = ConnectionRecord::select()
         ->include('tokenSecretId')
-        ->get(new \Tempest\Database\PrimaryKey($response->body['media_server']['id']));
+        ->get(new \Tempest\Database\PrimaryKey($response->body['connection']['id']));
 
     expect($connection?->tokenSecretId)->not->toBeNull()
         ->and($connection?->tokenSecretId)->toStartWith('secret_');
@@ -196,13 +196,13 @@ test('media server connection stores token through secrets service', function ()
     expect($plaintext)->toBe('super-secret-jellyfin-token-value');
 });
 
-test('connection stores plugin-defined settings without a library domain object', function (): void {
+test('connection stores opaque plugin-defined settings', function (): void {
     $headers = $this->authHeaders();
 
-    $response = $this->http->post('/api/v1/media-servers', [
-        'type' => 'plex',
+    $response = $this->http->post('/api/v1/connections', [
+        'plugin_key' => 'plex',
         'name' => 'Library Plex',
-        'base_uri' => 'https://plex.test',
+        'endpoint' => 'https://plex.test',
         'token' => 'fixture-token',
         'settings' => [
             'library_id' => '1',
@@ -211,7 +211,7 @@ test('connection stores plugin-defined settings without a library domain object'
         ],
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $connection = MediaServerConnectionRecord::findById(new PrimaryKey($response->body['media_server']['id']));
+    $connection = ConnectionRecord::findById(new PrimaryKey($response->body['connection']['id']));
 
     expect($connection)->not->toBeNull()
         ->and($connection->settings)->toBe([
@@ -219,7 +219,7 @@ test('connection stores plugin-defined settings without a library domain object'
             'library_name' => 'TV Shows',
             'library_type' => 'show',
         ])
-        ->and($response->body['media_server']['settings'])->toBe([
+        ->and($response->body['connection']['settings'])->toBe([
             'library_id' => '1',
             'library_name' => 'TV Shows',
             'library_type' => 'show',
@@ -227,31 +227,28 @@ test('connection stores plugin-defined settings without a library domain object'
 
     $row = $this->container->get(Database::class)->fetchFirst(new Query(
         'SELECT settings FROM media_server_connections WHERE id = ?',
-        bindings: [$response->body['media_server']['id']],
+        bindings: [$response->body['connection']['id']],
     ));
     $storedSettings = json_decode((string) $row['settings'], true, flags: JSON_THROW_ON_ERROR);
 
     expect($storedSettings)->toBe([
-        'type' => 'media_server_library_selection',
-        'data' => [
-            'libraryId' => '1',
-            'libraryName' => 'TV Shows',
-            'libraryType' => 'show',
-        ],
+        'library_id' => '1',
+        'library_name' => 'TV Shows',
+        'library_type' => 'show',
     ]);
 });
 
 test('generic connection operation returns plugin values', function (): void {
     $headers = $this->authHeaders();
 
-    $server = $this->http->post('/api/v1/media-servers', [
-        'type' => 'jellyfin',
+    $server = $this->http->post('/api/v1/connections', [
+        'plugin_key' => 'jellyfin',
         'name' => 'Test Jellyfin',
-        'base_uri' => 'https://jellyfin.test',
+        'endpoint' => 'https://jellyfin.test',
         'token' => 'fixture-token',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $result = $this->http->post('/api/v1/connections/' . $server->body['media_server']['id'] . '/operations/test_connection', headers: $headers)
+    $result = $this->http->post('/api/v1/connections/' . $server->body['connection']['id'] . '/operations/test_connection', headers: $headers)
         ->assertOk();
     expect($result->body['values'])->toContain(['key' => 'ok', 'value' => 'true']);
 });
@@ -259,14 +256,14 @@ test('generic connection operation returns plugin values', function (): void {
 test('generic connection operation failure does not leak token', function (): void {
     $headers = $this->authHeaders();
 
-    $server = $this->http->post('/api/v1/media-servers', [
-        'type' => 'jellyfin',
+    $server = $this->http->post('/api/v1/connections', [
+        'plugin_key' => 'jellyfin',
         'name' => 'Fail Jellyfin',
-        'base_uri' => 'https://jellyfin-fail.test',
+        'endpoint' => 'https://jellyfin-fail.test',
         'token' => 'leaked-token-should-not-appear',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $sync = $this->http->post('/api/v1/connections/' . $server->body['media_server']['id'] . '/operations/test_connection', headers: $headers);
+    $sync = $this->http->post('/api/v1/connections/' . $server->body['connection']['id'] . '/operations/test_connection', headers: $headers);
     $sync->assertStatus(Status::BAD_REQUEST);
     expect(json_encode($sync->body))->not->toContain('leaked-token-should-not-appear');
 });
@@ -274,33 +271,33 @@ test('generic connection operation failure does not leak token', function (): vo
 test('generic connection operation returns opaque choices', function (): void {
     $headers = $this->authHeaders();
 
-    $server = $this->http->post('/api/v1/media-servers', [
-        'type' => 'plex',
+    $server = $this->http->post('/api/v1/connections', [
+        'plugin_key' => 'plex',
         'name' => 'Library Plex',
-        'base_uri' => 'https://plex.test',
+        'endpoint' => 'https://plex.test',
         'token' => 'fixture-token',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $libraries = $this->http->post('/api/v1/connections/' . $server->body['media_server']['id'] . '/operations/list_libraries', headers: $headers);
+    $libraries = $this->http->post('/api/v1/connections/' . $server->body['connection']['id'] . '/operations/list_libraries', headers: $headers);
     $libraries->assertOk();
 
-    expect($libraries->body['choices'][0])->toBe(['value' => '1', 'label' => 'TV Shows']);
+    expect($libraries->body['choices'][0])->toBe(['label' => 'TV Shows', 'value' => '1']);
 });
 
-test('external media server operations return generic library choices', function (): void {
+test('external operations return generic choices', function (): void {
     $headers = $this->authHeaders();
 
-    $server = $this->http->post('/api/v1/media-servers', [
-        'type' => 'jellyfin',
+    $server = $this->http->post('/api/v1/connections', [
+        'plugin_key' => 'jellyfin',
         'name' => 'Library Jellyfin',
-        'base_uri' => 'https://jellyfin.test',
+        'endpoint' => 'https://jellyfin.test',
         'token' => 'fixture-token',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $libraries = $this->http->post('/api/v1/connections/' . $server->body['media_server']['id'] . '/operations/list_libraries', headers: $headers);
+    $libraries = $this->http->post('/api/v1/connections/' . $server->body['connection']['id'] . '/operations/list_libraries', headers: $headers);
     $libraries->assertOk();
 
-    expect($libraries->body['choices'][0])->toBe(['value' => 'shows-lib', 'label' => 'TV Shows']);
+    expect($libraries->body['choices'][0])->toBe(['label' => 'TV Shows', 'value' => 'shows-lib']);
 });
 
 test('external jellyfin rebuild refreshes through the Component with POST after publication', function (): void {
@@ -334,10 +331,10 @@ test('external jellyfin refresh failure leaves the published file and reports fa
         3,
     );
 
-    $server = $this->http->post('/api/v1/media-servers', [
-        'type' => 'jellyfin',
+    $server = $this->http->post('/api/v1/connections', [
+        'plugin_key' => 'jellyfin',
         'name' => 'Failing Fixture Jellyfin',
-        'base_uri' => 'https://jellyfin-fail.test',
+        'endpoint' => 'https://jellyfin-fail.test',
         'token' => 'fixture-jellyfin-token',
         'settings' => [
             'library_id' => 'shows-lib',
@@ -350,8 +347,7 @@ test('external jellyfin refresh failure leaves the published file and reports fa
         'name' => 'Failing Jellyfin Demo Series',
         'slug' => 'jellyfin-refresh-failure-' . bin2hex(random_bytes(3)),
         'settings' => [
-            'media_server_connection_id' => $server->body['media_server']['id'],
-            'auto_trigger_scan' => true,
+            'media_server_connection_id' => $server->body['connection']['id'],
         ],
     ], headers: $headers)->assertStatus(Status::CREATED);
 

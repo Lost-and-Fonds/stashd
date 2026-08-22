@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\MediaServers;
+namespace App\Connections;
 
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
@@ -11,19 +11,21 @@ use Tempest\DateTime\DateTime;
 use Tempest\Mapper\Hidden;
 
 #[Table(name: 'media_server_connections')]
-final class MediaServerConnectionRecord
+final class ConnectionRecord
 {
     use IsDatabaseModel;
 
     public PrimaryKey $id;
 
     public function __construct(
-        /** Logical plugin key retained in the legacy connection table for upgrade compatibility. */
+        /** Historical column name; this is the opaque installed-plugin key. */
         public string $type,
         public string $name,
+        /** Historical column name; this is the approved remote endpoint. */
         public string $baseUri,
-        public MediaServerConnectionState $state,
+        public ConnectionState $state,
         #[Hidden]
+        /** Historical column name for the encrypted credential reference. */
         public ?string $tokenSecretId = null,
         /** @var array<string, mixed>|null Plugin-defined connection settings. */
         public ?array $settings = null,

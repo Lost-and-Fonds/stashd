@@ -180,10 +180,10 @@ final readonly class BroadcastJobHandler implements JobHandler
         JobHandlerContext $context,
         BroadcastId $broadcastId,
     ): array {
-        $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Triggering media server scan'));
+        $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Running broadcast operation'));
         $trigger = $this->lifecycle->trigger($broadcastId);
         $this->recordTriggerActivity($command, $job, $broadcastId, $trigger->toArray());
-        $context->progress($job, JobProgressUpdate::ofSteps(2, 2, 'Broadcast trigger complete'));
+        $context->progress($job, JobProgressUpdate::ofSteps(2, 2, 'Broadcast operation complete'));
 
         return ['trigger' => $trigger->toArray()];
     }
@@ -196,9 +196,9 @@ final readonly class BroadcastJobHandler implements JobHandler
         array $trigger,
     ): void {
         if (($trigger['failure_count'] ?? 0) > 0) {
-            $this->activity->broadcastTriggerFailed($command, $job, $broadcastId, $trigger);
+            $this->activity->broadcastOperationFailed($command, $job, $broadcastId, $trigger);
         } elseif (($trigger['success_count'] ?? 0) > 0) {
-            $this->activity->broadcastTriggerSucceeded($command, $job, $broadcastId, $trigger);
+            $this->activity->broadcastOperationSucceeded($command, $job, $broadcastId, $trigger);
         }
     }
 

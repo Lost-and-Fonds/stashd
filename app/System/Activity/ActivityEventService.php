@@ -411,7 +411,7 @@ final readonly class ActivityEventService
     }
 
     /** @param array<string, mixed> $trigger */
-    public function broadcastTriggerSucceeded(
+    public function broadcastOperationSucceeded(
         CommandRecord $command,
         JobRecord $job,
         BroadcastId $broadcastId,
@@ -420,7 +420,7 @@ final readonly class ActivityEventService
         return $this->emit(
             level: ActivityLevel::Success,
             type: 'broadcast.trigger_succeeded',
-            message: 'Media server scan trigger succeeded.',
+            message: 'Broadcast operation succeeded.',
             entityType: 'broadcast',
             entityId: $broadcastId->toString(),
             jobId: (string) $job->id,
@@ -433,7 +433,7 @@ final readonly class ActivityEventService
     }
 
     /** @param array<string, mixed> $trigger */
-    public function broadcastTriggerFailed(
+    public function broadcastOperationFailed(
         CommandRecord $command,
         JobRecord $job,
         BroadcastId $broadcastId,
@@ -442,7 +442,7 @@ final readonly class ActivityEventService
         return $this->emit(
             level: ActivityLevel::Warning,
             type: 'broadcast.trigger_failed',
-            message: 'Media server scan trigger failed; broadcast files remain valid.',
+            message: 'Broadcast operation failed; broadcast files remain valid.',
             entityType: 'broadcast',
             entityId: $broadcastId->toString(),
             jobId: (string) $job->id,

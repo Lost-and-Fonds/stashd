@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace App\Connections;
 
 use App\Http\Api\ApiJson;
-use App\MediaServers\MediaServerConnectionRecord;
 
 final readonly class ConnectionResource
 {
     public function __construct(
-        private MediaServerConnectionRecord $connection,
+        private ConnectionRecord $connection,
     ) {
     }
 
-    public static function fromRecord(MediaServerConnectionRecord $connection): self
+    public static function fromRecord(ConnectionRecord $connection): self
     {
         return new self($connection);
     }

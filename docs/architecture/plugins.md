@@ -634,8 +634,8 @@ generic core suite asserting its behavior.
 The active connection API is generic:
 `/api/v1/connections/{id}/operations/{operation}`. It dispatches by opaque
 plugin key and returns opaque operation values/choices. The historical
-`media_server_connections` table and `MediaServerConnection*` persistence
-classes remain only as an upgrade-compatible storage layer for reusable
+`media_server_connections` table and historical column names remain only as
+an upgrade-compatible storage layer for reusable
 endpoint, settings, and encrypted credentials. Core does not parse library
 responses or execute provider scan triggers, and does not expose a first-class
 library or media-server operation. A broader `PluginConnection` framework

@@ -113,8 +113,8 @@ test('rebuild refuses to touch a pre-existing directory Stashd did not create', 
 });
 
 test('two broadcasts of the same type and name collide on the default root with a clear error, not a silent clobber', function (): void {
-    [$headersA, $stashIdA, $mediaItemIdA] = $this->bootstrapFakeDownloadStash('destination-path-collide-a');
-    [$headersB, $stashIdB, $mediaItemIdB] = $this->bootstrapFakeDownloadStash('destination-path-collide-b');
+    [$headersA, $stashIdA, $mediaItemIdA, , $connectionA] = $this->bootstrapJellyfinDownloadBroadcast('destination-path-collide-a');
+    [$headersB, $stashIdB, $mediaItemIdB, , $connectionB] = $this->bootstrapJellyfinDownloadBroadcast('destination-path-collide-b');
 
     foreach ([[$headersA, $mediaItemIdA, $stashIdA], [$headersB, $mediaItemIdB, $stashIdB]] as [$headers, $mediaItemId, $stashId]) {
         $this->http->post('/api/v1/commands', [
@@ -128,12 +128,14 @@ test('two broadcasts of the same type and name collide on the default root with 
         'type' => 'jellyfin',
         'name' => 'Duplicate Name Show',
         'slug' => 'dup-a-' . bin2hex(random_bytes(3)),
+        'settings' => ['media_server_connection_id' => $connectionA],
     ], headers: $headersA)->assertStatus(Status::CREATED);
 
     $broadcastB = $this->http->post('/api/v1/stashes/' . $stashIdB . '/broadcasts', [
         'type' => 'jellyfin',
         'name' => 'Duplicate Name Show',
         'slug' => 'dup-b-' . bin2hex(random_bytes(3)),
+        'settings' => ['media_server_connection_id' => $connectionB],
     ], headers: $headersB)->assertStatus(Status::CREATED);
 
     $rebuildA = $this->http->post('/api/v1/commands', [

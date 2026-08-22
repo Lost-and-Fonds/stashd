@@ -21,18 +21,20 @@ final class BroadcastTriggerRepository
 
     public function create(
         BroadcastId $broadcastId,
-        BroadcastTriggerType $type,
+        string $type,
         bool $enabled = true,
         BroadcastTriggerState $state = BroadcastTriggerState::Ready,
+        /** @var array<string, scalar|null>|null $settings */
         ?array $settings = null,
     ): BroadcastTriggerRecord {
         $id = $this->ids->generate('btrigger')->toString();
+        /** @var array<string, scalar|null>|null $settings */
         $record = new BroadcastTriggerRecord(
             broadcastId: $broadcastId,
             type: $type,
             enabled: $enabled,
             state: $state,
-            settings: MediaServerScanTriggerSettings::fromArray($settings),
+            settings: $settings,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);
@@ -60,12 +62,15 @@ final class BroadcastTriggerRepository
             ->all();
     }
 
-    public function findEnabledScanTrigger(BroadcastId $broadcastId, BroadcastTriggerType $type): ?BroadcastTriggerRecord
+    public function findEnabled(BroadcastId $broadcastId, string $type): ?BroadcastTriggerRecord
     {
-        return BroadcastTriggerRecord::select()
+        /** @var BroadcastTriggerRecord|null $record */
+        $record = BroadcastTriggerRecord::select()
             ->where('broadcastId', $broadcastId->toString())
             ->where('type', $type)
             ->where('enabled', true)
             ->first();
+
+        return $record;
     }
 }
