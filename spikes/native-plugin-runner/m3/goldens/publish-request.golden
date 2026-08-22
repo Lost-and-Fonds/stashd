@@ -1,0 +1,1 @@
+{"id":"golden-1","kind":"request","type":"publish-request","value":{"items":[{"description":null,"duration-seconds":null,"id":"item:1","published-at":null,"resources":[],"source-reference":"source:1","title":"Episode"}],"reference":"broadcast:1","settings":[{"key":"format","value":{"tag":"text","value":"mp3"}}],"sources":[{"reference":"source:1","settings":[]}]}}
