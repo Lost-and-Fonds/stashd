@@ -1,0 +1,10 @@
+{
+  "id": "jellyfin",
+  "name": "Jellyfin Broadcast",
+  "version": "0.1.0",
+  "runtime": "php",
+  "api_version": "0.1",
+  "entrypoint": "plugin.php",
+  "requires": {"php": ">=8.5", "extensions": []},
+  "architectures": ["amd64", "arm64"]
+}

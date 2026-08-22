@@ -23,7 +23,24 @@ foreach (glob(__DIR__ . '/../../plugin-sdk/src/*.php') ?: [] as $sdkFile) {
         require_once $sdkFile;
     }
 }
+spl_autoload_register(static function (string $class): void {
+    foreach ([
+        'Stashd\\NativeRuntime\\' => __DIR__ . '/../src/',
+        'Stashd\\PluginSdk\\' => __DIR__ . '/../../plugin-sdk/src/',
+    ] as $prefix => $root) {
+        if (str_starts_with($class, $prefix)) {
+            $path = $root . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
+            if (is_file($path)) {
+                require_once $path;
+            }
+        }
+    }
+});
 require_once __DIR__ . '/../src/Capabilities/Invocation.php';
+require_once __DIR__ . '/../src/Package/PackageValidationError.php';
+require_once __DIR__ . '/../src/Package/PackageStateError.php';
+require_once __DIR__ . '/../src/Package/PackageManifest.php';
+require_once __DIR__ . '/../src/Package/TarArchive.php';
 require_once __DIR__ . '/../src/Package/PackageManager.php';
 require_once __DIR__ . '/../src/Rpc/FrameCodec.php';
 require_once __DIR__ . '/../src/Sandbox/SandboxPolicy.php';

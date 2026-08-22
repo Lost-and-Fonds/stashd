@@ -9,7 +9,7 @@ use RuntimeException;
 final readonly class SandboxPolicy
 {
     /** @return list<string> */
-    public function command(string $packageRoot, string $stagingRoot, string $entrypoint, ?string $etcPath = null): array
+    public function command(string $packageRoot, string $stagingRoot, string $entrypoint, ?string $etcPath = null, ?string $sdkRoot = null): array
     {
         $this->assertRelative($entrypoint);
         $etcMount = $etcPath === null ? ['--dir', '/etc'] : ['--ro-bind', $etcPath, '/etc'];
@@ -21,6 +21,12 @@ final readonly class SandboxPolicy
             '--ro-bind', '/bin', '/bin', '--ro-bind', '/lib', '/lib', '--ro-bind', '/lib64', '/lib64',
             '--ro-bind', '/sbin', '/sbin', '--dir', '/home', '--dir', '/root',
         ];
+        if ($sdkRoot !== null) {
+            if (! is_dir($sdkRoot)) {
+                throw new RuntimeException('plugin SDK root is missing');
+            }
+            $command = array_merge($command, ['--ro-bind', $sdkRoot, '/sdk']);
+        }
 
         return array_merge($command, $etcMount, [
             '--dir', '/run', '--chdir', '/plugin', '--setenv', 'HOME', '/tmp', '--setenv',

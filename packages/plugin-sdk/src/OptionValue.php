@@ -23,6 +23,19 @@ final class OptionValue
         return new self('text', $value);
     }
 
+    /** @param array{tag?: mixed, value?: mixed} $value */
+    public static function fromWire(array $value): self
+    {
+        $tag = $value['tag'] ?? null;
+        $raw = $value['value'] ?? null;
+        return match ($tag) {
+            'boolean' => self::boolean((bool) $raw),
+            'number' => self::number((int) $raw),
+            'text' => self::text((string) $raw),
+            default => throw new \InvalidArgumentException('unknown option value type'),
+        };
+    }
+
     /** @return array{tag: string, value: bool|int|string} */
     public function toWire(): array
     {

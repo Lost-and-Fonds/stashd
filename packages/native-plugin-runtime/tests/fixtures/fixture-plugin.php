@@ -217,14 +217,14 @@ final class M7ExampleBroadcast implements BroadcastPlugin
         return new Publication(new Artifact('example:publication', 'application/octet-stream', 28), [new PublishedFile('item-1', 'source-1', 'published/item-1.bin')]);
     }
 
-    public function finalize(FinalizationRequest $request): Publication
+    public function finalize(FinalizationRequest $request, PluginContext $context): Publication
     {
         $this->context->progress->report('finalize');
 
         return $request->publication;
     }
 
-    public function operation(OperationRequest $request): OperationResult
+    public function operation(OperationRequest $request, PluginContext $context): OperationResult
     {
         return new OperationResult([new Choice('fixture', 'Fixture choice')], [new Setting('echo', OptionValue::text($request->name))]);
     }
@@ -261,7 +261,7 @@ while (($message = FrameCodec::read(STDIN, 10.0)) !== null) {
         $result = match ($method) {
             'broadcast.publish' => WireMapper::publication((new M7ExampleBroadcast($context, $rpc))->publish(new PublishRequest('fixture', [new Setting('mode', OptionValue::text((string) ($message['params']['mode'] ?? 'ok')))], [], [new Item('item-1', 'Fixture item', [], 'source-1')]))),
             'broadcast.prepare' => ['artifacts' => []],
-            'broadcast.finalize' => WireMapper::publication((new M7ExampleBroadcast($context, $rpc))->finalize(new FinalizationRequest(new PublishRequest('fixture'), new Publication(new Artifact('example:publication'))))),
+            'broadcast.finalize' => WireMapper::publication((new M7ExampleBroadcast($context, $rpc))->finalize(new FinalizationRequest(new PublishRequest('fixture'), new Publication(new Artifact('example:publication'))), $context)),
             'broadcast.operation' => ['choices' => [['value' => 'fixture', 'label' => 'Fixture choice']], 'values' => [['key' => 'echo', 'value' => ['tag' => 'text', 'value' => 'fixture']]]],
             'input.resolve' => ['id' => 'input-1', 'canonical-reference' => 'fixture:source', 'kind' => 'fixture', 'title' => 'Fixture input', 'artwork-reference' => null, 'estimated-item-count' => 1],
             'input.discover' => [['id' => 'item-1', 'reference' => 'fixture:item-1', 'title' => 'Fixture item', 'description' => null, 'published-at' => null, 'artwork-reference' => null, 'duration-seconds' => null, 'kind' => 'binary']],

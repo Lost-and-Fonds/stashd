@@ -10,7 +10,7 @@ interface BroadcastPlugin
 
     public function publish(PublishRequest $request): Publication;
 
-    public function finalize(FinalizationRequest $request): Publication;
+    public function finalize(FinalizationRequest $request, PluginContext $context): Publication;
 
-    public function operation(OperationRequest $request): OperationResult;
+    public function operation(OperationRequest $request, PluginContext $context): OperationResult;
 }

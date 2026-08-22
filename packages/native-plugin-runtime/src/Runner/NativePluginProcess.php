@@ -27,13 +27,15 @@ final class NativePluginProcess
         string $stagingRoot,
         string $entrypoint = 'plugin.php',
         ?SandboxPolicy $policy = null,
+        ?string $sdkRoot = null,
     ) {
-        $command = ($policy ?? new SandboxPolicy())->command($packageRoot, $stagingRoot, $entrypoint);
+        $command = ($policy ?? new SandboxPolicy())->command($packageRoot, $stagingRoot, $entrypoint, null, $sdkRoot);
         $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $this->pipes);
         if (! is_resource($process)) {
             throw new RuntimeException('native plugin process could not start');
         }
         $this->process = $process;
+        stream_set_blocking($this->pipes[2], false);
         $this->handshake();
     }
 

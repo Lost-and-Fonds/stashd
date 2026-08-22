@@ -10,7 +10,7 @@ use Stashd\NativeRuntime\Sandbox\SandboxPolicy;
 
 final readonly class NativePluginRunner
 {
-    public function __construct(private PackageManager $packages, private SandboxPolicy $policy = new SandboxPolicy()) {}
+    public function __construct(private PackageManager $packages, private SandboxPolicy $policy = new SandboxPolicy(), private ?string $sdkRoot = null) {}
 
     public function start(string $pluginId, string $stagingRoot): NativePluginProcess
     {
@@ -24,6 +24,8 @@ final readonly class NativePluginRunner
         }
         $entrypoint = is_string($manifest['entrypoint'] ?? null) ? $manifest['entrypoint'] : 'plugin.php';
 
-        return new NativePluginProcess($package, $stagingRoot, $entrypoint, $this->policy);
+        $sdkRoot = $this->sdkRoot ?? dirname(__DIR__, 3) . '/plugin-sdk';
+
+        return new NativePluginProcess($package, $stagingRoot, $entrypoint, $this->policy, $sdkRoot);
     }
 }
