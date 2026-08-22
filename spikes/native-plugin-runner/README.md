@@ -61,6 +61,10 @@ mounted or enabled. The test container runs non-root with all capabilities
 dropped and `no-new-privileges`; it does not use privileged mode, `CAP_SYS_ADMIN`,
 or seccomp relaxation.
 
+The M1 image installs Debian Bookworm's package
+`bubblewrap 0.8.0-2+deb12u1`, which reports `bwrap 0.8.0`. This is the package
+provided by the unchanged `php:8.5-cli-bookworm` base; M1 does not upgrade it.
+
 The runner uses `proc_open` with an argument array, not a shell. The child gets
 only the environment values explicitly supplied by bubblewrap (`HOME`, `PATH`)
 after `--clearenv`.
