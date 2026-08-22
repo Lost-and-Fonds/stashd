@@ -53,6 +53,7 @@
     "test:docker-upgrade": "tests/docker/upgrade-smoke.sh",
     "test:docker-upgrade:no-build": "STASHD_SMOKE_SKIP_BUILD=1 tests/docker/upgrade-smoke.sh",
     "lint": [
+      "composer dump-autoload --optimize --strict-psr --dry-run",
       "vendor/bin/php-cs-fixer check --diff --allow-risky=yes --config=.php-cs-fixer.dist.php",
       "vendor/bin/phpcs --standard=phpcs.xml.dist"
     ],

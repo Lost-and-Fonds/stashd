@@ -43,6 +43,13 @@ The following are stable enough for the Jellyfin native port:
 The SDK capability implementations remain host-provided. Provider ports must
 not add provider-specific behavior to these packages.
 
+## Deferred package boundary
+
+A separately extracted plugin-contract package is intentionally deferred. The
+current SDK and runtime packages remain the smallest useful boundaries; extract
+shared contract DTOs only if a real provider port exposes contract drift or
+awkward shared DTO ownership.
+
 ## Sandbox policy
 
 `SandboxPolicy` is the single construction point for the bubblewrap command.
