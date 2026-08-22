@@ -92,6 +92,14 @@ final readonly class ExternalMediaServerClient implements MediaServerClient
                     'settings' => [
                         ['key' => 'server_url', 'value' => ['kind' => 'text', 'value' => $connection->baseUri]],
                         ['key' => 'credential_name', 'value' => ['kind' => 'text', 'value' => $this->definition->credentialName ?? '']],
+                        ...array_map(
+                            static fn (string $key, string $value): array => [
+                                'key' => $key,
+                                'value' => ['kind' => 'text', 'value' => $value],
+                            ],
+                            array_keys($connection->settings?->toArray() ?? []),
+                            array_values($connection->settings?->toArray() ?? []),
+                        ),
                     ],
                     'items' => [],
                 ],

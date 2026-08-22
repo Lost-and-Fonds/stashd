@@ -9,6 +9,19 @@ The older strategy names and implementation descriptions below are historical
 design evidence; current provider behavior belongs to `plugins/youtube` and
 generic core selects it by logical provider identity only.
 
+Migration note, 2026-08-22: Podcast, Jellyfin, and Plex now run through
+manifest-registered external Components. Older references below to built-in
+provider classes or the shared PHP series engine are historical migration
+context, not current runtime wiring.
+
+The two remote Broadcast migrations leave the existing connection records as
+transitional infrastructure: they provide independently managed endpoint,
+secret, and library-selection state reused by both plugins. Their protocol
+clients and provider behavior are external. A new generic `PluginConnection`
+abstraction is deliberately deferred until another remote-service plugin
+demonstrates that this lifecycle is useful outside the current media-server
+configuration.
+
 This document designs the semantic Stashd Plugin API from existing behaviour and four capability stress tests. It does not implement a plugin runtime, package format, WIT contract, permissions UI, or plugin conversion.
 
 ## 1. Scope and status
@@ -148,9 +161,9 @@ The Component does not receive arbitrary network access. It uses a configured co
 
 ### 4.3 Plex
 
-The current `PlexBroadcastPlugin` uses the same shared series engine and the key `plex`. Its current output policy is materially the same as Jellyfin: SxxExxx layout, NFO sidecars, captions, optional poster hardlink, hardlink-first publishing, verification, and pruning.
+The external Plex Component uses the logical key `plex`. It owns Plex XML parsing, token query usage, library selection, SxxExxx layout, NFO output, caption sidecar selection, and section refresh. Core materializes only the Component's relative publication descriptors and retains filesystem authority.
 
-Plex's external behaviour differs in the Connection client. A Plex plugin knows the Plex protocol: it tests `/identity`, lists `/library/sections`, and triggers `GET /library/sections/{id}/refresh` with the token in the request. The selected library ID is meaningful to Plex; a scan path is not used by the current client in the same way as the endpoint shape suggests. Trigger failures remain separate from broadcast file validity.
+Plex's external behaviour uses the Connection grant. The Component tests `/identity`, lists `/library/sections`, and triggers `GET /library/sections/{id}/refresh` with the token in the request. The selected library ID is meaningful to Plex; a scan path is not used by the current client in the same way as the endpoint shape suggests. Trigger failures remain separate from broadcast file validity.
 
 #### Comparison
 
@@ -174,7 +187,7 @@ Provider-specific or implementation-specific details:
 - NFO/layout policies may diverge later even though current profiles are identical;
 - neither plugin should own the generic filesystem ownership, Vault selection, fixity, or public UI semantics.
 
-The shared PHP base class is useful evidence of common behaviour, not proof that the future third-party API should expose a “series plugin” superclass. The protocol details remain plugin-owned: Stashd owns Connection records and grants, while the selected plugin owns how it lists or refreshes its service. Core should not standardise provider operations such as `refresh-jellyfin-library`.
+The former shared PHP base class was useful migration evidence, not proof that the plugin API should expose a “series plugin” superclass. The protocol details remain plugin-owned: Stashd owns the transitional reusable Connection record and grants, while each selected Component owns how it lists or refreshes its service. Core does not standardise provider operations.
 
 ## 5. Stress test A — YouTube Input
 

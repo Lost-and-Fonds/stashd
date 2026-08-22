@@ -1501,6 +1501,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "stashd-plex-plugin"
+version = "0.1.0"
+dependencies = [
+ "wit-bindgen",
+]
+
+[[package]]
 name = "stashd-plugin-host"
 version = "0.1.0"
 dependencies = [

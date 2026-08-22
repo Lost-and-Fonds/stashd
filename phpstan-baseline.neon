@@ -598,24 +598,6 @@ parameters:
 			path: app/MediaServers/MediaServerController.php
 
 		-
-			message: '#^Argument of an invalid type mixed supplied for foreach, only iterables are supported\.$#'
-			identifier: foreach.nonIterable
-			count: 1
-			path: app/MediaServers/PlexMediaServerClient.php
-
-		-
-			message: '#^Cannot access offset ''Directory'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/MediaServers/PlexMediaServerClient.php
-
-		-
-			message: '#^Cannot cast mixed to string\.$#'
-			identifier: cast.string
-			count: 3
-			path: app/MediaServers/PlexMediaServerClient.php
-
-		-
 			message: '#^PHPDoc tag @return with type list\<App\\Providers\\Core\\DiscoveredItem\> is incompatible with native type App\\Providers\\Core\\DiscoveredItem\.$#'
 			identifier: return.phpDocType
 			count: 1
@@ -1148,14 +1130,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: app/System/SystemStorageCheckCommandHandler.php
-
-		-
-			message: '#^Parameter \#2 \$map of class App\\MediaServers\\Http\\FixtureMediaServerHttpClient constructor expects array\<string, string\>, array\<mixed\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/System/Wiring/MediaServerHttpClientInitializer.php
-
-
 		-
 			message: '#^Method App\\Vault\\AssetRepository\:\:findByMediaItemAndRole\(\) should return App\\Vault\\AssetRecord\|null but returns mixed\.$#'
 			identifier: return.type

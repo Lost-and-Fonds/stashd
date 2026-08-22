@@ -10,6 +10,10 @@ Broadcast adapter and shared plugin host, and no longer has a PHP
 core transcode job. The durable Broadcast key remains `podcast`; the component
 package identity is runtime provenance only.
 
+Podcast, Jellyfin, and Plex are now all registered external Components.
+Older PHP class names in this historical plan are not current runtime
+dependencies.
+
 **Phase 1 is done, in-tree, under `app/Broadcasts/Plugins/`.** `BroadcastPlugin`,
 `#[StashdBroadcast]`, `BroadcastPluginDiscoverer`, `BroadcastPluginRegistry`,
 `FileKind`, `UiControl`, and `DiscoveredPlugin` all exist and are wired into

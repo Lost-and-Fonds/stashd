@@ -420,6 +420,9 @@ final readonly class ExternalBroadcastPlugin implements
             return;
         }
         $settings[] = ['key' => 'server_url', 'value' => ['kind' => 'text', 'value' => $connection->baseUri]];
+        foreach ($connection->settings?->toArray() ?? [] as $key => $value) {
+            $settings[] = ['key' => $key, 'value' => ['kind' => 'text', 'value' => $value]];
+        }
         if ($this->definition->credentialName !== null) {
             $settings[] = ['key' => 'credential_name', 'value' => ['kind' => 'text', 'value' => $this->definition->credentialName]];
         }
@@ -487,6 +490,9 @@ final readonly class ExternalBroadcastPlugin implements
             }
             $target = $this->paths->broadcastFile($context->broadcast, ...explode('/', $relative));
             $this->hardlinks->publishHardlink($sourcePath, $target, $root);
+            if ($source->role === AssetRole::Subtitle) {
+                continue;
+            }
             $item->publishedPath = $target;
             $item->lastPublishedAt = DateTime::now(Timezone::UTC);
             $item->lastError = null;

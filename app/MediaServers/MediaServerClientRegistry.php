@@ -12,7 +12,6 @@ use App\Plugins\PluginHttpGrantFactory;
 final readonly class MediaServerClientRegistry
 {
     public function __construct(
-        private PlexMediaServerClient $plex,
         private ExternalBroadcastPluginRegistry $externalPlugins,
         private PluginHttpGrantFactory $grants,
     ) {
@@ -40,10 +39,6 @@ final readonly class MediaServerClientRegistry
 
     private function fallback(MediaServerType $type): MediaServerClient
     {
-        if ($type === MediaServerType::Plex) {
-            return $this->plex;
-        }
-
         return new UnavailableMediaServerClient();
     }
 }

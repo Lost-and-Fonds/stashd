@@ -46,7 +46,7 @@ JSON uses snake_case. Secrets are redacted from errors, activity, and command re
 | Class | Surface |
 |---|---|
 | External Broadcast Component | The installed plugin performs its protocol calls through the bounded host HTTP capability |
-| `PlexMediaServerClient` | `GET /identity`, `GET /library/sections`, `POST /library/sections/{id}/refresh` |
+| external Plex Component | `GET /identity`, `GET /library/sections`, `GET /library/sections/{id}/refresh` |
 
 Both implement `MediaServerClient` and use `MediaServerHttpClient` (`CurlMediaServerHttpClient` in production; `FixtureMediaServerHttpClient` when `ENVIRONMENT=testing`).
 
@@ -63,6 +63,8 @@ After a successful `broadcast.rebuild` verify pass, broadcasts with `auto_trigge
 | Retry trigger | `broadcast.trigger` re-runs scan only — does not rebuild files unless requested |
 | Secrets | Redacted in trigger run errors and activity |
 
-Trigger types: `jellyfin_scan`, `plex_scan` (mapped from `jellyfin_series` / `plex_series` broadcast types).
+Trigger records remain transitional infrastructure for provider refreshes;
+external Broadcast Components now perform their refresh after core
+materializes outputs.
 
 Activity events: `broadcast.trigger_succeeded`, `broadcast.trigger_failed`, `media_server.test_completed`.
