@@ -50,15 +50,18 @@ final class Invocation
         private SandboxPolicy $sandboxPolicy = new SandboxPolicy(),
     ) {
         $this->packageRoot = $this->withinRoot($packageRoot, 'package');
+
         if (! is_dir($stagingRoot) && ! mkdir($stagingRoot, 0700, true) && ! is_dir($stagingRoot)) {
             throw new RuntimeException('staging root could not be created');
         }
         $this->stagingRoot = $this->withinRoot($stagingRoot, 'staging');
         $this->resourceRoot = $this->stagingRoot . '/.resources';
         mkdir($this->resourceRoot, 0700, true);
+
         foreach ($credentials as $credential) {
             $this->credentials[$credential->reference] = $credential;
         }
+
         foreach ($helpers as $helper) {
             $this->helpers[$helper->name] = $helper;
         }
@@ -71,6 +74,7 @@ final class Invocation
         $this->assertActive();
         $current = $url;
         $grant = $credential === null ? null : ($this->credentials[$credential] ?? throw new CapabilityDenied('credential is not granted'));
+
         for ($redirect = 0; ; $redirect++) {
             $origin = $this->origin($current);
             $this->assertAllowedOrigin($origin);
@@ -78,6 +82,7 @@ final class Invocation
             $requestHeaders = $this->safeHeaders($headers, $grant, $origin);
             $response = $this->transport->request(strtoupper($method), $requestUrl, $requestHeaders, $body);
             $location = $response->headers['Location'] ?? $response->headers['location'] ?? null;
+
             if ($location !== null && $response->status >= 300 && $response->status < 400) {
                 if ($redirect >= $this->maxRedirects) {
                     throw new CapabilityDenied('redirect limit exceeded');
@@ -88,15 +93,18 @@ final class Invocation
             }
             $resourcePath = $this->resourceRoot . '/' . bin2hex(random_bytes(10)) . '.body';
             $handle = fopen($resourcePath, 'wb');
+
             if ($handle === false) {
                 throw new RuntimeException('response resource could not be created');
             }
             $size = 0;
+
             foreach ($response->chunks as $chunk) {
                 $size += strlen($chunk);
                 fwrite($handle, $chunk);
             }
             fclose($handle);
+
             if ($size <= $this->inlineLimit) {
                 $bodyValue = (string) file_get_contents($resourcePath);
                 unlink($resourcePath);
@@ -125,11 +133,13 @@ final class Invocation
     public function grantAsset(string $reference, string $path): void
     {
         $this->assertActive();
+
         if ($this->assetRoot === null) {
             throw new CapabilityDenied('asset reads are not granted');
         }
         $root = $this->withinRoot($this->assetRoot, 'asset root');
         $real = realpath($path);
+
         if ($real === false || ! is_file($real) || ! $this->isBelow($real, $root)) {
             throw new CapabilityDenied('asset is outside the granted asset root');
         }
@@ -153,9 +163,11 @@ final class Invocation
         $grant = $this->helpers[$name] ?? throw new CapabilityDenied('helper is not declared');
         $relative = $this->safeRelative($grant->relativeExecutable);
         $package = realpath($this->packageRoot . '/' . $relative);
+
         if ($package === false || ! $this->isBelow($package, $this->packageRoot) || ! is_file($package)) {
             throw new CapabilityDenied('helper is outside the package');
         }
+
         foreach ($arguments as $argument) {
             if (! is_string($argument) || str_contains($argument, "\0")) {
                 throw new CapabilityDenied('helper argument is invalid');
@@ -166,6 +178,7 @@ final class Invocation
         file_put_contents($etc . '/passwd', "plugin:x:1000:1000:plugin:/tmp:/bin/sh\n");
         file_put_contents($etc . '/group', "plugin:x:1000:\n");
         $command = $this->sandboxPolicy->command($this->packageRoot, $this->stagingRoot, $relative, $etc, null, $grant->network);
+
         if (! str_ends_with($relative, '.php')) {
             $command[count($command) - 1] = '/plugin/' . $relative;
         }
@@ -173,6 +186,7 @@ final class Invocation
         array_push($command, ...$arguments);
         $pipes = [];
         $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+
         if (! is_resource($process)) {
             throw new RuntimeException('helper could not start: ' . implode(' ', $command));
         }
@@ -182,13 +196,16 @@ final class Invocation
         $stdout = '';
         $stderr = '';
         $deadline = microtime(true) + $timeout;
+
         do {
             $stdout .= stream_get_contents($pipes[1]);
             $stderr .= stream_get_contents($pipes[2]);
             $status = proc_get_status($process);
+
             if (! $status['running']) {
                 break;
             }
+
             if (microtime(true) >= $deadline) {
                 proc_terminate($process, 9);
 
@@ -225,6 +242,7 @@ final class Invocation
             return;
         }
         $this->active = false;
+
         foreach ($this->resources as $resource) {
             $resource->close();
         }
@@ -268,17 +286,20 @@ final class Invocation
     private function safeHeaders(array $headers, ?CredentialGrant $grant, string $origin): array
     {
         $protected = ['authorization', 'proxy-authorization'];
+
         foreach ($this->credentials as $candidate) {
             if ($candidate->placement === 'header') {
                 $protected[] = strtolower($candidate->parameter);
             }
         }
         $safe = [];
+
         foreach ($headers as $name => $value) {
             if (! in_array(strtolower($name), $protected, true)) {
                 $safe[$name] = $value;
             }
         }
+
         if ($grant !== null && $grant->origin === $origin) {
             if ($grant->placement === 'header') {
                 $safe[$grant->parameter] = $grant->secret;
@@ -308,6 +329,7 @@ final class Invocation
     private function origin(string $url): string
     {
         $parts = parse_url($url);
+
         if ($parts === false || ! isset($parts['scheme'], $parts['host']) || ! in_array(strtolower($parts['scheme']), ['http', 'https'], true)) {
             throw new CapabilityDenied('HTTP URL is invalid');
         }
@@ -321,6 +343,7 @@ final class Invocation
             return $location;
         }
         $parts = parse_url($base);
+
         if ($parts === false || ! isset($parts['scheme'], $parts['host'])) {
             throw new CapabilityDenied('redirect URL is invalid');
         }
@@ -334,6 +357,7 @@ final class Invocation
             throw new CapabilityDenied('helper path must be relative');
         }
         $parts = explode('/', $path);
+
         if (in_array('', $parts, true) || in_array('.', $parts, true) || in_array('..', $parts, true)) {
             throw new CapabilityDenied('helper path is unsafe');
         }
@@ -344,6 +368,7 @@ final class Invocation
     private function withinRoot(string $path, string $label): string
     {
         $real = realpath($path);
+
         if ($real === false || ! is_dir($real)) {
             throw new RuntimeException($label . ' does not exist');
         }
@@ -363,9 +388,11 @@ final class Invocation
 
             return;
         }
+
         if (! is_dir($path)) {
             return;
         }
+
         foreach (scandir($path) ?: [] as $entry) {
             if ($entry !== '.' && $entry !== '..') {
                 $this->removeTree($path . '/' . $entry);

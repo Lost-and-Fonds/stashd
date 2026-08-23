@@ -20,8 +20,10 @@ final class ExternalBroadcastPluginRegistryInitializer implements Initializer
         $socket = '';
         $definitions = [];
         $packages = new PackageManager(dirname(__DIR__, 3) . '/.stashd/plugin-packages');
+
         foreach ((new ComposerPluginPackageDiscovery())->all($packages->activeRoot()) as $package) {
             $definition = ExternalBroadcastPluginDefinition::fromManifest($package['manifest'], $package['root'], $socket, dirname($package['manifest_path']));
+
             if ($definition === null) {
                 continue;
             }
@@ -36,11 +38,13 @@ final class ExternalBroadcastPluginRegistryInitializer implements Initializer
         foreach ($definitions as $logicalKey => $candidates) {
             $base = $candidates[0];
             $available = [];
+
             foreach ($candidates as $candidate) {
                 if ($candidate->runtime === 'plugin' && $packages->activePath($candidate->id) !== null) {
                     $available['plugin'] = new PluginBroadcastRuntime($runner, $packages, $candidate->id);
                 }
             }
+
             if ($available !== []) {
                 $plugins[] = $base;
                 $runtimes[$logicalKey] = $available;

@@ -79,6 +79,7 @@ test('add input title-regex include keeps only matching items and marks the rest
     expect($items)->toHaveCount(3);
 
     $byState = [];
+
     foreach ($items as $item) {
         $byState[$item->state->value][] = $item->ignoredReason;
     }
@@ -108,6 +109,7 @@ test('add input title-regex exclude removes matching items and keeps the rest', 
 
     $items = StashItemRecord::select()->where('stashId', $stashId)->all();
     $byState = [];
+
     foreach ($items as $item) {
         $byState[$item->state->value][] = $item->ignoredReason;
     }
@@ -165,6 +167,7 @@ test('add input excludes shorts and live items from a youtube channel when toggl
     expect($items)->toHaveCount(18);
 
     $reasonsByMediaItemId = [];
+
     foreach ($items as $item) {
         $media = MediaItemRecord::findById(new PrimaryKey((string) $item->mediaItemId));
         $reasonsByMediaItemId[$media->providerItemId] = [$item->state->value, $item->ignoredReason];

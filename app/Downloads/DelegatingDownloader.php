@@ -41,6 +41,7 @@ final readonly class DelegatingDownloader implements DownloaderInterface
     public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult
     {
         $external = $this->externalPlugins?->findDownloader($request->providerKey);
+
         if ($external !== null) {
             return $external->download($request, $onProgress);
         }

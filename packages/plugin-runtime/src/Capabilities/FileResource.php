@@ -18,6 +18,7 @@ final class FileResource implements ReadableResource
     public function __construct(private string $path, private $onClose)
     {
         $handle = fopen($path, 'rb');
+
         if ($handle === false) {
             throw new RuntimeException('resource could not be opened');
         }
@@ -29,6 +30,7 @@ final class FileResource implements ReadableResource
         if ($this->closed) {
             throw new InvocationClosed('resource is closed');
         }
+
         if (! is_resource($this->handle)) {
             throw new InvocationClosed('resource is closed');
         }
@@ -46,6 +48,7 @@ final class FileResource implements ReadableResource
         if ($this->closed) {
             return;
         }
+
         if (is_resource($this->handle)) {
             fclose($this->handle);
         }

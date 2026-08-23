@@ -50,6 +50,7 @@ final readonly class ExternalBroadcastPluginDefinition
 
         $required = static function (string $key) use ($raw): string {
             $value = $raw[$key] ?? null;
+
             if (! is_string($value) || trim($value) === '') {
                 throw new RuntimeException("External Broadcast plugin manifest requires {$key}.");
             }
@@ -58,11 +59,13 @@ final readonly class ExternalBroadcastPluginDefinition
         };
 
         $runtime = is_string($raw['application_runtime'] ?? null) && trim($raw['application_runtime']) !== '' ? trim($raw['application_runtime']) : 'plugin';
+
         if ($runtime !== 'plugin') {
             throw new RuntimeException("Unsupported external Broadcast runtime [{$runtime}].");
         }
 
         $component = null;
+
         if (is_string($raw['component_environment'] ?? null)) {
             $value = getenv($raw['component_environment']);
             $component = is_string($value) && trim($value) !== '' ? trim($value) : null;
@@ -82,6 +85,7 @@ final readonly class ExternalBroadcastPluginDefinition
         $runtimePackageRoot = $packageRoot;
         $componentPath = str_starts_with($component, '/') ? $component : rtrim($root, '/') . '/' . ltrim($component, '/');
         $helpers = [];
+
         if (is_array($raw['helpers'] ?? null)) {
             foreach ($raw['helpers'] as $name => $helper) {
                 if (! is_string($name) || ! is_array($helper) || ! is_string($helper['executable'] ?? null)) {
@@ -89,14 +93,17 @@ final readonly class ExternalBroadcastPluginDefinition
                 }
 
                 $relative = trim($helper['executable']);
+
                 if ($relative === '' || str_starts_with($relative, '/') || str_contains($relative, '..')) {
                     throw new RuntimeException('External Broadcast plugin helper paths must be package-relative.');
                 }
 
                 $candidate = $packageRoot . '/' . ltrim($relative, '/');
+
                 if (! is_file($candidate)) {
                     $componentPackageRoot = dirname($componentPath);
                     $packageName = basename($packageRoot);
+
                     while ($componentPackageRoot !== dirname($componentPackageRoot)) {
                         if (basename($componentPackageRoot) === $packageName) {
                             $runtimePackageRoot = $componentPackageRoot;
@@ -105,6 +112,7 @@ final readonly class ExternalBroadcastPluginDefinition
                         }
                         $componentPackageRoot = dirname($componentPackageRoot);
                     }
+
                     if ($runtimePackageRoot === $packageRoot) {
                         $runtimePackageRoot = rtrim(dirname($componentPath), '/') . '/' . $packageName;
                     }
@@ -115,6 +123,7 @@ final readonly class ExternalBroadcastPluginDefinition
         }
         /** @var array<string, string> $operations */
         $operations = [];
+
         if (is_array($raw['operations'] ?? null)) {
             foreach ($raw['operations'] as $name => $operation) {
                 if (is_string($name) && is_string($operation) && trim($operation) !== '') {

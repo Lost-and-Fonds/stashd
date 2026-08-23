@@ -50,6 +50,7 @@ final readonly class StorageCapabilityChecker
 
         if ($writable && is_int($freeBytes) && is_int($totalBytes) && $totalBytes > 0) {
             $freeRatio = $freeBytes / $totalBytes;
+
             if ($freeRatio < 0.05) {
                 $state = StorageLocationState::LowSpace;
                 $lastError = 'Less than 5% free space remaining.';
@@ -166,9 +167,11 @@ final readonly class StorageCapabilityChecker
             @unlink($target);
         }
         $linked = @symlink($source, $target);
+
         if (is_file($source) || is_link($source)) {
             @unlink($source);
         }
+
         if (is_file($target) || is_link($target)) {
             @unlink($target);
         }

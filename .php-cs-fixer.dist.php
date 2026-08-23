@@ -13,7 +13,7 @@ return (new Config())
         'ordered_imports' => [
             'sort_algorithm' => 'alpha',
         ],
-        'blank_line_before_statement' => ['statements' => ['break', 'continue', 'return', 'throw', 'try', 'switch']],
+        'blank_line_before_statement' => ['statements' => ['break', 'continue', 'do', 'for', 'foreach', 'if', 'return', 'throw', 'try', 'switch', 'while']],
     ])
     ->setFinder(
         Finder::create()

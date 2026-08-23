@@ -104,12 +104,14 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         $kind = $request->downloadPolicy === DownloadPolicy::AudioOnly ? 'audio' : 'video';
         $result = $this->invoke('input.acquire', ['item' => $item, 'media_kind' => $kind, 'options' => $this->wireOptions($request->providerOptions)], 'acquire', $request->tempDirectory, $this->definition->helper);
         $files = [];
+
         foreach (is_array($result['artifacts'] ?? null) ? $result['artifacts'] : [] as $artifact) {
             if (! is_array($artifact)) {
                 continue;
             }
             $reference = (string) ($artifact['reference'] ?? '');
             $path = rtrim($request->tempDirectory, '/') . '/' . $reference;
+
             if ($reference === '' || str_contains($reference, '..') || ! is_file($path)) {
                 continue;
             }
@@ -117,11 +119,13 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
             $role = match ($artifact['role'] ?? null) {
                 'primary' => AssetRole::VaultOriginal, 'captions' => AssetRole::Subtitle, 'artwork' => AssetRole::SourceThumbnail, 'metadata' => AssetRole::MetadataJson, default => null,
             };
+
             if ($role === null) {
                 continue;
             }
             $files[] = new DownloadedFile($path, basename($reference), $role, $this->assetKind($mime), $mime, pathinfo($reference, PATHINFO_EXTENSION), filesize($path) ?: 0);
         }
+
         if (! array_filter($files, static fn(DownloadedFile $file): bool => $file->role === AssetRole::VaultOriginal)) {
             throw DownloadException::withCode('plugin_missing_primary', 'YouTube acquisition produced no primary artifact.');
         }
@@ -132,18 +136,22 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     {
         $package = $this->packages->activePath($this->definition->id) ?? throw new RuntimeException('YouTube plugin is not active');
         $stage = $staging === null ? sys_get_temp_dir() . '/stashd-plugin-' . bin2hex(random_bytes(5)) : $staging . '/.plugin-' . bin2hex(random_bytes(5));
+
         if (! mkdir($stage, 0700, true) && ! is_dir($stage)) {
             throw new RuntimeException('plugin staging could not be created');
         }
         $origins = [];
         $credentials = [];
+
         foreach ($this->definition->httpGrants($this->secrets, $operation) as $grant) {
             foreach ($grant->allowedPrefixes as $prefix) {
                 $p = parse_url($prefix);
+
                 if (! is_array($p) || ! isset($p['scheme'], $p['host'])) {
                     continue;
                 } $origin = strtolower($p['scheme'] . '://' . $p['host']);
                 $origins[] = $origin;
+
                 if ($grant->credential !== null) {
                     $credentials[] = new CredentialGrant($grant->credential->name, $origin, $grant->credential->parameter, $grant->credential->value, $grant->credential->placement);
                 }
@@ -160,9 +168,11 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
                     'http.request' => $this->capabilityHttp($invocation, $p), 'staging.stage' => $this->capabilityStage($invocation, $p), 'staging.write' => $this->capabilityWrite($invocation, $p), 'helper.run' => $this->capabilityHelper($invocation, $p), 'event.log', 'event.progress' => ['accepted' => true], default => throw new RuntimeException('unsupported plugin capability'),
                 };
             });
+
             if (isset($result['error'])) {
                 throw new RuntimeException((string) (($result['error']['message'] ?? null) ?: 'plugin failed'));
             }
+
             if ($staging !== null) {
                 $this->copy($stage, $staging);
             }
@@ -171,6 +181,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         } finally {
             $process->close();
             $invocation->close();
+
             if ($staging === null) {
                 $this->remove($stage);
             }
@@ -206,6 +217,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
             if ($file !== '.' && $file !== '..') {
                 $source = $from . '/' . $file;
                 $target = $to . '/' . $file;
+
                 if (is_file($source)) {
                     rename($source, $target);
                 }

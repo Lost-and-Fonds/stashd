@@ -45,6 +45,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
         $params = [...$broadcast, 'name' => $operation];
 
         $result = $this->invokeRaw('broadcast.operation', $params, $stagingDirectory, null, $httpGrants, $fixtureDirectory);
+
         if (is_array($result['choices'] ?? null)) {
             $result['choices'] = array_map(static function (mixed $choice): mixed {
                 if (! is_array($choice) || ! array_key_exists('label', $choice) || ! array_key_exists('value', $choice)) {
@@ -73,20 +74,24 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
     private function invokeRaw(string $method, array $params, string $stagingDirectory, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory): array
     {
         $package = $this->packages->activePath($this->pluginId);
+
         if ($package === null) {
             throw new RuntimeException('Plugin is not active: ' . $this->pluginId);
         }
 
         $credentials = [];
         $origins = [];
+
         foreach ($httpGrants ?? [] as $grant) {
             foreach ($grant->allowedPrefixes as $prefix) {
                 $parts = parse_url($prefix);
+
                 if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
                     continue;
                 }
                 $origin = strtolower($parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : ''));
                 $origins[] = $origin;
+
                 if ($grant->credential !== null) {
                     $credentials[] = new CredentialGrant(
                         $grant->credential->name,
@@ -100,6 +105,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
         }
 
         $pluginStage = $stagingDirectory . '/.plugin-' . bin2hex(random_bytes(6));
+
         if (! mkdir($pluginStage, 0700, true) && ! is_dir($pluginStage)) {
             throw new RuntimeException('Plugin Broadcast staging could not be created.');
         }
@@ -133,10 +139,12 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
                 };
             };
             $result = $process->invoke($method, $pluginParams, $capabilityHandler);
+
             if (isset($result['error'])) {
                 $error = is_array($result['error']) ? $result['error'] : [];
                 $message = is_string($error['message'] ?? null) ? $error['message'] : 'Plugin failed.';
                 $stderr = $process->stderr();
+
                 if (trim($stderr) !== '') {
                     $message .= ' (' . trim($stderr) . ')';
                 }
@@ -151,6 +159,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             foreach ($resources as $resource) {
                 $resource->close();
             }
+
             if ($process !== null) {
                 $process->close();
             }
@@ -171,6 +180,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             is_string($params['body'] ?? null) ? $params['body'] : null,
             is_string($params['credential'] ?? null) ? $params['credential'] : null,
         );
+
         if ($response->resource === null) {
             return ['status' => $response->status, 'headers' => $response->headers, 'body' => $response->body()];
         }
@@ -200,6 +210,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
     private function writeStaging(Invocation $invocation, array $params): array
     {
         $content = is_string($params['content'] ?? null) ? base64_decode($params['content'], true) : false;
+
         if ($content === false) {
             throw new RuntimeException('Plugin staging content is invalid.');
         }
@@ -241,6 +252,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
         }
         $root = realpath($package);
         $executable = realpath($helper->executable);
+
         if ($root === false || $executable === false || ! str_starts_with($executable, $root . '/')) {
             throw new RuntimeException('Plugin helper is outside the active plugin package.');
         }
@@ -254,6 +266,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
     private function normalizePublication(array $publication): array
     {
         $files = [];
+
         foreach (is_array($publication['files'] ?? null) ? $publication['files'] : [] as $file) {
             if (! is_array($file)) {
                 continue;
@@ -276,6 +289,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             return [];
         }
         $result = [];
+
         foreach ($value as $key => $item) {
             if (is_string($key)) {
                 $result[$key] = $item;
@@ -296,16 +310,19 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             $request = $params['request'];
             $params['request'] = $this->pluginParams($request);
         }
+
         foreach (['settings', 'payload'] as $key) {
             if (is_array($params[$key] ?? null)) {
                 $params[$key] = $this->pluginSettings($params[$key]);
             }
         }
+
         if (is_array($params['sources'] ?? null)) {
             foreach ($params['sources'] as $index => $source) {
                 if (! is_array($source)) {
                     continue;
                 }
+
                 if (is_array($source['settings'] ?? null)) {
                     $source['settings'] = $this->pluginSettings($source['settings']);
                     $params['sources'][$index] = $source;
@@ -323,10 +340,12 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             return [];
         }
         $settings = [];
+
         foreach ($value as $setting) {
             if (! is_array($setting)) {
                 continue;
             }
+
             /** @var array<string, mixed> $setting */
             if (isset($setting['value']) && is_array($setting['value']) && isset($setting['value']['kind'])) {
                 $setting['value']['tag'] = $setting['value']['kind'];
@@ -342,6 +361,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
     private function stringHeaders(mixed $value): array
     {
         $result = [];
+
         foreach ($this->stringKeyed($value) as $key => $item) {
             if (is_string($item)) {
                 $result[$key] = $item;
@@ -359,6 +379,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             }
             $from = $source . '/' . $entry;
             $to = $destination . '/' . $entry;
+
             if (is_dir($from)) {
                 if (! is_dir($to)) {
                     mkdir($to, 0700, true);

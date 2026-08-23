@@ -133,6 +133,7 @@ final readonly class ConnectionController
         try {
             $body = $this->requestBody($request);
             $payload = [];
+
             foreach (is_array($body['payload'] ?? null) ? $body['payload'] : [] as $key => $value) {
                 if (is_string($key) && is_scalar($value)) {
                     $payload[$key] = $value;
@@ -181,6 +182,7 @@ final readonly class ConnectionController
         $body = $request->body;
         /** @var array<string, mixed> $filtered */
         $filtered = [];
+
         foreach ($body as $key => $value) {
             if (is_string($key)) {
                 $filtered[$key] = $value;
@@ -190,6 +192,7 @@ final readonly class ConnectionController
         $normalized = ApiJson::normalizeRequest($filtered);
         /** @var array<string, mixed> $result */
         $result = [];
+
         foreach ($normalized as $key => $value) {
             if (is_string($key)) {
                 $result[$key] = $value;

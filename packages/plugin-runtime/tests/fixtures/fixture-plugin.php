@@ -59,14 +59,18 @@ final class M7Rpc
     {
         $id = 'plugin-' . $this->nextId++;
         FrameCodec::write(STDOUT, ['protocol' => 1, 'id' => $id, 'kind' => 'request', 'method' => $method, 'params' => $params]);
+
         while (true) {
             $message = FrameCodec::read(STDIN, 5.0);
+
             if (($message['kind'] ?? null) === 'notification') {
                 continue;
             }
+
             if (($message['id'] ?? null) !== $id) {
                 throw new RuntimeException('RPC response ID mismatch');
             }
+
             if (isset($message['error'])) {
                 throw new RuntimeException((string) ($message['error']['message'] ?? 'host capability failed'));
             }
@@ -80,6 +84,7 @@ final class M7Rpc
         $id = 'hello';
         FrameCodec::write(STDOUT, ['protocol' => 1, 'id' => $id, 'kind' => 'request', 'method' => 'hello', 'params' => ['min' => 1, 'max' => 1]]);
         $response = FrameCodec::read(STDIN, 5.0);
+
         if (($response['id'] ?? null) !== $id || ($response['result']['protocol'] ?? null) !== 1) {
             throw new RuntimeException('RPC handshake failed');
         }
@@ -187,29 +192,36 @@ final class M7ExampleBroadcast implements BroadcastPlugin
         $this->context->logger->info('example broadcast publish');
         $this->context->progress->report('publish');
         $small = $this->context->http->request('GET', 'https://allowed.test/small', [], null, 'fixture-token');
+
         if ($small->body() !== 'small-response') {
             throw new RuntimeException('small broker response mismatch');
         }
         $large = $this->context->http->request('GET', 'https://allowed.test/large');
         $bytes = 0;
+
         if ($large->resource === null) {
             throw new RuntimeException('large broker response was not a resource');
         }
+
         while (! $large->resource->isEof()) {
             $bytes += strlen($large->resource->read(8192));
         }
+
         if ($bytes !== 300_000) {
             throw new RuntimeException('large broker resource mismatch');
         }
         $asset = $this->rpc->call('asset.read', ['reference' => 'asset-1']);
+
         if (base64_decode((string) $asset['data'], true) !== 'asset-content') {
             throw new RuntimeException('asset handle mismatch');
         }
         $helper = $this->rpc->call('helper.run', ['name' => 'fixture-helper', 'arguments' => []]);
+
         if ((int) $helper['exit_code'] !== 0) {
             throw new RuntimeException('helper failed');
         }
         $this->context->staging?->write('published/item-1.bin', 'authoritative fixture output', 'application/octet-stream');
+
         if (($request->settings[0]->value->value ?? null) === 'fail') {
             throw new PluginFailureException(new PluginFailure(PluginErrorCode::Failed, new PluginError('fixture publish failure', true)));
         }
@@ -254,6 +266,7 @@ final class M7ExampleInput implements InputPlugin
 
 $rpc = new M7Rpc();
 $context = new PluginContext(new M7Log($rpc), new M7Progress($rpc), new M7Http($rpc), new M7Stage($rpc));
+
 while (($message = FrameCodec::read(STDIN, 10.0)) !== null) {
     $id = $message['id'] ?? null;
 

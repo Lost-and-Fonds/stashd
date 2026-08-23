@@ -82,6 +82,7 @@ final readonly class MediaItemController
         $vaultOriginalReady = $vaultOriginal?->state === AssetState::Ready;
 
         $broadcastNamesById = [];
+
         foreach ($assets as $asset) {
             if ($asset->broadcastId === null || array_key_exists((string) $asset->broadcastId, $broadcastNamesById)) {
                 continue;

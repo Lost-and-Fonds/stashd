@@ -21,6 +21,7 @@ final class PluginBuilder
     {
         $source = realpath($source) ?: throw new PackageValidationError('plugin source does not exist');
         $platform ??= self::platform();
+
         if (! in_array($platform, ['linux-amd64', 'linux-arm64'], true)) {
             throw new PackageValidationError('unsupported plugin platform: ' . $platform);
         }
@@ -30,6 +31,7 @@ final class PluginBuilder
         $lock = $this->jsonFile($lockPath);
         $input = hash('sha256', (string) file_get_contents($manifestPath) . (string) file_get_contents($lockPath) . (string) @file_get_contents($source . '/composer.lock') . $platform);
         $layout = $this->store . '/' . $input;
+
         if (is_file($layout . '/index.json')) {
             $index = $this->jsonFile($layout . '/index.json');
             $digest = (string) ($index['manifests'][0]['digest'] ?? '');
@@ -67,12 +69,14 @@ final class PluginBuilder
         $environment = getenv();
         $environment['COMPOSER_VENDOR_DIR'] = $root . '/vendor';
         $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $environment);
+
         if (! is_resource($process)) {
             throw new PackageValidationError('Composer could not start');
         }
         $error = stream_get_contents($pipes[2]);
         $output = stream_get_contents($pipes[1]);
         $exit = proc_close($process);
+
         if ($exit !== 0) {
             throw new PackageValidationError('locked Composer install failed: ' . trim((string) $error . ' ' . (string) $output));
         }
@@ -83,26 +87,32 @@ final class PluginBuilder
     {
         $declared = is_array($manifest['helpers'] ?? null) ? $manifest['helpers'] : [];
         $locked = is_array($lock['helpers'] ?? null) ? $lock['helpers'] : [];
+
         foreach ($locked as $name => $input) {
             if (! is_string($name) || ! is_array($input) || ! is_array($declared[$name] ?? null)) {
                 throw new PackageValidationError('helper lock does not match the plugin manifest');
             }
             $artifact = $input['platforms'][$platform] ?? null;
+
             if (! is_array($artifact) || ! is_string($artifact['url'] ?? null) || ! is_string($artifact['sha256'] ?? null)) {
                 throw new PackageValidationError('helper has no locked artifact for ' . $platform);
             }
             $target = $declared[$name]['executable'] ?? null;
+
             if (! is_string($target) || str_starts_with($target, '/') || str_contains($target, '..')) {
                 throw new PackageValidationError('helper executable path is unsafe');
             }
             $download = $root . '/.helper-' . bin2hex(random_bytes(6));
+
             if (@copy($artifact['url'], $download) === false || ! hash_equals(strtolower($artifact['sha256']), hash_file('sha256', $download) ?: '')) {
                 throw new PackageValidationError('helper checksum verification failed for ' . $name);
             }
             $destination = $root . '/' . $target;
+
             if (! is_dir(dirname($destination))) {
                 mkdir(dirname($destination), 0755, true);
             }
+
             if (is_string($artifact['archive_binary'] ?? null)) {
                 $extract = $root . '/.helper-extract-' . bin2hex(random_bytes(4));
                 mkdir($extract, 0700, true);
@@ -111,6 +121,7 @@ final class PluginBuilder
                 $error = is_resource($pipe) ? stream_get_contents($pipes[2]) : '';
                 $exit = is_resource($pipe) ? proc_close($pipe) : 1;
                 $extracted = $extract . '/' . $artifact['archive_binary'];
+
                 if ($exit !== 0 || ! is_file($extracted)) {
                     throw new PackageValidationError('helper archive extraction failed: ' . trim((string) $error));
                 }
@@ -131,6 +142,7 @@ final class PluginBuilder
         $archive = $layout . '/layer.tar';
         $command = ['sh', '-c', 'find "$1" -exec touch -h -d @0 {} + && cd "$1" && tar --format=ustar --sort=name --mtime="UTC 1970-01-01" --owner=0 --group=0 --numeric-owner -cf "$2" .', 'builder', $root, $archive];
         $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+
         if (! is_resource($process) || proc_close($process) !== 0) {
             throw new PackageValidationError('plugin layer creation failed');
         }
@@ -160,6 +172,7 @@ final class PluginBuilder
     {
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::SELF_FIRST) as $item) {
             $target = $destination . '/' . substr($item->getPathname(), strlen($source) + 1);
+
             if ($item->isDir()) {
                 if (! is_dir($target)) {
                     mkdir($target, 0755, true);
@@ -178,6 +191,7 @@ final class PluginBuilder
         if (! file_exists($path) && ! is_link($path)) {
             return;
         }
+
         if (is_dir($path) && ! is_link($path)) {
             foreach (scandir($path) ?: [] as $entry) {
                 if ($entry !== '.' && $entry !== '..') {
@@ -185,6 +199,7 @@ final class PluginBuilder
                 }
             }
         }
+
         if (is_dir($path) && ! is_link($path)) {
             rmdir($path);
 

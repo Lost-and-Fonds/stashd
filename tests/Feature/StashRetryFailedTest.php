@@ -27,6 +27,7 @@ test('stash.retry_failed retries every failed item in the stash, ignores non-fai
     // Two of three items in stash A fail; the third is left untouched so we
     // can prove it's not retried.
     $failedMediaItemIdsA = [(string) $itemsA[0]->mediaItemId, (string) $itemsA[1]->mediaItemId];
+
     foreach ($failedMediaItemIdsA as $mediaItemId) {
         $mediaItem = $mediaItems->find(MediaItemId::parse($mediaItemId));
         $mediaItem->state = MediaItemState::Failed;

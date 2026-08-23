@@ -47,6 +47,7 @@ final class FilesystemProbe
     public function probeHardlinkWithinRoot(string $path): FilesystemProbeResult
     {
         $writable = $this->probeWritable($path);
+
         if (! $writable->ok) {
             return $writable;
         }
@@ -61,6 +62,7 @@ final class FilesystemProbe
     public function probeHardlinkCrossRoot(string $sourceRoot, string $targetRoot): FilesystemProbeResult
     {
         $sourceWritable = $this->probeWritable($sourceRoot);
+
         if (! $sourceWritable->ok) {
             return FilesystemProbeResult::failed(
                 message: "Vault is not writable; cannot test hardlinks: {$sourceWritable->message}",
@@ -69,6 +71,7 @@ final class FilesystemProbe
         }
 
         $targetWritable = $this->probeWritable($targetRoot);
+
         if (! $targetWritable->ok) {
             return FilesystemProbeResult::failed(
                 message: "Broadcasts root is not writable; cannot test hardlinks: {$targetWritable->message}",
@@ -105,6 +108,7 @@ final class FilesystemProbe
         clearstatcache();
 
         $linked = @link($source, $target);
+
         if (! $linked) {
             $error = error_get_last()['message'] ?? 'link() returned false';
             $this->safeUnlink($source);

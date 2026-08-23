@@ -141,6 +141,7 @@ test('GET /api/v1/stashes/{id}/items marks ignored items with their filter reaso
     $response = $this->http->get('/api/v1/stashes/' . $stashId . '/items', headers: $headers)->assertStatus(Status::OK);
 
     $byState = [];
+
     foreach ($response->body['items'] as $item) {
         $byState[$item['state']][] = $item['ignored_reason'];
     }

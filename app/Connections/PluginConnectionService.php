@@ -130,11 +130,13 @@ final readonly class PluginConnectionService
         $definition = $this->plugins->findByLogicalKey($connection->type);
         $operation = $definition?->operations[$operationKey] ?? null;
         $runtime = $definition === null ? null : $this->plugins->runtimeFor($connection->type);
+
         if ($definition === null || $runtime === null || $operation === null) {
             throw ConnectionException::withCode('connection_operation_unavailable', 'Connection operation is unavailable.');
         }
 
         $stage = sys_get_temp_dir() . '/stashd-external-connection-' . bin2hex(random_bytes(6));
+
         if (! mkdir($stage, 0o775, true) && ! is_dir($stage)) {
             throw ConnectionException::withCode('connection_unavailable', 'Could not create operation staging directory.');
         }
@@ -176,6 +178,7 @@ final readonly class PluginConnectionService
     {
         /** @var list<array{key: string, value: array{kind: 'text', value: string}}> $entries */
         $entries = [];
+
         foreach ($settings as $key => $value) {
             if (is_scalar($value)) {
                 $entries[] = ['key' => $key, 'value' => ['kind' => 'text', 'value' => (string) $value]];

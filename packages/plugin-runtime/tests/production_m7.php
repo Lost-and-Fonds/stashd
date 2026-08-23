@@ -23,6 +23,7 @@ spl_autoload_register(static function (string $class) use ($sdkRoot): void {
     ] as $prefix => $root) {
         if (str_starts_with($class, $prefix)) {
             $path = $root . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
+
             if (is_file($path)) {
                 require_once $path;
             }
@@ -43,6 +44,7 @@ require_once __DIR__ . '/../src/Runner/PluginRunner.php';
 function m7Temp(string $prefix): string
 {
     $path = sys_get_temp_dir() . '/' . $prefix . '-' . bin2hex(random_bytes(8));
+
     if (! mkdir($path, 0700, true)) {
         throw new RuntimeException('temporary directory could not be created');
     }
@@ -57,9 +59,11 @@ function m7Remove(string $path): void
 
         return;
     }
+
     if (! is_dir($path)) {
         return;
     }
+
     foreach (scandir($path) ?: [] as $entry) {
         if ($entry !== '.' && $entry !== '..') {
             m7Remove($path . '/' . $entry);
@@ -78,10 +82,12 @@ function m7Assert(bool $condition, string $message): void
 function m7Archive(string $source, string $archive): void
 {
     $files = ['plugin.json', 'plugin.php', 'rpc/FrameCodec.php', 'helpers/fixture-helper.php'];
+
     foreach (glob($source . '/sdk/*.php') ?: [] as $sdkFile) {
         $files[] = 'sdk/' . basename($sdkFile);
     }
     $process = proc_open(array_merge(['tar', '-czf', $archive, '-C', $source], $files), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+
     if (! is_resource($process) || proc_close($process) !== 0) {
         throw new RuntimeException('fixture archive failed');
     }
@@ -126,6 +132,7 @@ final class M7HostProcess
         $command = (new SandboxPolicy())->command($packageRoot, $this->invocationRoot(), 'plugin.php');
         $this->pipes = [];
         $this->process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $this->pipes);
+
         if (! is_resource($this->process)) {
             throw new RuntimeException('plugin fixture process could not start');
         }
@@ -137,17 +144,21 @@ final class M7HostProcess
     {
         $id = 'host-' . $this->nextHostId++;
         FrameCodec::write($this->pipes[0], ['protocol' => 1, 'id' => $id, 'kind' => 'request', 'method' => $method, 'params' => $params]);
+
         while (true) {
             $message = FrameCodec::read($this->pipes[1], 5.0);
+
             if ($message === null) {
                 throw new RuntimeException('plugin exited before responding');
             }
+
             if (($message['kind'] ?? null) !== 'request') {
                 if (($message['id'] ?? null) === $id && isset($message['error'])) {
                     $this->metrics->failures++;
 
                     return ['error' => $message['error']];
                 }
+
                 if (($message['id'] ?? null) === $id) {
                     return $message['result'] ?? [];
                 }
@@ -222,6 +233,7 @@ final class M7HostProcess
             isset($params['body']) ? (string) $params['body'] : null,
             isset($params['credential']) ? (string) $params['credential'] : null,
         );
+
         if ($response->resource === null) {
             return ['status' => $response->status, 'headers' => $response->headers, 'body' => $response->body()];
         }
@@ -253,6 +265,7 @@ final class M7HostProcess
     private function stagingWrite(array $params): array
     {
         $content = base64_decode((string) ($params['content'] ?? ''), true);
+
         if ($content === false) {
             throw new CapabilityDenied('staging content is invalid');
         }
@@ -288,18 +301,22 @@ function promote(string $stagingRoot, string $relativePath, string $promotionRoo
         throw new RuntimeException('publication path is unsafe');
     }
     $parts = explode('/', $relativePath);
+
     if (in_array('', $parts, true) || in_array('.', $parts, true) || in_array('..', $parts, true)) {
         throw new RuntimeException('publication path is unsafe');
     }
     $source = realpath($stagingRoot . '/' . $relativePath);
     $staging = realpath($stagingRoot);
+
     if ($source === false || $staging === false || ! is_file($source) || ! str_starts_with($source, $staging . '/')) {
         throw new RuntimeException('publication source is outside staging');
     }
     $destination = $promotionRoot . '/' . $relativePath;
+
     if (! is_dir(dirname($destination)) && ! mkdir(dirname($destination), 0700, true) && ! is_dir(dirname($destination))) {
         throw new RuntimeException('promotion directory could not be created');
     }
+
     if (! copy($source, $destination)) {
         throw new RuntimeException('promotion failed');
     }
@@ -316,6 +333,7 @@ try {
     mkdir($source . '/helpers', 0700, true);
     copy(__DIR__ . '/fixtures/fixture-plugin.php', $source . '/plugin.php');
     copy(__DIR__ . '/fixtures/fixture-helper.php', $source . '/helpers/fixture-helper.php');
+
     foreach (glob($sdkRoot . '/src/*.php') ?: [] as $sdkFile) {
         copy($sdkFile, $source . '/sdk/' . basename($sdkFile));
     }
@@ -350,11 +368,13 @@ try {
     $metrics = new M7Metrics();
     $transport = new FixtureTransport(static function (string $method, string $url, array $headers): TransportResponse {
         m7Assert($method === 'GET', 'fixture request method mismatch');
+
         if ($url === 'https://allowed.test/small') {
             m7Assert(($headers['X-Fixture-Token'] ?? null) === 'fixture-secret', 'credential was not injected');
 
             return new TransportResponse(200, ['content-type' => 'text/plain'], ['small-response']);
         }
+
         if ($url === 'https://allowed.test/large') {
             return new TransportResponse(200, ['content-type' => 'application/octet-stream'], [str_repeat('a', 100000), str_repeat('b', 100000), str_repeat('c', 100000)]);
         }

@@ -433,6 +433,7 @@ function mercureAuthorizationCookieFrom(TestResponseHelper $response): ?Cookie
 
     foreach ($setCookie as $value) {
         $cookie = Cookie::createFromString($value);
+
         if ($cookie->key === 'mercureAuthorization') {
             return $cookie;
         }

@@ -36,6 +36,7 @@ final readonly class DownloadCaptions
         }
 
         $plugin = $this->plugins->findDownloader($media->providerKey);
+
         if ($plugin === null) {
             throw DownloadException::withCode('captions_unavailable', 'No Input plugin is available for this media item.');
         }
@@ -56,12 +57,14 @@ final readonly class DownloadCaptions
             options: ['include_captions' => true, 'caption_languages' => $languages, 'include_auto' => $includeAuto],
         );
         $source = array_values(array_filter($files, static fn($file): bool => $file->role === AssetRole::Subtitle))[0] ?? null;
+
         if ($source === null) {
             throw DownloadException::withCode('captions_unavailable', 'No requested caption track is available.');
         }
 
         $language = explode('.', $source->filename)[1] ?? null;
         $asset = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::Subtitle);
+
         if ($asset !== null && $asset->state === AssetState::Ready) {
             return;
         }

@@ -31,6 +31,7 @@ try {
             ? new PluginCredentialGrant($credentialName, $credentialValue, 'key')
             : null,
     );
+
     if ($operation === 'resolve') {
         $client->resolveInput($component, $value, $fixtureDirectory, [$httpGrant]);
     } else {

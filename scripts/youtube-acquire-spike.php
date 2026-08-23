@@ -8,6 +8,7 @@ use App\Plugins\PluginHelperGrant;
 use App\Plugins\PluginHostClient;
 
 [$script, $socket, $component, $helper] = array_pad($argv, 4, null);
+
 if (! is_string($socket) || ! is_string($component) || ! is_string($helper)) {
     fwrite(STDERR, "usage: youtube-acquire-spike.php <socket> <component> <helper>\n");
     exit(64);
@@ -36,23 +37,29 @@ try {
     );
     $artifacts = $result->acquisition['artifacts'] ?? [];
     $roles = array_column($artifacts, 'role');
+
     foreach (['primary', 'captions', 'artwork', 'metadata'] as $role) {
         if (! in_array($role, $roles, true)) {
             throw new RuntimeException("missing {$role} artifact");
         }
     }
+
     foreach ($artifacts as $artifact) {
         $reference = $artifact['reference'] ?? null;
+
         if (! is_string($reference) || str_contains($reference, '/') || str_starts_with($reference, '.')) {
             throw new RuntimeException('artifact reference was not a safe staging reference');
         }
+
         if (! is_file($staging . '/' . $reference)) {
             throw new RuntimeException("staged artifact missing: {$reference}");
         }
     }
+
     if (! in_array('finalizing artifacts', array_column($result->progress, 'stage'), true)) {
         throw new RuntimeException('artifact finalization progress was not reported');
     }
+
     if (! in_array('complete', array_column($result->progress, 'stage'), true)) {
         throw new RuntimeException('acquisition completion progress was not reported');
     }

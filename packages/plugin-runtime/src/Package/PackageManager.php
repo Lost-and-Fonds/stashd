@@ -22,6 +22,7 @@ final class PackageManager
         $this->active = $root . '/active';
         $this->links = $root . '/links';
         $this->staging = $root . '/staging';
+
         foreach ([$this->packages, $this->active, $this->links, $this->staging] as $directory) {
             if (! is_dir($directory) && ! mkdir($directory, 0700, true) && ! is_dir($directory)) {
                 throw new RuntimeException('package directory could not be created');
@@ -41,17 +42,21 @@ final class PackageManager
             TarArchive::extract($archive, $temporary);
             $manifest = PackageManifest::fromFile($this->manifestPath($temporary), $this->apiVersion, $this->architecture ?? self::architecture());
             $entrypoint = $temporary . '/' . $manifest->entrypoint;
+
             if (! is_file($entrypoint)) {
                 throw new PackageValidationError('manifest entrypoint is missing');
             }
             $destination = $this->packages . '/' . $manifest->id . '/' . $manifest->version;
+
             if (file_exists($destination) || is_link($destination)) {
                 throw new PackageStateError('plugin version is already installed');
             }
             $parent = dirname($destination);
+
             if (! is_dir($parent) && ! mkdir($parent, 0700, true) && ! is_dir($parent)) {
                 throw new PackageStateError('package version directory could not be created');
             }
+
             if (! rename($temporary, $destination)) {
                 throw new PackageStateError('package version could not be committed');
             }
@@ -72,10 +77,12 @@ final class PackageManager
             throw new PackageValidationError('OCI manifest digest is invalid');
         }
         $index = json_decode((string) @file_get_contents($layout . '/index.json'), true);
+
         if (! is_array($index) || ! is_array($index['manifests'] ?? null)) {
             throw new PackageValidationError('OCI index is invalid');
         }
         $entry = null;
+
         foreach ($index['manifests'] as $candidate) {
             if (is_array($candidate) && ($candidate['digest'] ?? null) === $manifestDigest) {
                 $entry = $candidate;
@@ -83,23 +90,28 @@ final class PackageManager
                 break;
             }
         }
+
         if ($entry === null) {
             throw new PackageValidationError('OCI manifest is not present in index');
         }
         $architecture = is_array($entry['platform'] ?? null) ? ($entry['platform']['architecture'] ?? null) : null;
+
         if (($entry['platform']['os'] ?? 'linux') !== 'linux' || ($architecture !== null && $architecture !== self::architecture())) {
             throw new PackageValidationError('OCI plugin platform is incompatible');
         }
         $manifestPath = $layout . '/blobs/sha256/' . substr($manifestDigest, 7);
+
         if (! is_file($manifestPath) || ! hash_equals(substr($manifestDigest, 7), hash_file('sha256', $manifestPath) ?: '')) {
             throw new PackageValidationError('OCI manifest checksum mismatch');
         }
         $manifest = json_decode((string) @file_get_contents($manifestPath), true);
+
         if (! is_array($manifest) || ! is_array($manifest['layers'] ?? null) || count($manifest['layers']) !== 1) {
             throw new PackageValidationError('OCI plugin manifest must contain one layer');
         }
         $layer = $manifest['layers'][0];
         $digest = is_array($layer) ? (string) ($layer['digest'] ?? '') : '';
+
         if (! preg_match('/^sha256:[a-f0-9]{64}$/', $digest)) {
             throw new PackageValidationError('OCI layer digest is invalid');
         }
@@ -113,14 +125,17 @@ final class PackageManager
         $this->validateId($id);
         $this->validateVersion($version);
         $package = $this->packages . '/' . $id . '/' . $version;
+
         if (! is_dir($package) || ! is_file($this->manifestPath($package))) {
             throw new PackageStateError('plugin version is not installed');
         }
         $current = $this->active . '/' . $id;
         $temporary = $this->active . '/.' . $id . '-' . bin2hex(random_bytes(8));
+
         if (! symlink('../packages/' . $id . '/' . $version, $temporary)) {
             throw new PackageStateError('active version link could not be prepared');
         }
+
         if (! rename($temporary, $current)) {
             @unlink($temporary);
 
@@ -137,6 +152,7 @@ final class PackageManager
     {
         $this->validateId($id);
         $path = $this->active . '/' . $id;
+
         if (is_link($path) || is_file($path)) {
             unlink($path);
         }
@@ -146,10 +162,12 @@ final class PackageManager
     {
         $this->validateId($id);
         $this->validateVersion($version);
+
         if ($this->activeVersion($id) === $version) {
             throw new PackageStateError('active plugin version must be disabled before removal');
         }
         $path = $this->packages . '/' . $id . '/' . $version;
+
         if (is_dir($path)) {
             $this->makeMutable($path);
             $this->removeTree($path);
@@ -161,18 +179,22 @@ final class PackageManager
         $this->validateId($id);
         $source = realpath($source) ?: throw new PackageValidationError('linked source does not exist');
         $manifest = PackageManifest::fromFile($this->manifestPath($source), $this->apiVersion, $this->architecture ?? self::architecture());
+
         if (! is_file($source . '/' . $manifest->entrypoint)) {
             throw new PackageValidationError('linked entrypoint is missing');
         }
         $this->disable($id);
         $link = $this->links . '/' . $id;
+
         if (is_link($link) || file_exists($link)) {
             $this->removeTree($link);
         }
+
         if (! symlink($source, $link)) {
             throw new PackageStateError('development link could not be created');
         }
         $temporary = $this->active . '/.' . $id . '-link-' . bin2hex(random_bytes(8));
+
         if (! symlink('../links/' . $id, $temporary) || ! rename($temporary, $this->active . '/' . $id)) {
             @unlink($temporary);
 
@@ -187,6 +209,7 @@ final class PackageManager
         $this->validateId($id);
         $this->disable($id);
         $path = $this->links . '/' . $id;
+
         if (is_link($path)) {
             unlink($path);
         }
@@ -196,10 +219,12 @@ final class PackageManager
     {
         $this->validateId($id);
         $path = $this->active . '/' . $id;
+
         if (! is_link($path)) {
             return null;
         }
         $manifest = $this->manifestPath(realpath($path) ?: $path);
+
         if (! is_file($manifest)) {
             return null;
         }
@@ -267,8 +292,10 @@ final class PackageManager
         if (is_link($path)) {
             return;
         }
+
         if (is_dir($path)) {
             chmod($path, $directoryMode);
+
             foreach (scandir($path) ?: [] as $entry) {
                 if ($entry !== '.' && $entry !== '..') {
                     $this->walkMode($path . '/' . $entry, $fileMode, $directoryMode);
@@ -287,9 +314,11 @@ final class PackageManager
 
             return;
         }
+
         if (! is_dir($path)) {
             return;
         }
+
         foreach (scandir($path) ?: [] as $entry) {
             if ($entry !== '.' && $entry !== '..') {
                 $this->removeTree($path . '/' . $entry);

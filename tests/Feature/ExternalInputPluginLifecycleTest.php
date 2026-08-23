@@ -98,6 +98,7 @@ test('an external Input Component uses the normal Stash discovery and Vault life
 
     $assets = AssetRecord::select()->where('mediaItemId', (string) $media->id)->all();
     expect($assets)->toHaveCount(3);
+
     foreach ($assets as $asset) {
         expect($asset->state)->toBe(AssetState::Ready)
             ->and($asset->path)->not->toBeNull()

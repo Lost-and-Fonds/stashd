@@ -78,11 +78,13 @@ final readonly class BroadcastContextFactory
     {
         $settings = $broadcast->settings ?? [];
         $legacy = $settings['season_mapping'] ?? null;
+
         if (! is_array($legacy)) {
             return;
         }
 
         $sourceSettings = is_array($settings['source_settings'] ?? null) ? $settings['source_settings'] : [];
+
         foreach ($legacy as $reference => $value) {
             if (is_string($reference) && $reference !== '' && is_int($value) && $value > 0) {
                 $sourceSettings[$reference] ??= ['season' => $value];

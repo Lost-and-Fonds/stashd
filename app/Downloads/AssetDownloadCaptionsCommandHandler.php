@@ -28,6 +28,7 @@ final readonly class AssetDownloadCaptionsCommandHandler implements CommandHandl
     public function validate(array $options): void
     {
         $id = is_string($options['media_item_id'] ?? null) ? $options['media_item_id'] : '';
+
         if (! MediaItemId::isValid($id) || $this->mediaItems->find(MediaItemId::parse($id)) === null) {
             throw InvalidCommandPayload::withErrors(['Media item not found.']);
         }
@@ -43,6 +44,7 @@ final readonly class AssetDownloadCaptionsCommandHandler implements CommandHandl
         $command->targetId = $payload['media_item_id'];
         $this->commands->save($command);
         $entityId = PrefixedUlid::parse($payload['media_item_id']);
+
         if ($this->jobs->hasPendingOrProcessing(JobIntent::DownloadCaptions, $entityId)) {
             return [];
         }

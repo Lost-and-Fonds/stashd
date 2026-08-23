@@ -31,6 +31,7 @@ test('Podcast plugin is discovered and publishes an audio feed from PostgreSQL l
         (string) $media->providerItemId,
         'episode.wav',
     );
+
     if (! is_dir(dirname($audioPath))) {
         mkdir(dirname($audioPath), 0o775, true);
     }

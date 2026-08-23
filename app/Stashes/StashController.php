@@ -62,29 +62,36 @@ final readonly class StashController
         $body = ApiJson::normalizeRequest($request->body);
 
         $name = trim((string) ($body['name'] ?? ''));
+
         if ($name === '') {
             $name = 'New Stash';
         }
 
         $syncMode = SyncMode::Automatic;
+
         if (isset($body['syncMode'])) {
             $syncMode = SyncMode::tryFrom((string) $body['syncMode']);
+
             if ($syncMode === null) {
                 return $this->validationError('Unsupported sync_mode.');
             }
         }
 
         $downloadPolicy = DownloadPolicy::Video;
+
         if (isset($body['downloadPolicy'])) {
             $downloadPolicy = DownloadPolicy::tryFrom((string) $body['downloadPolicy']);
+
             if ($downloadPolicy === null) {
                 return $this->validationError('Unsupported download_policy.');
             }
         }
 
         $organizationMode = OrganizationMode::Flat;
+
         if (isset($body['organizationMode'])) {
             $organizationMode = OrganizationMode::tryFrom((string) $body['organizationMode']);
+
             if ($organizationMode === null) {
                 return $this->validationError('Unsupported organization_mode.');
             }

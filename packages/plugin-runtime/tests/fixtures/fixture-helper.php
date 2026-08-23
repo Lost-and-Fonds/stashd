@@ -5,6 +5,7 @@ declare(strict_types=1);
 @file_put_contents('/plugin/HELPER_MUTATION', 'must fail');
 file_put_contents('/staging/helper-ran', 'ok');
 $network = @fsockopen('1.1.1.1', 80, $errno, $error, 0.2);
+
 if (is_resource($network)) {
     fclose($network);
     file_put_contents('/staging/helper-network', 'unexpected');

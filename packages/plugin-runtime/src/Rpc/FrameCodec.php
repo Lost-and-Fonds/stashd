@@ -19,6 +19,7 @@ final class FrameCodec
     {
         $json = json_encode($message, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         $length = strlen($json);
+
         if ($length > self::MAX_FRAME_BYTES) {
             throw new FrameProtocolError('frame exceeds maximum size');
         }
@@ -35,16 +36,19 @@ final class FrameCodec
     {
         $deadline = $timeout === null ? null : microtime(true) + $timeout;
         $header = self::readExact($stream, 4, $deadline);
+
         if ($header === null) {
             return null;
         }
 
         $length = unpack('Nlength', $header)['length'] ?? null;
+
         if (! is_int($length) || $length > self::MAX_FRAME_BYTES) {
             throw new FrameProtocolError('frame exceeds maximum size');
         }
 
         $json = self::readExact($stream, $length, $deadline);
+
         if ($json === null) {
             throw new FrameProtocolError('unexpected EOF inside frame');
         }
@@ -54,11 +58,13 @@ final class FrameCodec
         } catch (JsonException $exception) {
             throw new FrameProtocolError('frame payload is not valid JSON', previous: $exception);
         }
+
         if (! is_array($message)) {
             throw new FrameProtocolError('frame payload must be an object');
         }
 
         $normalized = [];
+
         foreach ($message as $key => $value) {
             if (is_string($key)) {
                 $normalized[$key] = $value;
@@ -82,9 +88,11 @@ final class FrameCodec
         $seconds = (int) floor($timeout);
         $microseconds = (int) (($timeout - $seconds) * 1_000_000);
         $ready = stream_select($read, $write, $except, $seconds, $microseconds);
+
         if ($ready === 0) {
             throw new FrameTimeout('frame read timed out');
         }
+
         if ($ready === false) {
             throw new FrameProtocolError('frame read select failed');
         }
@@ -99,11 +107,13 @@ final class FrameCodec
         }
 
         $result = '';
+
         while (strlen($result) < $length) {
             if ($deadline !== null) {
                 self::waitForRead($stream, max(0.0, $deadline - microtime(true)));
             }
             $chunk = fread($stream, max(1, $length - strlen($result)));
+
             if ($chunk === false || $chunk === '') {
                 if (feof($stream)) {
                     return $result === '' ? null : throw new FrameProtocolError('unexpected EOF');
@@ -122,8 +132,10 @@ final class FrameCodec
     private static function writeAll($stream, string $value): void
     {
         $offset = 0;
+
         while ($offset < strlen($value)) {
             $written = fwrite($stream, substr($value, $offset));
+
             if ($written === false || $written === 0) {
                 throw new FrameProtocolError('frame write failed');
             }

@@ -37,6 +37,7 @@ final readonly class PublishedResourceService
             (string) $asset->id,
             $mediaType,
         );
+
         if ($existing !== null) {
             $existing->downloadName = $downloadName;
             $existing->access = $access;
@@ -58,6 +59,7 @@ final readonly class PublishedResourceService
         $this->paths->broadcastFile($broadcast, ...$this->safeSegments($relativePath));
 
         $existing = $this->resources->findByBroadcastAndPath(BroadcastId::fromPrimaryKey($broadcast->id), $relativePath);
+
         if ($existing !== null) {
             $existing->mediaType = $mediaType;
             $existing->downloadName = $downloadName;
@@ -100,6 +102,7 @@ final readonly class PublishedResourceService
 
         if ($resource->credentialSecretId !== null) {
             $old = $this->secretRecords->find(PrefixedUlid::parse($resource->credentialSecretId));
+
             if ($old !== null) {
                 $this->secrets->revoke($old->key);
             }
@@ -118,6 +121,7 @@ final readonly class PublishedResourceService
             }
 
             $secret = $this->secretRecords->find(PrefixedUlid::parse($resource->credentialSecretId));
+
             if ($secret !== null) {
                 $this->secrets->revoke($secret->key);
             }
@@ -139,6 +143,7 @@ final readonly class PublishedResourceService
         }
 
         $secret = $this->secretRecords->find(PrefixedUlid::parse($resource->credentialSecretId));
+
         if ($secret === null || $secret->revokedAt !== null) {
             return false;
         }
@@ -158,6 +163,7 @@ final readonly class PublishedResourceService
             $path = $asset instanceof AssetRecord ? $asset->path : null;
         } elseif ($resource->relativePath !== null) {
             $broadcast = BroadcastRecord::findById($resource->broadcastId->toPrimaryKey());
+
             if (! $broadcast instanceof BroadcastRecord) {
                 throw new RuntimeException('Published resource broadcast is unavailable.');
             }
@@ -238,6 +244,7 @@ final readonly class PublishedResourceService
         }
 
         $segments = explode('/', $relativePath);
+
         if (in_array('..', $segments, true) || in_array('', $segments, true)) {
             throw new RuntimeException('Published resource path is invalid.');
         }

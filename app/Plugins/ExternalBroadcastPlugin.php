@@ -134,11 +134,13 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     {
         $this->paths->claimRoot($context->broadcast);
         $stage = sys_get_temp_dir() . '/stashd-broadcast-plugin-' . bin2hex(random_bytes(8));
+
         if (! mkdir($stage, 0o775, true) && ! is_dir($stage)) {
             throw BroadcastException::withCode('broadcast_plugin_staging_failed', 'Broadcast plugin staging could not be created.');
         }
 
         $settings = $this->settings($context);
+
         if ($this->definition->outputPath !== null) {
             $output = $this->publications->publishFile(
                 $context->broadcast,
@@ -161,6 +163,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 StashItemId::fromPrimaryKey($stashItem->id),
                 $stashItem->mediaItemId,
             );
+
             if (! $media instanceof MediaItemRecord) {
                 $this->failItem($item, 'item_unavailable');
                 $failed[] = (string) $stashItem->id;
@@ -169,6 +172,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             }
 
             $resources = $this->resources($context->broadcast, $media, $stage, $stagedAssets);
+
             if ($resources === []) {
                 $this->failItem($item, 'resource_unavailable');
                 $failed[] = (string) $stashItem->id;
@@ -203,10 +207,12 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR') ?: null,
             );
             $artifacts = $prepared->publication['artifacts'] ?? [];
+
             if (! is_array($artifacts)) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned invalid preparation data.');
             }
             $validArtifacts = [];
+
             foreach ($artifacts as $artifact) {
                 if (is_array($artifact)) {
                     /** @var array<string, mixed> $artifact */
@@ -221,18 +227,22 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                     BroadcastId::fromPrimaryKey($context->broadcast->id),
                     StashItemId::fromPrimaryKey(new PrimaryKey($itemStashItemIds[(string) $itemData['id']])),
                 );
+
                 if ($item instanceof BroadcastItemRecord) {
                     $this->readyItem($item);
                 }
             }
 
             $items = [];
+
             foreach ($this->contexts->publishableStashItems($context) as $stashItem) {
                 $media = $context->mediaItems[(string) $stashItem->mediaItemId] ?? null;
+
                 if (! $media instanceof MediaItemRecord) {
                     continue;
                 }
                 $item = $this->items->findByBroadcastAndStashItem(BroadcastId::fromPrimaryKey($context->broadcast->id), StashItemId::fromPrimaryKey($stashItem->id));
+
                 if (! $item instanceof BroadcastItemRecord || $item->state !== BroadcastItemState::Ready) {
                     continue;
                 }
@@ -256,9 +266,11 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             /** @var array{artifact?: array{reference?: mixed}, files?: mixed} $publication */
             $publication = $result->publication;
             $reference = $publication['artifact']['reference'] ?? null;
+
             if ($this->definition->outputPath !== null && (! is_string($reference) || ! is_file($stage . '/' . $reference))) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned no valid output artifact.');
             }
+
             if ($this->definition->outputPath !== null) {
                 $outputPath = $this->paths->broadcastFile($context->broadcast, ...explode('/', $this->definition->outputPath));
                 copy($stage . '/' . $reference, $outputPath);
@@ -294,16 +306,20 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     public function verify(BroadcastContext $context): BroadcastVerifyResult
     {
         $missing = [];
+
         if ($this->definition->outputPath !== null) {
             $path = $this->paths->broadcastFile($context->broadcast, ...explode('/', $this->definition->outputPath));
+
             if (! is_file($path) || ! is_readable($path)) {
                 $missing[] = $this->definition->outputPath;
             }
         }
+
         foreach ($this->items->listForBroadcast(BroadcastId::fromPrimaryKey($context->broadcast->id)) as $item) {
             if ($item->publishedPath !== null && ! is_file($item->publishedPath)) {
                 $missing[] = $item->publishedPath;
                 $item->lastError = 'broadcast_item_output_missing';
+
                 if ($item->state !== BroadcastItemState::Stale) {
                     $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Stale);
                 } else {
@@ -318,18 +334,22 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     public function prune(BroadcastContext $context): BroadcastPruneResult
     {
         $removed = [];
+
         if ($this->definition->outputPath !== null) {
             $path = $this->paths->broadcastFile($context->broadcast, ...explode('/', $this->definition->outputPath));
+
             if (is_file($path) && @unlink($path)) {
                 $removed[] = $path;
             }
         }
+
         foreach ($this->items->listForBroadcast(BroadcastId::fromPrimaryKey($context->broadcast->id)) as $item) {
             if ($item->publishedPath !== null && is_file($item->publishedPath) && @unlink($item->publishedPath)) {
                 $removed[] = $item->publishedPath;
             }
         }
         $root = $this->paths->claimRoot($context->broadcast);
+
         foreach (glob($root . '/*') ?: [] as $path) {
             if (basename($path) === '.stashd-broadcast') {
                 continue;
@@ -350,9 +370,11 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
 
             return;
         }
+
         if (! is_dir($path)) {
             return;
         }
+
         foreach (glob($path . '/*') ?: [] as $child) {
             $this->removeGeneratedPath($child, $removed);
         }
@@ -391,6 +413,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     {
         /** @var list<array{id: string, label: string, intent: string, confirmation?: bool}> $actions */
         $actions = [];
+
         foreach ($this->definition->actions as $action) {
             if (! is_string($action['id'] ?? null)
                 || ! is_string($action['label'] ?? null)
@@ -403,6 +426,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 'label' => (string) $action['label'],
                 'intent' => (string) $action['intent'],
             ];
+
             if (isset($action['confirmation']) && is_bool($action['confirmation'])) {
                 $entry['confirmation'] = $action['confirmation'];
             }
@@ -416,6 +440,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     public function invokeAction(BroadcastRecord $broadcast, string $intent, array $payload = []): array
     {
         $action = null;
+
         foreach ($this->definition->actions as $candidate) {
             if (($candidate['intent'] ?? null) === $intent) {
                 $action = $candidate;
@@ -423,9 +448,11 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 break;
             }
         }
+
         if ($action === null) {
             throw BroadcastException::withCode('broadcast_action_unsupported', 'Broadcast action is unsupported.');
         }
+
         if (is_string($action['operation'] ?? null) && $action['operation'] !== 'rotate-publication-credentials') {
             $context = $this->contexts->build($broadcast);
             $settings = $this->settings($context);
@@ -443,8 +470,10 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR') ?: null,
             );
         }
+
         if (($action['operation'] ?? null) === 'rotate-publication-credentials') {
             $urls = [];
+
             foreach ($this->publicationRecords->listForBroadcast(BroadcastId::fromPrimaryKey($broadcast->id)) as $resource) {
                 if ($resource->access === 'credential') {
                     $this->publications->rotateCredential($resource);
@@ -465,19 +494,23 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             return;
         }
         $connectionId = $context->settings()[$this->definition->connectionSettingKey] ?? null;
+
         if (! is_string($connectionId) || trim($connectionId) === '') {
             return;
         }
         $connection = $this->connections->find(PrefixedUlid::parse($connectionId));
+
         if ($connection === null) {
             return;
         }
         $settings[] = ['key' => 'server_url', 'value' => ['kind' => 'text', 'value' => $connection->baseUri]];
+
         foreach ($connection->settings ?? [] as $key => $value) {
             if (is_scalar($value)) {
                 $settings[] = ['key' => $key, 'value' => ['kind' => 'text', 'value' => (string) $value]];
             }
         }
+
         if ($this->definition->credentialName !== null) {
             $settings[] = ['key' => 'credential_name', 'value' => ['kind' => 'text', 'value' => $this->definition->credentialName]];
         }
@@ -498,11 +531,13 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             return [];
         }
         $connectionId = $context->settings()[$this->definition->connectionSettingKey] ?? null;
+
         if (! is_string($connectionId) || trim($connectionId) === '') {
             return [];
         }
         $connection = $this->connections->find(PrefixedUlid::parse($connectionId));
         $token = $connection === null ? null : $this->connectionSecrets->resolve($connection);
+
         if ($connection === null || $token === null || trim($token) === '') {
             return [];
         }
@@ -525,6 +560,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             return;
         }
         $root = $this->paths->claimRoot($context->broadcast);
+
         foreach ($files as $file) {
             if (! is_array($file)
                 || ! is_string($file['source_reference'] ?? null)
@@ -532,15 +568,18 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an invalid published file.');
             }
             $relative = $file['relative_path'];
+
             if ($relative === '' || str_starts_with($relative, '/') || str_contains($relative, '..')) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an unsafe published path.');
             }
             $source = $stagedAssets[$file['source_reference']] ?? null;
             $sourcePath = $source instanceof AssetRecord ? $source->path : null;
+
             if (! $source instanceof AssetRecord || $sourcePath === null || ! is_file($sourcePath)) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an unavailable source resource.');
             }
             $item = null;
+
             foreach ($this->items->listForBroadcast(BroadcastId::fromPrimaryKey($context->broadcast->id)) as $candidate) {
                 if ((string) $candidate->id === ($file['item_id'] ?? '')) {
                     $item = $candidate;
@@ -548,11 +587,13 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                     break;
                 }
             }
+
             if (! $item instanceof BroadcastItemRecord) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an unknown item.');
             }
             $target = $this->paths->broadcastFile($context->broadcast, ...explode('/', $relative));
             $this->hardlinks->publishHardlink($sourcePath, $target, $root);
+
             if ($source->role === AssetRole::Subtitle) {
                 continue;
             }
@@ -561,6 +602,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             $item->lastError = null;
             $this->items->save($item);
             $this->upsertPublishedAsset($context, $item, $source, $target, $relative);
+
             if ($item->state !== BroadcastItemState::Ready) {
                 if ($item->state !== BroadcastItemState::Processing) {
                     $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Processing);
@@ -608,6 +650,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         $asset->sizeBytes = is_int($size) ? $size : $asset->sizeBytes;
         $asset->missingAt = null;
         $asset->missingReason = null;
+
         if ($asset->state !== AssetState::Ready) {
             $this->transitions->transitionAsset($asset, AssetState::Ready);
         } else {
@@ -621,19 +664,23 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     private function resources(BroadcastRecord $broadcast, MediaItemRecord $media, ?string $stage = null, array &$stagedAssets = []): array
     {
         $resources = [];
+
         foreach (AssetRecord::select()->where('mediaItemId', (string) $media->id)->all() as $asset) {
             if (! $asset instanceof AssetRecord || $asset->state !== AssetState::Ready || $asset->path === null) {
                 continue;
             }
             $publication = $this->publications->publishAsset($broadcast, $asset, $asset->mimeType ?? 'application/octet-stream', 'credential');
             $reference = (string) $asset->id;
+
             if ($stage !== null) {
                 $extension = pathinfo($asset->path, PATHINFO_EXTENSION) ?: 'bin';
                 $reference = 'resources/' . (string) $asset->id . '.' . $extension;
                 $destination = $stage . '/' . $reference;
+
                 if (! is_dir(dirname($destination))) {
                     mkdir(dirname($destination), 0o775, true);
                 }
+
                 if (! copy($asset->path, $destination)) {
                     throw BroadcastException::withCode('broadcast_plugin_staging_failed', 'Broadcast asset could not be staged.');
                 }
@@ -663,16 +710,19 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             $sourceReference = $artifact['derived_from_reference'] ?? null;
             $derivationKey = $artifact['derivation_key'] ?? null;
             $kind = $artifact['kind'] ?? null;
+
             if (! is_string($reference) || ! is_string($itemId) || ! is_string($sourceReference) || ! is_string($derivationKey) || $derivationKey === '' || ! is_string($kind)) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an invalid derived artifact.');
             }
             $source = $stagedAssets[$sourceReference] ?? null;
             $sourceId = $source?->id;
             $stagePath = $stage . '/' . $reference;
+
             if (! $source instanceof AssetRecord || $sourceId === null || ! is_file($stagePath)) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an unavailable derived artifact.');
             }
             $media = $context->mediaItems[$this->itemMediaId($context, $itemId)] ?? null;
+
             if (! $media instanceof MediaItemRecord) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an artifact for an unknown item.');
             }
@@ -681,6 +731,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             $derivationDigest = substr(hash('sha256', $derivationKey), 0, 16);
             $destination = $this->vaultPaths->vaultFile((string) $media->providerKey, (string) $media->providerItemId, 'derived-' . $derivationDigest . '.' . $extension);
             $existing = $this->assets->findDerived(MediaItemId::fromPrimaryKey($media->id), $assetKind, $derivationKey);
+
             if ($existing instanceof AssetRecord
                 && $existing->state === AssetState::Ready
                 && $existing->path !== null
@@ -688,10 +739,12 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 && (string) $existing->derivedFromAssetId === (string) $sourceId) {
                 continue;
             }
+
             if ($existing instanceof AssetRecord && $existing->path !== null && is_file($existing->path)) {
                 @unlink($existing->path);
             }
             $this->mover->moveIntoPlace($stagePath, $destination);
+
             if ($existing instanceof AssetRecord) {
                 $existing->path = $destination;
                 $existing->relativePath = $this->vaultPaths->relativeFile((string) $media->providerKey, (string) $media->providerItemId, basename($destination));
@@ -727,6 +780,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     {
         foreach ($this->contexts->publishableStashItems($context) as $stashItem) {
             $item = $this->items->findByBroadcastAndStashItem(BroadcastId::fromPrimaryKey($context->broadcast->id), StashItemId::fromPrimaryKey($stashItem->id));
+
             if ((string) $item?->id === $broadcastItemId) {
                 return (string) $stashItem->mediaItemId;
             }
@@ -747,6 +801,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     private function settings(BroadcastContext $context): array
     {
         $settings = [];
+
         foreach ($context->settings() as $key => $value) {
             if (! is_bool($value) && ! is_scalar($value)) {
                 continue;
@@ -783,6 +838,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     private function encodeSettings(array $settings): array
     {
         $encoded = [];
+
         foreach ($settings as $key => $value) {
             if (! is_bool($value) && ! is_int($value) && ! is_float($value) && ! is_string($value)) {
                 continue;
@@ -822,6 +878,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         }
         $item->lastError = $reason;
         $this->items->save($item);
+
         if ($item->state->canTransitionTo(BroadcastItemState::Failed)) {
             $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Failed);
         }

@@ -31,6 +31,7 @@ final class PluginProcess
     ) {
         $command = ($policy ?? new SandboxPolicy())->command($packageRoot, $stagingRoot, $entrypoint, null, $sdkRoot);
         $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $this->pipes);
+
         if (! is_resource($process)) {
             throw new RuntimeException('plugin process could not start');
         }
@@ -49,13 +50,17 @@ final class PluginProcess
         $id = 'host-' . $this->nextId++;
         FrameCodec::write($this->pipes[0], ['protocol' => 1, 'id' => $id, 'kind' => 'request', 'method' => $method, 'params' => $params]);
         $deadline = microtime(true) + $timeout;
+
         while (true) {
             $message = FrameCodec::read($this->pipes[1], max(0.0, $deadline - microtime(true)));
+
             if ($message === null) {
                 throw new RuntimeException('plugin closed IPC before responding');
             }
+
             if (($message['kind'] ?? null) === 'request') {
                 $responseId = $message['id'] ?? null;
+
                 if (! is_string($responseId)) {
                     throw new FrameProtocolError('plugin capability request has no ID');
                 }
@@ -69,13 +74,17 @@ final class PluginProcess
 
                 continue;
             }
+
             if (($message['id'] ?? null) !== $id) {
                 throw new FrameProtocolError('plugin response ID mismatch');
             }
+
             if (isset($message['error'])) {
                 $error = $message['error'];
+
                 if (is_array($error)) {
                     $normalizedError = [];
+
                     foreach ($error as $key => $value) {
                         if (is_string($key)) {
                             $normalizedError[$key] = $value;
@@ -88,10 +97,12 @@ final class PluginProcess
                 return ['error' => ['message' => is_string($error) ? $error : 'plugin returned an error']];
             }
             $result = $message['result'] ?? [];
+
             if (! is_array($result)) {
                 return [];
             }
             $normalizedResult = [];
+
             foreach ($result as $key => $value) {
                 if (is_string($key)) {
                     $normalizedResult[$key] = $value;
@@ -115,6 +126,7 @@ final class PluginProcess
             return 0;
         }
         $this->closed = true;
+
         if (is_resource($this->pipes[0])) {
             fclose($this->pipes[0]);
         }
@@ -133,9 +145,11 @@ final class PluginProcess
     private function handshake(): void
     {
         $message = FrameCodec::read($this->pipes[1], 5.0);
+
         if ($message === null) {
             throw new FrameProtocolError('plugin produced no handshake: ' . $this->stderr());
         }
+
         if (($message['method'] ?? null) !== 'hello' || ! isset($message['id'])) {
             throw new FrameProtocolError('plugin handshake is invalid: ' . json_encode($message, JSON_THROW_ON_ERROR));
         }

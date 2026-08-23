@@ -42,6 +42,7 @@ final readonly class StorageCheckJobHandler implements JobHandler
     public function handle(JobRecord $job, JobHandlerContext $context): void
     {
         $command = $this->optionalCommand($job);
+
         if ($command !== null) {
             $this->transitions->transitionCommand($command, CommandState::Running);
         }
@@ -74,6 +75,7 @@ final readonly class StorageCheckJobHandler implements JobHandler
         $this->jobs->save($job);
 
         $this->transitions->transitionJob($job, JobState::Ready);
+
         if ($command !== null) {
             $this->transitions->transitionCommand($command, CommandState::Completed);
             $this->activity->commandCompleted($command);

@@ -106,6 +106,7 @@ final class JobRepository
 
         if ($lane !== null) {
             $placeholders = [];
+
             foreach ($lane->intents() as $index => $intent) {
                 $key = "intent_{$index}";
                 $placeholders[] = ":{$key}";
@@ -203,12 +204,15 @@ final class JobRepository
 
         $seen = [];
         $jobs = [];
+
         foreach ($processing as $job) {
             $seen[(string) $job->id] = true;
             $jobs[] = $job;
         }
+
         foreach ($recent as $job) {
             $id = (string) $job->id;
+
             if (isset($seen[$id])) {
                 continue;
             }
@@ -256,11 +260,13 @@ final class JobRepository
             ->all();
 
         $latestByMediaItem = [];
+
         foreach ($jobs as $job) {
             $latestByMediaItem[(string) $job->entityId] ??= $job;
         }
 
         $failures = [];
+
         foreach ($latestByMediaItem as $mediaItemId => $job) {
             if ($job->state === JobState::Failed && $job->lastError !== null) {
                 $failures[$mediaItemId] = $job->lastError;

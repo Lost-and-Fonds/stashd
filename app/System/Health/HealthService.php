@@ -42,6 +42,7 @@ final readonly class HealthService
 
             if (in_array($location->key, [StorageLocationKey::Vault, StorageLocationKey::Broadcasts], true)) {
                 $vaultBroadcastHardlink = $vaultBroadcastHardlink && $location->supportsHardlinks;
+
                 if (! $location->supportsHardlinks && $location->lastError !== null) {
                     $storageMessage ??= $location->lastError;
                 }

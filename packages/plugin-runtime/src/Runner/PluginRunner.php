@@ -15,11 +15,13 @@ final readonly class PluginRunner
     public function start(string $pluginId, string $stagingRoot): PluginProcess
     {
         $package = $this->packages->activePath($pluginId);
+
         if ($package === null) {
             throw new RuntimeException('plugin is not active: ' . $pluginId);
         }
         $manifestPath = is_file($package . '/plugin.json') ? $package . '/plugin.json' : $package . '/stashd-plugin/plugin.json';
         $manifest = json_decode((string) file_get_contents($manifestPath), true, 512, JSON_THROW_ON_ERROR);
+
         if (! is_array($manifest)) {
             throw new RuntimeException('active plugin manifest is invalid');
         }

@@ -262,35 +262,43 @@ final readonly class BroadcastController
     public function updateSourceSettings(string $id, Request $request): Json
     {
         $broadcast = $this->findBroadcast($id);
+
         if ($broadcast === null) {
             return $this->notFound('Broadcast not found.');
         }
 
         $plugin = BroadcastPluginRegistry::findByKey($broadcast->type)?->plugin;
+
         if (! $plugin instanceof BroadcastPluginSourceOptions) {
             return $this->validationError('This Broadcast does not declare source-scoped options.');
         }
 
         $source = $request->body['source_reference'] ?? null;
         $values = $request->body['settings'] ?? null;
+
         if (! is_string($source) || $source === '' || ! is_array($values)) {
             return $this->validationError('source_reference and settings are required.');
         }
 
         $validSources = array_map(static fn($input): string => (string) $input->id, $this->stashInputs->listForStash($broadcast->stashId));
+
         if (! in_array($source, $validSources, true)) {
             return $this->validationError('Unknown source for this Broadcast.');
         }
 
         $controls = [];
+
         foreach ($plugin->sourceUiControls() as $control) {
             $controls[$control->name] = $control;
         }
+
         foreach ($values as $key => $value) {
             $control = is_string($key) ? $controls[$key] ?? null : null;
+
             if ($control === null || (! is_bool($value) && ! is_int($value) && ! is_float($value) && ! is_string($value))) {
                 return $this->validationError('Invalid source-scoped option.');
             }
+
             if ($control->type === 'number' && ! is_int($value) && ! is_float($value)) {
                 return $this->validationError('Invalid source-scoped option.');
             }
@@ -426,6 +434,7 @@ final readonly class BroadcastController
             ? $plugin->actions($broadcast)
             : [];
         $publishedUrl = null;
+
         foreach ($metadata as $field) {
             if (($field['kind'] ?? null) === 'url' && is_string($field['value'] ?? null)) {
                 $publishedUrl = $field['value'];

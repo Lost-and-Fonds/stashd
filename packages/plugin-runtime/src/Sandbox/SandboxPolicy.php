@@ -19,9 +19,11 @@ final readonly class SandboxPolicy
             '--ro-bind', $packageRoot, '/plugin', '--bind', $stagingRoot, '/staging',
             '--tmpfs', '/tmp', '--dev', '/dev', '--dir', '/home', '--dir', '/root',
         ];
+
         if (! $network) {
             array_splice($command, 5, 0, ['--unshare-net']);
         }
+
         foreach (['/usr', '/bin', '/lib', '/lib64', '/sbin'] as $directory) {
             if (is_dir($directory)) {
                 $command[] = '--ro-bind';
@@ -29,6 +31,7 @@ final readonly class SandboxPolicy
                 $command[] = $directory;
             }
         }
+
         if ($sdkRoot !== null) {
             if (! is_dir($sdkRoot)) {
                 throw new RuntimeException('plugin SDK root is missing');
@@ -45,6 +48,7 @@ final readonly class SandboxPolicy
     private function assertRelative(string $path): void
     {
         $parts = explode('/', $path);
+
         if ($path === '' || str_starts_with($path, '/') || str_contains($path, "\0") || in_array('', $parts, true) || in_array('.', $parts, true) || in_array('..', $parts, true)) {
             throw new RuntimeException('sandbox entrypoint must be a safe relative path');
         }

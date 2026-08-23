@@ -8,6 +8,7 @@ use App\Plugins\PluginHelperGrant;
 use App\Plugins\PluginHostClient;
 
 [$script, $socket, $component, $helper] = array_pad($argv, 4, null);
+
 if (! is_string($socket) || ! is_string($component) || ! is_string($helper)) {
     fwrite(STDERR, "usage: youtube-acquire-parity.php <socket> <component> <helper>\n");
     exit(64);
@@ -35,6 +36,7 @@ try {
         new PluginHelperGrant('yt-dlp', $helper),
     );
     $pluginPrimary = null;
+
     foreach ($plugin->acquisition['artifacts'] ?? [] as $artifact) {
         if (($artifact['role'] ?? null) === 'primary') {
             $pluginPrimary = $pluginStage . '/' . $artifact['reference'];
@@ -42,6 +44,7 @@ try {
             break;
         }
     }
+
     if (! is_string($pluginPrimary) || ! is_file($pluginPrimary)) {
         throw new RuntimeException('plugin primary artifact missing');
     }

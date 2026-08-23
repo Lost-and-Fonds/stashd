@@ -39,6 +39,7 @@ final class MoveFileIntoVault
 
         if ($handle !== false) {
             fflush($handle);
+
             if (function_exists('fsync')) {
                 fsync($handle);
             }

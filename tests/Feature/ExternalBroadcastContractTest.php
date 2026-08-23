@@ -97,6 +97,7 @@ test('external Broadcast materializes plugin-selected media and subtitle resourc
         (string) $media->providerItemId,
         'captions.en.vtt',
     );
+
     if (! is_dir(dirname($subtitlePath))) {
         mkdir(dirname($subtitlePath), 0o775, true);
     }
@@ -133,6 +134,7 @@ test('external Broadcast materializes plugin-selected media and subtitle resourc
     expect(is_file($publishedPath))->toBeTrue()
         ->and($subtitle?->path)->not->toBeNull()
         ->and(is_string($publishedSubtitlePath) && is_file($publishedSubtitlePath))->toBeTrue();
+
     if (! is_string($publishedSubtitlePath) || $subtitle?->path === null) {
         return;
     }

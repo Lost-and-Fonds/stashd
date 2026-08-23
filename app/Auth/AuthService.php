@@ -125,6 +125,7 @@ final readonly class AuthService
         }
 
         $user = $this->users->findById($token->userId);
+
         if ($user === null) {
             return null;
         }

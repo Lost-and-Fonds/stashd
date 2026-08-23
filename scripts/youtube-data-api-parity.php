@@ -9,6 +9,7 @@ use App\Plugins\PluginHostClient;
 use App\Plugins\PluginHttpGrant;
 
 [$script, $socket, $component, $fixtureDirectory] = array_pad($argv, 4, null);
+
 if (! is_string($socket) || ! is_string($component) || ! is_string($fixtureDirectory)) {
     fwrite(STDERR, "usage: youtube-data-api-parity.php <socket> <component> <fixture-directory>\n");
     exit(64);
@@ -33,13 +34,16 @@ try {
     );
 
     $pluginItems = $plugin->items ?? [];
+
     if (count($pluginItems) !== 18) {
         throw new RuntimeException('Data API fixture discovery count failed: ' . count($pluginItems));
     }
+
     foreach ($pluginItems as $index => $actual) {
         if (! is_array($actual)) {
             throw new RuntimeException("Data API item {$index} was invalid");
         }
+
         foreach (['id', 'reference', 'title', 'description', 'published_at', 'artwork_reference', 'duration_seconds', 'kind'] as $field) {
             if (! array_key_exists($field, $actual)) {
                 throw new RuntimeException("Data API item {$index} omitted {$field}");
@@ -48,6 +52,7 @@ try {
     }
 
     $output = json_encode(['count' => count($pluginItems), 'first' => $pluginItems[0] ?? null, 'progress' => $plugin->progress, 'logs' => $plugin->logs], JSON_THROW_ON_ERROR);
+
     if (str_contains($output, $secret)) {
         throw new RuntimeException('credential secret appeared in plugin-visible output');
     }

@@ -73,6 +73,7 @@ final readonly class DownloadMediaItem
             ?? throw DownloadException::withCode('stash_not_found', 'Stash not found.');
 
         $stashItem = $this->stashItems->findByStashAndMediaItem($stashId, $mediaItemId);
+
         if ($stashItem === null) {
             throw DownloadException::withCode('stash_item_not_found', 'Media item is not part of the requested stash.');
         }

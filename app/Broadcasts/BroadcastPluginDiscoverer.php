@@ -57,6 +57,7 @@ final class BroadcastPluginDiscoverer implements Discovery
 
         foreach ($externalPlugins->all() as $definition) {
             $runtimes = $externalPlugins->runtimesFor($definition->logicalKey);
+
             if ($runtimes === []) {
                 continue;
             }

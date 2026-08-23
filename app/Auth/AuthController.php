@@ -158,6 +158,7 @@ final readonly class AuthController
         }
 
         $scopes = null;
+
         if (is_array($rawScopes)) {
             foreach ($rawScopes as $scope) {
                 if (! is_string($scope)) {

@@ -47,6 +47,7 @@ final readonly class ProviderStrategySelector
                 $strategies,
                 static fn(ProviderStrategy $strategy): bool => $strategy->supportsIncremental,
             ));
+
             if ($incremental !== []) {
                 $strategies = $incremental;
             }

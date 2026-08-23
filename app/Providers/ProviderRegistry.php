@@ -20,6 +20,7 @@ final class ProviderRegistry
         ?ExternalInputPluginRegistry $externalPlugins = null,
     ) {
         $this->register($fakeProvider);
+
         foreach ($externalPlugins?->providers() ?? [] as $plugin) {
             $this->register($plugin);
         }

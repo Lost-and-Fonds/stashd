@@ -15,6 +15,7 @@ final class InvocationStaging implements StagingArea
     {
         $path = $this->safePath($relativePath, false);
         $handle = @fopen($path, 'x');
+
         if ($handle === false) {
             throw new UnsafePath('staging output already exists or cannot be created');
         }
@@ -48,27 +49,34 @@ final class InvocationStaging implements StagingArea
             throw new UnsafePath('staging path must be relative');
         }
         $parts = explode('/', $relativePath);
+
         if (in_array('', $parts, true) || in_array('.', $parts, true) || in_array('..', $parts, true)) {
             throw new UnsafePath('staging path contains an unsafe segment');
         }
         $cursor = $this->root;
         $last = array_pop($parts);
+
         foreach ($parts as $part) {
             $cursor .= '/' . $part;
+
             if (is_link($cursor)) {
                 throw new UnsafePath('staging path crosses a symlink');
             }
+
             if (file_exists($cursor) && ! is_dir($cursor)) {
                 throw new UnsafePath('staging path crosses a file');
             }
+
             if (! is_dir($cursor) && ! mkdir($cursor, 0700, true) && ! is_dir($cursor)) {
                 throw new UnsafePath('staging directory could not be created');
             }
         }
         $path = $cursor . '/' . $last;
+
         if (is_link($path)) {
             throw new UnsafePath('staging target is a symlink');
         }
+
         if ($mustExist && ! is_file($path)) {
             throw new UnsafePath('staging output does not exist');
         }

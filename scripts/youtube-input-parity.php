@@ -27,6 +27,7 @@ try {
     ]);
     $resolved = $client->resolveInput($component, $source, $fixtureDirectory, [$httpGrant]);
     $inputId = $resolved->resolved['id'] ?? null;
+
     if (! is_string($inputId)) {
         throw new RuntimeException('plugin returned no input ID');
     }
@@ -36,6 +37,7 @@ try {
     $expectedKind = str_contains($source, 'playlist')
         ? 'playlist'
         : ((str_contains($source, 'watch') || str_contains($source, 'shorts') || str_contains($source, 'youtu.be')) ? 'video' : 'channel');
+
     if (($resolved->resolved['kind'] ?? null) !== $expectedKind
         || $items === []
         || ($items[0]['id'] ?? null) === null

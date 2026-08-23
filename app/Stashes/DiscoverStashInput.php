@@ -124,6 +124,7 @@ final readonly class DiscoverStashInput
         }
 
         $options = [];
+
         foreach ($value as $key => $option) {
             if (is_string($key) && (is_bool($option) || is_string($option))) {
                 $options[$key] = $option;

@@ -136,6 +136,7 @@ final class FakeProvider implements Provider
         $count = $generation >= 2 ? 4 : 3;
 
         $items = [];
+
         for ($i = 1; $i <= $count; $i++) {
             $items[] = new DiscoveredItem(
                 providerItemId: "{$slug}-episode-{$i}",
