@@ -6,47 +6,44 @@ namespace App\Auth;
 
 use Tempest\Database\Database;
 use Tempest\Database\Query;
-use Tempest\DateTime\DateTime;
-use Tempest\DateTime\FormatPattern;
-use Tempest\DateTime\Timezone;
 
 final readonly class LoginAttemptLimiter
 {
     private const int MAX_ATTEMPTS = 5;
 
-    private const int WINDOW_SECONDS = 900;
-
     public function __construct(
         private Database $database,
     ) {}
 
-    public function ensureAllowed(string $username, string $clientAddress): void
+    public function consumeAttempt(string $username, string $clientAddress): void
     {
-        $now = DateTime::now(Timezone::UTC);
-        $this->prune($now);
+        $this->pruneExpired();
         $row = $this->database->fetchFirst(new Query(
-            'SELECT attempts FROM login_attempts WHERE "keyHash" = ? AND "expiresAt" > ?',
-            [$this->key($username, $clientAddress), $this->sql($now)],
+            <<<'SQL'
+            INSERT INTO "login_attempts" ("keyHash", "attempts", "expiresAt")
+            VALUES (?, 1, CURRENT_TIMESTAMP + INTERVAL '15 minutes')
+            ON CONFLICT ("keyHash") DO UPDATE
+            SET "attempts" = CASE
+                    WHEN "login_attempts"."expiresAt" <= CURRENT_TIMESTAMP THEN 1
+                    WHEN "login_attempts"."attempts" < ? THEN "login_attempts"."attempts" + 1
+                    ELSE ?
+                END,
+                "expiresAt" = CASE
+                    WHEN "login_attempts"."expiresAt" <= CURRENT_TIMESTAMP
+                        THEN EXCLUDED."expiresAt"
+                    ELSE "login_attempts"."expiresAt"
+                END
+            RETURNING "attempts"
+            SQL,
+            [$this->key($username, $clientAddress), self::MAX_ATTEMPTS, self::MAX_ATTEMPTS + 1],
         ));
 
         $value = is_array($row) ? ($row['attempts'] ?? null) : null;
         $attempts = is_int($value) || is_string($value) ? (int) $value : 0;
 
-        if ($attempts >= self::MAX_ATTEMPTS) {
+        if ($attempts > self::MAX_ATTEMPTS || $row === null) {
             throw new LoginThrottled('Too many login attempts.');
         }
-    }
-
-    public function recordFailure(string $username, string $clientAddress): void
-    {
-        $now = DateTime::now(Timezone::UTC);
-        $this->prune($now);
-        $this->database->execute(new Query(
-            'INSERT INTO login_attempts ("keyHash", attempts, "expiresAt")
-             VALUES (?, 1, ?)
-             ON CONFLICT("keyHash") DO UPDATE SET attempts = login_attempts.attempts + 1, "expiresAt" = excluded."expiresAt"',
-            [$this->key($username, $clientAddress), $this->sql($now->plusSeconds(self::WINDOW_SECONDS))],
-        ));
     }
 
     public function reset(string $username, string $clientAddress): void
@@ -57,18 +54,13 @@ final readonly class LoginAttemptLimiter
         ));
     }
 
-    private function prune(DateTime $now): void
-    {
-        $this->database->execute(new Query('DELETE FROM login_attempts WHERE "expiresAt" <= ?', [$this->sql($now)]));
-    }
-
     private function key(string $username, string $clientAddress): string
     {
         return hash('sha256', strtolower(trim($username)) . "\0" . $clientAddress);
     }
 
-    private function sql(DateTime $dateTime): string
+    private function pruneExpired(): void
     {
-        return $dateTime->format(FormatPattern::SQL_DATE_TIME, Timezone::UTC);
+        $this->database->execute(new Query('DELETE FROM "login_attempts" WHERE "expiresAt" <= CURRENT_TIMESTAMP'));
     }
 }

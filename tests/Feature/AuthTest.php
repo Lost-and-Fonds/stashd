@@ -7,6 +7,8 @@ namespace Tests\Feature;
 use App\Auth\ApiTokenRecord;
 use App\Auth\ApiTokenScopes;
 use App\Auth\AuthService;
+use App\Auth\LoginAttemptLimiter;
+use App\Auth\LoginThrottled;
 use App\Auth\UserRecord;
 use App\Auth\UserRepository;
 use App\Config\TrustedProxyConfig;
@@ -19,6 +21,7 @@ use Tempest\DateTime\Timezone;
 use Tempest\Http\GenericRequest;
 use Tempest\Http\Method;
 use Tempest\Http\Status;
+use Tests\Support\PostgresDatabase;
 
 test('owner setup creates the first user', function (): void {
     $response = $this->http->post('/api/v1/auth/setup', [
@@ -321,6 +324,18 @@ test('unknown usernames receive the same login failure response', function (): v
     expect($unknown->body)->toBe($known->body);
 });
 
+test('login attempt identities are independent', function (): void {
+    $limiter = $this->container->get(LoginAttemptLimiter::class);
+
+    for ($attempt = 0; $attempt < 5; $attempt++) {
+        $limiter->consumeAttempt('owner', '198.51.100.30');
+    }
+
+    expect(fn(): mixed => $limiter->consumeAttempt('owner', '198.51.100.31'))->not->toThrow(\Throwable::class)
+        ->and(fn(): mixed => $limiter->consumeAttempt('another-owner', '198.51.100.30'))->not->toThrow(\Throwable::class)
+        ->and(fn(): mixed => $limiter->consumeAttempt('owner', '198.51.100.30'))->toThrow(LoginThrottled::class);
+});
+
 test('api tokens can be revoked', function (): void {
     $setup = $this->http->post('/api/v1/auth/setup', [
         'username' => 'owner',
@@ -469,4 +484,63 @@ test('legacy empty-scope tokens retain full owner access', function (): void {
     $this->http->post('/api/v1/stashes', ['name' => 'Legacy Full Access'], headers: $headers)
         ->assertStatus(Status::CREATED);
     $this->http->get('/api/v1/auth/tokens', headers: $headers)->assertOk();
+});
+
+test('concurrent login attempts cannot exceed the allowance', function (): void {
+    $username = 'concurrent-owner';
+    $clientAddress = '198.51.100.20';
+    $dsn = sprintf(
+        'pgsql:host=%s;port=%s;dbname=%s',
+        getenv('DB_HOST') ?: '127.0.0.1',
+        getenv('DB_PORT') ?: '5432',
+        getenv('DB_DATABASE') ?: 'stashd',
+    );
+    $children = [];
+    $channels = [];
+
+    for ($index = 0; $index < 6; $index++) {
+        [$parent, $child] = stream_socket_pair(AF_UNIX, SOCK_STREAM, 0);
+        $pid = pcntl_fork();
+
+        if ($pid === 0) {
+            fclose($parent);
+            $pdo = new \PDO($dsn, getenv('DB_USERNAME') ?: 'postgres', getenv('DB_PASSWORD') ?: '', [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]);
+            fwrite($child, "ready\n");
+            fgets($child);
+
+            try {
+                (new LoginAttemptLimiter(new PostgresDatabase($pdo)))->consumeAttempt($username, $clientAddress);
+                fwrite($child, "allowed\n");
+            } catch (\Throwable $exception) {
+                fwrite($child, $exception instanceof \App\Auth\LoginThrottled ? "throttled\n" : "failed\n");
+            }
+
+            fclose($child);
+            exit(0);
+        }
+
+        fclose($child);
+        $children[] = $pid;
+        $channels[] = $parent;
+    }
+
+    foreach ($channels as $channel) {
+        expect(fgets($channel))->toBe("ready\n");
+    }
+
+    foreach ($channels as $channel) {
+        fwrite($channel, "go\n");
+    }
+
+    $results = array_map(static fn($channel): string => trim((string) fgets($channel)), $channels);
+
+    foreach ($channels as $channel) {
+        fclose($channel);
+    }
+
+    foreach ($children as $pid) {
+        pcntl_waitpid($pid, $status);
+    }
+
+    expect(array_count_values($results))->toEqual(['allowed' => 5, 'throttled' => 1]);
 });

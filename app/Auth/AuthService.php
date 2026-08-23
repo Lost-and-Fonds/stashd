@@ -68,12 +68,10 @@ final readonly class AuthService
             throw new SetupRequired('Complete admin setup before logging in.');
         }
 
-        $this->loginAttempts->ensureAllowed($username, $clientAddress);
+        $this->loginAttempts->consumeAttempt($username, $clientAddress);
         $user = $this->users->findByUsername($username);
 
         if ($user === null || ! password_verify($password, $user->passwordHash)) {
-            $this->loginAttempts->recordFailure($username, $clientAddress);
-
             throw new InvalidCredentials('Invalid username or password.');
         }
 
