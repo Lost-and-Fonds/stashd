@@ -483,17 +483,8 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
 
     private function runtime(): BroadcastPluginRuntime
     {
-        $selected = 'wasmtime';
-        $configured = getenv('STASHD_BROADCAST_IMPLEMENTATIONS');
-        if (is_string($configured) && trim($configured) !== '') {
-            $map = json_decode($configured, true);
-            if (is_array($map) && is_string($map[$this->definition->logicalKey] ?? null)) {
-                $selected = $map[$this->definition->logicalKey];
-            }
-        }
-
-        return $this->runtimes[$selected]
-            ?? throw BroadcastException::withCode('broadcast_runtime_unavailable', "Broadcast runtime [{$selected}] is unavailable.");
+        return $this->runtimes['native']
+            ?? throw BroadcastException::withCode('broadcast_runtime_unavailable', 'Native Broadcast runtime is unavailable.');
     }
 
     /** @return list<PluginHttpGrant> */

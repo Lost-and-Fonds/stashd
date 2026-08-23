@@ -18,13 +18,14 @@ final readonly class NativePluginRunner
         if ($package === null) {
             throw new RuntimeException('plugin is not active: ' . $pluginId);
         }
-        $manifest = json_decode((string) file_get_contents($package . '/plugin.json'), true, 512, JSON_THROW_ON_ERROR);
+        $manifestPath = is_file($package . '/plugin.json') ? $package . '/plugin.json' : $package . '/stashd-plugin/plugin.json';
+        $manifest = json_decode((string) file_get_contents($manifestPath), true, 512, JSON_THROW_ON_ERROR);
         if (! is_array($manifest)) {
             throw new RuntimeException('active plugin manifest is invalid');
         }
-        $entrypoint = is_string($manifest['entrypoint'] ?? null) ? $manifest['entrypoint'] : 'plugin.php';
+        $entrypoint = is_string($manifest['entrypoint'] ?? null) ? $manifest['entrypoint'] : 'stashd-plugin/plugin.php';
 
-        $sdkRoot = $this->sdkRoot ?? dirname(__DIR__, 3) . '/plugin-sdk';
+        $sdkRoot = $this->sdkRoot ?? dirname(__DIR__, 4) . '/vendor/stashd/plugin-sdk';
 
         return new NativePluginProcess($package, $stagingRoot, $entrypoint, $this->policy, $sdkRoot);
     }

@@ -14,19 +14,12 @@ use Stashd\NativeRuntime\Runner\NativePluginRunner;
 use Stashd\NativeRuntime\Sandbox\SandboxPolicy;
 use Stashd\PluginSdk\ReadableResource;
 
-foreach (['BroadcastPlugin.php', 'InputPlugin.php', 'Logger.php', 'ProgressReporter.php', 'ReadableResource.php', 'HttpClient.php', 'StagingArea.php'] as $interface) {
-    require_once __DIR__ . '/../../plugin-sdk/src/' . $interface;
-}
-
-foreach (glob(__DIR__ . '/../../plugin-sdk/src/*.php') ?: [] as $sdkFile) {
-    if (! in_array(basename($sdkFile), ['BroadcastPlugin.php', 'InputPlugin.php', 'Logger.php', 'ProgressReporter.php', 'ReadableResource.php', 'HttpClient.php', 'StagingArea.php'], true)) {
-        require_once $sdkFile;
-    }
-}
-spl_autoload_register(static function (string $class): void {
+$sdkRoot = getenv('STASHD_PLUGIN_SDK_ROOT');
+$sdkRoot = is_string($sdkRoot) && trim($sdkRoot) !== '' ? trim($sdkRoot) : dirname(__DIR__, 3) . '/vendor/stashd/plugin-sdk';
+spl_autoload_register(static function (string $class) use ($sdkRoot): void {
     foreach ([
         'Stashd\\NativeRuntime\\' => __DIR__ . '/../src/',
-        'Stashd\\PluginSdk\\' => __DIR__ . '/../../plugin-sdk/src/',
+        'Stashd\\PluginSdk\\' => $sdkRoot . '/src/',
     ] as $prefix => $root) {
         if (str_starts_with($class, $prefix)) {
             $path = $root . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
@@ -320,7 +313,7 @@ try {
     mkdir($source . '/helpers', 0700, true);
     copy(__DIR__ . '/fixtures/fixture-plugin.php', $source . '/plugin.php');
     copy(__DIR__ . '/fixtures/fixture-helper.php', $source . '/helpers/fixture-helper.php');
-    foreach (glob(__DIR__ . '/../../plugin-sdk/src/*.php') ?: [] as $sdkFile) {
+    foreach (glob($sdkRoot . '/src/*.php') ?: [] as $sdkFile) {
         copy($sdkFile, $source . '/sdk/' . basename($sdkFile));
     }
     copy(__DIR__ . '/fixtures/FrameCodec.php', $source . '/rpc/FrameCodec.php');
@@ -338,7 +331,7 @@ try {
     $package = $manager->activePath('m7-example');
     m7Assert($package !== null, 'active package path is missing');
     $runnerSmokeStage = m7Temp('stashd-production-runner');
-    $productionRunner = new NativePluginRunner($manager);
+    $productionRunner = new NativePluginRunner($manager, sdkRoot: $sdkRoot);
     $productionProcess = $productionRunner->start('m7-example', $runnerSmokeStage);
     $operation = $productionProcess->invoke('broadcast.operation', ['name' => 'runner-smoke'], static fn(array $message): array => []);
     m7Assert(($operation['choices'][0]['value'] ?? null) === 'fixture', 'production runner invocation failed');

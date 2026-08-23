@@ -4,43 +4,33 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
-use InvalidArgumentException;
+use App\Downloads\DownloaderInterface;
+use App\Providers\Provider;
 use Tempest\Container\Singleton;
 
 #[Singleton]
 final class ExternalInputPluginRegistry
 {
-    /** @param list<ExternalInputPlugin> $plugins */
-    public function __construct(private array $plugins) {}
+    public function __construct() {}
 
-    public function get(string $id): ExternalInputPlugin
+    public function get(string $id): Provider
     {
-        foreach ($this->plugins as $plugin) {
-            if ($plugin->key() === $id) {
-                return $plugin;
-            }
-        }
-
-        throw new InvalidArgumentException("Unknown external Input plugin: {$id}");
+        throw new \InvalidArgumentException("Unknown external Input plugin: {$id}");
     }
 
-    public function find(string $id): ?ExternalInputPlugin
+    public function find(string $id): ?Provider
     {
-        foreach ($this->providers() as $plugin) {
-            if ($plugin->key() === $id) {
-                return $plugin;
-            }
-        }
-
         return null;
     }
 
-    /** @return list<ExternalInputPlugin> */
+    public function findDownloader(string $id): ?DownloaderInterface
+    {
+        return null;
+    }
+
+    /** @return list<Provider> */
     public function providers(): array
     {
-        return array_values(array_filter(
-            $this->plugins,
-            static fn(ExternalInputPlugin $plugin): bool => $plugin->isRuntimeAvailable(),
-        ));
+        return [];
     }
 }

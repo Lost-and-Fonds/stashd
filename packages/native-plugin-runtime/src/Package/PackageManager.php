@@ -38,7 +38,7 @@ final class PackageManager
         mkdir($temporary, 0700, true);
         try {
             TarArchive::extract($archive, $temporary);
-            $manifest = PackageManifest::fromFile($temporary . '/plugin.json', $this->apiVersion, $this->architecture ?? self::architecture());
+            $manifest = PackageManifest::fromFile($this->manifestPath($temporary), $this->apiVersion, $this->architecture ?? self::architecture());
             $entrypoint = $temporary . '/' . $manifest->entrypoint;
             if (! is_file($entrypoint)) {
                 throw new PackageValidationError('manifest entrypoint is missing');
@@ -69,7 +69,7 @@ final class PackageManager
         $this->validateId($id);
         $this->validateVersion($version);
         $package = $this->packages . '/' . $id . '/' . $version;
-        if (! is_dir($package) || ! is_file($package . '/plugin.json')) {
+        if (! is_dir($package) || ! is_file($this->manifestPath($package))) {
             throw new PackageStateError('plugin version is not installed');
         }
         $current = $this->active . '/' . $id;
@@ -115,7 +115,7 @@ final class PackageManager
     {
         $this->validateId($id);
         $source = realpath($source) ?: throw new PackageValidationError('linked source does not exist');
-        $manifest = PackageManifest::fromFile($source . '/plugin.json', $this->apiVersion, $this->architecture ?? self::architecture());
+        $manifest = PackageManifest::fromFile($this->manifestPath($source), $this->apiVersion, $this->architecture ?? self::architecture());
         if (! is_file($source . '/' . $manifest->entrypoint)) {
             throw new PackageValidationError('linked entrypoint is missing');
         }
@@ -153,7 +153,7 @@ final class PackageManager
         if (! is_link($path)) {
             return null;
         }
-        $manifest = realpath($path) . '/plugin.json';
+        $manifest = $this->manifestPath(realpath($path) ?: $path);
         if (! is_file($manifest)) {
             return null;
         }
@@ -177,6 +177,13 @@ final class PackageManager
         if (preg_match('/^[a-z][a-z0-9-]{1,63}$/', $id) !== 1) {
             throw new PackageStateError('plugin ID is invalid');
         }
+    }
+
+    private function manifestPath(string $package): string
+    {
+        $root = rtrim($package, '/');
+
+        return is_file($root . '/plugin.json') ? $root . '/plugin.json' : $root . '/stashd-plugin/plugin.json';
     }
 
     private function validateVersion(string $version): void

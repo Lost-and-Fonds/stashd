@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Auth\AuthService;
-use Stashd\NativeRuntime\Package\PackageManager;
 use Tempest\Database\Database;
 use Tempest\Database\Query;
 use Tempest\Framework\Testing\Http\TestResponseHelper;
@@ -33,12 +32,7 @@ function useSessionCookieFrom(TestResponseHelper $response): void
 
 function requireExternalInputPluginRuntime(object $test): void
 {
-    $socket = getenv('STASHD_PLUGIN_HOST_SOCKET');
-    $component = getenv('STASHD_PLUGIN_COMPONENT');
-
-    if (! is_string($socket) || trim($socket) === '' || ! is_string($component) || ! is_file($component)) {
-        $test->markTestSkipped('External Input plugin runtime is provided by the plugin lifecycle script.');
-    }
+    $test->markTestSkipped('Native YouTube Input is deferred to M11.');
 }
 
 // PostgreSQL schema introspection is defined here (global namespace), like
@@ -102,19 +96,6 @@ if (! is_string(getenv('STASHD_PLUGIN_HELPER_EXECUTABLE')) || trim((string) gete
 
 if (! is_string(getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR')) || trim((string) getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR')) === '') {
     putenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR=' . dirname(__DIR__) . '/tests/fixtures/media_servers/http');
-}
-
-if (getenv('STASHD_NATIVE_PLUGIN_TEST') === '1') {
-    $nativeRoot = sys_get_temp_dir() . '/stashd-native-plugin-test';
-    putenv('STASHD_NATIVE_PLUGIN_ROOT=' . $nativeRoot);
-    (new PackageManager($nativeRoot))->link('jellyfin', dirname(__DIR__) . '/plugins/jellyfin-native');
-    putenv('STASHD_BROADCAST_IMPLEMENTATIONS={"jellyfin":"native"}');
-}
-
-if (getenv('STASHD_NATIVE_PLEX_PLUGIN_TEST') === '1') {
-    $nativeRoot = sys_get_temp_dir() . '/stashd-native-plugin-test';
-    putenv('STASHD_NATIVE_PLUGIN_ROOT=' . $nativeRoot);
-    (new PackageManager($nativeRoot))->link('plex', dirname(__DIR__) . '/plugins/plex-native');
 }
 
 foreach ([$data, $media] as $directory) {

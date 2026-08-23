@@ -34,7 +34,7 @@ final readonly class DownloadCaptions
             throw DownloadException::withCode('temp_not_writable', 'Could not create caption staging directory.');
         }
 
-        $plugin = $this->plugins->find($media->providerKey);
+        $plugin = $this->plugins->findDownloader($media->providerKey);
         if ($plugin === null) {
             throw DownloadException::withCode('captions_unavailable', 'No Input plugin is available for this media item.');
         }

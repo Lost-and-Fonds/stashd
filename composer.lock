@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8e895c8c050e2f8dcb33b46d8eb57385",
+    "content-hash": "52bf1e5ce84fed25334972283cda41e7",
     "packages": [
         {
             "name": "composer/semver",
@@ -2858,6 +2858,155 @@
                 }
             ],
             "time": "2026-07-27T06:19:16+00:00"
+        },
+        {
+            "name": "stashd/jellyfin",
+            "version": "v0.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Lost-and-Fonds/jellyfin.git",
+                "reference": "8e8ba658fe814ec120c238618dfb81fd97ef863c"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Lost-and-Fonds/jellyfin/zipball/8e8ba658fe814ec120c238618dfb81fd97ef863c",
+                "reference": "8e8ba658fe814ec120c238618dfb81fd97ef863c",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.5",
+                "stashd/plugin-sdk": "^0.1"
+            },
+            "type": "stashd-plugin",
+            "extra": {
+                "stashd-plugin": {
+                    "manifest": "stashd-plugin/plugin.json",
+                    "entrypoint": "stashd-plugin/plugin.php"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "JellyfinNative\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "JellyfinNative\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Native Jellyfin Broadcast plugin for Stashd",
+            "support": {
+                "source": "https://github.com/Lost-and-Fonds/jellyfin/tree/v0.1.1",
+                "issues": "https://github.com/Lost-and-Fonds/jellyfin/issues"
+            },
+            "time": "2026-08-23T03:20:07+00:00"
+        },
+        {
+            "name": "stashd/plex",
+            "version": "v0.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Lost-and-Fonds/plex.git",
+                "reference": "a66d24a098ccc14bdb5136191493e185221cdf41"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Lost-and-Fonds/plex/zipball/a66d24a098ccc14bdb5136191493e185221cdf41",
+                "reference": "a66d24a098ccc14bdb5136191493e185221cdf41",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.5",
+                "stashd/plugin-sdk": "^0.1"
+            },
+            "type": "stashd-plugin",
+            "extra": {
+                "stashd-plugin": {
+                    "manifest": "stashd-plugin/plugin.json",
+                    "entrypoint": "stashd-plugin/plugin.php"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "PlexNative\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "PlexNative\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Native Plex Broadcast plugin for Stashd",
+            "support": {
+                "source": "https://github.com/Lost-and-Fonds/plex/tree/v0.1.1",
+                "issues": "https://github.com/Lost-and-Fonds/plex/issues"
+            },
+            "time": "2026-08-23T03:20:09+00:00"
+        },
+        {
+            "name": "stashd/plugin-api",
+            "version": "0.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Lost-and-Fonds/plugin-api.git",
+                "reference": "55280efaafd045e15b243bad32ca6f4761721cbd"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Lost-and-Fonds/plugin-api/zipball/55280efaafd045e15b243bad32ca6f4761721cbd",
+                "reference": "55280efaafd045e15b243bad32ca6f4761721cbd",
+                "shasum": ""
+            },
+            "type": "library",
+            "license": [
+                "MIT"
+            ],
+            "description": "The language-neutral contract for native Stashd plugins",
+            "support": {
+                "source": "https://github.com/Lost-and-Fonds/plugin-api/tree/v0.1.0",
+                "issues": "https://github.com/Lost-and-Fonds/plugin-api/issues"
+            },
+            "time": "2026-08-23T03:08:42+00:00"
+        },
+        {
+            "name": "stashd/plugin-sdk",
+            "version": "v0.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Lost-and-Fonds/plugin-sdk.git",
+                "reference": "fd105b875fa4d8a9fcee3e3cef804a8a40018425"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Lost-and-Fonds/plugin-sdk/zipball/fd105b875fa4d8a9fcee3e3cef804a8a40018425",
+                "reference": "fd105b875fa4d8a9fcee3e3cef804a8a40018425",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.5",
+                "stashd/plugin-api": "^0.1"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Stashd\\PluginSdk\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Independent PHP SDK for Stashd native plugins",
+            "support": {
+                "source": "https://github.com/Lost-and-Fonds/plugin-sdk/tree/v0.1.0",
+                "issues": "https://github.com/Lost-and-Fonds/plugin-sdk/issues"
+            },
+            "time": "2026-08-23T03:09:42+00:00"
         },
         {
             "name": "symfony/cache",

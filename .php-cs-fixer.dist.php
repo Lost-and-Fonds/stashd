@@ -19,7 +19,6 @@ return (new Config())
             ->in([
                 __DIR__ . '/app',
                 __DIR__ . '/packages',
-                __DIR__ . '/plugins',
                 __DIR__ . '/scripts',
                 __DIR__ . '/tests',
             ])

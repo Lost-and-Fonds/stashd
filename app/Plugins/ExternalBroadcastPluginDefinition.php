@@ -57,8 +57,8 @@ final readonly class ExternalBroadcastPluginDefinition
             return trim($value);
         };
 
-        $runtime = is_string($raw['application_runtime'] ?? null) && trim($raw['application_runtime']) !== '' ? trim($raw['application_runtime']) : 'wasmtime';
-        if (! in_array($runtime, ['wasmtime', 'native'], true)) {
+        $runtime = is_string($raw['application_runtime'] ?? null) && trim($raw['application_runtime']) !== '' ? trim($raw['application_runtime']) : 'native';
+        if ($runtime !== 'native') {
             throw new RuntimeException("Unsupported external Broadcast runtime [{$runtime}].");
         }
 
@@ -68,9 +68,6 @@ final readonly class ExternalBroadcastPluginDefinition
             $component = is_string($value) && trim($value) !== '' ? trim($value) : null;
         }
         $component ??= is_string($raw['component'] ?? null) ? trim($raw['component']) : '';
-        if ($runtime === 'wasmtime' && $component === '') {
-            throw new RuntimeException('External Broadcast plugin manifest requires component.');
-        }
 
         /** @var array<int, array<string, mixed>> $uiOptions */
         $uiOptions = is_array($raw['ui_options'] ?? null) ? array_values(array_filter($raw['ui_options'], 'is_array')) : [];

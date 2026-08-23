@@ -37,15 +37,6 @@ final readonly class ExternalBroadcastPluginRegistry
 
     public function runtimeFor(string $key): ?BroadcastPluginRuntime
     {
-        $selected = 'wasmtime';
-        $configured = getenv('STASHD_BROADCAST_IMPLEMENTATIONS');
-        if (is_string($configured) && trim($configured) !== '') {
-            $map = json_decode($configured, true);
-            if (is_array($map) && is_string($map[$key] ?? null)) {
-                $selected = $map[$key];
-            }
-        }
-
-        return $this->runtimes[$key][$selected] ?? null;
+        return $this->runtimes[$key]['native'] ?? null;
     }
 }
