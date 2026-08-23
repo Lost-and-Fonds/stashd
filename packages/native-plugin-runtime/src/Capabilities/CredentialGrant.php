@@ -6,5 +6,11 @@ namespace Stashd\NativeRuntime\Capabilities;
 
 final readonly class CredentialGrant
 {
-    public function __construct(public string $reference, public string $origin, public string $header, public string $secret) {}
+    public function __construct(
+        public string $reference,
+        public string $origin,
+        public string $parameter,
+        public string $secret,
+        public string $placement = 'header',
+    ) {}
 }

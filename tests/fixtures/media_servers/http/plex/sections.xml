@@ -1,2 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<MediaContainer size="1"><Directory key="1" title="TV Shows" type="show" /></MediaContainer>
+<MediaContainer size="3" platform="Fixture Plex" platformVersion="1.0">
+  <Directory key="1" title="TV Shows" type="show" uuid="show-1" />
+  <Directory key="2" title="Movies &amp; Specials" type="movie" extra="ignored" />
+  <Directory key="3" type="show" />
+  <UnexpectedElement value="ignored" />
+</MediaContainer>

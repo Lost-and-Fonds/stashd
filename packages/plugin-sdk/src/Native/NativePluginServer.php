@@ -15,6 +15,7 @@ use Stashd\PluginSdk\Publication;
 use Stashd\PluginSdk\PublishRequest;
 use Stashd\PluginSdk\Setting;
 use Stashd\PluginSdk\Source;
+use Stashd\PluginSdk\StagingArea;
 use Stashd\PluginSdk\WireMapper;
 use Throwable;
 
@@ -42,9 +43,9 @@ final class NativePluginServer
     {
         $context = $this->context();
         return match ($method) {
-            'broadcast.prepare' => WireMapper::preparation($this->broadcast->prepare($this->publishRequest($params))),
-            'broadcast.publish' => WireMapper::publication($this->broadcast->publish($this->publishRequest($params))),
-            'broadcast.finalize' => WireMapper::publication($this->broadcast->finalize(new FinalizationRequest($this->publishRequest($params['request'] ?? $params), $this->publication($params['publication'] ?? [])), $context)),
+            'broadcast.prepare' => WireMapper::preparation($this->broadcast->prepare($this->publishRequest($params, $context->staging))),
+            'broadcast.publish' => WireMapper::publication($this->broadcast->publish($this->publishRequest($params, $context->staging))),
+            'broadcast.finalize' => WireMapper::publication($this->broadcast->finalize(new FinalizationRequest($this->publishRequest($params['request'] ?? $params, $context->staging), $this->publication($params['publication'] ?? [])), $context)),
             'broadcast.operation' => WireMapper::operationResult($this->broadcast->operation($this->operationRequest($params), $context)),
             default => throw new \RuntimeException('unknown plugin method: ' . $method),
         };
@@ -69,13 +70,13 @@ final class NativePluginServer
             throw new \RuntimeException('host closed capability channel');
         };
 
-        return new PluginContext(new NativeLogger($call), new NativeProgressReporter($call), new NativeHttpClient($call));
+        return new PluginContext(new NativeLogger($call), new NativeProgressReporter($call), new NativeHttpClient($call), new NativeStagingArea($call));
     }
 
     /** @param array<string,mixed> $data */
-    private function publishRequest(array $data): PublishRequest
+    private function publishRequest(array $data, ?StagingArea $staging = null): PublishRequest
     {
-        return WireMapper::publishRequestFromWire($data);
+        return WireMapper::publishRequestFromWire($data, $staging);
     }
 
     /** @param array<string,mixed> $data */

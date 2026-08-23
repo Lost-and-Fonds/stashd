@@ -107,8 +107,14 @@ if (! is_string(getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR')) || trim((string) ge
 if (getenv('STASHD_NATIVE_PLUGIN_TEST') === '1') {
     $nativeRoot = sys_get_temp_dir() . '/stashd-native-plugin-test';
     putenv('STASHD_NATIVE_PLUGIN_ROOT=' . $nativeRoot);
-    putenv('STASHD_BROADCAST_IMPLEMENTATIONS={"jellyfin":"native"}');
     (new PackageManager($nativeRoot))->link('jellyfin', dirname(__DIR__) . '/plugins/jellyfin-native');
+    putenv('STASHD_BROADCAST_IMPLEMENTATIONS={"jellyfin":"native"}');
+}
+
+if (getenv('STASHD_NATIVE_PLEX_PLUGIN_TEST') === '1') {
+    $nativeRoot = sys_get_temp_dir() . '/stashd-native-plugin-test';
+    putenv('STASHD_NATIVE_PLUGIN_ROOT=' . $nativeRoot);
+    (new PackageManager($nativeRoot))->link('plex', dirname(__DIR__) . '/plugins/plex-native');
 }
 
 foreach ([$data, $media] as $directory) {

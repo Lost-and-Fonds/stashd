@@ -87,14 +87,12 @@ final readonly class NativeBroadcastRuntime implements BroadcastPluginRuntime
                 $origin = strtolower($parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : ''));
                 $origins[] = $origin;
                 if ($grant->credential !== null) {
-                    if ($grant->credential->placement !== 'header') {
-                        throw new RuntimeException('Native Broadcast credentials require header placement.');
-                    }
                     $credentials[] = new CredentialGrant(
                         $grant->credential->name,
                         $origin,
                         $grant->credential->parameter,
                         $grant->credential->value,
+                        $grant->credential->placement,
                     );
                 }
             }
@@ -117,7 +115,7 @@ final readonly class NativeBroadcastRuntime implements BroadcastPluginRuntime
             $process = $this->runner->start($this->pluginId, $nativeStage);
             /** @var array<string, mixed> $nativeParams */
             $nativeParams = $this->nativeParams($params);
-            $result = $process->invoke($method, $nativeParams, function (array $message) use ($invocation, &$resources): array {
+            $capabilityHandler = /** @param array<string, mixed> $message */ function (array $message) use ($invocation, &$resources): array {
                 $method = is_string($message['method'] ?? null) ? $message['method'] : '';
                 $params = $this->stringKeyed($message['params'] ?? null);
 
@@ -125,10 +123,12 @@ final readonly class NativeBroadcastRuntime implements BroadcastPluginRuntime
                     'http.request' => $this->http($invocation, $params, $resources),
                     'resource.read' => $this->readResource($resources, $params),
                     'staging.write' => $this->writeStaging($invocation, $params),
+                    'staging.stage' => $this->stageStaging($invocation, $params),
                     'event.log', 'event.progress' => ['accepted' => true],
                     default => throw new RuntimeException('Native Broadcast capability is not supported: ' . $method),
                 };
-            });
+            };
+            $result = $process->invoke($method, $nativeParams, $capabilityHandler);
             if (isset($result['error'])) {
                 $error = is_array($result['error']) ? $result['error'] : [];
                 $message = is_string($error['message'] ?? null) ? $error['message'] : 'Native Broadcast plugin failed.';
@@ -200,6 +200,18 @@ final readonly class NativeBroadcastRuntime implements BroadcastPluginRuntime
         }
         $relativePath = is_string($params['relative_path'] ?? null) ? $params['relative_path'] : '';
         $artifact = $invocation->staging()->write($relativePath, $content, is_string($params['media_type'] ?? null) ? $params['media_type'] : null);
+
+        return ['reference' => $artifact->reference, 'media_type' => $artifact->mediaType, 'size_bytes' => $artifact->sizeBytes];
+    }
+
+    /**
+     * @param  array<string, mixed>  $params
+     * @return array<string, mixed>
+     */
+    private function stageStaging(Invocation $invocation, array $params): array
+    {
+        $relativePath = is_string($params['relative_path'] ?? null) ? $params['relative_path'] : '';
+        $artifact = $invocation->staging()->stage($relativePath, is_string($params['media_type'] ?? null) ? $params['media_type'] : null);
 
         return ['reference' => $artifact->reference, 'media_type' => $artifact->mediaType, 'size_bytes' => $artifact->sizeBytes];
     }

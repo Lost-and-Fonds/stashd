@@ -130,8 +130,10 @@ COPY --from=composer /usr/bin/composer /usr/bin/composer
 COPY --from=plugin-runtime /plugin-build/target/release/stashd-plugin-host /usr/local/bin/stashd-plugin-host
 COPY --from=plugin-runtime /plugin-output /usr/local/share/stashd/plugins
 COPY plugins/jellyfin-native /usr/local/share/stashd/native-plugins/packages/jellyfin/0.1.0
+COPY plugins/plex-native /usr/local/share/stashd/native-plugins/packages/plex/0.1.0
 RUN mkdir -p /usr/local/share/stashd/native-plugins/active \
-    && ln -s ../packages/jellyfin/0.1.0 /usr/local/share/stashd/native-plugins/active/jellyfin
+    && ln -s ../packages/jellyfin/0.1.0 /usr/local/share/stashd/native-plugins/active/jellyfin \
+    && ln -s ../packages/plex/0.1.0 /usr/local/share/stashd/native-plugins/active/plex
 
 WORKDIR /var/www/html
 

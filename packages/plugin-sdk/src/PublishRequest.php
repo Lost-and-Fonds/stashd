@@ -11,5 +11,5 @@ final readonly class PublishRequest
      * @param  list<Source>  $sources
      * @param  list<Item>  $items
      */
-    public function __construct(public string $reference, public array $settings = [], public array $sources = [], public array $items = []) {}
+    public function __construct(public string $reference, public array $settings = [], public array $sources = [], public array $items = [], public ?StagingArea $staging = null) {}
 }

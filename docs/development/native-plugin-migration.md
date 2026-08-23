@@ -28,11 +28,14 @@ in [native plugin runtime](../architecture/native-plugin-runtime.md).
 
 ### M9 — Plex
 
+- **Status:** Complete.
 - **Purpose:** Port Plex to native runtime parity.
-- **Completion criterion:** Plex has native parity with provider behavior and
-  operational coverage, with Wasmtime retained as rollback.
+- **Completion criterion:** Plex has native parity through the real
+  PostgreSQL-backed application lifecycle, including runtime selection,
+  rebuild/materialization behavior, credential-backed HTTP, XML discovery,
+  publication, captions, refresh, and rollback, with Wasmtime retained.
 - **Hard stop:** No new provider semantics in core; do not remove Wasmtime
-  rollback.
+  rollback or begin M10 in this milestone.
 
 ### M10 — Podcast Broadcast
 

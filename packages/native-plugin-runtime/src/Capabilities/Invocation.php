@@ -74,8 +74,9 @@ final class Invocation
         for ($redirect = 0; ; $redirect++) {
             $origin = $this->origin($current);
             $this->assertAllowedOrigin($origin);
+            $requestUrl = $this->safeUrl($current, $grant, $origin);
             $requestHeaders = $this->safeHeaders($headers, $grant, $origin);
-            $response = $this->transport->request(strtoupper($method), $current, $requestHeaders, $body);
+            $response = $this->transport->request(strtoupper($method), $requestUrl, $requestHeaders, $body);
             $location = $response->headers['Location'] ?? $response->headers['location'] ?? null;
             if ($location !== null && $response->status >= 300 && $response->status < 400) {
                 if ($redirect >= $this->maxRedirects) {
@@ -267,7 +268,9 @@ final class Invocation
     {
         $protected = ['authorization', 'proxy-authorization'];
         foreach ($this->credentials as $candidate) {
-            $protected[] = strtolower($candidate->header);
+            if ($candidate->placement === 'header') {
+                $protected[] = strtolower($candidate->parameter);
+            }
         }
         $safe = [];
         foreach ($headers as $name => $value) {
@@ -276,10 +279,22 @@ final class Invocation
             }
         }
         if ($grant !== null && $grant->origin === $origin) {
-            $safe[$grant->header] = $grant->secret;
+            if ($grant->placement === 'header') {
+                $safe[$grant->parameter] = $grant->secret;
+            }
         }
 
         return $safe;
+    }
+
+    private function safeUrl(string $url, ?CredentialGrant $grant, string $origin): string
+    {
+        if ($grant === null || $grant->placement !== 'query' || $grant->origin !== $origin) {
+            return $url;
+        }
+        $separator = str_contains($url, '?') ? '&' : '?';
+
+        return $url . $separator . rawurlencode($grant->parameter) . '=' . rawurlencode($grant->secret);
     }
 
     private function assertAllowedOrigin(string $origin): void
