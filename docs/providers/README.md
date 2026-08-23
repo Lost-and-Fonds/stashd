@@ -23,13 +23,16 @@ Used for tests, local development, and Docker smoke. Downloads use `FakeDownload
 
 Fixtures: `tests/fixtures/providers/fake/`
 
-## YouTube Input plugin
+## YouTube Input plugin (deferred)
 
 Key: `youtube`
 
-The bundled Component under `plugins/youtube` owns YouTube source parsing, RSS/Data API discovery, and yt-dlp acquisition. Its manifest contributes logical provider key `youtube`; the implementation package identity is runtime provenance only.
+`Lost-and-Fonds/youtube` is reserved for the M11 native Input plugin. No
+production YouTube provider is installed in core yet; the retired Wasm design
+is reference material under `reference/wasmtime/`.
 
-The Component chooses RSS versus Data API based on semantic discovery intent and granted capabilities. The host supplies bounded HTTP, credential use, staging, and the trusted `yt-dlp` helper without exposing those mechanisms as core provider strategies.
+When M11 begins, provider-specific discovery and acquisition will remain in the
+YouTube package while core supplies only generic capabilities.
 
 ## Download service
 

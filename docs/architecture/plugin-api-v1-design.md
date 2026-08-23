@@ -1,13 +1,10 @@
-# Draft Plugin API v1 design — not yet stable
+# Plugin API v1 design history
 
 Status: draft design evidence, 2026-08-11. No WIT interface in this document is frozen.
 
-Migration note, 2026-08-21: the experimental substrate is now exercised by a
-standalone YouTube Input Component through the normal Stashd lifecycle. The
-former in-tree PHP YouTube provider and its ytdlphp wiring have been removed.
-The older strategy names and implementation descriptions below are historical
-design evidence; current provider behavior belongs to `plugins/youtube` and
-generic core selects it by logical provider identity only.
+The normative contract now lives in `Lost-and-Fonds/plugin-api`. This document
+is retained as design history; provider behavior belongs to provider packages
+and generic core selects packages through Composer discovery.
 
 Migration note, 2026-08-22: Podcast, Jellyfin, and Plex now run through
 manifest-registered external Components. Older references below to built-in

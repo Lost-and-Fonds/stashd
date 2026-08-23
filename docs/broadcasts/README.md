@@ -1,9 +1,7 @@
 # Broadcasts (Phase 5A + 5B + 5C)
 
-> Current architecture note (2026-08-22): Podcast is now an external
-> Component under `plugins/podcast`. The older route/token/transcode details
-> below are historical Phase 5C notes; current publication uses generic
-> `PublishedResource`, and Podcast's FFmpeg helper is plugin-local.
+> Current architecture note: Jellyfin and Plex are Composer-installed native
+> packages. Podcast is reserved for M10 and is not installed in production.
 
 Broadcasts are **disposable, regeneratable views** of a stash. They do not own canonical media — the Vault remains the source of truth.
 
@@ -22,7 +20,7 @@ Deleting a broadcast is asynchronous. It removes only its marker-owned generated
 - Minimal deterministic NFO sidecars (`tvshow.nfo`, per-episode `.nfo`)
 - Optional poster hardlink when Vault thumbnail exists and hardlink succeeds (skipped otherwise)
 - Optional creator or auto-generated YouTube captions, hardlinked beside each episode as `Episode.language.vtt`
-- Scan triggers via Jellyfin/Plex HTTP clients (see `docs/media-servers/README.md`)
+- Scan triggers via the Jellyfin/Plex packages (see `docs/media-servers/README.md`)
 - `broadcast.trigger` command + optional `auto_trigger_scan` after rebuild
 
 Not implemented:
