@@ -25,4 +25,4 @@ See the [runtime](docs/runtime/frankenphp.md), [providers](docs/providers/README
 - [Plugin API](https://github.com/Lost-and-Fonds/plugin-api)
 - [PHP plugin SDK](https://github.com/Lost-and-Fonds/plugin-sdk)
 - [Jellyfin](https://github.com/Lost-and-Fonds/jellyfin) and [Plex](https://github.com/Lost-and-Fonds/plex) Broadcast plugins
-- [Podcast](https://github.com/Lost-and-Fonds/podcast) (M10) and [YouTube](https://github.com/Lost-and-Fonds/youtube) (M11) plugin homes
+- [Podcast](https://github.com/Lost-and-Fonds/podcast) and [YouTube](https://github.com/Lost-and-Fonds/youtube) plugin homes (M11.5 complete)

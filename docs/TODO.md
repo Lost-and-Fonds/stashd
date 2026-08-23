@@ -1,5 +1,23 @@
 # Stashd implementation roadmap (foundation → v1)
 
+## M11.5 — COMPLETE
+
+M11.5 final acceptance is complete. The acceptance gates now pass for the
+naked provider-free core, PostgreSQL lifecycle, installed Podcast and YouTube
+OCI packages, helper resolution and bubblewrap execution, OCI
+materialization/install/activation, generic runtime conformance, clean core
+PHPStan, deterministic PostgreSQL test setup, and packaged-plugin CI coverage.
+
+Provider packages are optional additions to core. The OCI/umoci migration and
+the dependency-replacement hardening pass are complete; no follow-up work in
+those areas is pending for this milestone.
+
+The former production Wasm/Wasmtime and dual-runtime direction is obsolete.
+Production plugins run as bubblewrap-isolated processes; WIT remains the
+semantic/reference contract and Wasmtime material is reference-only.
+
+Next: resume Stashd UI/product work.
+
 ## Code organization (complete)
 
 - [x] Feature-first `app/` layout — see [docs/architecture/code-organization.md](architecture/code-organization.md)
@@ -214,12 +232,12 @@
   - `stashes.videoQualityProfileId`/`audioQualityProfileId` columns exist but are unused — only meaningful once this work exists
   - `BroadcastPlan::estimatedCopyBytes` stays hardcoded at `0` until generated-media (podcast audio/video) work exists; `0` is already correct for hardlink-only broadcast types in the meantime
 
-### Phase 5D — Broadcast plugin architecture migration (complete, in-tree; Composer packaging deferred)
+### Phase 5D — Broadcast plugin architecture migration (complete)
 
 Full design/status doc: `docs/architecture/Broadcast-Plugin-Architecture-Plan.md`.
 
 - [x] `BroadcastType` enum, `BroadcastTypeRegistry`, `BroadcastFormat` interface, `AbstractSeriesBroadcastType`, `app/Broadcasts/Formats/` deleted; replaced by `BroadcastPlugin` interface + `#[StashdBroadcast]` attribute discovery (`BroadcastPluginDiscoverer` → `BroadcastPluginRegistry`) — broadcast keys are now plain strings (`filesystem`, `jellyfin`, `plex`, `podcast`), not enum cases
-  - Plugins stay in-tree under `app/Broadcasts/Plugins/` (`AbstractSeriesBroadcastPlugin` + `Filesystem`/`Jellyfin`/`Plex`/`PodcastBroadcastPlugin`) — the plan's `stashd/plugin-podcast`/`stashd/plugin-media-server` Composer packages are deferred, not scheduled, per `AGENTS.md`'s "v1 ships no plugin runtime"
+  - Provider plugins are optional packages; installed-package acceptance covers OCI materialization, activation, discovery, and bubblewrap execution. Core retains only provider-neutral broadcast semantics.
 - [x] `GET /api/v1/broadcast-plugins` — lists discovered plugins (key/label/description/supported_file_kinds/ui_controls); the stash-detail create-broadcast dropdown and the season-mapping series check (`BroadcastController::isSeriesBroadcast()`) both now derive from this instead of a hardcoded type list
 - [x] Fixed the migration's incomplete follow-through, caught via full-suite regression (98 → 0 failures across several sessions): stale `filesystem_series`/`jellyfin_series`/`plex_series` keys left in the frontend and three test files after the key rename; `BroadcastLifecycleService`'s six lifecycle methods retyped to `string` without updating their only callers (still `PrefixedUlid`); `BroadcastTriggerService::execute()` similarly mismatched; `AssetRepository`/`BroadcastItemRepository` left strictly `PrefixedUlid`-typed while the new plugin code calls them with plain strings; a missing `PrefixedUlid` import in `BroadcastContextFactory`; and stray `->toString()` calls on already-string values in `AbstractSeriesBroadcastPlugin`
 - [x] Deleted the gutted `BroadcastTypeTest.php` stub (`expect(true)->toBeTrue()` placeholders); the policy matrix it once covered is fully exercised by `BroadcastPolicyMismatchTest`

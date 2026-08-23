@@ -1,7 +1,7 @@
 # Broadcasts (Phase 5A + 5B + 5C)
 
-> Current architecture note: Jellyfin and Plex are Composer-installed
-> packages. Podcast is reserved for M10 and is not installed in production.
+> Current architecture note: Jellyfin, Plex, and Podcast are optional
+> Composer/OCI plugin packages. Podcast packaged acceptance is complete.
 
 Broadcasts are **disposable, regeneratable views** of a stash. They do not own canonical media — the Vault remains the source of truth.
 

@@ -23,16 +23,16 @@ Used for tests, local development, and Docker smoke. Downloads use `FakeDownload
 
 Fixtures: `tests/fixtures/providers/fake/`
 
-## YouTube Input plugin (deferred)
+## YouTube Input plugin (complete)
 
 Key: `youtube`
 
-`Lost-and-Fonds/youtube` is reserved for the M11 Input plugin. No
-production YouTube provider is installed in core yet; the retired Wasm design
-is reference material under `reference/wasmtime/`.
-
-When M11 begins, provider-specific discovery and acquisition will remain in the
-YouTube package while core supplies only generic capabilities.
+`Lost-and-Fonds/youtube` is an optional installed OCI package. Its PostgreSQL
+input lifecycle, helper resolution, brokered HTTP behavior, and bubblewrap
+execution are covered by packaged acceptance tests. Provider-specific
+discovery and acquisition remain in the YouTube package while core supplies
+generic capabilities. The retired Wasm design is reference material under
+`reference/wasmtime/`.
 
 ## Download service
 
