@@ -6,6 +6,7 @@ namespace App\Plugins;
 
 use RuntimeException;
 use Stashd\NativeRuntime\Capabilities\CredentialGrant;
+use Stashd\NativeRuntime\Capabilities\HelperGrant;
 use Stashd\NativeRuntime\Capabilities\Invocation;
 use Stashd\NativeRuntime\Package\PackageManager;
 use Stashd\NativeRuntime\Runner\NativePluginRunner;
@@ -107,6 +108,7 @@ final readonly class NativeBroadcastRuntime implements BroadcastPluginRuntime
             $nativeStage,
             array_values(array_unique($origins)),
             $credentials,
+            helpers: $this->helperGrants($package, $helper),
             transport: new NativeBroadcastHttpTransport($fixtureDirectory),
         );
         $resources = [];
@@ -124,6 +126,7 @@ final readonly class NativeBroadcastRuntime implements BroadcastPluginRuntime
                     'resource.read' => $this->readResource($resources, $params),
                     'staging.write' => $this->writeStaging($invocation, $params),
                     'staging.stage' => $this->stageStaging($invocation, $params),
+                    'helper.run' => $this->runHelper($invocation, $params),
                     'event.log', 'event.progress' => ['accepted' => true],
                     default => throw new RuntimeException('Native Broadcast capability is not supported: ' . $method),
                 };
@@ -214,6 +217,33 @@ final readonly class NativeBroadcastRuntime implements BroadcastPluginRuntime
         $artifact = $invocation->staging()->stage($relativePath, is_string($params['media_type'] ?? null) ? $params['media_type'] : null);
 
         return ['reference' => $artifact->reference, 'media_type' => $artifact->mediaType, 'size_bytes' => $artifact->sizeBytes];
+    }
+
+    /** @param array<string, mixed> $params
+     * @return array<string, mixed>
+     */
+    private function runHelper(Invocation $invocation, array $params): array
+    {
+        $name = is_string($params['name'] ?? null) ? $params['name'] : '';
+        $arguments = is_array($params['arguments'] ?? null) ? array_values($params['arguments']) : [];
+        $result = $invocation->runHelper($name, $arguments);
+
+        return ['exit_code' => $result->exitCode, 'stdout' => $result->stdout, 'stderr' => $result->stderr];
+    }
+
+    /** @return list<HelperGrant> */
+    private function helperGrants(string $package, ?PluginHelperGrant $helper): array
+    {
+        if ($helper === null) {
+            return [];
+        }
+        $root = realpath($package);
+        $executable = realpath($helper->executable);
+        if ($root === false || $executable === false || ! str_starts_with($executable, $root . '/')) {
+            throw new RuntimeException('Native helper is outside the active plugin package.');
+        }
+
+        return [new HelperGrant($helper->name, substr($executable, strlen($root) + 1))];
     }
 
     /** @param array<string, mixed> $publication
