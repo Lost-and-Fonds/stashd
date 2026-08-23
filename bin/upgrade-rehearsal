@@ -1,0 +1,57 @@
+#!/bin/sh
+set -eu
+
+# This deliberately has no host/port flags: it may only touch its own local
+# PostgreSQL 18 container and an obviously disposable database.
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+SNAPSHOT_ROOT="$ROOT/.stashd/upgrade-fixtures/private"
+SNAPSHOT="${2:-$SNAPSHOT_ROOT/live-2026-08-24}"
+CONTAINER=stashd-upgrade-rehearsal-postgres
+DATABASE=stashd_upgrade_rehearsal
+USER=stashd_rehearsal
+PASSWORD=stashd_rehearsal
+
+fail() { echo "upgrade-rehearsal: $*" >&2; exit 1; }
+
+case "${1:-}" in
+    restore|inspect) ;;
+    *) echo "Usage: $0 restore [snapshot-directory] | inspect [snapshot-directory]" >&2; exit 64 ;;
+esac
+
+[ "$(basename "$DATABASE")" = "$DATABASE" ] && [ "$DATABASE" = "stashd_upgrade_rehearsal" ] || fail "unsafe database name"
+[ -f "$SNAPSHOT/postgres.custom" ] || fail "missing private custom dump: $SNAPSHOT/postgres.custom"
+
+if podman container exists "$CONTAINER"; then
+    label="$(podman inspect --format '{{ index .Config.Labels "io.stashd.upgrade-rehearsal" }}' "$CONTAINER")"
+    [ "$label" = true ] || fail "refusing unlabelled container named $CONTAINER"
+else
+    podman run -d --name "$CONTAINER" --network lerd \
+        --label io.stashd.upgrade-rehearsal=true \
+        -e POSTGRES_DB="$DATABASE" -e POSTGRES_USER="$USER" -e POSTGRES_PASSWORD="$PASSWORD" \
+        -v stashd-upgrade-rehearsal-postgres:/var/lib/postgresql \
+        docker.io/library/postgres:18-alpine >/dev/null
+fi
+
+podman start "$CONTAINER" >/dev/null 2>&1 || true
+# The target database may be about to be dropped, so probe PostgreSQL's
+# always-present maintenance database instead.
+until podman exec "$CONTAINER" pg_isready -U "$USER" -d postgres >/dev/null 2>&1; do sleep 1; done
+
+psql() { podman exec -i "$CONTAINER" psql -X -v ON_ERROR_STOP=1 -U "$USER" -d "$DATABASE" "$@"; }
+
+if [ "$1" = restore ]; then
+    podman exec "$CONTAINER" dropdb --if-exists --force -U "$USER" "$DATABASE"
+    podman exec "$CONTAINER" createdb -U "$USER" "$DATABASE"
+    podman exec -i "$CONTAINER" pg_restore --exit-on-error --no-owner --no-privileges -U "$USER" -d "$DATABASE" < "$SNAPSHOT/postgres.custom"
+    echo "Restored immutable snapshot into disposable database $DATABASE in local container $CONTAINER."
+    exit 0
+fi
+
+echo "Migration records:"
+psql -Atc 'SELECT name FROM migrations ORDER BY name'
+echo "Structural counts:"
+psql -Atc "SELECT 'stashes=' || count(*) FROM stashes UNION ALL SELECT 'stash_inputs=' || count(*) FROM stash_inputs UNION ALL SELECT 'broadcasts=' || count(*) FROM broadcasts UNION ALL SELECT 'media_items=' || count(*) FROM media_items ORDER BY 1"
+echo "Relevant columns (table|column|type|nullable):"
+psql -Atc "SELECT table_name || '|' || column_name || '|' || data_type || '|' || is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('stashes', 'stash_inputs', 'broadcasts', 'media_items', 'media_item_sources', 'broadcast_items') ORDER BY table_name, ordinal_position"
+echo "JSON object keys (table|column|key|rows), without values:"
+psql -Atc "SELECT 'broadcasts|settings|' || key || '|' || count(*) FROM broadcasts CROSS JOIN LATERAL jsonb_object_keys(COALESCE(\"settings\"::jsonb, '{}'::jsonb)) key GROUP BY key UNION ALL SELECT 'stash_inputs|options|' || key || '|' || count(*) FROM stash_inputs CROSS JOIN LATERAL jsonb_object_keys(COALESCE(\"options\"::jsonb, '{}'::jsonb)) key GROUP BY key ORDER BY 1"
