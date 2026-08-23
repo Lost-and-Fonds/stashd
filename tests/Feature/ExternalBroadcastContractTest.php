@@ -170,6 +170,22 @@ test('external Broadcast source settings survive the normal lifecycle', function
         ->and($item['published_path'])->toBeString();
 });
 
+test('external Broadcast actions execute through the generic Broadcast action endpoint', function (): void {
+    [$headers, , , $broadcastId] = $this->bootstrapJellyfinDownloadBroadcast('jellyfin-action');
+
+    $response = $this->http->post('/api/v1/broadcasts/' . $broadcastId . '/actions', [
+        'intent' => 'refresh_library',
+    ], headers: $headers)->assertOk();
+
+    expect($response->body['completed'])->toBeTrue()
+        ->and($response->body['broadcast']['id'])->toBe($broadcastId)
+        ->and($response->body['broadcast']['plugin_actions'])->toContain([
+            'id' => 'refresh-library',
+            'label' => 'Refresh Jellyfin library',
+            'intent' => 'refresh_library',
+        ]);
+});
+
 test('connection stores token through secrets service', function (): void {
     $headers = $this->authHeaders();
 

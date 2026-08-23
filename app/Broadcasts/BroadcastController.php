@@ -351,6 +351,39 @@ final readonly class BroadcastController
         ]);
     }
 
+    #[Post('/api/v1/broadcasts/{id}/actions')]
+    public function invokeAction(string $id, Request $request): Json
+    {
+        $broadcast = $this->findBroadcast($id);
+
+        if ($broadcast === null) {
+            return $this->notFound('Broadcast not found.');
+        }
+
+        $body = ApiJson::normalizeRequest($request->body);
+        $intent = is_string($body['intent'] ?? null) ? trim($body['intent']) : '';
+
+        if ($intent === '') {
+            return $this->validationError('intent is required.');
+        }
+
+        try {
+            $this->lifecycle->invokePluginAction(BroadcastId::fromPrimaryKey($broadcast->id), $intent);
+        } catch (BroadcastException $exception) {
+            return new Json([
+                'error' => [
+                    'code' => $exception->errorCode,
+                    'message' => $exception->getMessage(),
+                ],
+            ], Status::BAD_REQUEST);
+        }
+
+        return new Json([
+            'completed' => true,
+            'broadcast' => $this->mapBroadcast($broadcast),
+        ]);
+    }
+
     /** @return array<string, mixed> */
     private function decodeSettings(BroadcastRecord $broadcast): array
     {

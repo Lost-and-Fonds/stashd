@@ -40,6 +40,17 @@ export async function updateBroadcastSourceSettings(broadcastId: string, sourceR
   return body.broadcast
 }
 
+export async function invokeBroadcastAction(broadcastId: string, intent: string): Promise<BroadcastApiResource> {
+  const response = await fetch(`/api/v1/broadcasts/${encodeURIComponent(broadcastId)}/actions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ intent })
+  })
+  const body = await responseBody<{ completed: true, broadcast: BroadcastApiResource }>(response)
+
+  return body.broadcast
+}
+
 async function responseBody<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => null) as { error?: { message?: unknown }, message?: unknown } | null
 

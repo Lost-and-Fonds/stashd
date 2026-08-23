@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { normalizeBroadcastActions, type PluginAction } from '../adapters/normalizeBroadcastActions'
 import { normalizeBroadcastDetailFields } from '../adapters/normalizeBroadcastDetailFields'
-import { fetchBroadcast } from '../api/broadcasts'
+import { fetchBroadcast, invokeBroadcastAction } from '../api/broadcasts'
+import PluginActions from '../components/plugin/PluginActions.vue'
 import PluginDetailFields from '../components/plugin/PluginDetailFields.vue'
 import type { BroadcastApiResource } from '../types/broadcast-plugin'
 
@@ -11,12 +13,19 @@ const broadcastId = String(route.params.broadcastId)
 const broadcast = ref<BroadcastApiResource>()
 const loading = ref(true)
 const error = ref<string>()
+const errorTitle = ref('Could not load Broadcast details')
+const pendingActionId = ref<string>()
+const confirmingAction = ref<PluginAction>()
+const confirmationOpen = ref(false)
+const completedActionLabel = ref<string>()
 
 const details = computed(() => normalizeBroadcastDetailFields(broadcast.value?.plugin_detail_fields ?? []))
+const actions = computed(() => normalizeBroadcastActions(broadcast.value?.plugin_actions ?? []))
 
 async function load() {
   loading.value = true
   error.value = undefined
+  errorTitle.value = 'Could not load Broadcast details'
 
   try {
     broadcast.value = await fetchBroadcast(broadcastId)
@@ -28,6 +37,40 @@ async function load() {
 }
 
 onMounted(load)
+
+function requestAction(action: PluginAction) {
+  error.value = undefined
+  errorTitle.value = 'Could not run Broadcast action'
+  completedActionLabel.value = undefined
+
+  if (action.confirmation) {
+    confirmingAction.value = action
+    confirmationOpen.value = true
+    return
+  }
+
+  void runAction(action)
+}
+
+async function runAction(action: PluginAction) {
+  if (!broadcast.value || pendingActionId.value !== undefined) return
+
+  pendingActionId.value = action.id
+  error.value = undefined
+  errorTitle.value = 'Could not run Broadcast action'
+  completedActionLabel.value = undefined
+
+  try {
+    broadcast.value = await invokeBroadcastAction(broadcast.value.id, action.intent)
+    completedActionLabel.value = action.label
+    confirmationOpen.value = false
+    confirmingAction.value = undefined
+  } catch (exception) {
+    error.value = exception instanceof Error ? exception.message : 'Could not run Broadcast action.'
+  } finally {
+    pendingActionId.value = undefined
+  }
+}
 </script>
 
 <template>
@@ -48,7 +91,7 @@ onMounted(load)
     </div>
 
     <template v-else>
-      <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not load Broadcast details" :description="error" />
+      <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="errorTitle" :description="error" />
 
       <template v-if="broadcast">
         <UAlert
@@ -67,7 +110,30 @@ onMounted(load)
             <p v-else class="text-sm text-muted">This Broadcast has no plugin-provided details.</p>
           </UCard>
         </section>
+
+        <section v-if="actions.actions.length || actions.diagnostics.length" class="space-y-3">
+          <h2 class="text-base font-medium text-highlighted">Actions</h2>
+          <UAlert
+            v-if="actions.diagnostics.length"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            title="Some plugin actions are unsupported"
+            :description="actions.diagnostics.map(diagnostic => diagnostic.message).join(' ')"
+          />
+          <PluginActions :actions="actions.actions" :pending-action-id="pendingActionId" :disabled="pendingActionId !== undefined" @run="requestAction" />
+          <p v-if="completedActionLabel" class="text-sm text-success">{{ completedActionLabel }} completed.</p>
+        </section>
       </template>
     </template>
+
+    <UModal v-model:open="confirmationOpen" title="Confirm action" :description="confirmingAction ? `Run “${confirmingAction.label}”?` : undefined" :ui="{ content: 'max-w-md' }">
+      <template #body>
+        <div class="flex justify-end gap-2">
+          <UButton label="Cancel" variant="ghost" color="neutral" :disabled="pendingActionId !== undefined" @click="confirmationOpen = false" />
+          <UButton :label="confirmingAction?.label ?? 'Run action'" :loading="pendingActionId === confirmingAction?.id" @click="confirmingAction && runAction(confirmingAction)" />
+        </div>
+      </template>
+    </UModal>
   </main>
 </template>
