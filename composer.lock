@@ -2861,16 +2861,16 @@
         },
         {
             "name": "stashd/jellyfin",
-            "version": "v0.1.1",
+            "version": "v0.1.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Lost-and-Fonds/jellyfin.git",
-                "reference": "8e8ba658fe814ec120c238618dfb81fd97ef863c"
+                "reference": "c478bb392d894086e1cda8d84cee819b7e9569d3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Lost-and-Fonds/jellyfin/zipball/8e8ba658fe814ec120c238618dfb81fd97ef863c",
-                "reference": "8e8ba658fe814ec120c238618dfb81fd97ef863c",
+                "url": "https://api.github.com/repos/Lost-and-Fonds/jellyfin/zipball/c478bb392d894086e1cda8d84cee819b7e9569d3",
+                "reference": "c478bb392d894086e1cda8d84cee819b7e9569d3",
                 "shasum": ""
             },
             "require": {
@@ -2899,23 +2899,23 @@
             ],
             "description": "Native Jellyfin Broadcast plugin for Stashd",
             "support": {
-                "source": "https://github.com/Lost-and-Fonds/jellyfin/tree/v0.1.1",
+                "source": "https://github.com/Lost-and-Fonds/jellyfin/tree/v0.1.2",
                 "issues": "https://github.com/Lost-and-Fonds/jellyfin/issues"
             },
-            "time": "2026-08-23T03:20:07+00:00"
+            "time": "2026-08-23T03:29:40+00:00"
         },
         {
             "name": "stashd/plex",
-            "version": "v0.1.1",
+            "version": "v0.1.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Lost-and-Fonds/plex.git",
-                "reference": "a66d24a098ccc14bdb5136191493e185221cdf41"
+                "reference": "99b6dbc14d27aa96b45bd12152fd04e15099c608"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Lost-and-Fonds/plex/zipball/a66d24a098ccc14bdb5136191493e185221cdf41",
-                "reference": "a66d24a098ccc14bdb5136191493e185221cdf41",
+                "url": "https://api.github.com/repos/Lost-and-Fonds/plex/zipball/99b6dbc14d27aa96b45bd12152fd04e15099c608",
+                "reference": "99b6dbc14d27aa96b45bd12152fd04e15099c608",
                 "shasum": ""
             },
             "require": {
@@ -2944,10 +2944,10 @@
             ],
             "description": "Native Plex Broadcast plugin for Stashd",
             "support": {
-                "source": "https://github.com/Lost-and-Fonds/plex/tree/v0.1.1",
+                "source": "https://github.com/Lost-and-Fonds/plex/tree/v0.1.2",
                 "issues": "https://github.com/Lost-and-Fonds/plex/issues"
             },
-            "time": "2026-08-23T03:20:09+00:00"
+            "time": "2026-08-23T03:29:44+00:00"
         },
         {
             "name": "stashd/plugin-api",

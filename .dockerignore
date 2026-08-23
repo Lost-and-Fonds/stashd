@@ -11,6 +11,11 @@ data/
 media/
 database/
 rr
+target/
+reference/wasmtime/
+.migration-*
+.stashd/
+.php-cs-fixer.cache
 
 .env
 .env.*

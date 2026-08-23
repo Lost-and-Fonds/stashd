@@ -17,8 +17,7 @@ final class ExternalBroadcastPluginRegistryInitializer implements Initializer
 {
     public function initialize(Container $container): ExternalBroadcastPluginRegistry
     {
-        $socket = getenv('STASHD_PLUGIN_HOST_SOCKET');
-        $socket = is_string($socket) && trim($socket) !== '' ? trim($socket) : '/tmp/stashd-plugin-host.sock';
+        $socket = '';
         $definitions = [];
         $packages = new PackageManager(dirname(__DIR__, 3) . '/.stashd/native-plugins');
         foreach ((new ComposerPluginPackageDiscovery())->all() as $package) {

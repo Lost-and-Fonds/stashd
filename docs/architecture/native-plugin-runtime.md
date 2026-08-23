@@ -1,17 +1,17 @@
 # Native plugin runtime boundary
 
 M7.5 moved the proven native-plugin behavior out of the milestone spikes and
-into two deliberate package boundaries. This document records the boundary
-that is stable for the first native provider port; it does not replace the
-existing WIT contract or migrate the current Wasmtime runtime.
+into deliberate package boundaries. This document records the production
+native boundary after the M8/M9 provider ports.
 
 ## Package ownership
 
 ```text
-packages/plugin-sdk/
-  generated/                  transport-neutral WIT/schema artifact
+stashd/plugin-sdk/             Composer-installed authoring SDK
   src/                        handwritten PHP authoring API and mapping
   tests/                      SDK/conformance checks
+
+stashd/plugin-api/             canonical language-neutral contract and schema
 
 packages/native-plugin-runtime/
   src/Rpc/                    framed RPC v1 codec
@@ -89,10 +89,9 @@ the spike code.
 ## Spike disposition
 
 The executable M4–M7 PHP/runtime copies were removed after the equivalent
-production-package conformance test passed. Their README files remain as
-historical milestone evidence. M1–M3 protocol/schema evidence remains in the
-spike tree where it is useful for comparison; production behavior does not
-load any file under `spikes/`.
+production-package conformance test passed. Their README files remain under
+`reference/wasmtime/` as historical milestone evidence. Production behavior
+does not load that directory.
 
-The Wasmtime Component runtime remains active production code. Native runtime
-productionization is additive and does not change WIT or remove Wasmtime.
+Wasmtime is not a production runtime. Native is the only production runtime;
+the historical implementation is retained solely for reference.

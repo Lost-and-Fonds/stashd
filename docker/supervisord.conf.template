@@ -22,20 +22,6 @@ stdout_logfile_maxbytes=0
 stderr_logfile=/dev/fd/2
 stderr_logfile_maxbytes=0
 
-; One generic Wasmtime host serves all installed Components over the private
-; Unix socket.  It is infrastructure, not a provider-specific service.
-[program:plugin-host]
-command=/usr/local/bin/stashd-plugin-host serve /tmp/stashd-plugin-host.sock
-directory=__APP_DIR__
-autostart=true
-autorestart=true
-startsecs=1
-startretries=999999
-stdout_logfile=/dev/fd/1
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/fd/2
-stderr_logfile_maxbytes=0
-
 ; One worker program per lane: interactive jobs (preflights, add-input --
 ; things a human is watching) never queue behind bulk work (downloads,
 ; transcodes, broadcast rebuilds), and fresh-channel discovery doesn't wait

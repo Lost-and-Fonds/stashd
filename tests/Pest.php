@@ -82,18 +82,6 @@ $worker = getenv('TEST_TOKEN') ?: 'default';
 $data = sys_get_temp_dir() . '/stashd-test/' . $worker . '/data';
 $media = sys_get_temp_dir() . '/stashd-test/' . $worker . '/media';
 
-if (! is_string(getenv('STASHD_PLUGIN_FIXTURE_DIR')) || trim((string) getenv('STASHD_PLUGIN_FIXTURE_DIR')) === '') {
-    putenv('STASHD_PLUGIN_FIXTURE_DIR=' . dirname(__DIR__) . '/tests/fixtures/providers/youtube/http');
-}
-
-if (! is_string(getenv('YOUTUBE_DATA_API_KEY')) || trim((string) getenv('YOUTUBE_DATA_API_KEY')) === '') {
-    putenv('YOUTUBE_DATA_API_KEY=fixture-secret-do-not-cross-wasm');
-}
-
-if (! is_string(getenv('STASHD_PLUGIN_HELPER_EXECUTABLE')) || trim((string) getenv('STASHD_PLUGIN_HELPER_EXECUTABLE')) === '') {
-    putenv('STASHD_PLUGIN_HELPER_EXECUTABLE=' . dirname(__DIR__) . '/tests/fixtures/providers/youtube/fake-yt-dlp.sh');
-}
-
 if (! is_string(getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR')) || trim((string) getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR')) === '') {
     putenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR=' . dirname(__DIR__) . '/tests/fixtures/media_servers/http');
 }
@@ -185,4 +173,4 @@ pest()->extend(IntegrationTestCase::class)
         $this->database->reset();
 
     })
-    ->in('Feature', '../plugins/podcast/tests');
+    ->in('Feature');
