@@ -16,3 +16,4 @@ __pycache__/
 /playwright-report/
 /.env.lerd_override
 /.pi-lens/
+/.stashd/

@@ -2,7 +2,7 @@ domains:
     - stashd
 secured: true
 services:
-    - postgres-18
+    - postgres
 workers:
     - schedule
 custom_workers:

@@ -12,7 +12,6 @@
         </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
-            <directory>plugins/podcast/tests</directory>
         </testsuite>
     </testsuites>
     <source>
