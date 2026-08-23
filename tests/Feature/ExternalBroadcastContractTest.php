@@ -64,7 +64,6 @@ test('external Broadcast materializes a plugin-selected media path', function ()
 });
 
 test('external Broadcast materializes plugin-selected media and subtitle resources', function (): void {
-    requireExternalInputPluginRuntime($this);
     [$headers, $stashId, $mediaItemId] = array_slice($this->bootstrapFakeDownloadStash('plex-rebuild'), 0, 3);
 
     $server = $this->http->post('/api/v1/connections', [
@@ -141,7 +140,6 @@ test('external Broadcast materializes plugin-selected media and subtitle resourc
 });
 
 test('external Broadcast source settings survive the normal lifecycle', function (): void {
-    requireExternalInputPluginRuntime($this);
     [$headers, $stashId, $mediaItemId] = array_slice($this->bootstrapFakeDownloadStash('plex-source-settings'), 0, 3);
     $server = $this->http->post('/api/v1/connections', [
         'plugin_key' => 'plex', 'name' => 'Fixture Plex', 'endpoint' => 'https://plex.test', 'token' => 'fixture-plex-token',
