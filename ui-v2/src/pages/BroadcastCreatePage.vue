@@ -1,82 +1,154 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import type { FormError, FormSubmitEvent } from '@nuxt/ui'
-import PreflightSummary from '../components/PreflightSummary.vue'
-import { broadcastFixtures } from '../fixtures/broadcasts'
-import { stashFixtures } from '../fixtures/stashes'
-import type { BroadcastFixture, BroadcastKind } from '../types/broadcast'
-import type { PreflightOperation, PreflightState } from '../types/preflight'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import type { FormError } from '@nuxt/ui'
+import { useRoute } from 'vue-router'
+import { broadcastOptionValues, normalizeBroadcastOptions } from '../adapters/normalizeBroadcastOptions'
+import { createStashBroadcast, fetchBroadcastPlugins, fetchStash } from '../api/broadcasts'
+import PluginField from '../components/plugin/PluginField.vue'
+import type { BroadcastOptionValue, BroadcastPluginApiResource, CreatedBroadcastApiResource, StashApiResource } from '../types/broadcast-plugin'
+import type { PluginFieldValue } from '../types/plugin-ui'
 
-type Control = { key: string; label: string; type: string; default?: string | boolean; required?: boolean; options?: string[] }
-type BroadcastTypeDescriptor = { key: BroadcastKind; label: string; icon: string; description: string; controls?: Control[] }
-const route = useRoute(); const router = useRouter()
-const stash = computed(() => stashFixtures.find(s => s.id === route.params.stashId))
+const route = useRoute()
+const stashId = String(route.params.stashId)
+const stash = ref<StashApiResource>()
+const plugins = ref<BroadcastPluginApiResource[]>([])
+const loading = ref(true)
+const saving = ref(false)
+const error = ref<string>()
+const created = ref<CreatedBroadcastApiResource>()
+const typeKey = ref('')
+const values = reactive<Record<string, PluginFieldValue | undefined>>({})
 
-// Production descriptors come from the plugin API. The fixture uses the same
-// data shape so this renderer never branches on a provider name.
-const availableBroadcastTypes = ref<BroadcastTypeDescriptor[]>([])
-const typeItems = computed(() => availableBroadcastTypes.value.map(type => ({ label: type.label, description: type.description, value: type.key, icon: type.icon })))
-onMounted(async () => {
-  const response = await fetch('/api/v1/broadcast-plugins')
-  if (!response.ok) return
-  const body = await response.json() as { plugins?: Array<{ key: string; label: string; description?: string; ui_controls?: Array<{ name: string; label: string; type: string; default?: string | boolean; options?: string[]; required?: boolean }> }> }
-  availableBroadcastTypes.value = (body.plugins ?? []).map(plugin => ({
-    key: plugin.key as BroadcastKind,
-    label: plugin.label,
-    icon: 'i-lucide-box',
-    description: plugin.description ?? '',
-    controls: plugin.ui_controls?.map(control => ({ key: control.name, label: control.label, type: control.type, default: control.default, options: control.options, required: control.required })),
+const selectedPlugin = computed(() => plugins.value.find(plugin => plugin.key === typeKey.value))
+const normalized = computed(() => normalizeBroadcastOptions(selectedPlugin.value?.ui_controls ?? []))
+const typeItems = computed(() => plugins.value.map(plugin => ({
+  label: plugin.label,
+  description: plugin.description ?? '',
+  value: plugin.key,
+  icon: 'i-lucide-box'
+})))
+
+function resetValues() {
+  for (const key of Object.keys(values)) delete values[key]
+  Object.assign(values, broadcastOptionValues(normalized.value.fields))
+}
+
+watch(typeKey, () => {
+  error.value = undefined
+  created.value = undefined
+  resetValues()
+})
+
+async function load() {
+  loading.value = true
+  error.value = undefined
+
+  try {
+    const [stashResource, pluginResources] = await Promise.all([fetchStash(stashId), fetchBroadcastPlugins()])
+    stash.value = stashResource
+    plugins.value = pluginResources
+  } catch (exception) {
+    error.value = exception instanceof Error ? exception.message : 'Could not load broadcast configuration.'
+  } finally {
+    loading.value = false
+  }
+}
+
+function validate(state: Record<string, PluginFieldValue | undefined>): FormError[] {
+  return normalized.value.fields
+    .filter(field => field.required && (state[field.key] === undefined || state[field.key] === ''))
+    .map(field => ({ name: field.key, message: `${field.label} is required.` }))
+}
+
+function settings(): Record<string, BroadcastOptionValue> {
+  return Object.fromEntries(normalized.value.fields.flatMap(field => {
+    const value = values[field.key]
+
+    return typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string' ? [[field.key, value]] : []
   }))
-})
-const selectedType = computed(() => availableBroadcastTypes.value.find(type => type.key === form.typeKey))
-const form = reactive({ typeKey: '' as '' | BroadcastKind, settings: {} as Record<string, string | boolean> })
-watch(() => form.typeKey, key => {
-  const controls = availableBroadcastTypes.value.find(type => type.key === key)?.controls ?? []
-  form.settings = Object.fromEntries(controls.map(control => [control.key, control.default ?? '']))
-  if (controls.some(control => control.key === 'title') && !form.settings.title) form.settings.title = stash.value?.name ?? ''
-})
-const broadcastPreflight = ref<PreflightState | null>(null); let itemsTimer: ReturnType<typeof setTimeout> | undefined; let storageTimer: ReturnType<typeof setTimeout> | undefined
-function clearTimers() { clearTimeout(itemsTimer); clearTimeout(storageTimer) }
-function runAnalysis() {
-  clearTimers(); broadcastPreflight.value = null; const type = selectedType.value; const total = stash.value?.itemCount ?? 0
-  if (!type || total === 0) return
-  itemsTimer = setTimeout(() => {
-    if (selectedType.value?.key !== type.key) return
-    const operations: PreflightOperation[] = [{ key: 'plugin', label: 'Plugin output', itemCount: total, storageLabel: 'managed by plugin', icon: 'i-lucide-box' }]
-    broadcastPreflight.value = { status: 'analyzing', plan: { itemCountLabel: `${total.toLocaleString()} items`, operations, storage: { kind: 'calculating' } } }
-    storageTimer = setTimeout(() => { if (selectedType.value?.key === type.key) broadcastPreflight.value = { status: 'ready', plan: { itemCountLabel: `${total.toLocaleString()} items`, operations, storage: { kind: 'none' } } } }, 400)
-  }, 150)
 }
-watch(() => form.typeKey, runAnalysis, { immediate: true }); onUnmounted(clearTimers)
-function validate(state: Partial<typeof form>): FormError[] {
-  if (!state.typeKey) return [{ name: 'typeKey', message: 'Choose a broadcast type to continue.' }]
-  return (selectedType.value?.controls ?? []).filter(control => control.required && !String(state.settings?.[control.key] ?? '').trim()).map(control => ({ name: `settings.${control.key}`, message: `${control.label} is required.` }))
+
+async function create() {
+  if (!stash.value || !selectedPlugin.value || normalized.value.diagnostics.length) return
+
+  saving.value = true
+  error.value = undefined
+  created.value = undefined
+
+  try {
+    created.value = await createStashBroadcast(stash.value.id, selectedPlugin.value.key, settings())
+  } catch (exception) {
+    error.value = exception instanceof Error ? exception.message : 'Could not create broadcast.'
+  } finally {
+    saving.value = false
+  }
 }
-function settingValue(key: string): string { return String(form.settings[key] ?? '') }
-function setSetting(key: string, value: unknown): void { form.settings[key] = typeof value === 'boolean' ? value : String(value ?? '') }
-function onSubmit(event: FormSubmitEvent<typeof form>) {
-  if (!stash.value || !selectedType.value) return
-  const title = String(event.data.settings.title ?? stash.value.name).trim()
-  const broadcast: BroadcastFixture = { id: `${stash.value.id}-broadcast-${broadcastFixtures.length + 1}-${Date.now()}`, stashId: stash.value.id, kind: selectedType.value.key, name: `${title} · ${selectedType.value.label}`, formLabel: selectedType.value.label, status: 'active', buildState: 'stale', lastRebuild: 'never', lastRebuildAt: new Date().toISOString(), itemsPublished: 0, itemsTotal: stash.value.itemCount }
-  broadcastFixtures.push(broadcast); router.push(`/stashes/${stash.value.id}`)
-}
+
+onMounted(load)
 </script>
 
 <template>
-  <main v-if="stash" class="mx-auto max-w-2xl space-y-8 px-4 py-8 sm:px-8">
-    <RouterLink :to="`/stashes/${stash.id}`" class="inline-flex items-center gap-1 font-mono text-xs text-dimmed">{{ stash.name }}</RouterLink>
-    <header class="space-y-1.5"><h1 class="text-2xl font-semibold text-highlighted">New broadcast</h1><p class="text-sm text-muted">Choose an output for <span class="font-mono text-toned">{{ stash.name }}</span>.</p></header>
-    <UForm :state="form" :validate="validate" class="space-y-8" @submit="onSubmit">
-      <UFormField name="typeKey"><URadioGroup v-model="form.typeKey" :items="typeItems" variant="card" size="lg" /></UFormField>
-      <template v-if="selectedType">
-        <div class="space-y-4">
-          <UFormField v-for="control in selectedType.controls" :key="control.key" :name="`settings.${control.key}`" :label="control.label"><UTextarea v-if="control.type === 'textarea'" :model-value="settingValue(control.key)" class="w-full" @update:model-value="setSetting(control.key, $event)" /><USelect v-else-if="control.type === 'select'" :model-value="settingValue(control.key)" :items="control.options ?? []" class="w-full" @update:model-value="setSetting(control.key, $event)" /><USwitch v-else-if="control.type === 'boolean'" :model-value="form.settings[control.key] === true" @update:model-value="setSetting(control.key, $event)" /><UInput v-else :model-value="settingValue(control.key)" class="w-full" @update:model-value="setSetting(control.key, $event)" /></UFormField>
+  <main class="mx-auto max-w-2xl space-y-8 px-4 py-8 sm:px-8">
+    <RouterLink :to="`/stashes/${stashId}`" class="inline-flex items-center gap-1 font-mono text-xs text-dimmed transition-colors hover:text-muted">
+      <UIcon name="i-lucide-arrow-left" class="size-3.5" />
+      Stash
+    </RouterLink>
+
+    <header class="space-y-1.5">
+      <h1 class="text-2xl font-semibold text-highlighted">New broadcast</h1>
+      <p class="text-sm text-muted">Choose an output for <span v-if="stash" class="font-mono text-toned">{{ stash.name }}</span><span v-else>this Stash</span>.</p>
+    </header>
+
+    <div v-if="loading" class="flex items-center gap-2 text-sm text-muted">
+      <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" />
+      Loading broadcast types…
+    </div>
+
+    <template v-else>
+      <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not create broadcast" :description="error" />
+
+      <UForm v-if="stash" :state="values" :validate="validate" class="space-y-6" @submit="create">
+        <UFormField name="type">
+          <URadioGroup v-model="typeKey" :items="typeItems" variant="card" size="lg" />
+        </UFormField>
+
+        <template v-if="selectedPlugin">
+          <UAlert
+            v-if="normalized.diagnostics.length"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            title="Some declared settings are unsupported"
+            :description="normalized.diagnostics.map(diagnostic => diagnostic.message).join(' ')"
+          />
+
+          <UCard :ui="{ body: 'p-4 sm:p-6' }">
+            <div class="space-y-5">
+              <PluginField
+                v-for="field in normalized.fields"
+                :key="field.key"
+                v-model="values[field.key]"
+                :field="field"
+              />
+              <p v-if="normalized.fields.length === 0" class="text-sm text-muted">This Broadcast type has no configurable settings.</p>
+            </div>
+          </UCard>
+        </template>
+
+        <UAlert
+          v-if="created"
+          color="success"
+          variant="subtle"
+          icon="i-lucide-circle-check"
+          title="Broadcast created"
+          :description="`${created.name} was created and its first rebuild was queued.`"
+        />
+
+        <div class="flex gap-2">
+          <UButton label="Create broadcast" type="submit" size="lg" :loading="saving" :disabled="!selectedPlugin || normalized.diagnostics.length > 0" />
+          <UButton label="Cancel" :to="`/stashes/${stash.id}`" variant="ghost" color="neutral" size="lg" :disabled="saving" />
         </div>
-      </template>
-      <PreflightSummary v-if="broadcastPreflight" :state="broadcastPreflight" />
-      <div class="flex gap-2"><UButton label="Create broadcast" type="submit" size="lg" :disabled="!form.typeKey" /><UButton label="Cancel" :to="`/stashes/${stash.id}`" variant="ghost" color="neutral" size="lg" /></div>
-    </UForm>
+      </UForm>
+    </template>
   </main>
-  <main v-else class="mx-auto max-w-2xl px-4 py-8 sm:px-8"><p class="text-sm text-muted">Stash not found.</p></main>
 </template>

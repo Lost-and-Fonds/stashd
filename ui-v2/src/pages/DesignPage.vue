@@ -138,7 +138,10 @@ const notifyOnFailure = ref(false)
     <section class="max-w-3xl space-y-3">
       <h2 class="font-mono text-xs uppercase tracking-wider text-dimmed">Plugin fields</h2>
       <p class="text-sm text-muted">Reusable configuration controls, kept separate from plugin-specific pages.</p>
-      <UButton to="/design/plugin-fields" label="Open plugin field gallery" variant="soft" />
+      <div class="flex flex-wrap gap-2">
+        <UButton to="/design/plugin-fields" label="Open plugin field gallery" variant="soft" />
+        <UButton to="/design/youtube-input-options" label="View YouTube input integration" variant="ghost" color="neutral" />
+      </div>
     </section>
 
     <USeparator class="max-w-3xl" />
