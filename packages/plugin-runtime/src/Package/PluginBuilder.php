@@ -104,15 +104,18 @@ final class PluginBuilder
                 mkdir(dirname($destination), 0755, true);
             }
             if (is_string($artifact['archive_binary'] ?? null)) {
-                $command = ['tar', '-xJOf', $download, $artifact['archive_binary']];
+                $extract = $root . '/.helper-extract-' . bin2hex(random_bytes(4));
+                mkdir($extract, 0700, true);
+                $command = ['tar', '-xJf', $download, '-C', $extract, $artifact['archive_binary']];
                 $pipe = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-                $bytes = is_resource($pipe) ? stream_get_contents($pipes[1]) : false;
                 $error = is_resource($pipe) ? stream_get_contents($pipes[2]) : '';
                 $exit = is_resource($pipe) ? proc_close($pipe) : 1;
-                if ($exit !== 0 || ! is_string($bytes) || $bytes === '') {
+                $extracted = $extract . '/' . $artifact['archive_binary'];
+                if ($exit !== 0 || ! is_file($extracted)) {
                     throw new PackageValidationError('helper archive extraction failed: ' . trim((string) $error));
                 }
-                file_put_contents($destination, $bytes);
+                copy($extracted, $destination);
+                $this->remove($extract);
             } else {
                 copy($download, $destination);
             }
