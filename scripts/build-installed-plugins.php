@@ -32,5 +32,19 @@ foreach ($sources as $source) {
     $built = $builder->materialize($source, $platform);
     $manifest = $manager->installOciLayout($built['layout'], $built['digest']);
     $manager->activate($manifest->id, $manifest->version);
+    $active = $manager->activePath($manifest->id);
+
+    if ($active === null) {
+        throw new RuntimeException('installed package is not active: ' . $manifest->id);
+    }
+    $declaration = json_decode((string) file_get_contents($active . '/stashd-plugin/plugin.json'), true, 512, JSON_THROW_ON_ERROR);
+
+    foreach (is_array($declaration['helpers'] ?? null) ? $declaration['helpers'] : [] as $helper) {
+        $executable = is_array($helper) && is_string($helper['executable'] ?? null) ? $active . '/' . $helper['executable'] : '';
+
+        if ($executable === '' || ! is_executable($executable)) {
+            throw new RuntimeException('installed helper is not executable: ' . $manifest->id);
+        }
+    }
     fwrite(STDOUT, $manifest->id . ' ' . $manifest->version . ' ' . $built['digest'] . PHP_EOL);
 }
