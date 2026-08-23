@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stashd.dev/schemas/plugin-manifest-v0.1.json",
+  "type": "object",
+  "required": ["id", "name", "version", "runtime", "api_version", "entrypoint"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
+    "name": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$"},
+    "runtime": {"const": "php"},
+    "api_version": {"type": "string", "pattern": "^\\d+\\.\\d+$"},
+    "entrypoint": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["input", "broadcast"]},
+    "application_runtime": {"const": "plugin"},
+    "broadcast_key": {"type": "string", "minLength": 1},
+    "provider_key": {"type": "string", "minLength": 1},
+    "helpers_lock": {"type": "string", "minLength": 1},
+    "supported_file_kinds": {"type": "array", "items": {"type": "string"}},
+    "source_prefixes": {"type": "array", "items": {"type": "string"}},
+    "http_grants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "allowed_prefixes": {"type": "array", "items": {"type": "string"}},
+          "operations": {"type": "array", "items": {"type": "string"}},
+          "credential": {
+            "type": "object",
+            "required": ["name", "parameter", "placement"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "secret_key": {"type": "string", "minLength": 1},
+              "parameter": {"type": "string", "minLength": 1},
+              "placement": {"enum": ["query", "header"]}
+            },
+            "additionalProperties": true
+          }
+        },
+        "required": ["allowed_prefixes"],
+        "additionalProperties": true
+      }
+    },
+    "input_options": {"$ref": "#/$defs/options"},
+    "ui_options": {"$ref": "#/$defs/options"},
+    "source_options": {"$ref": "#/$defs/options"},
+    "helpers": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/helper"}
+    },
+    "helper": {"$ref": "#/$defs/helper"},
+    "operations": {"type": "object", "additionalProperties": {"type": ["string", "array"]}},
+    "requires": {
+      "type": "object",
+      "properties": {
+        "php": {"type": "string", "minLength": 1},
+        "extensions": {"type": "array", "items": {"type": "string", "pattern": "^[a-zA-Z0-9_]+$"}}
+      },
+      "additionalProperties": true
+    },
+    "architectures": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "helper": {
+      "type": "object",
+      "required": ["executable"],
+      "properties": {
+        "executable": {"type": "string", "minLength": 1},
+        "network": {"type": "boolean"}
+      },
+      "additionalProperties": true
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "label", "type"],
+        "properties": {
+          "key": {"type": "string", "minLength": 1},
+          "label": {"type": "string", "minLength": 1},
+          "type": {"type": "string", "enum": ["text", "textarea", "url", "select", "number", "boolean", "bool"]},
+          "required": {"type": "boolean"},
+          "default": {},
+          "choices": {"type": "array"},
+          "applicable_input_types": {"type": "array", "items": {"type": "string"}},
+          "description": {"type": ["string", "null"]}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

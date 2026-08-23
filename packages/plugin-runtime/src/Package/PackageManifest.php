@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Stashd\PluginRuntime\Package;
 
 use Composer\Semver\Semver;
+use Opis\JsonSchema\Errors\ErrorFormatter;
+use Opis\JsonSchema\Helper;
+use Opis\JsonSchema\Validator;
 use Tempest\Support\Filesystem;
 
 final readonly class PackageManifest
@@ -41,19 +44,8 @@ final readonly class PackageManifest
             throw new PackageValidationError('plugin.json must be an object');
         }
 
-        foreach (['id', 'name', 'version', 'runtime', 'api_version', 'entrypoint'] as $key) {
-            if (! isset($data[$key]) || ! is_string($data[$key]) || $data[$key] === '') {
-                throw new PackageValidationError("plugin.json field {$key} is required");
-            }
-        }
-
-        if (preg_match('/^[a-z][a-z0-9-]{1,63}$/', $data['id']) !== 1) {
-            throw new PackageValidationError('plugin ID is invalid');
-        }
-
-        if (preg_match('/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/', $data['version']) !== 1) {
-            throw new PackageValidationError('plugin version is invalid');
-        }
+        $data = self::object($data);
+        self::validateData($data);
 
         if ($data['api_version'] !== $apiVersion) {
             throw new PackageValidationError('plugin API version is incompatible');
@@ -62,18 +54,14 @@ final readonly class PackageManifest
         if ($data['runtime'] !== 'php') {
             throw new PackageValidationError('plugin runtime is unsupported');
         }
-        self::validateRelative($data['entrypoint'], 'entrypoint');
-        $requires = is_array($data['requires'] ?? null) ? $data['requires'] : [];
-        $extensions = $requires['extensions'] ?? [];
-        $architectures = $data['architectures'] ?? [];
-
-        if (! is_array($extensions) || ! array_is_list($extensions) || ! is_array($architectures) || ! array_is_list($architectures)) {
-            throw new PackageValidationError('manifest compatibility declarations are invalid');
-        }
+        self::validateRelative(self::string($data['entrypoint']), 'entrypoint');
+        $requires = self::object($data['requires'] ?? []);
+        $extensions = self::stringList($requires['extensions'] ?? []);
+        $architectures = self::stringList($data['architectures'] ?? []);
         $extensionNames = [];
 
         foreach ($extensions as $extension) {
-            if (! is_string($extension) || preg_match('/^[a-zA-Z0-9_]+$/', $extension) !== 1 || ! extension_loaded($extension)) {
+            if (! extension_loaded($extension)) {
                 throw new PackageValidationError('required PHP extension is unavailable');
             }
             $extensionNames[] = $extension;
@@ -81,9 +69,6 @@ final readonly class PackageManifest
         $architectureNames = [];
 
         foreach ($architectures as $architectureName) {
-            if (! is_string($architectureName)) {
-                throw new PackageValidationError('manifest architecture is invalid');
-            }
             $architectureNames[] = $architectureName;
         }
 
@@ -96,7 +81,92 @@ final readonly class PackageManifest
             throw new PackageValidationError('PHP version is incompatible');
         }
 
-        return new self($data['id'], $data['name'], $data['version'], $data['runtime'], $data['api_version'], $data['entrypoint'], $phpConstraint, $extensionNames, $architectureNames);
+        return new self(self::string($data['id']), self::string($data['name']), self::string($data['version']), self::string($data['runtime']), self::string($data['api_version']), self::string($data['entrypoint']), $phpConstraint, $extensionNames, $architectureNames);
+    }
+
+    /** @param array<string, mixed> $data */
+    public static function validateData(array $data): void
+    {
+        $schemaPath = dirname(__DIR__, 2) . '/resources/plugin-manifest-v0.1.schema.json';
+        $schema = json_decode(Filesystem\read_file($schemaPath), flags: JSON_THROW_ON_ERROR);
+
+        if (! is_object($schema)) {
+            throw new PackageValidationError('plugin manifest schema is invalid');
+        }
+        $validator = new Validator();
+        $validator->setMaxErrors(20);
+        $validator->setStopAtFirstError(false);
+        $result = $validator->validate(Helper::toJSON($data), $schema);
+
+        if ($result->isValid()) {
+            return;
+        }
+
+        $error = $result->error();
+
+        if ($error === null) {
+            throw new PackageValidationError('plugin.json structural validation failed');
+        }
+
+        $errors = (new ErrorFormatter())->format($error);
+        $messages = [];
+
+        foreach ($errors as $path => $pathErrors) {
+            if (is_array($pathErrors)) {
+                $messages[] = sprintf('%s: %s', $path, implode('; ', array_map(static fn(mixed $message): string => is_string($message) ? $message : get_debug_type($message), $pathErrors)));
+            }
+        }
+
+        throw new PackageValidationError('plugin.json structural validation failed: ' . implode(' | ', $messages));
+    }
+
+    /** @return array<string, mixed> */
+    private static function object(mixed $value): array
+    {
+        if (! is_array($value)) {
+            throw new PackageValidationError('plugin.json object value is invalid');
+        }
+
+        $object = [];
+
+        foreach ($value as $key => $entry) {
+            if (! is_string($key)) {
+                throw new PackageValidationError('plugin.json object key is invalid');
+            }
+
+            $object[$key] = $entry;
+        }
+
+        return $object;
+    }
+
+    private static function string(mixed $value): string
+    {
+        if (! is_string($value)) {
+            throw new PackageValidationError('plugin.json string value is invalid');
+        }
+
+        return $value;
+    }
+
+    /** @return list<string> */
+    private static function stringList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            throw new PackageValidationError('plugin.json string list is invalid');
+        }
+
+        $list = [];
+
+        foreach ($value as $entry) {
+            if (! is_string($entry)) {
+                throw new PackageValidationError('plugin.json string list entry is invalid');
+            }
+
+            $list[] = $entry;
+        }
+
+        return $list;
     }
 
     private static function validateRelative(string $path, string $label): void

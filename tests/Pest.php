@@ -97,38 +97,46 @@ putenv('STASHD_MEDIA_PATH=' . $media);
 $_ENV['STASHD_DATA_PATH'] = $data;
 $_ENV['STASHD_MEDIA_PATH'] = $media;
 
-$databaseBase = preg_replace('/[^a-zA-Z0-9_]+/', '_', (string) (getenv('DB_DATABASE') ?: 'stashd'));
-$databaseBase = trim((string) $databaseBase, '_') ?: 'stashd';
-$workerName = preg_replace('/[^a-zA-Z0-9_]+/', '_', $worker);
-$workerName = trim((string) $workerName, '_') ?: 'default';
-$databaseName = substr($databaseBase, 0, 40) . '_test_' . substr($workerName, 0, 16);
-
-$host = (string) (getenv('DB_HOST') ?: '127.0.0.1');
-$port = (string) (getenv('DB_PORT') ?: '5432');
-$username = (string) (getenv('DB_USERNAME') ?: 'postgres');
-$password = (string) (getenv('DB_PASSWORD') ?: '');
-$adminDatabase = (string) (getenv('DB_ADMIN_DATABASE') ?: 'postgres');
-$pdo = new PDO(
-    "pgsql:host={$host};port={$port};dbname={$adminDatabase}",
-    $username,
-    $password,
-    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+$unitOnly = array_reduce(
+    $_SERVER['argv'] ?? [],
+    static fn(bool $unitOnly, mixed $argument): bool => $unitOnly || (is_string($argument) && str_contains($argument, 'tests/Unit/')),
+    false,
 );
-$databaseExists = $pdo->prepare('SELECT 1 FROM pg_database WHERE datname = ?');
-$databaseExists->execute([$databaseName]);
 
-if ($databaseExists->fetchColumn() === false) {
-    try {
-        $pdo->exec(sprintf('CREATE DATABASE "%s"', $databaseName));
-    } catch (PDOException $exception) {
-        if ($exception->getCode() !== '42P04') {
-            throw $exception;
+if (getenv('STASHD_SKIP_DATABASE_BOOT') !== '1' && ! $unitOnly) {
+    $databaseBase = preg_replace('/[^a-zA-Z0-9_]+/', '_', (string) (getenv('DB_DATABASE') ?: 'stashd'));
+    $databaseBase = trim((string) $databaseBase, '_') ?: 'stashd';
+    $workerName = preg_replace('/[^a-zA-Z0-9_]+/', '_', $worker);
+    $workerName = trim((string) $workerName, '_') ?: 'default';
+    $databaseName = substr($databaseBase, 0, 40) . '_test_' . substr($workerName, 0, 16);
+
+    $host = (string) (getenv('DB_HOST') ?: '127.0.0.1');
+    $port = (string) (getenv('DB_PORT') ?: '5432');
+    $username = (string) (getenv('DB_USERNAME') ?: 'postgres');
+    $password = (string) (getenv('DB_PASSWORD') ?: '');
+    $adminDatabase = (string) (getenv('DB_ADMIN_DATABASE') ?: 'postgres');
+    $pdo = new PDO(
+        "pgsql:host={$host};port={$port};dbname={$adminDatabase}",
+        $username,
+        $password,
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+    );
+    $databaseExists = $pdo->prepare('SELECT 1 FROM pg_database WHERE datname = ?');
+    $databaseExists->execute([$databaseName]);
+
+    if ($databaseExists->fetchColumn() === false) {
+        try {
+            $pdo->exec(sprintf('CREATE DATABASE "%s"', $databaseName));
+        } catch (PDOException $exception) {
+            if ($exception->getCode() !== '42P04') {
+                throw $exception;
+            }
         }
     }
-}
 
-putenv('DB_DATABASE=' . $databaseName);
-$_ENV['DB_DATABASE'] = $databaseName;
+    putenv('DB_DATABASE=' . $databaseName);
+    $_ENV['DB_DATABASE'] = $databaseName;
+}
 
 pest()->extend(IntegrationTestCase::class)
     ->beforeEach(function () use ($media): void {

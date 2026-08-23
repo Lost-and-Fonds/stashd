@@ -6,6 +6,7 @@ namespace App\Plugins;
 
 use Composer\InstalledVersions;
 use RuntimeException;
+use Stashd\PluginRuntime\Package\PackageManifest;
 use Tempest\Support\Filesystem;
 
 final class ComposerPluginPackageDiscovery
@@ -35,6 +36,7 @@ final class ComposerPluginPackageDiscovery
             if (! is_array($manifest)) {
                 throw new RuntimeException("Invalid Stashd plugin manifest: {$manifestPath}");
             }
+            PackageManifest::validateData($manifest);
             $packages[] = ['name' => $name, 'root' => $root, 'manifest' => $manifest, 'manifest_path' => $manifestPath];
         }
 
@@ -59,6 +61,7 @@ final class ComposerPluginPackageDiscovery
                 $manifest = $this->readJson($manifestPath);
 
                 if (is_array($manifest)) {
+                    PackageManifest::validateData($manifest);
                     $name = is_string($composer['name'] ?? null)
                         ? $composer['name']
                         : (is_string($manifest['id'] ?? null) ? $manifest['id'] : 'installed');

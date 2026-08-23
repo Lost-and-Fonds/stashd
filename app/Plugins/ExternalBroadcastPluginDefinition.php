@@ -6,6 +6,8 @@ namespace App\Plugins;
 
 use RuntimeException;
 use Tempest\Support\Filesystem;
+use Tempest\Validation\Rules\IsString;
+use Tempest\Validation\Validator;
 
 /** Data-only registration for an external Broadcast Component. */
 final readonly class ExternalBroadcastPluginDefinition
@@ -66,6 +68,7 @@ final readonly class ExternalBroadcastPluginDefinition
         }
 
         $component = null;
+        $validator = new Validator();
 
         if (is_string($raw['component_environment'] ?? null)) {
             $value = getenv($raw['component_environment']);
@@ -89,7 +92,12 @@ final readonly class ExternalBroadcastPluginDefinition
 
         if (is_array($raw['helpers'] ?? null)) {
             foreach ($raw['helpers'] as $name => $helper) {
-                if (! is_string($name) || ! is_array($helper) || ! is_string($helper['executable'] ?? null)) {
+                if (! is_string($name) || ! is_array($helper)) {
+                    continue;
+                }
+                $helper = array_filter($helper, static fn(mixed $value, mixed $key): bool => is_string($key), ARRAY_FILTER_USE_BOTH);
+
+                if ($validator->validateValues($helper, ['executable' => new IsString()]) !== [] || ! is_string($helper['executable'] ?? null)) {
                     continue;
                 }
 
