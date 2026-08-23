@@ -419,6 +419,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         foreach ($this->definition->actions as $candidate) {
             if (($candidate['intent'] ?? null) === $intent) {
                 $action = $candidate;
+
                 break;
             }
         }
@@ -453,6 +454,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
 
             return ['urls' => $urls];
         }
+
         throw BroadcastException::withCode('broadcast_action_unsupported', 'Broadcast action is unsupported.');
     }
 
@@ -542,6 +544,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             foreach ($this->items->listForBroadcast(BroadcastId::fromPrimaryKey($context->broadcast->id)) as $candidate) {
                 if ((string) $candidate->id === ($file['item_id'] ?? '')) {
                     $item = $candidate;
+
                     break;
                 }
             }

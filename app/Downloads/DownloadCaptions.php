@@ -28,6 +28,7 @@ final readonly class DownloadCaptions
     {
         $media = $this->mediaItems->find($mediaItemId) ?? throw DownloadException::withCode('media_item_not_found', 'Media item not found.');
         $temp = sys_get_temp_dir() . '/stashd-captions-' . $jobId;
+
         try {
             create_directory($temp, 0o775);
         } catch (FilesystemException) {

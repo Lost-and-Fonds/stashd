@@ -48,13 +48,16 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
             if (str_starts_with($uri->toString(), $prefix)) {
                 return true;
             }
-        } return false;
+        }
+
+        return false;
     }
     public function resolveInput(StashdUri $uri): ResolvedInput
     {
         $result = $this->invoke('input.resolve', ['source' => $uri->toString()], 'resolve');
         $resolved = $result;
         $reference = is_string($resolved['canonical-reference'] ?? null) ? $resolved['canonical-reference'] : $uri->toString();
+
         return new ResolvedInput($this->key(), (string) ($resolved['kind'] ?? 'input'), StashdUri::parse($reference), (string) ($resolved['id'] ?? ''), $resolved['title'] ?? null, $resolved['title'] ?? null, isset($resolved['artwork-reference']) ? StashdUri::parse($resolved['artwork-reference']) : null, isset($resolved['estimated-item-count']) ? (int) $resolved['estimated-item-count'] : null);
     }
     public function discoveryStrategies(): array
@@ -80,6 +83,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = []): array
     {
         $raw = $this->invoke('input.discover', ['input_id' => $input->providerInputId, 'intent' => $strategy->key === 'plugin.complete' ? 'complete' : 'refresh', 'options' => $this->wireOptions($options)], $strategy->key === 'plugin.complete' ? 'complete' : 'refresh');
+
         return array_map(static fn(array $item): DiscoveredItem => new DiscoveredItem((string) $item['id'], StashdUri::parse((string) $item['reference']), (string) $item['title'], $item['description'] ?? null, isset($item['duration-seconds']) ? (int) $item['duration-seconds'] : null, ProviderDates::tryParse($item['published-at'] ?? null), isset($item['artwork-reference']) ? StashdUri::parse($item['artwork-reference']) : null, null, $item['kind'] ?? null), array_values(array_filter($raw, 'is_array')));
     }
     public function implementationName(): string
@@ -121,6 +125,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         if (! array_filter($files, static fn(DownloadedFile $file): bool => $file->role === AssetRole::VaultOriginal)) {
             throw DownloadException::withCode('plugin_missing_primary', 'YouTube acquisition produced no primary artifact.');
         }
+
         return new DownloadResult($files, $this->implementationName(), $this->implementationVersion(), $request->canonicalUri, DateTime::now(Timezone::UTC), ['plugin_id' => $this->definition->id]);
     }
     private function invoke(string $method, array $params, string $operation, ?string $staging = null, ?PluginHelperGrant $helper = null): array
@@ -144,11 +149,13 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
                 }
             }
         }
-        $invocation = new Invocation($package, $stage, array_values(array_unique($origins)), $credentials, helpers: $helper === null ? [] : [new \Stashd\PluginRuntime\Capabilities\HelperGrant($helper->name, substr($helper->executable, strlen($package) + 1))], transport: new PluginBroadcastHttpTransport());
+        $invocation = new Invocation($package, $stage, array_values(array_unique($origins)), $credentials, helpers: $helper === null ? [] : [new \Stashd\PluginRuntime\Capabilities\HelperGrant($helper->name, substr($helper->executable, strlen($package) + 1), $helper->network)], transport: new PluginBroadcastHttpTransport());
         $process = $this->runner->start($this->definition->id, $stage);
+
         try {
             $result = $process->invoke($method, $params, function (array $message) use ($invocation): array {
                 $p = is_array($message['params'] ?? null) ? $message['params'] : [];
+
                 return match ($message['method'] ?? '') {
                     'http.request' => $this->capabilityHttp($invocation, $p), 'staging.stage' => $this->capabilityStage($invocation, $p), 'staging.write' => $this->capabilityWrite($invocation, $p), 'helper.run' => $this->capabilityHelper($invocation, $p), 'event.log', 'event.progress' => ['accepted' => true], default => throw new RuntimeException('unsupported plugin capability'),
                 };
@@ -159,6 +166,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
             if ($staging !== null) {
                 $this->copy($stage, $staging);
             }
+
             return $result;
         } finally {
             $process->close();
@@ -171,21 +179,25 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     private function capabilityHttp(Invocation $i, array $p): array
     {
         $r = $i->http((string) ($p['method'] ?? 'GET'), (string) ($p['url'] ?? ''), is_array($p['headers'] ?? null) ? $p['headers'] : [], isset($p['body']) ? (string) $p['body'] : null, isset($p['credential']) ? (string) $p['credential'] : null);
+
         return ['status' => $r->status, 'headers' => $r->headers, 'body' => $r->body()];
     }
     private function capabilityStage(Invocation $i, array $p): array
     {
         $a = $i->staging()->stage((string) ($p['relative_path'] ?? ''), $p['media_type'] ?? null);
+
         return ['reference' => $a->reference, 'media_type' => $a->mediaType, 'size_bytes' => $a->sizeBytes];
     }
     private function capabilityWrite(Invocation $i, array $p): array
     {
         $a = $i->staging()->write((string) ($p['relative_path'] ?? ''), base64_decode((string) ($p['content'] ?? ''), true) ?: '', $p['media_type'] ?? null);
+
         return ['reference' => $a->reference, 'media_type' => $a->mediaType, 'size_bytes' => $a->sizeBytes];
     }
     private function capabilityHelper(Invocation $i, array $p): array
     {
         $r = $i->runHelper((string) ($p['name'] ?? ''), is_array($p['arguments'] ?? null) ? $p['arguments'] : []);
+
         return ['exit_code' => $r->exitCode, 'stdout' => $r->stdout, 'stderr' => $r->stderr];
     }
     private function copy(string $from, string $to): void

@@ -29,6 +29,7 @@ final class ExternalInputPluginRegistryInitializer implements Initializer
         }
         $runner = new PluginRunner($packages);
         $providers = array_map(static fn(PluginInputDefinition $definition): PluginInputRuntime => new PluginInputRuntime($definition, $runner, $packages, $container->get(\App\System\Secret\SecretsService::class)), $definitions);
+
         return new ExternalInputPluginRegistry($providers);
     }
 }

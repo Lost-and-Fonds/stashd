@@ -15,6 +15,7 @@ if (! is_string($socket) || ! is_string($component) || ! is_string($helper) || !
 
 $staging = sys_get_temp_dir() . '/stashd-youtube-acquire-error-' . bin2hex(random_bytes(6));
 mkdir($staging, 0700, true);
+
 try {
     (new PluginHostClient($socket))->acquireInput(
         $component,

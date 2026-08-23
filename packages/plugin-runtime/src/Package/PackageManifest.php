@@ -27,6 +27,7 @@ final readonly class PackageManifest
         if (! is_file($path)) {
             throw new PackageValidationError('plugin.json is missing');
         }
+
         try {
             $data = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
         } catch (\Throwable $exception) {

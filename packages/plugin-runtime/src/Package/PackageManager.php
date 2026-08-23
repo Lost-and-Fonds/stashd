@@ -36,6 +36,7 @@ final class PackageManager
         }
         $temporary = $this->staging . '/install-' . bin2hex(random_bytes(10));
         mkdir($temporary, 0700, true);
+
         try {
             TarArchive::extract($archive, $temporary);
             $manifest = PackageManifest::fromFile($this->manifestPath($temporary), $this->apiVersion, $this->architecture ?? self::architecture());
@@ -78,11 +79,16 @@ final class PackageManager
         foreach ($index['manifests'] as $candidate) {
             if (is_array($candidate) && ($candidate['digest'] ?? null) === $manifestDigest) {
                 $entry = $candidate;
+
                 break;
             }
         }
         if ($entry === null) {
             throw new PackageValidationError('OCI manifest is not present in index');
+        }
+        $architecture = is_array($entry['platform'] ?? null) ? ($entry['platform']['architecture'] ?? null) : null;
+        if (($entry['platform']['os'] ?? 'linux') !== 'linux' || ($architecture !== null && $architecture !== self::architecture())) {
+            throw new PackageValidationError('OCI plugin platform is incompatible');
         }
         $manifestPath = $layout . '/blobs/sha256/' . substr($manifestDigest, 7);
         if (! is_file($manifestPath) || ! hash_equals(substr($manifestDigest, 7), hash_file('sha256', $manifestPath) ?: '')) {
@@ -98,6 +104,7 @@ final class PackageManager
             throw new PackageValidationError('OCI layer digest is invalid');
         }
         $archive = $layout . '/blobs/sha256/' . substr($digest, 7);
+
         return $this->install($archive, substr($digest, 7));
     }
 
@@ -116,6 +123,7 @@ final class PackageManager
         }
         if (! rename($temporary, $current)) {
             @unlink($temporary);
+
             throw new PackageStateError('active version switch failed');
         }
     }
@@ -167,6 +175,7 @@ final class PackageManager
         $temporary = $this->active . '/.' . $id . '-link-' . bin2hex(random_bytes(8));
         if (! symlink('../links/' . $id, $temporary) || ! rename($temporary, $this->active . '/' . $id)) {
             @unlink($temporary);
+
             throw new PackageStateError('development link could not be activated');
         }
 
@@ -194,6 +203,7 @@ final class PackageManager
         if (! is_file($manifest)) {
             return null;
         }
+
         try {
             return PackageManifest::fromFile($manifest, $this->apiVersion, $this->architecture ?? self::architecture())->version;
         } catch (PackageValidationError) {

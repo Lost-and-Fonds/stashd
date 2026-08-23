@@ -36,6 +36,8 @@ or public media catalogue.
   internal records directly.
 - Keep PHP source compatible with PHP 8.5 and the project's PER Coding Style
   3.0 standard. See [PHP standards](docs/foundation/php-standards.md).
+- Use code-as-paragraphs vertical spacing: separate logical control-flow and
+  terminal steps with blank lines, without padding trivial blocks.
 
 ## Verification
 

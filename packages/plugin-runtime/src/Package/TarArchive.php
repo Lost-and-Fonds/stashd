@@ -10,6 +10,7 @@ final class TarArchive
     {
         $stream = self::open($archive);
         $seen = [];
+
         try {
             while (true) {
                 $header = self::read($stream, 512);

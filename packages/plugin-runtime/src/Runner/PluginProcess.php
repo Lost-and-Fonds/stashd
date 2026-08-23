@@ -59,6 +59,7 @@ final class PluginProcess
                 if (! is_string($responseId)) {
                     throw new FrameProtocolError('plugin capability request has no ID');
                 }
+
                 try {
                     $result = $capabilityHandler($message);
                     FrameCodec::write($this->pipes[0], ['protocol' => 1, 'id' => $responseId, 'kind' => 'response', 'result' => $result]);

@@ -38,6 +38,7 @@ try {
     foreach ($plugin->acquisition['artifacts'] ?? [] as $artifact) {
         if (($artifact['role'] ?? null) === 'primary') {
             $pluginPrimary = $pluginStage . '/' . $artifact['reference'];
+
             break;
         }
     }

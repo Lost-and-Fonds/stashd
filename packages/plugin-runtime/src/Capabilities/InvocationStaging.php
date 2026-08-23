@@ -18,6 +18,7 @@ final class InvocationStaging implements StagingArea
         if ($handle === false) {
             throw new UnsafePath('staging output already exists or cannot be created');
         }
+
         try {
             fwrite($handle, $content);
         } finally {

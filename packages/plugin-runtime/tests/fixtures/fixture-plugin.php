@@ -256,6 +256,7 @@ $rpc = new M7Rpc();
 $context = new PluginContext(new M7Log($rpc), new M7Progress($rpc), new M7Http($rpc), new M7Stage($rpc));
 while (($message = FrameCodec::read(STDIN, 10.0)) !== null) {
     $id = $message['id'] ?? null;
+
     try {
         $method = $message['method'] ?? '';
         $result = match ($method) {

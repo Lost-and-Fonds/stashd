@@ -44,9 +44,10 @@ final readonly class PluginInputDefinition
             }
             $path = $root . '/' . $relative;
             if (is_file($path)) {
-                $helper ??= new PluginHelperGrant($name, $path, $root);
+                $helper ??= new PluginHelperGrant($name, $path, $root, (bool) ($definition['network'] ?? false));
             }
         }
+
         return new self((string) $manifest['id'], (string) ($manifest['provider_key'] ?? $manifest['id']), (string) ($manifest['name'] ?? $manifest['id']), (string) ($manifest['version'] ?? '0.0.0'), $root, is_array($manifest['source_prefixes'] ?? null) ? $manifest['source_prefixes'] : [], is_array($manifest['http_grants'] ?? null) ? $manifest['http_grants'] : [], $options, $helper);
     }
 
@@ -73,6 +74,7 @@ final readonly class PluginInputDefinition
             }
             $result[] = new PluginHttpGrant($prefixes, $credential);
         }
+
         return $result;
     }
 }

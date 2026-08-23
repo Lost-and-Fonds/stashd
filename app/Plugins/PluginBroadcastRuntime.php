@@ -113,6 +113,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
         );
         $resources = [];
         $process = null;
+
         try {
             $process = $this->runner->start($this->pluginId, $pluginStage);
             /** @var array<string, mixed> $pluginParams */
@@ -139,6 +140,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
                 if (trim($stderr) !== '') {
                     $message .= ' (' . trim($stderr) . ')';
                 }
+
                 throw new RuntimeException($message);
             }
 
@@ -243,7 +245,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             throw new RuntimeException('Plugin helper is outside the active plugin package.');
         }
 
-        return [new HelperGrant($helper->name, substr($executable, strlen($root) + 1))];
+        return [new HelperGrant($helper->name, substr($executable, strlen($root) + 1), $helper->network)];
     }
 
     /** @param array<string, mixed> $publication

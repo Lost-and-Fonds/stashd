@@ -71,6 +71,7 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
         // instead of failing fast with the reason the app already knows.
         if ($stashItem->state === StashItemState::Ignored) {
             $reason = $stashItem->ignoredReason ?? 'unknown reason';
+
             throw InvalidCommandPayload::withErrors(["This item is ignored ({$reason}) and cannot be downloaded."]);
         }
     }

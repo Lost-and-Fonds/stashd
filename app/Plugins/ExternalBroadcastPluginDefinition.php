@@ -100,6 +100,7 @@ final readonly class ExternalBroadcastPluginDefinition
                     while ($componentPackageRoot !== dirname($componentPackageRoot)) {
                         if (basename($componentPackageRoot) === $packageName) {
                             $runtimePackageRoot = $componentPackageRoot;
+
                             break;
                         }
                         $componentPackageRoot = dirname($componentPackageRoot);

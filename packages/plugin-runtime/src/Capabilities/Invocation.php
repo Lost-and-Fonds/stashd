@@ -165,7 +165,7 @@ final class Invocation
         mkdir($etc, 0700, true);
         file_put_contents($etc . '/passwd', "plugin:x:1000:1000:plugin:/tmp:/bin/sh\n");
         file_put_contents($etc . '/group', "plugin:x:1000:\n");
-        $command = $this->sandboxPolicy->command($this->packageRoot, $this->stagingRoot, $relative, $etc);
+        $command = $this->sandboxPolicy->command($this->packageRoot, $this->stagingRoot, $relative, $etc, null, $grant->network);
         if (! str_ends_with($relative, '.php')) {
             $command[count($command) - 1] = '/plugin/' . $relative;
         }
@@ -191,6 +191,7 @@ final class Invocation
             }
             if (microtime(true) >= $deadline) {
                 proc_terminate($process, 9);
+
                 throw new RuntimeException('helper timed out');
             }
             usleep(10_000);

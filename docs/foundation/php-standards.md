@@ -45,6 +45,19 @@ When many symbols come from one coherent namespace, import that namespace once
 with a short, meaningful alias when `Alias\\Type` remains clear and reduces
 noise. Apply this judgmentally; it is not a lint rule.
 
+### Vertical spacing
+
+Use blank lines to separate logical steps.
+
+In particular:
+
+- prefer a blank line before control-flow blocks such as `if`, `foreach`, `for`, `while`, `switch`, and `try`;
+- prefer a blank line before terminal/control-transfer statements such as `return`, `throw`, `continue`, and `break`;
+- keep tightly related statements together;
+- do not add blank lines merely to satisfy the rule when a block is already trivial.
+
+The goal is for control flow to be visually obvious when scanning a method.
+
 ## API vs PHP naming
 
 PER Coding Style 3.0 governs PHP source. REST JSON remains **snake_case** per the engineering spec; translate at controller boundaries only.

@@ -151,6 +151,7 @@ final class M7HostProcess
                 if (($message['id'] ?? null) === $id) {
                     return $message['result'] ?? [];
                 }
+
                 throw new RuntimeException('unexpected plugin response');
             }
             $this->metrics->capabilityCalls++;
@@ -190,6 +191,7 @@ final class M7HostProcess
     {
         $id = $message['id'] ?? null;
         $method = $message['method'] ?? '';
+
         try {
             $result = match ($method) {
                 'http.request' => $this->http($message['params'] ?? []),
@@ -306,6 +308,7 @@ function promote(string $stagingRoot, string $relativePath, string $promotionRoo
 }
 
 $root = m7Temp('stashd-m7');
+
 try {
     $source = $root . '/source';
     mkdir($source . '/sdk', 0700, true);
@@ -355,6 +358,7 @@ try {
         if ($url === 'https://allowed.test/large') {
             return new TransportResponse(200, ['content-type' => 'application/octet-stream'], [str_repeat('a', 100000), str_repeat('b', 100000), str_repeat('c', 100000)]);
         }
+
         throw new CapabilityDenied('fixture destination denied');
     });
     $staging = m7Temp('stashd-m7-stage');
@@ -413,5 +417,6 @@ try {
     echo "M7.5 production plugin runtime conformance: PASS\n";
 } catch (Throwable $exception) {
     m7Remove($root);
+
     throw $exception;
 }

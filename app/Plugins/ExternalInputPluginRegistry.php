@@ -26,12 +26,14 @@ final class ExternalInputPluginRegistry
                 return $plugin;
             }
         }
+
         return null;
     }
 
     public function findDownloader(string $id): ?DownloaderInterface
     {
         $plugin = $this->find($id);
+
         return $plugin instanceof DownloaderInterface ? $plugin : null;
     }
 

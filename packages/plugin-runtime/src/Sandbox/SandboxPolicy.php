@@ -9,16 +9,19 @@ use RuntimeException;
 final readonly class SandboxPolicy
 {
     /** @return list<string> */
-    public function command(string $packageRoot, string $stagingRoot, string $entrypoint, ?string $etcPath = null, ?string $sdkRoot = null): array
+    public function command(string $packageRoot, string $stagingRoot, string $entrypoint, ?string $etcPath = null, ?string $sdkRoot = null, bool $network = false): array
     {
         $this->assertRelative($entrypoint);
         $etcMount = $etcPath === null ? ['--dir', '/etc'] : ['--ro-bind', $etcPath, '/etc'];
         $command = [
             'bwrap', '--die-with-parent', '--new-session', '--unshare-user', '--unshare-pid',
-            '--unshare-ipc', '--unshare-uts', '--unshare-net', '--clearenv',
+            '--unshare-ipc', '--unshare-uts', '--clearenv',
             '--ro-bind', $packageRoot, '/plugin', '--bind', $stagingRoot, '/staging',
             '--tmpfs', '/tmp', '--dev', '/dev', '--dir', '/home', '--dir', '/root',
         ];
+        if (! $network) {
+            array_splice($command, 5, 0, ['--unshare-net']);
+        }
         foreach (['/usr', '/bin', '/lib', '/lib64', '/sbin'] as $directory) {
             if (is_dir($directory)) {
                 $command[] = '--ro-bind';

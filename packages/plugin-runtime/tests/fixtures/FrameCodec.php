@@ -40,6 +40,7 @@ final class FrameCodec
         if ($json === null) {
             throw new FrameProtocolError('unexpected EOF inside frame');
         }
+
         try {
             $message = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
@@ -90,6 +91,7 @@ final class FrameCodec
                 if (feof($stream)) {
                     return $result === '' ? null : throw new FrameProtocolError('unexpected EOF');
                 }
+
                 throw new FrameProtocolError('frame read failed');
             }
             $result .= $chunk;
