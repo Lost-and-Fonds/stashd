@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import BroadcastCreatePage from '../pages/BroadcastCreatePage.vue'
+import BroadcastDetailPage from '../pages/BroadcastDetailPage.vue'
 import BroadcastSourceConfigurationPage from '../pages/BroadcastSourceConfigurationPage.vue'
 import BroadcastsPage from '../pages/BroadcastsPage.vue'
 import ConnectionsPage from '../pages/ConnectionsPage.vue'
@@ -31,6 +32,7 @@ const router = createRouter({
     { path: '/stashes/new', name: 'stash-create', component: StashCreatePage },
     { path: '/stashes/:id', name: 'stash-detail', component: StashDetailPage },
     { path: '/stashes/:stashId/broadcasts/new', name: 'broadcast-create', component: BroadcastCreatePage },
+    { path: '/broadcasts/:broadcastId', name: 'broadcast-detail', component: BroadcastDetailPage },
     { path: '/broadcasts/:broadcastId/sources/:sourceId/configure', name: 'broadcast-source-configure', component: BroadcastSourceConfigurationPage },
     { path: '/inputs', name: 'inputs', component: InputsPage },
     { path: '/stashes/:stashId/inputs/:inputId/configure', name: 'input-configure', component: InputConfigurationPage },

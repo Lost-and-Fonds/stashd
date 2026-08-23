@@ -13,6 +13,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     MetaLine: typeof import('./src/components/MetaLine.vue')['default']
     OperationProgress: typeof import('./src/components/OperationProgress.vue')['default']
+    PluginDetailFields: typeof import('./src/components/plugin/PluginDetailFields.vue')['default']
     PluginField: typeof import('./src/components/plugin/PluginField.vue')['default']
     PluginFieldBoolean: typeof import('./src/components/plugin/PluginFieldBoolean.vue')['default']
     PluginFieldNumber: typeof import('./src/components/plugin/PluginFieldNumber.vue')['default']

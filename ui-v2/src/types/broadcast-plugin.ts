@@ -35,5 +35,14 @@ export interface BroadcastApiResource {
   settings?: {
     source_settings?: Record<string, Record<string, BroadcastOptionValue>>
   } | null
+  plugin_detail_fields?: BroadcastDetailFieldApiResource[]
   plugin_source_options?: BroadcastOptionDeclaration[]
+}
+
+export interface BroadcastDetailFieldApiResource {
+  id: string
+  label: string
+  value: unknown
+  kind?: string
+  link?: unknown
 }
