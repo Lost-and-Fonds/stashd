@@ -9,9 +9,9 @@ use RuntimeException;
 use Stashd\PluginRuntime\Capabilities\CredentialGrant;
 use Stashd\PluginRuntime\Capabilities\HelperGrant;
 use Stashd\PluginRuntime\Capabilities\Invocation;
+use Stashd\PluginRuntime\Capabilities\ReadableResource;
 use Stashd\PluginRuntime\Package\PackageManager;
 use Stashd\PluginRuntime\Runner\PluginRunner;
-use Stashd\PluginSdk\ReadableResource;
 use Tempest\Support\Filesystem;
 
 final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime

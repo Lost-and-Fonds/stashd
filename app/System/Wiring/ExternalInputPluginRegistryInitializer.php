@@ -17,7 +17,8 @@ final class ExternalInputPluginRegistryInitializer implements Initializer
 {
     public function initialize(Container $container): ExternalInputPluginRegistry
     {
-        $packages = new PackageManager(dirname(__DIR__, 3) . '/.stashd/plugin-packages');
+        $root = getenv('STASHD_PLUGIN_PACKAGE_ROOT');
+        $packages = new PackageManager(is_string($root) && trim($root) !== '' ? trim($root) : dirname(__DIR__, 3) . '/.stashd/plugin-packages');
         $definitions = [];
 
         foreach ((new ComposerPluginPackageDiscovery())->all($packages->activeRoot()) as $package) {

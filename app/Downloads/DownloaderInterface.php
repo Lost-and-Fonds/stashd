@@ -23,4 +23,10 @@ interface DownloaderInterface
      *                                 the implementation supports it.
      */
     public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult;
+
+    /** @param array<string, mixed> $item
+     * @param array<string, bool|string> $options
+     * @return list<DownloadedFile>
+     */
+    public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array;
 }

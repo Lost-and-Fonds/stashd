@@ -88,6 +88,11 @@ final readonly class FakeDownloader implements DownloaderInterface
         );
     }
 
+    public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array
+    {
+        throw DownloadException::withCode('captions_unavailable', 'The fake downloader has no caption acquisition.');
+    }
+
     private function writeOriginal(DownloadRequest $request, string $filename, AssetKind $kind, string $mime): DownloadedFile
     {
         $path = $this->tempPath($request, $filename);

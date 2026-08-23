@@ -18,8 +18,12 @@ final class Umoci
 
     public const BINARY = '/usr/local/libexec/stashd/umoci';
 
-    public function __construct(private string $binary = self::BINARY)
+    private string $binary;
+
+    public function __construct(?string $binary = null)
     {
+        $this->binary = $binary ?? (is_string(getenv('STASHD_UMOCI_BINARY')) && trim((string) getenv('STASHD_UMOCI_BINARY')) !== '' ? trim((string) getenv('STASHD_UMOCI_BINARY')) : self::BINARY);
+
         if (! Filesystem\is_file($this->binary)) {
             throw new RuntimeException('verified umoci binary is not installed');
         }

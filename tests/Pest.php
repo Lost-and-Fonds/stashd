@@ -32,7 +32,9 @@ function useSessionCookieFrom(TestResponseHelper $response): void
 
 function requireExternalInputPluginRuntime(object $test): void
 {
-    $test->markTestSkipped('YouTube Input is deferred to M11.');
+    if ($test->container->get(\App\Plugins\ExternalInputPluginRegistry::class)->providers() === []) {
+        $test->markTestSkipped('Optional YouTube package is not installed.');
+    }
 }
 
 // PostgreSQL schema introspection is defined here (global namespace), like
@@ -123,6 +125,13 @@ if (getenv('STASHD_SKIP_DATABASE_BOOT') !== '1' && ! $unitOnly) {
     );
     $databaseExists = $pdo->prepare('SELECT 1 FROM pg_database WHERE datname = ?');
     $databaseExists->execute([$databaseName]);
+
+    if ($databaseExists->fetchColumn() !== false && getenv('STASHD_RESET_TEST_DATABASE') === '1') {
+        $terminate = $pdo->prepare('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ? AND pid <> pg_backend_pid()');
+        $terminate->execute([$databaseName]);
+        $pdo->exec('DROP DATABASE "' . str_replace('"', '""', $databaseName) . '"');
+        $databaseExists->execute([$databaseName]);
+    }
 
     if ($databaseExists->fetchColumn() === false) {
         try {

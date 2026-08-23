@@ -42,6 +42,7 @@ final readonly class DownloadCaptions
         $files = $plugin->acquireArtifacts(
             item: [
                 'id' => $media->providerItemId,
+                'provider_key' => $media->providerKey,
                 'reference' => StashdUri::parse($media->canonicalUri)->toString(),
                 'title' => $media->title,
                 'description' => $media->description,

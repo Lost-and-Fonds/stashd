@@ -57,10 +57,11 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     public function resolveInput(StashdUri $uri): ResolvedInput
     {
         $result = $this->invoke('input.resolve', ['source' => $uri->toString()], 'resolve');
-        $resolved = $result;
-        $reference = is_string($resolved['canonical-reference'] ?? null) ? $resolved['canonical-reference'] : $uri->toString();
+        $reference = self::string($result['canonical-reference'] ?? null, $uri->toString());
+        $title = self::nullableString($result['title'] ?? null);
+        $artwork = self::nullableString($result['artwork-reference'] ?? null);
 
-        return new ResolvedInput($this->key(), (string) ($resolved['kind'] ?? 'input'), StashdUri::parse($reference), (string) ($resolved['id'] ?? ''), $resolved['title'] ?? null, $resolved['title'] ?? null, isset($resolved['artwork-reference']) ? StashdUri::parse($resolved['artwork-reference']) : null, isset($resolved['estimated-item-count']) ? (int) $resolved['estimated-item-count'] : null);
+        return new ResolvedInput($this->key(), self::string($result['kind'] ?? null, 'input'), StashdUri::parse($reference), self::string($result['id'] ?? null), $title, $title, $artwork === null ? null : StashdUri::parse($artwork), self::nullableInt($result['estimated-item-count'] ?? null));
     }
     public function discoveryStrategies(): array
     {
@@ -86,13 +87,17 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     {
         $raw = $this->invoke('input.discover', ['input_id' => $input->providerInputId, 'intent' => $strategy->key === 'plugin.complete' ? 'complete' : 'refresh', 'options' => $this->wireOptions($options)], $strategy->key === 'plugin.complete' ? 'complete' : 'refresh');
 
-        return array_map(static fn(array $item): DiscoveredItem => new DiscoveredItem((string) $item['id'], StashdUri::parse((string) $item['reference']), (string) $item['title'], $item['description'] ?? null, isset($item['duration-seconds']) ? (int) $item['duration-seconds'] : null, ProviderDates::tryParse($item['published-at'] ?? null), isset($item['artwork-reference']) ? StashdUri::parse($item['artwork-reference']) : null, null, $item['kind'] ?? null), array_values(array_filter($raw, 'is_array')));
+        return array_map(static function (array $item): DiscoveredItem {
+            $artwork = self::nullableString($item['artwork-reference'] ?? null);
+
+            return new DiscoveredItem(self::string($item['id'] ?? null), StashdUri::parse(self::string($item['reference'] ?? null)), self::string($item['title'] ?? null), self::nullableString($item['description'] ?? null), self::nullableInt($item['duration-seconds'] ?? null), ProviderDates::tryParse(self::nullableString($item['published-at'] ?? null)), $artwork === null ? null : StashdUri::parse($artwork), null, self::nullableString($item['kind'] ?? null));
+        }, self::arrayOfArrays($raw));
     }
     public function implementationName(): string
     {
         return 'plugin:' . $this->definition->id;
     }
-    public function implementationVersion(): ?string
+    public function implementationVersion(): string
     {
         return $this->definition->version;
     }
@@ -105,28 +110,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         $item = ['id' => $request->providerItemId, 'reference' => $request->canonicalUri->toString(), 'title' => $request->title, 'description' => null, 'published-at' => $request->publishedAt?->toRfc3339(useZ: true), 'artwork-reference' => $request->thumbnailUri?->toString(), 'duration-seconds' => $request->durationSeconds];
         $kind = $request->downloadPolicy === DownloadPolicy::AudioOnly ? 'audio' : 'video';
         $result = $this->invoke('input.acquire', ['item' => $item, 'media_kind' => $kind, 'options' => $this->wireOptions($request->providerOptions)], 'acquire', $request->tempDirectory, $this->definition->helper);
-        $files = [];
-
-        foreach (is_array($result['artifacts'] ?? null) ? $result['artifacts'] : [] as $artifact) {
-            if (! is_array($artifact)) {
-                continue;
-            }
-            $reference = (string) ($artifact['reference'] ?? '');
-            $path = rtrim($request->tempDirectory, '/') . '/' . $reference;
-
-            if ($reference === '' || str_contains($reference, '..') || ! Filesystem\is_file($path)) {
-                continue;
-            }
-            $mime = is_string($artifact['media-type'] ?? null) ? $artifact['media-type'] : null;
-            $role = match ($artifact['role'] ?? null) {
-                'primary' => AssetRole::VaultOriginal, 'captions' => AssetRole::Subtitle, 'artwork' => AssetRole::SourceThumbnail, 'metadata' => AssetRole::MetadataJson, default => null,
-            };
-
-            if ($role === null) {
-                continue;
-            }
-            $files[] = new DownloadedFile($path, basename($reference), $role, $this->assetKind($mime), $mime, pathinfo($reference, PATHINFO_EXTENSION), filesize($path) ?: 0);
-        }
+        $files = $this->filesFromResult($result, $request->tempDirectory);
 
         if (! array_filter($files, static fn(DownloadedFile $file): bool => $file->role === AssetRole::VaultOriginal)) {
             throw DownloadException::withCode('plugin_missing_primary', 'YouTube acquisition produced no primary artifact.');
@@ -134,6 +118,41 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
 
         return new DownloadResult($files, $this->implementationName(), $this->implementationVersion(), $request->canonicalUri, DateTime::now(Timezone::UTC), ['plugin_id' => $this->definition->id]);
     }
+
+    public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array
+    {
+        return $this->filesFromResult($this->invoke('input.acquire', ['item' => $item, 'media_kind' => $mediaKind, 'options' => $this->wireOptions($options)], 'acquire', $staging, $this->definition->helper), $staging);
+    }
+
+    /** @param array<string, mixed> $result
+     * @return list<DownloadedFile>
+     */
+    private function filesFromResult(array $result, string $staging): array
+    {
+        $files = [];
+
+        foreach ($this->arrayOfArrays($result['artifacts'] ?? null) as $artifact) {
+            $reference = self::string($artifact['reference'] ?? null);
+            $path = rtrim($staging, '/') . '/' . $reference;
+
+            if ($reference === '' || str_contains($reference, '..') || ! Filesystem\is_file($path)) {
+                continue;
+            }
+            $mime = self::nullableString($artifact['media-type'] ?? null);
+            $role = match ($artifact['role'] ?? null) {
+                'primary' => AssetRole::VaultOriginal, 'captions' => AssetRole::Subtitle, 'artwork' => AssetRole::SourceThumbnail, 'metadata' => AssetRole::MetadataJson, default => null,
+            };
+
+            if ($role !== null) {
+                $files[] = new DownloadedFile($path, basename($reference), $role, $this->assetKind($mime), $mime, pathinfo($reference, PATHINFO_EXTENSION), filesize($path) ?: 0);
+            }
+        }
+
+        return $files;
+    }
+    /** @param array<string, mixed> $params
+     * @return array<string, mixed>
+     */
     private function invoke(string $method, array $params, string $operation, ?string $staging = null, ?PluginHelperGrant $helper = null): array
     {
         $package = $this->packages->activePath($this->definition->id) ?? throw new RuntimeException('YouTube plugin is not active');
@@ -165,7 +184,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
 
         try {
             $result = $process->invoke($method, $params, function (array $message) use ($invocation): array {
-                $p = is_array($message['params'] ?? null) ? $message['params'] : [];
+                $p = self::stringKeyed($message['params'] ?? null);
 
                 return match ($message['method'] ?? '') {
                     'http.request' => $this->capabilityHttp($invocation, $p), 'staging.stage' => $this->capabilityStage($invocation, $p), 'staging.write' => $this->capabilityWrite($invocation, $p), 'helper.run' => $this->capabilityHelper($invocation, $p), 'event.log', 'event.progress' => ['accepted' => true], default => throw new RuntimeException('unsupported plugin capability'),
@@ -173,7 +192,9 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
             });
 
             if (isset($result['error'])) {
-                throw new RuntimeException((string) (($result['error']['message'] ?? null) ?: 'plugin failed'));
+                $error = is_array($result['error']) ? $result['error'] : [];
+
+                throw new RuntimeException(self::string($error['message'] ?? null, 'plugin failed'));
             }
 
             if ($staging !== null) {
@@ -190,27 +211,41 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
             }
         }
     }
+    /** @param array<string, mixed> $p
+     * @return array<string, mixed>
+     */
     private function capabilityHttp(Invocation $i, array $p): array
     {
-        $r = $i->http((string) ($p['method'] ?? 'GET'), (string) ($p['url'] ?? ''), is_array($p['headers'] ?? null) ? $p['headers'] : [], isset($p['body']) ? (string) $p['body'] : null, isset($p['credential']) ? (string) $p['credential'] : null);
+        $r = $i->http(self::string($p['method'] ?? null, 'GET'), self::string($p['url'] ?? null), self::headers($p['headers'] ?? null), self::nullableString($p['body'] ?? null), self::nullableString($p['credential'] ?? null));
 
         return ['status' => $r->status, 'headers' => $r->headers, 'body' => $r->body()];
     }
+    /** @param array<string, mixed> $p
+     * @return array<string, mixed>
+     */
     private function capabilityStage(Invocation $i, array $p): array
     {
-        $a = $i->staging()->stage((string) ($p['relative_path'] ?? ''), $p['media_type'] ?? null);
+        $a = $i->staging()->stage(self::string($p['relative_path'] ?? null), self::nullableString($p['media_type'] ?? null));
 
         return ['reference' => $a->reference, 'media_type' => $a->mediaType, 'size_bytes' => $a->sizeBytes];
     }
+    /** @param array<string, mixed> $p
+     * @return array<string, mixed>
+     */
     private function capabilityWrite(Invocation $i, array $p): array
     {
-        $a = $i->staging()->write((string) ($p['relative_path'] ?? ''), base64_decode((string) ($p['content'] ?? ''), true) ?: '', $p['media_type'] ?? null);
+        $content = base64_decode(self::string($p['content'] ?? null), true);
+        $a = $i->staging()->write(self::string($p['relative_path'] ?? null), $content === false ? '' : $content, self::nullableString($p['media_type'] ?? null));
 
         return ['reference' => $a->reference, 'media_type' => $a->mediaType, 'size_bytes' => $a->sizeBytes];
     }
+    /** @param array<string, mixed> $p
+     * @return array<string, mixed>
+     */
     private function capabilityHelper(Invocation $i, array $p): array
     {
-        $r = $i->runHelper((string) ($p['name'] ?? ''), is_array($p['arguments'] ?? null) ? $p['arguments'] : []);
+        $arguments = is_array($p['arguments'] ?? null) ? array_values($p['arguments']) : [];
+        $r = $i->runHelper(self::string($p['name'] ?? null), $arguments);
 
         return ['exit_code' => $r->exitCode, 'stdout' => $r->stdout, 'stderr' => $r->stderr];
     }
@@ -236,6 +271,9 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
             }
         } @rmdir($path);
     }
+    /** @param array<string, bool|string> $options
+     * @return list<array{key: string, value: array{tag: string, value: bool|string}}>
+     */
     private function wireOptions(array $options): array
     {
         return array_map(static fn($key, $value): array => ['key' => $key, 'value' => is_bool($value) ? ['tag' => 'boolean', 'value' => $value] : ['tag' => 'text', 'value' => (string) $value]], array_keys($options), array_values($options));
@@ -245,5 +283,79 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         return match (true) {
             is_string($mime) && str_starts_with($mime, 'video/') => AssetKind::Video, is_string($mime) && str_starts_with($mime, 'audio/') => AssetKind::Audio, is_string($mime) && str_starts_with($mime, 'image/') => AssetKind::Image, is_string($mime) && str_starts_with($mime, 'text/') => AssetKind::Subtitle, $mime === 'application/json' => AssetKind::Metadata, default => AssetKind::Other,
         };
+    }
+
+    private static function string(mixed $value, string $default = ''): string
+    {
+        return is_scalar($value) ? (string) $value : $default;
+    }
+
+    private static function nullableString(mixed $value): ?string
+    {
+        return is_scalar($value) ? (string) $value : null;
+    }
+
+    private static function nullableInt(mixed $value): ?int
+    {
+        return is_int($value) ? $value : (is_string($value) && filter_var($value, FILTER_VALIDATE_INT) !== false ? (int) $value : null);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private static function arrayOfArrays(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+        $result = [];
+
+        foreach ($value as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $object = [];
+
+            foreach ($item as $key => $entry) {
+                if (is_string($key)) {
+                    $object[$key] = $entry;
+                }
+            }
+            $result[] = $object;
+        }
+
+        return $result;
+    }
+
+    /** @return array<string, mixed> */
+    private static function stringKeyed(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+        $result = [];
+
+        foreach ($value as $key => $entry) {
+            if (is_string($key)) {
+                $result[$key] = $entry;
+            }
+        }
+
+        return $result;
+    }
+
+    /** @return array<string, string> */
+    private static function headers(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+        $headers = [];
+
+        foreach ($value as $key => $header) {
+            if (is_string($key) && is_scalar($header)) {
+                $headers[$key] = (string) $header;
+            }
+        }
+
+        return $headers;
     }
 }

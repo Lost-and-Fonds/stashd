@@ -9,8 +9,6 @@ use GuzzleHttp\Psr7\Uri;
 use GuzzleHttp\Psr7\UriResolver;
 use RuntimeException;
 use Stashd\PluginRuntime\Sandbox\SandboxPolicy;
-use Stashd\PluginSdk\HttpResponse;
-use Stashd\PluginSdk\ReadableResource;
 use Tempest\DateTime\Duration;
 use Tempest\Process\GenericProcessExecutor;
 use Tempest\Process\PendingProcess;

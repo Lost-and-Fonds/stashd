@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Stashd\PluginRuntime\Capabilities;
 
-use Stashd\PluginSdk\StagedArtifact;
-use Stashd\PluginSdk\StagingArea;
 use Tempest\Support\Filesystem;
 
 final class InvocationStaging implements StagingArea

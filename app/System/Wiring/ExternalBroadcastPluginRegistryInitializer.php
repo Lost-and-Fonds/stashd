@@ -19,7 +19,8 @@ final class ExternalBroadcastPluginRegistryInitializer implements Initializer
     {
         $socket = '';
         $definitions = [];
-        $packages = new PackageManager(dirname(__DIR__, 3) . '/.stashd/plugin-packages');
+        $root = getenv('STASHD_PLUGIN_PACKAGE_ROOT');
+        $packages = new PackageManager(is_string($root) && trim($root) !== '' ? trim($root) : dirname(__DIR__, 3) . '/.stashd/plugin-packages');
 
         foreach ((new ComposerPluginPackageDiscovery())->all($packages->activeRoot()) as $package) {
             $definition = ExternalBroadcastPluginDefinition::fromManifest($package['manifest'], $package['root'], $socket, dirname($package['manifest_path']));

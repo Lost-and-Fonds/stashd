@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Stashd\PluginRuntime\Capabilities;
 
 use RuntimeException;
-use Stashd\PluginSdk\ReadableResource;
 
 final class FileResource implements ReadableResource
 {

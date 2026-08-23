@@ -55,4 +55,16 @@ final readonly class DelegatingDownloader implements DownloaderInterface
             "No external Input plugin is registered for provider {$request->providerKey}.",
         );
     }
+
+    public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array
+    {
+        $provider = is_string($item['provider_key'] ?? null) ? $item['provider_key'] : '';
+        $external = $this->externalPlugins?->findDownloader($provider);
+
+        if ($external !== null) {
+            return $external->acquireArtifacts($item, $staging, $mediaKind, $options);
+        }
+
+        throw DownloadException::withCode('captions_unavailable', "No external Input plugin is registered for provider {$provider}.");
+    }
 }
