@@ -483,8 +483,8 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
 
     private function runtime(): BroadcastPluginRuntime
     {
-        return $this->runtimes['native']
-            ?? throw BroadcastException::withCode('broadcast_runtime_unavailable', 'Native Broadcast runtime is unavailable.');
+        return $this->runtimes['plugin']
+            ?? throw BroadcastException::withCode('broadcast_runtime_unavailable', 'Plugin runtime is unavailable.');
     }
 
     /** @return list<PluginHttpGrant> */

@@ -32,7 +32,7 @@ function useSessionCookieFrom(TestResponseHelper $response): void
 
 function requireExternalInputPluginRuntime(object $test): void
 {
-    $test->markTestSkipped('Native YouTube Input is deferred to M11.');
+    $test->markTestSkipped('YouTube Input is deferred to M11.');
 }
 
 // PostgreSQL schema introspection is defined here (global namespace), like

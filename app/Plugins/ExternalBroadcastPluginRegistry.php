@@ -37,6 +37,6 @@ final readonly class ExternalBroadcastPluginRegistry
 
     public function runtimeFor(string $key): ?BroadcastPluginRuntime
     {
-        return $this->runtimes[$key]['native'] ?? null;
+        return $this->runtimes[$key]['plugin'] ?? null;
     }
 }

@@ -1,6 +1,6 @@
 # Broadcasts (Phase 5A + 5B + 5C)
 
-> Current architecture note: Jellyfin and Plex are Composer-installed native
+> Current architecture note: Jellyfin and Plex are Composer-installed
 > packages. Podcast is reserved for M10 and is not installed in production.
 
 Broadcasts are **disposable, regeneratable views** of a stash. They do not own canonical media — the Vault remains the source of truth.
@@ -84,7 +84,7 @@ Video remux/transcode at request time remain future work, a v1 non-goal — this
 
 ### Audio derived assets
 
-A podcast configured for audio can request an audio representation when only a video Vault asset is available. The external Podcast Component owns the media policy and invokes its package-local native helper through the generic Broadcast staging capability. The host returns a staged artifact; Stashd validates, hashes, and promotes it as a generic derived Asset before the feed is published. The core runtime does not install, configure, or invoke FFmpeg.
+A podcast configured for audio can request an audio representation when only a video Vault asset is available. The external Podcast Component owns the media policy and invokes its package-local plugin helper through the generic Broadcast staging capability. The host returns a staged artifact; Stashd validates, hashes, and promotes it as a generic derived Asset before the feed is published. The core runtime does not install, configure, or invoke FFmpeg.
 
 ```text
 publish() supplies the available generic resources to the Component

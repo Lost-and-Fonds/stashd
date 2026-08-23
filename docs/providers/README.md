@@ -27,7 +27,7 @@ Fixtures: `tests/fixtures/providers/fake/`
 
 Key: `youtube`
 
-`Lost-and-Fonds/youtube` is reserved for the M11 native Input plugin. No
+`Lost-and-Fonds/youtube` is reserved for the M11 Input plugin. No
 production YouTube provider is installed in core yet; the retired Wasm design
 is reference material under `reference/wasmtime/`.
 

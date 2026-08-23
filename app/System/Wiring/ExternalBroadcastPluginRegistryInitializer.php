@@ -7,9 +7,9 @@ namespace App\System\Wiring;
 use App\Plugins\ComposerPluginPackageDiscovery;
 use App\Plugins\ExternalBroadcastPluginDefinition;
 use App\Plugins\ExternalBroadcastPluginRegistry;
-use App\Plugins\NativeBroadcastRuntime;
-use Stashd\NativeRuntime\Package\PackageManager;
-use Stashd\NativeRuntime\Runner\NativePluginRunner;
+use App\Plugins\PluginBroadcastRuntime;
+use Stashd\PluginRuntime\Package\PackageManager;
+use Stashd\PluginRuntime\Runner\PluginRunner;
 use Tempest\Container\Container;
 use Tempest\Container\Initializer;
 
@@ -19,7 +19,7 @@ final class ExternalBroadcastPluginRegistryInitializer implements Initializer
     {
         $socket = '';
         $definitions = [];
-        $packages = new PackageManager(dirname(__DIR__, 3) . '/.stashd/native-plugins');
+        $packages = new PackageManager(dirname(__DIR__, 3) . '/.stashd/plugin-packages');
         foreach ((new ComposerPluginPackageDiscovery())->all() as $package) {
             $definition = ExternalBroadcastPluginDefinition::fromManifest($package['manifest'], $package['root'], $socket, dirname($package['manifest_path']));
             if ($definition === null) {
@@ -29,7 +29,7 @@ final class ExternalBroadcastPluginRegistryInitializer implements Initializer
             $definitions[$definition->logicalKey][] = $definition;
         }
 
-        $runner = new NativePluginRunner($packages);
+        $runner = new PluginRunner($packages);
         $plugins = [];
         $runtimes = [];
 
@@ -37,8 +37,8 @@ final class ExternalBroadcastPluginRegistryInitializer implements Initializer
             $base = $candidates[0];
             $available = [];
             foreach ($candidates as $candidate) {
-                if ($candidate->runtime === 'native' && $packages->activePath($candidate->id) !== null) {
-                    $available['native'] = new NativeBroadcastRuntime($runner, $packages, $candidate->id);
+                if ($candidate->runtime === 'plugin' && $packages->activePath($candidate->id) !== null) {
+                    $available['plugin'] = new PluginBroadcastRuntime($runner, $packages, $candidate->id);
                 }
             }
             if ($available !== []) {

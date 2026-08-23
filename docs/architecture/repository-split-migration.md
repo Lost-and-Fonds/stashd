@@ -3,19 +3,19 @@
 ## Status
 
 Implementation-ready migration specification. Do not perform the migration without
-an explicit follow-up task. Native plugins are the production architecture;
+an explicit follow-up task. Plugins are the production architecture;
 Wasmtime/Wasm is historical reference material only.
 
 ## 1. Final ownership
 
 | Repository | Owns | Does not own |
 |---|---|---|
-| `Lost-and-Fonds/stashd` | App, PostgreSQL, jobs, Vault, generic Inputs/Broadcasts, UI, Docker, native runtime, Composer discovery/activation, application integration tests | Provider protocols/packages |
+| `Lost-and-Fonds/stashd` | App, PostgreSQL, jobs, Vault, generic Inputs/Broadcasts, UI, Docker, plugin runtime, Composer discovery/activation, application integration tests | Provider protocols/packages |
 | `Lost-and-Fonds/docs` | Curated user, admin, architecture, contributor, ecosystem documentation | Code-adjacent procedures and stale plans |
 | `Lost-and-Fonds/plugin-api` | Normative language-neutral WIT/schema, manifest schema, fixtures, compatibility policy | SDK, runtime, providers |
 | `Lost-and-Fonds/plugin-sdk` | PHP 8.5 API, DTOs, RPC bridge, capability interfaces, SDK tests/example | Core/provider implementation |
-| `Lost-and-Fonds/jellyfin` | Native Jellyfin Broadcast package/tests | Core lifecycle/persistence |
-| `Lost-and-Fonds/plex` | Native Plex Broadcast package/tests | Core lifecycle/persistence |
+| `Lost-and-Fonds/jellyfin` | Jellyfin Broadcast package/tests | Core lifecycle/persistence |
+| `Lost-and-Fonds/plex` | Plex Broadcast package/tests | Core lifecycle/persistence |
 | `Lost-and-Fonds/podcast` | M10-ready package/documentation skeleton | A claimed native implementation |
 | `Lost-and-Fonds/youtube` | M11-ready package/documentation skeleton | A claimed native implementation |
 
@@ -86,7 +86,7 @@ plugins/youtube/**
 Create fresh repositories with only `composer.json`, `README.md`,
 `AGENTS.md`, and `LICENSE`. They are ordinary Composer libraries, not
 `stashd-plugin` packages, and contain no manifest or executable entrypoint
-until M10/M11 delivers an actual native provider.
+until M10/M11 delivers an actual provider plugin.
 
 ### Remain in core
 
@@ -96,13 +96,13 @@ under Wasmtime reference below. In particular:
 ```text
 app/** bootstrap/** docker/** e2e/** public/** src/** tests/** ui-v2/**
 scripts/**                         # except the listed Wasmtime spike scripts
-packages/native-plugin-runtime/**
+packages/plugin-runtime/**
 .github/**
 Dockerfile docker-compose*.yml composer.* package*.json
 PHPStan, PHPCS, PHP-CS-Fixer, Tempest, Vite, Playwright, and Lerd files
 ```
 
-Keep `packages/native-plugin-runtime/**` as an internal core directory, not a
+Keep `packages/plugin-runtime/**` as an internal core directory, not a
 public package. Remove its nested `composer.json` once absorbed into core
 metadata.
 
@@ -128,8 +128,8 @@ core/reference/wasmtime/
 │   ├── podcast-broadcast-spike.sh
 │   └── youtube-input-spike.sh
 └── tests/
-    ├── NativeJellyfinLifecycleTest.php
-    └── NativePlexLifecycleTest.php
+    ├── PluginJellyfinLifecycleTest.php
+    └── PluginPlexLifecycleTest.php
 ```
 
 Place the old root `Cargo.toml` and `Cargo.lock` there too, adjusting only
@@ -138,7 +138,7 @@ root.
 
 The README must say:
 
-> Historical/reference code only. Native PHP plugins are Stashd's production
+> Historical/reference code only. PHP plugins are Stashd's production
 > architecture. Do not update this directory to implement current behavior. It
 > is excluded from Docker production builds, Composer autoloading, Cargo
 > workspaces, plugin discovery, normal CI, and routine tests.
@@ -148,7 +148,7 @@ Production cleanup:
 - Delete `WasmtimeBroadcastRuntime`.
 - Remove `wasmtime` from production manifests and remove runtime-selection
   variables including `STASHD_BROADCAST_IMPLEMENTATIONS`.
-- Replace native/Wasm parity tests with native-only lifecycle tests.
+- Replace native/Wasm parity tests with plugin-only lifecycle tests.
 - Remove Wasm components, Rust stages, Cargo workspace commands, and Wasmtime
   host supervision from Docker and CI.
 - Production discovery must not glob `plugins/*/plugin.json`; Composer is the
@@ -291,7 +291,7 @@ the task.
 |---|---|
 | Engineering specs and architecture vision files | Rewrite once into docs product/architecture overview |
 | Storage, Broadcast, Provider, media-server READMEs | Rewrite into docs user-guide/administration |
-| Native runtime architecture | Rewrite for docs; keep implementation details in core |
+| Plugin runtime architecture | Rewrite for docs; keep implementation details in core |
 | Plugin API v1 design | Distill into plugin-api reference; preserve native decision as ADR |
 | Database/PHP standards, testing, security, local-development, workflow, runtime docs | Keep concise and code-adjacent in core |
 | SDK README/generated-schema notes | Keep with SDK |
@@ -327,7 +327,7 @@ actually needs it.
 - Jellyfin/Plex: integration, Broadcast role, credentials/configuration,
   supported behavior, development/testing, Stashd relationship.
 - Podcast/YouTube: intended role and explicit statement that no production
-  native provider exists yet.
+  provider plugin exists yet.
 - Docs: scope, navigation, Markdown contribution workflow, no local server.
 - Organization profile:
 
@@ -349,7 +349,7 @@ Do not over-brand individual repositories.
 | plugin-sdk | SDK tests plus API compatibility fixture matrix | PHP lint/static/tests |
 | Jellyfin/Plex | Provider fixture tests plus SDK compatibility | PHP lint/static/provider tests |
 | Podcast/YouTube skeleton | Metadata/README validation | Composer validation and Markdown/link check |
-| Core | Unit/feature/PostgreSQL/native runtime; Docker only when boundary touched | Application quality, native-only integration, UI/Docker as needed |
+| Core | Unit/feature/PostgreSQL/plugin runtime; Docker only when boundary touched | Application quality, plugin-only integration, UI/Docker as needed |
 | Docs | Markdown/internal links | Docs-only job |
 
 Every repository gets a short `AGENTS.md` naming its canonical test command and
@@ -392,7 +392,7 @@ the useful native history there; keep Wasm history in core reference.
 5. Extract/publish Jellyfin/Plex 0.1.0 and provider tests. Rollback: do not add
    core constraints.
 6. Create Podcast/YouTube skeletons and docs. Rollback: remove skeletons.
-7. Convert core discovery to Composer packages and pass native-only lifecycle
+7. Convert core discovery to Composer packages and pass plugin-only lifecycle
    tests. Checkpoint: core installs released Jellyfin/Plex only. Rollback:
    revert this core commit.
 8. Remove production Wasmtime/Docker/Cargo/CI and move reference material.

@@ -57,8 +57,8 @@ final readonly class ExternalBroadcastPluginDefinition
             return trim($value);
         };
 
-        $runtime = is_string($raw['application_runtime'] ?? null) && trim($raw['application_runtime']) !== '' ? trim($raw['application_runtime']) : 'native';
-        if ($runtime !== 'native') {
+        $runtime = is_string($raw['application_runtime'] ?? null) && trim($raw['application_runtime']) !== '' ? trim($raw['application_runtime']) : 'plugin';
+        if ($runtime !== 'plugin') {
             throw new RuntimeException("Unsupported external Broadcast runtime [{$runtime}].");
         }
 
@@ -133,7 +133,7 @@ final readonly class ExternalBroadcastPluginDefinition
             runtime: $runtime,
             name: is_string($raw['name'] ?? null) && trim($raw['name']) !== '' ? trim($raw['name']) : $required('id'),
             version: is_string($raw['version'] ?? null) && trim($raw['version']) !== '' ? trim($raw['version']) : '0.0.0',
-            componentPath: $runtime === 'native' ? '' : $componentPath,
+            componentPath: '',
             socketPath: $socketPath,
             uiOptions: $uiOptions,
             actions: $actions,
@@ -156,7 +156,7 @@ final readonly class ExternalBroadcastPluginDefinition
 
     public function available(): bool
     {
-        return $this->runtime === 'native' || (is_file($this->componentPath) && file_exists($this->socketPath));
+        return $this->runtime === 'plugin';
     }
 
     public function helperGrant(string $name): ?PluginHelperGrant

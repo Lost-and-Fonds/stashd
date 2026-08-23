@@ -1,0 +1,9 @@
+{
+  "name": "stashd/plugin-runtime",
+  "description": "Bubblewrap-isolated plugin runtime for Stashd",
+  "type": "library",
+  "license": "MIT",
+  "require": {"php": ">=8.5"},
+  "autoload": {"psr-4": {"Stashd\\PluginRuntime\\": "src/"}},
+  "autoload-dev": {"psr-4": {"Stashd\\PluginRuntime\\Tests\\": "tests/"}}
+}

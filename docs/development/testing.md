@@ -96,14 +96,14 @@ migrated development database when available.
 Do not modify historical migrations merely to silence validation without first
 understanding the mismatch.
 
-### Plugin SDK / native runtime changes
+### Plugin SDK / plugin runtime changes
 
 Start with the directly affected package/conformance test.
 
 Then run:
 
 ```bash
-composer test:native-runtime
+composer test:plugin-runtime
 composer lint
 composer test:static
 ```
@@ -173,11 +173,11 @@ DTO implementation only
 repository/query change
 → focused feature + PostgreSQL coverage + lint + static
 
-native RPC framing
-→ focused RPC/conformance + native runtime + Rust checks
+plugin RPC framing
+→ focused RPC/conformance + plugin runtime + Rust checks
 
 Jellyfin application integration
-→ Jellyfin parity + application lifecycle + PostgreSQL + native runtime
+→ Jellyfin parity + application lifecycle + PostgreSQL + plugin runtime
 
 CSS/layout tweak in ui-v2
 → typecheck + build

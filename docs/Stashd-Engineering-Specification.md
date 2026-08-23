@@ -1350,7 +1350,7 @@ No universal H.265 default. H.265/HEVC can be an advanced preference.
 ## Audio Podcast
 
 Audio podcast broadcasts may generate derived audio files through a
-Podcast-plugin-owned native helper. The helper and its media profile are not
+Podcast-plugin-owned helper. The helper and its media profile are not
 part of Stashd core.
 
 Default v1 podcast audio profile:
@@ -2723,7 +2723,7 @@ advanced storage cleanup tools
 distributed workers
 multi-user / role-based permissions
 third-party plugin runtime
-native provider-specific downloaders
+provider plugin-specific downloaders
 storage tiers
 object storage support
 AI summaries/search
@@ -2768,7 +2768,7 @@ If Stashd becomes boring infrastructure, it has succeeded.
 
 Chapter support is **not required for v1**, but the v1 data model should not make it difficult to add later.
 
-## Native / Provider Chapters
+## Plugin / Provider Chapters
 
 yt-dlp can expose chapter information where the source provides it, and Stashd should treat source/provider chapters as metadata or enrichment assets.
 

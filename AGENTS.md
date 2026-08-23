@@ -53,5 +53,5 @@ deployment. See [local development](docs/development/local-development.md),
 [workflow](docs/development/workflow.md), and the relevant architecture docs.
 
 For security-sensitive work, read [security practices](docs/development/security.md).
-For native plugins, read [the native runtime boundary](docs/architecture/native-plugin-runtime.md)
-and [the migration roadmap](docs/development/native-plugin-migration.md).
+For plugins, read [the plugin runtime boundary](docs/architecture/plugin-runtime.md)
+and [the migration roadmap](docs/development/plugin-migration.md).
