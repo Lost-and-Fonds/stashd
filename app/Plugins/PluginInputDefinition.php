@@ -30,10 +30,21 @@ final readonly class PluginInputDefinition
             $options[] = new InputOption($raw['key'], $raw['label'], $type, $raw['default'], is_array($raw['choices'] ?? null) ? $raw['choices'] : null, is_array($raw['applicable_input_types'] ?? null) ? $raw['applicable_input_types'] : [], [], $raw['description'] ?? null);
         }
         $helper = null;
-        if (is_array($manifest['helper'] ?? null) && is_string($manifest['helper']['name'] ?? null) && is_string($manifest['helper']['executable'] ?? null)) {
-            $path = $root . '/' . ltrim($manifest['helper']['executable'], '/');
+        $declared = is_array($manifest['helpers'] ?? null) ? $manifest['helpers'] : [];
+        if ($declared === [] && is_array($manifest['helper'] ?? null)) {
+            $declared = [(string) ($manifest['helper']['name'] ?? '') => $manifest['helper']];
+        }
+        foreach ($declared as $name => $definition) {
+            if (! is_string($name) || ! is_array($definition) || ! is_string($definition['executable'] ?? null)) {
+                continue;
+            }
+            $relative = ltrim($definition['executable'], '/');
+            if (str_contains($relative, '..') || str_contains($relative, "\0")) {
+                throw new RuntimeException('Plugin helper paths must be package-relative.');
+            }
+            $path = $root . '/' . $relative;
             if (is_file($path)) {
-                $helper = new PluginHelperGrant($manifest['helper']['name'], $path, $root);
+                $helper ??= new PluginHelperGrant($name, $path, $root);
             }
         }
         return new self((string) $manifest['id'], (string) ($manifest['provider_key'] ?? $manifest['id']), (string) ($manifest['name'] ?? $manifest['id']), (string) ($manifest['version'] ?? '0.0.0'), $root, is_array($manifest['source_prefixes'] ?? null) ? $manifest['source_prefixes'] : [], is_array($manifest['http_grants'] ?? null) ? $manifest['http_grants'] : [], $options, $helper);

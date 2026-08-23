@@ -31,7 +31,7 @@ final class TarArchive
                     throw new PackageValidationError('archive contains a duplicate or empty path');
                 }
                 $seen[$path] = true;
-                self::validatePath($path);
+                self::validatePath($path, $type === '5');
                 if ($type === '1' || $type === '2') {
                     throw new PackageValidationError('archive links are not permitted');
                 }
@@ -126,8 +126,11 @@ final class TarArchive
         return $path;
     }
 
-    private static function validatePath(string $path): void
+    private static function validatePath(string $path, bool $directory = false): void
     {
+        if ($directory) {
+            $path = rtrim($path, '/');
+        }
         $parts = explode('/', $path);
         if (str_starts_with($path, '/') || in_array('', $parts, true) || in_array('..', $parts, true) || in_array('.', $parts, true)) {
             throw new PackageValidationError('archive path is unsafe');

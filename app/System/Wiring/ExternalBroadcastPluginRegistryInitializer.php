@@ -20,7 +20,7 @@ final class ExternalBroadcastPluginRegistryInitializer implements Initializer
         $socket = '';
         $definitions = [];
         $packages = new PackageManager(dirname(__DIR__, 3) . '/.stashd/plugin-packages');
-        foreach ((new ComposerPluginPackageDiscovery())->all() as $package) {
+        foreach ((new ComposerPluginPackageDiscovery())->all($packages->activeRoot()) as $package) {
             $definition = ExternalBroadcastPluginDefinition::fromManifest($package['manifest'], $package['root'], $socket, dirname($package['manifest_path']));
             if ($definition === null) {
                 continue;

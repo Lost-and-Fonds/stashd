@@ -19,7 +19,7 @@ final class ExternalInputPluginRegistryInitializer implements Initializer
     {
         $packages = new PackageManager(dirname(__DIR__, 3) . '/.stashd/plugin-packages');
         $definitions = [];
-        foreach ((new ComposerPluginPackageDiscovery())->all() as $package) {
+        foreach ((new ComposerPluginPackageDiscovery())->all($packages->activeRoot()) as $package) {
             $definition = PluginInputDefinition::from($package['manifest'], $package['root']);
             if ($definition === null) {
                 continue;

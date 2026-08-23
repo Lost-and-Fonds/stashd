@@ -64,6 +64,43 @@ final class PackageManager
         }
     }
 
+    /** Install a single-platform OCI image layout by its immutable manifest digest. */
+    public function installOciLayout(string $layout, string $manifestDigest): PackageManifest
+    {
+        if (! preg_match('/^sha256:[a-f0-9]{64}$/', $manifestDigest)) {
+            throw new PackageValidationError('OCI manifest digest is invalid');
+        }
+        $index = json_decode((string) @file_get_contents($layout . '/index.json'), true);
+        if (! is_array($index) || ! is_array($index['manifests'] ?? null)) {
+            throw new PackageValidationError('OCI index is invalid');
+        }
+        $entry = null;
+        foreach ($index['manifests'] as $candidate) {
+            if (is_array($candidate) && ($candidate['digest'] ?? null) === $manifestDigest) {
+                $entry = $candidate;
+                break;
+            }
+        }
+        if ($entry === null) {
+            throw new PackageValidationError('OCI manifest is not present in index');
+        }
+        $manifestPath = $layout . '/blobs/sha256/' . substr($manifestDigest, 7);
+        if (! is_file($manifestPath) || ! hash_equals(substr($manifestDigest, 7), hash_file('sha256', $manifestPath) ?: '')) {
+            throw new PackageValidationError('OCI manifest checksum mismatch');
+        }
+        $manifest = json_decode((string) @file_get_contents($manifestPath), true);
+        if (! is_array($manifest) || ! is_array($manifest['layers'] ?? null) || count($manifest['layers']) !== 1) {
+            throw new PackageValidationError('OCI plugin manifest must contain one layer');
+        }
+        $layer = $manifest['layers'][0];
+        $digest = is_array($layer) ? (string) ($layer['digest'] ?? '') : '';
+        if (! preg_match('/^sha256:[a-f0-9]{64}$/', $digest)) {
+            throw new PackageValidationError('OCI layer digest is invalid');
+        }
+        $archive = $layout . '/blobs/sha256/' . substr($digest, 7);
+        return $this->install($archive, substr($digest, 7));
+    }
+
     public function activate(string $id, string $version): void
     {
         $this->validateId($id);
@@ -170,6 +207,11 @@ final class PackageManager
         $path = $this->active . '/' . $id;
 
         return is_link($path) ? (realpath($path) ?: null) : null;
+    }
+
+    public function activeRoot(): string
+    {
+        return $this->active;
     }
 
     private function validateId(string $id): void
