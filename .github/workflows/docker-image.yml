@@ -19,6 +19,40 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Optional provider packages are path repositories for local development.
+      # Keep them outside the core image/runtime dependency set while making
+      # the packaged acceptance job reproducible in this monorepo checkout.
+      - name: Checkout optional packages
+        uses: actions/checkout@v4
+        with:
+          repository: Lost-and-Fonds/plugin-api
+          path: ../plugin-api
+      - name: Checkout plugin SDK
+        uses: actions/checkout@v4
+        with:
+          repository: Lost-and-Fonds/plugin-sdk
+          path: ../plugin-sdk
+      - name: Checkout provider packages
+        uses: actions/checkout@v4
+        with:
+          repository: Lost-and-Fonds/podcast
+          path: ../plugins/podcast
+      - name: Checkout YouTube package
+        uses: actions/checkout@v4
+        with:
+          repository: Lost-and-Fonds/youtube
+          path: ../plugins/youtube
+      - name: Checkout Jellyfin package
+        uses: actions/checkout@v4
+        with:
+          repository: Lost-and-Fonds/jellyfin
+          path: ../plugins/jellyfin
+      - name: Checkout Plex package
+        uses: actions/checkout@v4
+        with:
+          repository: Lost-and-Fonds/plex
+          path: ../plugins/plex
+
       - name: Build Lerd development image
         run: docker build --target dev -t stashd:ci .
 
@@ -51,6 +85,9 @@ jobs:
             -e DB_PASSWORD=stashd-ci \
             -e DB_ADMIN_DATABASE=postgres \
             -v "$GITHUB_WORKSPACE:/var/www/html" \
+            -v "$GITHUB_WORKSPACE/../plugin-api:/var/www/plugin-api:ro" \
+            -v "$GITHUB_WORKSPACE/../plugin-sdk:/var/www/plugin-sdk:ro" \
+            -v "$GITHUB_WORKSPACE/../plugins:/var/www/plugins:ro" \
             -w /var/www/html \
             stashd:ci -lc '
               git config --global --add safe.directory /var/www/html
@@ -61,6 +98,9 @@ jobs:
               composer test:static
               npm run typecheck
               composer test:parallel
+              composer test:naked-core
+              composer test:packaged
+              composer test:plugin-runtime
             '
 
   smoke:
