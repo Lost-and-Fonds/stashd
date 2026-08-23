@@ -1,6 +1,6 @@
 # Plugin migration status
 
-Plugin PHP plugins are Stashd's production architecture. The plugin runtime,
+PHP plugins are Stashd's production architecture. The plugin runtime,
 SDK, package lifecycle, and Jellyfin/Plex parity gates are complete through M9.
 
 Wasmtime/Wasm implementations are retained only under
