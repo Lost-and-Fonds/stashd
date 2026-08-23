@@ -39,11 +39,14 @@ or public media catalogue.
 
 ## Verification
 
-Run the narrowest relevant checks first, then broader checks when the change
-warrants them. Before handoff, report commands actually run and anything not
-run. Normal quality gates are `composer lint`, `composer test:static`, the
-relevant Pest tests, and `git diff --check`; Docker/runtime changes also need
-the appropriate fresh-container smoke test.
+Do not rediscover the project's test strategy for every task.
+
+Read [`docs/development/testing.md`](docs/development/testing.md) and use its
+verification ladder.
+
+Start with the narrowest relevant test and expand only across boundaries touched
+by the change. Prefer existing Composer/package scripts over ad-hoc commands.
+Do not begin by running the entire test universe.
 
 The project uses Lerd for local PHP development and Docker/Podman for
 deployment. See [local development](docs/development/local-development.md),
