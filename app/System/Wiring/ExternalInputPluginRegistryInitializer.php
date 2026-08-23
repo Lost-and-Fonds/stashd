@@ -21,7 +21,9 @@ final class ExternalInputPluginRegistryInitializer implements Initializer
         $definitions = [];
         foreach ((new ComposerPluginPackageDiscovery())->all() as $package) {
             $definition = PluginInputDefinition::from($package['manifest'], $package['root']);
-            if ($definition === null) continue;
+            if ($definition === null) {
+                continue;
+            }
             $packages->link($definition->id, $package['root']);
             $definitions[] = $definition;
         }

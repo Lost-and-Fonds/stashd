@@ -21,7 +21,11 @@ final class ExternalInputPluginRegistry
 
     public function find(string $id): ?Provider
     {
-        foreach ($this->plugins as $plugin) if ($plugin->key() === $id) return $plugin;
+        foreach ($this->plugins as $plugin) {
+            if ($plugin->key() === $id) {
+                return $plugin;
+            }
+        }
         return null;
     }
 
