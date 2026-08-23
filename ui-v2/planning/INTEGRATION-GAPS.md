@@ -10,8 +10,8 @@ During design phases, **record gaps here instead of solving them**.
 | Stash detail · Broadcast | Published vs. total item count per Broadcast, and a build-currentness state (`current`/`rebuilding`/`stale`) distinct from trigger health | Unknown — AGENTS.md documents trigger failures being separate from file validity, but no confirmed field for "how much of the Vault has been published into this Broadcast" | Verify during Phase 6 |
 | Stash detail · Broadcast | Output size per Broadcast (separate from Vault/Stash total size) | Unknown | Verify during Phase 6 |
 | Stash detail · Broadcast (podcast) | Rotate feed URL/token action | Unknown | Verify during Phase 6 |
-| Stash detail · Input | Sync mode (automatic/manual) and a short filter summary | Unknown | Verify during Phase 6 |
 | Stash detail · Input/Broadcast | Direct "Sync now" / "Rebuild" trigger per row (not just Stash-level rebuild) | Unknown | Verify during Phase 6 |
+| Stash detail · Input | Add an Input to an existing Stash through the preflight-and-create flow | Backend endpoints exist, but UI-v2 has no reusable live creation surface; the former Stash-detail modal was fixture-only | Build in a dedicated Input-creation slice |
 | New stash workflow | Real provider/source detection from a pasted URL (type, and a source-derived name suggestion) | Unknown — UI-v2 currently simulates this with regex against the URL string | Verify during Phase 6 |
 | New stash workflow | Create-Stash + initial Input as one action/transaction | Unknown | Verify during Phase 6 |
 | New broadcast workflow | Authoritative list of available/configurable Broadcast types | Backend exposes the generic plugin registry and declarations; the frontend consumes them without provider-specific component names | Verify during Phase 6 |

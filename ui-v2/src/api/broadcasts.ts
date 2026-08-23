@@ -1,4 +1,4 @@
-import type { BroadcastApiResource, BroadcastOptionValue, BroadcastPluginApiResource, CreatedBroadcastApiResource, StashApiResource } from '../types/broadcast-plugin'
+import type { BroadcastApiResource, BroadcastOptionValue, BroadcastPluginApiResource, CreatedBroadcastApiResource } from '../types/broadcast-plugin'
 
 export async function fetchBroadcastPlugins(): Promise<BroadcastPluginApiResource[]> {
   const body = await responseBody<{ plugins?: BroadcastPluginApiResource[] }>(await fetch('/api/v1/broadcast-plugins'))
@@ -6,10 +6,10 @@ export async function fetchBroadcastPlugins(): Promise<BroadcastPluginApiResourc
   return body.plugins ?? []
 }
 
-export async function fetchStash(stashId: string): Promise<StashApiResource> {
-  const body = await responseBody<{ stash: StashApiResource }>(await fetch(`/api/v1/stashes/${encodeURIComponent(stashId)}`))
+export async function fetchStashBroadcasts(stashId: string): Promise<BroadcastApiResource[]> {
+  const body = await responseBody<{ broadcasts?: BroadcastApiResource[] }>(await fetch(`/api/v1/stashes/${encodeURIComponent(stashId)}/broadcasts`))
 
-  return body.stash
+  return body.broadcasts ?? []
 }
 
 export async function createStashBroadcast(stashId: string, type: string, settings: Record<string, BroadcastOptionValue>): Promise<CreatedBroadcastApiResource> {

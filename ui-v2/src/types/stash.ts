@@ -19,3 +19,15 @@ export interface StashFixture {
   broadcastCount: number
   operation?: StashOperation
 }
+
+export interface StashApiResource {
+  id: string
+  name: string
+  description?: string | null
+  sync_mode?: string
+  download_policy?: string
+  organization_mode?: string
+  state: string
+  created_at?: string
+  updated_at?: string
+}

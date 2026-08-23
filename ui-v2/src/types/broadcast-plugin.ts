@@ -18,11 +18,6 @@ export interface BroadcastPluginApiResource {
   ui_controls?: BroadcastOptionDeclaration[]
 }
 
-export interface StashApiResource {
-  id: string
-  name: string
-}
-
 export interface CreatedBroadcastApiResource {
   id: string
   name: string
@@ -31,7 +26,13 @@ export interface CreatedBroadcastApiResource {
 export interface BroadcastApiResource {
   id: string
   stash_id: string
+  type: string
   name: string
+  state: string
+  published_url?: string
+  last_built_at?: string | null
+  created_at?: string
+  updated_at?: string
   settings?: {
     source_settings?: Record<string, Record<string, BroadcastOptionValue>>
   } | null

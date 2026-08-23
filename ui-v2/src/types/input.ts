@@ -34,6 +34,9 @@ export interface StashInputApiResource extends InputOptionsApiResource {
   provider_input_id: string
   state: string
   title?: string | null
+  sync_mode?: string | null
+  last_checked_at?: string | null
+  last_success_at?: string | null
   options?: StashInputOptionsApiResource | null
 }
 

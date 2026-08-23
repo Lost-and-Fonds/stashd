@@ -3,9 +3,11 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { FormError } from '@nuxt/ui'
 import { useRoute } from 'vue-router'
 import { broadcastOptionValues, normalizeBroadcastOptions } from '../adapters/normalizeBroadcastOptions'
-import { createStashBroadcast, fetchBroadcastPlugins, fetchStash } from '../api/broadcasts'
+import { createStashBroadcast, fetchBroadcastPlugins } from '../api/broadcasts'
+import { fetchStash } from '../api/stashes'
 import PluginField from '../components/plugin/PluginField.vue'
-import type { BroadcastOptionValue, BroadcastPluginApiResource, CreatedBroadcastApiResource, StashApiResource } from '../types/broadcast-plugin'
+import type { BroadcastOptionValue, BroadcastPluginApiResource, CreatedBroadcastApiResource } from '../types/broadcast-plugin'
+import type { StashApiResource } from '../types/stash'
 import type { PluginFieldValue } from '../types/plugin-ui'
 
 const route = useRoute()
