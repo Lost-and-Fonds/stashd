@@ -2,34 +2,32 @@
 
 ## Current phase
 
-**Phase 1 — Nothing → something scaffold**
+**Phase 4 — Pages, one slice at a time**
 
 ## Goal
 
-Produce the smallest useful navigable Stashd UI-v2 shell so Hazel has something visible to react to.
+Build approved Stashd pages one slice at a time on the established visual
+foundation, using fixtures/local state until the explicit integration phase.
 
 ## Allowed in this phase
 
-- basic app shell
-- basic navigation
-- placeholder route content
-- Nuxt UI defaults
-- enough responsive behavior that the shell is not obviously broken
+- the specifically requested page slice
+- fixture/local interactions needed to review that slice
+- responsive behavior for desktop and phone-sized layouts
 - build/typecheck fixes inside `ui-v2/`
 
 ## Explicitly not in this phase
 
-- Stashd branding/theme work
-- detailed design-system work
-- detailed Stashes/Vault/Broadcasts/Settings UI
 - backend/API integration
 - auth integration
 - global state architecture
 - legacy UI changes
 - production build/deployment integration with the PHP app
+- adjacent pages or approved slices not named by the current task
 
 ## Stop condition
 
-Stop when the app boots, navigation works between the placeholder routes, the shell is visible and coherent enough to review, and the build/typecheck pass.
+Stop when the requested slice is reviewable with fixtures/local state and the
+relevant build/typecheck checks pass.
 
-Then wait for visual feedback before doing anything else.
+Then wait for visual feedback or the next explicitly requested slice.

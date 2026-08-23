@@ -34,11 +34,8 @@ npm run dev
 
 Then open the Vite URL shown in the terminal (normally `http://localhost:5173`).
 
-The seed project intentionally contains almost no design. The first Claude session should create only the bare application shell. See:
-
-```text
-prompts/01-FIRST-SCAFFOLD.md
-```
+The interface design is now recorded in `planning/DECISIONS.md` and is being
+worked through page-by-page with local fixtures before backend integration.
 
 ## Important files
 
@@ -73,3 +70,15 @@ Avoid prompts such as "build the new frontend" or even "finish the Stashes page"
 Fixtures are intentionally simple. A page may import from `src/fixtures/` while being designed.
 
 Do not add a mock HTTP service merely to make the fake data feel more realistic. Integration is a later phase.
+
+## Working rules
+
+- Design the UI before integrating backend data or endpoints.
+- Treat phone-sized layouts as first-class; check completed slices at desktop
+  and approximately 390px wide.
+- Keep fixture data at page boundaries while designing.
+- The current task is the maximum scope; stop at its requested slice.
+- Treat approved pages and slices as frozen unless the task explicitly revisits
+  them.
+- Record backend gaps in `planning/INTEGRATION-GAPS.md`; do not implement them
+  prematurely.

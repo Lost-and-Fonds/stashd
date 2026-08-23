@@ -2,9 +2,6 @@
 command = "lerd"
 args = ["mcp"]
 
-[mcp_servers.lerd.env]
-LERD_SITE_PATH = "/home/hazel/Projects/stashd"
-
 [mcp_servers.lerd.tools.worker]
 approval_mode = "approve"
 

@@ -20,15 +20,15 @@ PSRs we do **not** implement directly today: PSR-6/16 (cache), PSR-18 (HTTP clie
 ## Commands
 
 ```bash
-composer lint      # check PER-CS 3.0 and PSR-1/PSR-4 structure (CI gate)
-composer format    # auto-fix style
-composer dump-autoload --optimize --strict-psr --dry-run
+composer lint        # strict PSR-4, PHP CS Fixer/PER-CS 3.0, PHPCS
+composer test:static # PHPStan
+composer format      # auto-fix style
 ```
 
-`composer lint` runs the strict autoload check alongside PHP CS Fixer,
-PHPCS, and PHPStan. PHP CS Fixer enforces PER Coding Style 3.0; PHPCS covers
-the PSR-1 structural rules, including one named type per file; Composer checks
-the actual PSR-4 namespace-to-path mappings.
+`composer lint` runs Composer's strict PSR-4 check, PHP CS Fixer with PER
+Coding Style 3.0, and PHPCS structural checks. `composer test:static` runs
+PHPStan. PHPCS covers the PSR-1 structural rules, including one named type per
+file; Composer checks the actual PSR-4 namespace-to-path mappings.
 
 ## Non-negotiables
 
