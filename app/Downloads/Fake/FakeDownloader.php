@@ -18,6 +18,7 @@ use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
 use function Tempest\Support\Filesystem\is_directory;
+use function Tempest\Support\Filesystem\is_writable;
 use function Tempest\Support\Filesystem\write_file;
 use function Tempest\Support\str;
 

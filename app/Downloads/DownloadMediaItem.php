@@ -36,6 +36,8 @@ use Tempest\DateTime\Timezone;
 use function Tempest\Support\Filesystem\delete_file;
 use function Tempest\Support\Filesystem\is_directory;
 use function Tempest\Support\Filesystem\is_file;
+use function Tempest\Support\Filesystem\is_readable;
+use function Tempest\Support\Filesystem\is_writable;
 
 final readonly class DownloadMediaItem
 {

@@ -54,6 +54,7 @@ use function Tempest\Support\Filesystem\delete_directory;
 use function Tempest\Support\Filesystem\delete_file;
 use function Tempest\Support\Filesystem\is_directory;
 use function Tempest\Support\Filesystem\is_file;
+use function Tempest\Support\Filesystem\is_readable;
 use function Tempest\Support\Filesystem\list_directory;
 
 /** Generic application adapter for manifest-registered Broadcast Components. */

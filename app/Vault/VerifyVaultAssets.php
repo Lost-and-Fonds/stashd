@@ -13,6 +13,7 @@ use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
 use function Tempest\Support\Filesystem\is_file;
+use function Tempest\Support\Filesystem\is_readable;
 
 final readonly class VerifyVaultAssets
 {
