@@ -11,6 +11,7 @@
     "stashd/jellyfin": "^0.2",
     "stashd/plex": "^0.2",
     "stashd/podcast": "^0.2",
+    "stashd/youtube": "^0.3",
     "tempest/framework": "^3.0",
     "symfony/process": "^7.3",
     "symfony/uid": "^7.3",
@@ -72,6 +73,7 @@
     {"type": "vcs", "url": "https://github.com/Lost-and-Fonds/jellyfin.git"},
     {"type": "vcs", "url": "https://github.com/Lost-and-Fonds/plex.git"},
     {"type": "vcs", "url": "https://github.com/Lost-and-Fonds/podcast.git"}
+    ,{"type": "vcs", "url": "https://github.com/Lost-and-Fonds/youtube.git"}
   ],
   "config": {
     "allow-plugins": {

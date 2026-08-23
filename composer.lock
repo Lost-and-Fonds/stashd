@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c46da821c90203b17c4de9b2738c8f5b",
+    "content-hash": "e8afa5477f3bcd4e8c6e41c76850af21",
     "packages": [
         {
             "name": "composer/semver",
@@ -2976,16 +2976,16 @@
         },
         {
             "name": "stashd/plugin-sdk",
-            "version": "v0.2.0",
+            "version": "v0.2.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Lost-and-Fonds/plugin-sdk.git",
-                "reference": "82c3af4e0536e8d68069d87de4e5b6434e42f174"
+                "reference": "737cbdc26cd3d1547e824f6e26487ab31dbc6b32"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Lost-and-Fonds/plugin-sdk/zipball/82c3af4e0536e8d68069d87de4e5b6434e42f174",
-                "reference": "82c3af4e0536e8d68069d87de4e5b6434e42f174",
+                "url": "https://api.github.com/repos/Lost-and-Fonds/plugin-sdk/zipball/737cbdc26cd3d1547e824f6e26487ab31dbc6b32",
+                "reference": "737cbdc26cd3d1547e824f6e26487ab31dbc6b32",
                 "shasum": ""
             },
             "require": {
@@ -3003,10 +3003,10 @@
             ],
             "description": "Independent PHP SDK for Stashd plugins",
             "support": {
-                "source": "https://github.com/Lost-and-Fonds/plugin-sdk/tree/v0.2.0",
+                "source": "https://github.com/Lost-and-Fonds/plugin-sdk/tree/v0.2.1",
                 "issues": "https://github.com/Lost-and-Fonds/plugin-sdk/issues"
             },
-            "time": "2026-08-23T04:34:54+00:00"
+            "time": "2026-08-23T05:22:29+00:00"
         },
         {
             "name": "stashd/podcast",
@@ -3052,6 +3052,46 @@
                 "issues": "https://github.com/Lost-and-Fonds/podcast/issues"
             },
             "time": "2026-08-23T04:55:19+00:00"
+        },
+        {
+            "name": "stashd/youtube",
+            "version": "v0.3.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Lost-and-Fonds/youtube.git",
+                "reference": "64d1d0fe4efca29d251643a4c3e07fb96c2266ea"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Lost-and-Fonds/youtube/zipball/64d1d0fe4efca29d251643a4c3e07fb96c2266ea",
+                "reference": "64d1d0fe4efca29d251643a4c3e07fb96c2266ea",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.5",
+                "stashd/plugin-sdk": "^0.2"
+            },
+            "type": "stashd-plugin",
+            "extra": {
+                "stashd-plugin": {
+                    "manifest": "stashd-plugin/plugin.json",
+                    "entrypoint": "stashd-plugin/plugin.php"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "YouTube\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "YouTube Input plugin for Stashd",
+            "support": {
+                "source": "https://github.com/Lost-and-Fonds/youtube/tree/v0.3.1",
+                "issues": "https://github.com/Lost-and-Fonds/youtube/issues"
+            },
+            "time": "2026-08-23T05:26:21+00:00"
         },
         {
             "name": "symfony/cache",
