@@ -32,6 +32,9 @@ use Stashd\PluginRuntime\Runner\PluginRunner;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
+use function Tempest\Support\Filesystem\is_directory;
+use function Tempest\Support\Filesystem\is_file;
+
 final readonly class PluginInputRuntime implements Provider, DownloaderInterface
 {
     public function __construct(private PluginInputDefinition $definition, private PluginRunner $runner, private PackageManager $packages, private SecretsService $secrets) {}

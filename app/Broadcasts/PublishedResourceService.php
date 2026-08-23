@@ -14,6 +14,8 @@ use App\Vault\AssetRecord;
 use RuntimeException;
 use SensitiveParameter;
 
+use function Tempest\Support\Filesystem\is_file;
+
 final readonly class PublishedResourceService
 {
     public function __construct(
