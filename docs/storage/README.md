@@ -104,7 +104,8 @@ Stash `downloadPolicy` is enforced at download time:
 - `GET /api/v1/items/{id}/assets`
 - `POST /api/v1/commands` with `type=item.download`
 
-API JSON uses snake_case; SQLite columns remain camelCase.
+API JSON uses snake_case; PostgreSQL columns retain the application's camelCase
+record names.
 
 ## Checksums
 

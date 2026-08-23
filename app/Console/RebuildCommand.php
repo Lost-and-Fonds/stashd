@@ -57,7 +57,7 @@ final readonly class RebuildCommand
             }
         }
 
-        // Stop the roles first so nothing holds a SQLite connection open
+        // Stop the roles first so rebuild starts from a quiescent application.
         // across the schema drop below. Gracefully skipped (and the restart
         // below skipped too) when supervisorctl isn't reachable -- plain
         // `php tempest serve` dev setups without supervisord are unaffected.

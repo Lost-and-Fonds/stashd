@@ -17,11 +17,6 @@ final readonly class StashdConfig
         public string $httpPort,
     ) {}
 
-    public function databasePath(): string
-    {
-        return rtrim($this->dataPath, '/') . '/stashd.sqlite';
-    }
-
     public function vaultPath(): string
     {
         return rtrim($this->mediaPath, '/') . '/vault';

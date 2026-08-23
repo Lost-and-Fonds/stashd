@@ -11,17 +11,12 @@ use App\Providers\ProviderRegistry;
 use App\Providers\StashdUri;
 use App\System\Boot\BootstrapService;
 use App\System\Boot\MigrationRunner;
-use App\System\Boot\SqliteConfigurator;
 use App\System\Storage\StorageCapabilityChecker;
 use App\System\Storage\StorageCheckRecord;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRecord;
 use App\System\Storage\StorageLocationState;
 use App\System\Storage\StorageRootService;
-use Tempest\Database\Config\DatabaseConfig;
-use Tempest\Database\Config\DatabaseDialect;
-use Tempest\Database\Config\PostgresConfig;
-use Tempest\Database\Config\SQLiteConfig;
 use Tempest\Database\Database;
 use Tempest\Database\Migrations\Migration;
 use Tempest\Database\Migrations\RunnableMigrations;
@@ -30,7 +25,7 @@ use Tempest\Database\Query;
 
 test('boot creates schema command and job records', function (): void {
     $bootstrap = $this->container->get(BootstrapService::class);
-    $result = $bootstrap->boot($this->container->get(DatabaseConfig::class));
+    $result = $bootstrap->boot();
 
     expect($result['command_id'])->toStartWith('cmd_')
         ->and($result['job_id'])->toStartWith('job_')
@@ -40,19 +35,7 @@ test('boot creates schema command and job records', function (): void {
         ->and(StorageCheckRecord::select()->all())->not->toBeEmpty();
 });
 
-test('boot skips SQLite setup for a PostgreSQL config', function (): void {
-    $result = $this->container->get(BootstrapService::class)
-        ->boot(new PostgresConfig());
-
-    expect($result['command_id'])->toStartWith('cmd_')
-        ->and($result['job_id'])->toStartWith('job_');
-});
-
 test('PostgreSQL replays every Stashd migration', function (): void {
-    if ($this->container->get(Database::class)->dialect !== DatabaseDialect::POSTGRESQL) {
-        $this->markTestSkipped('Run with DB_CONNECTION=pgsql to exercise PostgreSQL migrations.');
-    }
-
     $migrations = $this->container->get(RunnableMigrations::class);
 
     expect(Migration::all())->toHaveCount(iterator_count($migrations->up()));
@@ -60,7 +43,7 @@ test('PostgreSQL replays every Stashd migration', function (): void {
 
 test('health endpoint returns ok after boot', function (): void {
     $this->container->get(BootstrapService::class)
-        ->boot($this->container->get(DatabaseConfig::class));
+        ->boot();
 
     $response = $this->http->get('/health');
 
@@ -84,68 +67,6 @@ test('provider registry resolves youtube uris', function (): void {
     expect($provider->key())->toBe('youtube');
 });
 
-test('sqlite pragmas are enabled on the tempest connection', function (): void {
-    if ($this->container->get(Database::class)->dialect === DatabaseDialect::POSTGRESQL) {
-        $this->markTestSkipped('SQLite-specific: pragmas, WAL, and file backups have no PostgreSQL equivalent.');
-    }
-
-    $sqlite = $this->container->get(SQLiteConfig::class);
-    $configurator = $this->container->get(SqliteConfigurator::class);
-
-    $configurator->configure($sqlite);
-    $configurator->enableWriteAheadLogging($sqlite);
-    $pragmas = $configurator->readPragmas();
-
-    expect($pragmas['foreign_keys'])->toBe(1)
-        ->and((int) $pragmas['busy_timeout'])->toBe(5000);
-
-    if ($sqlite->path !== ':memory:') {
-        expect($pragmas['journal_mode'])->toBe('wal');
-    }
-});
-
-test('enabling WAL does not retain a SQLite statement that blocks schema migrations', function (): void {
-    if ($this->container->get(Database::class)->dialect === DatabaseDialect::POSTGRESQL) {
-        $this->markTestSkipped('SQLite-specific: pragmas, WAL, and file backups have no PostgreSQL equivalent.');
-    }
-
-    $sqlite = $this->container->get(SQLiteConfig::class);
-    $configurator = $this->container->get(SqliteConfigurator::class);
-    $database = $this->container->get(Database::class);
-
-    $configurator->configure($sqlite);
-    $database->execute(new Query('CREATE INDEX `stashes_slug` ON `stashes` (`name`)'));
-    $configurator->enableWriteAheadLogging($sqlite);
-    $database->execute(new Query('DROP INDEX IF EXISTS `stashes_slug`'));
-
-    expect($database->fetchFirst(new Query(
-        "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'stashes_slug'",
-    )))->toBeNull();
-});
-
-test('migration runner skips backup when no pending migrations remain', function (): void {
-    if ($this->container->get(Database::class)->dialect === DatabaseDialect::POSTGRESQL) {
-        $this->markTestSkipped('SQLite-specific: pragmas, WAL, and file backups have no PostgreSQL equivalent.');
-    }
-
-    $runner = $this->container->get(MigrationRunner::class);
-    $sqlite = $this->container->get(SQLiteConfig::class);
-    $data = getenv('STASHD_DATA_PATH') ?: '/tmp/stashd-test/data';
-    $backupGlob = $data . '/backups/stashd-before-migration-*.sqlite';
-
-    foreach (glob($backupGlob) ?: [] as $stale) {
-        if (is_file($stale)) {
-            @unlink($stale);
-        }
-    }
-
-    expect($runner->hasPendingMigrations())->toBeFalse();
-
-    $runner->run($sqlite);
-
-    expect(glob($backupGlob) ?: [])->toBeEmpty();
-});
-
 test('migration runner detects pending migrations when a record is missing', function (): void {
     $runner = $this->container->get(MigrationRunner::class);
 
@@ -158,30 +79,6 @@ test('migration runner detects pending migrations when a record is missing', fun
     ));
 
     expect($runner->hasPendingMigrations())->toBeTrue();
-});
-
-test('migration runner creates a timestamped backup file before applying migrations', function (): void {
-    if ($this->container->get(Database::class)->dialect === DatabaseDialect::POSTGRESQL) {
-        $this->markTestSkipped('SQLite-specific: pragmas, WAL, and file backups have no PostgreSQL equivalent.');
-    }
-
-    $runner = $this->container->get(MigrationRunner::class);
-    $sqlite = $this->container->get(SQLiteConfig::class);
-    $data = getenv('STASHD_DATA_PATH') ?: '/tmp/stashd-test/data';
-    $backupGlob = $data . '/backups/stashd-before-migration-*.sqlite';
-
-    foreach (glob($backupGlob) ?: [] as $stale) {
-        if (is_file($stale)) {
-            @unlink($stale);
-        }
-    }
-
-    expect(is_file($sqlite->path))->toBeTrue();
-
-    $method = new \ReflectionMethod(MigrationRunner::class, 'backupIfExists');
-    $method->invoke($runner, $sqlite->path);
-
-    expect(glob($backupGlob) ?: [])->not->toBeEmpty();
 });
 
 test('storage roots are created and writable', function (): void {
@@ -240,7 +137,7 @@ test('an unwritable storage root is recorded as unwritable, not silently ready',
 
 test('detailed health reports vault broadcast hardlink status', function (): void {
     $this->container->get(BootstrapService::class)
-        ->boot($this->container->get(DatabaseConfig::class));
+        ->boot();
 
     $response = $this->http->get('/api/v1/system/health', headers: $this->authHeaders());
 

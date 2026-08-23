@@ -6,11 +6,11 @@ Stashd uses [FrankenPHP](https://frankenphp.dev/) (classic, non-worker mode) as 
 
 FrankenPHP's worker mode (persistent PHP processes across requests, like RoadRunner) needs first-party Tempest support that doesn't exist yet ([tempestphp/tempest-framework#2172](https://github.com/tempestphp/tempest-framework/pull/2172) is still a draft foundation PR, with the actual worker application slated for a separate follow-up PR). Classic mode needs none of that: `public/index.php` already boots Tempest for traditional one-request-per-process SAPI, and FrankenPHP (via Caddy) serves it directly — no custom bridge, no per-request state-reset glue.
 
-This also means Stashd previously ran a hand-written RoadRunner↔Tempest adapter (`TempestPsr7Bridge` and friends). That adapter is gone: it existed only because RoadRunner keeps workers alive across requests and needed manual cookie/`AuthContext`/SQLite-connection resets between them. Classic mode has no such worker to reset.
+This also means Stashd previously ran a hand-written RoadRunner↔Tempest adapter (`TempestPsr7Bridge` and friends). That adapter is gone: it existed only because RoadRunner kept workers alive across requests and needed manual request-state resets between them. Classic mode has no such worker to reset.
 
 ## The one thing classic mode needs that FPM/worker setups don't
 
-Every request opens a fresh SQLite connection, and `busy_timeout`/`foreign_keys` are per-connection pragmas — `stashd:boot`'s pragma configuration (on its own throwaway CLI connection at container start) doesn't carry over to web requests. `App\Http\Middleware\ConfigureSqliteMiddleware` re-applies them at the very start of every request (via `#[Priority(Priority::FRAMEWORK - 30)]`, ahead of everything else, including auth) using the same `SqliteConfigurator` that `stashd:boot` and the worker/scheduler tick commands already use.
+Every request uses the PostgreSQL connection configured by `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`. There is no file-database pragma or per-request database compatibility middleware.
 
 ## Local development
 
@@ -44,7 +44,7 @@ Tempest's stock `GenericResponseSender` only knows how to stream a `Generator` b
 
 ## Real-time updates
 
-Replaced the RoadRunner-era SQLite-poll SSE endpoint with FrankenPHP's embedded Mercure hub (`docker/Caddyfile`'s `mercure` block). `App\System\Event\MercurePublisher` publishes the same five event types over HTTP to `/.well-known/mercure` (from both web requests and out-of-process worker/scheduler CLI roles, which can't use the `mercure_publish()` function). Job events carry a safe job summary (never the job payload); activity events carry the activity resource. Subscribers need a JWT: `GET /api/v1/events/subscription` (behind `RequireAuthMiddleware`) mints one via `AuthService::issueMercureSubscriberToken()` and sets it as the `mercureAuthorization` cookie, scoped to `/.well-known/mercure`. The frontend uses one shared `EventSource`, patches live jobs/activity in memory, and does one authoritative page resync after a reconnect or when a tab becomes visible. It polls only in browsers without `EventSource` support.
+Replaced the RoadRunner-era polling SSE endpoint with FrankenPHP's embedded Mercure hub (`docker/Caddyfile`'s `mercure` block). `App\System\Event\MercurePublisher` publishes the same five event types over HTTP to `/.well-known/mercure` (from both web requests and out-of-process worker/scheduler CLI roles, which can't use the `mercure_publish()` function). Job events carry a safe job summary (never the job payload); activity events carry the activity resource. Subscribers need a JWT: `GET /api/v1/events/subscription` (behind `RequireAuthMiddleware`) mints one via `AuthService::issueMercureSubscriberToken()` and sets it as the `mercureAuthorization` cookie, scoped to `/.well-known/mercure`. The frontend uses one shared `EventSource`, patches live jobs/activity in memory, and does one authoritative page resync after a reconnect or when a tab becomes visible. It polls only in browsers without `EventSource` support.
 
 ## Request diagnostics
 

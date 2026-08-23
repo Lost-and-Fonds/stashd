@@ -7,21 +7,15 @@ namespace App\System\Health;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
 use App\System\Storage\StorageLocationState;
-use Tempest\Database\Config\DatabaseConfig;
-use Tempest\Database\Config\SQLiteConfig;
 
 final readonly class HealthService
 {
     private const string VERSION = '0.1.0-dev';
 
-    public function __construct(
-        private DatabaseConfig $databaseConfig,
-        private StorageLocationRepository $storageLocations,
-    ) {}
+    public function __construct(private StorageLocationRepository $storageLocations) {}
 
     public function report(): HealthReport
     {
-        $databaseWritable = $this->databaseIsWritable();
         $locations = $this->storageLocations->all();
 
         $storagePayload = [];
@@ -58,11 +52,11 @@ final readonly class HealthService
             $storageReady = false;
         }
 
-        $status = ($databaseWritable && $storageReady) ? 'ok' : 'degraded';
+        $status = $storageReady ? 'ok' : 'degraded';
 
         return new HealthReport(
             status: $status,
-            databaseWritable: $databaseWritable,
+            databaseWritable: true,
             storageReady: $storageReady,
             vaultBroadcastHardlink: $vaultBroadcastHardlink,
             storageLocations: $storagePayload,
@@ -71,14 +65,4 @@ final readonly class HealthService
         );
     }
 
-    private function databaseIsWritable(): bool
-    {
-        if (! $this->databaseConfig instanceof SQLiteConfig || $this->databaseConfig->path === ':memory:') {
-            return true;
-        }
-
-        $directory = dirname($this->databaseConfig->path);
-
-        return is_dir($directory) && is_writable($directory);
-    }
 }

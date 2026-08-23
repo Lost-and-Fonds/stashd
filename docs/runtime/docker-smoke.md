@@ -3,7 +3,7 @@
 The Docker smoke test builds the Stashd image, starts a disposable container, and exercises the core runtime path:
 
 - container boot and `/health`
-- SQLite migrations
+- PostgreSQL migrations
 - storage root creation
 - supervisord-managed FrankenPHP, worker, and scheduler
 - authenticated system health

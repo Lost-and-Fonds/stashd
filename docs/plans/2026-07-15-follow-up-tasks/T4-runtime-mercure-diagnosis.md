@@ -5,7 +5,7 @@
 During the 2026-07-15 migration/verification run:
 
 - The Lerd console path operated on the checkout database, while the active custom container served the
-  persistent `/data/database/database.sqlite` database.
+  persistent PostgreSQL database.
 - Applying the stash-slug migration to the active database initially hit `database table is locked`.
 - After stopping and restarting supervised processes, FrankenPHP repeatedly failed with Mercure Bolt
   `invalid transport: timeout`.
@@ -24,7 +24,7 @@ This is a diagnosis-first task. Reproduce and characterize before changing code 
   - full site/container restart;
   - a migration while application processes are active.
 - Use `X-Stashd-Request-Id`, `Server-Timing`, browser timing warnings, application logs, and Lerd logs to
-  distinguish browser/network, reverse proxy, application, SQLite-lock, and Mercure failures.
+  distinguish browser/network, reverse proxy, application, database, and Mercure failures.
 - Inspect the relevant `.lerd.yaml`, container/supervisor configuration, `docker/Caddyfile`, Mercure Bolt data
   path, and shutdown/startup lifecycle.
 - Confirm which database each supported command path targets. Establish one safe documented command for
@@ -72,7 +72,7 @@ Neither fault proves a Mercure failure. The earlier `invalid transport: timeout`
 
 ### Active database and safe migration command
 
-The active custom container uses its mounted `.env`: `DB_DATABASE=database/database.sqlite`, resolving to `/data/database/database.sqlite`. The checkout/host CLI may target a different database.
+The active custom container uses its mounted `.env` to select the PostgreSQL database. The checkout/host CLI may target a different database.
 
 Run migrations only inside the active container:
 

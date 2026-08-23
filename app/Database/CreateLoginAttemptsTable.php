@@ -15,10 +15,7 @@ final class CreateLoginAttemptsTable implements MigratesUp
     public function up(): QueryStatement
     {
         return new CompoundStatement(
-            new MigrationSqlStatement(
-                'CREATE TABLE `login_attempts` (`keyHash` VARCHAR(64) NOT NULL PRIMARY KEY, `attempts` INTEGER NOT NULL, `expiresAt` DATETIME NOT NULL)',
-                'CREATE TABLE "login_attempts" ("keyHash" VARCHAR(64) NOT NULL PRIMARY KEY, "attempts" INTEGER NOT NULL, "expiresAt" TIMESTAMP NOT NULL)',
-            ),
+            new MigrationSqlStatement('CREATE TABLE "login_attempts" ("keyHash" VARCHAR(64) NOT NULL PRIMARY KEY, "attempts" INTEGER NOT NULL, "expiresAt" TIMESTAMP NOT NULL)'),
             new MigrationSqlStatement('CREATE INDEX `login_attempts_expires_at` ON `login_attempts` (`expiresAt`)'),
         );
     }

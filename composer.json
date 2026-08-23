@@ -46,12 +46,9 @@
     "test:unit": "ENVIRONMENT=testing vendor/bin/pest --testsuite=Unit",
     "test:feature": "ENVIRONMENT=testing vendor/bin/pest --testsuite=Feature",
     "test:feature:parallel": "ENVIRONMENT=testing vendor/bin/pest --testsuite=Feature --parallel",
-    "test:sqlite:parallel": "ENVIRONMENT=testing DB_CONNECTION=sqlite vendor/bin/pest --parallel",
     "test:postgres": "scripts/test-postgres.sh",
     "test:docker-smoke": "tests/docker/smoke.sh",
     "test:docker-smoke:no-build": "STASHD_SMOKE_SKIP_BUILD=1 tests/docker/smoke.sh",
-    "test:docker-upgrade": "tests/docker/upgrade-smoke.sh",
-    "test:docker-upgrade:no-build": "STASHD_SMOKE_SKIP_BUILD=1 tests/docker/upgrade-smoke.sh",
     "lint": [
       "composer dump-autoload --optimize --strict-psr --dry-run",
       "vendor/bin/php-cs-fixer check --diff --allow-risky=yes --config=.php-cs-fixer.dist.php",

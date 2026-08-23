@@ -1,7 +1,6 @@
 # Local development
 
-Stashd is Docker-first and uses PostgreSQL as its normal database. SQLite is
-the supported import/upgrade source, not the normal production database.
+Stashd is Docker-first and PostgreSQL-only.
 
 The repository is also configured for Lerd, the local Podman-based PHP
 environment. Use the Lerd project/runtime tooling for PHP, Composer, workers,

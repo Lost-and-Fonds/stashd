@@ -12,7 +12,7 @@
 
 - [x] Tempest app boot + configuration
 - [x] RoadRunner HTTP worker bridge
-- [x] SQLite foundation schema (storage, commands, jobs, settings)
+- [x] PostgreSQL foundation schema (storage, commands, jobs, settings)
 - [x] Storage root checks with hardlink/symlink probing
 - [x] Fake provider for tests/dev
 - [x] `/health` endpoint
@@ -24,7 +24,7 @@
 
 - [x] Add full v1 domain schema migration (`2026_06_17_create_domain_schema`)
   - Tables: `stashes`, `stash_inputs`, `stash_items`, `media_items`, `media_item_sources`, `raw_metadata_snapshots`, `assets`, `broadcasts`, `broadcast_items`, `broadcast_triggers`, `broadcast_trigger_runs`, `provider_accounts`, `media_server_connections`, `users`, `api_tokens`, `secrets`
-  - Prefixed ULID primary keys, camelCase SQLite columns, inline SQLite foreign keys, indexes/uniques (incl. `unique(providerKey, providerItemId)` and `unique(stashId, mediaItemId)`)
+  - Prefixed ULID primary keys, camelCase PostgreSQL columns, explicit foreign keys, indexes/uniques (incl. `unique(providerKey, providerItemId)` and `unique(stashId, mediaItemId)`)
   - Records/enums for all domain tables; repositories for stash, stash input, stash item, media item, broadcast (+ existing command/job/storage repos)
   - Migration/constraint/repository tests (`tests/Feature/DomainSchemaTest.php`)
 - [x] Minimal `stash.preflight` command (fake provider only — no YouTube, no UI)
@@ -284,7 +284,7 @@ Full task breakdown (T1-T20) in `docs/plans/phase-6-slice-6/plan.md`; `docs/plan
 - [x] OpenAPI-documented `/api/v1` resources — `docs/openapi.yaml`, written from actual `Resource::toArray()` output; a Pest test asserts every discovered route has a matching `paths` entry so it can't silently drift (T17, `e60d2ee`)
 - [x] True low-latency SSE streaming over RoadRunner — `GeneratorEventStream` adapts the poll-loop generator to a PSR-7 `StreamInterface` (`PSR7Worker::chunkSize`), so events deliver incrementally instead of bursting after `MAX_ITERATIONS` (T18, `18f6daa`)
   - **Worker-pinning itself is not eliminated.** RoadRunner is one-process-one-request, so streaming changes *when* bytes reach the client, not *whether the worker is free* for the duration — that part of the original acceptance bar was never achievable via streaming alone. The open-tab pool-exhaustion problem below is instead now *bounded*: a `sse_connections` table caps concurrent `/api/v1/events` connections at 4 of 8 workers; rejected connections get a `retry-after` SSE message and `EventSource`'s own reconnect handles the rest.
-  - **Known sharp edge, hit twice (superseded by the connection cap above):** because the worker is held for the whole loop regardless of client disconnects (confirmed via a logged `broken pipe` at `elapsed: 30148ms`), every page that subscribes to `/api/v1/events` tied up one RoadRunner worker for ~`MAX_ITERATIONS` seconds out of every `MAX_ITERATIONS + ~3`s reconnect cycle, for as long as that page stayed open. `.rr.yaml`'s `pool.num_workers` was bumped once (2 → 4) for this; Slice 4 adding a third SSE-subscribing page (Stash detail) used up that headroom, and with all workers busy, new page navigations (including the auth check) had no worker free to run on — intermittently bouncing users to `/login` in a way that looked like a recurrence of the SQLite `busy_timeout` bug (`b841ea7`) but was actually worker-pool exhaustion, a different mechanism with the same symptom. Mitigated 2026-06-20 by dropping `MAX_ITERATIONS` 30 → 10 and raising `num_workers` 4 → 8; the hard cap above is the real fix for the exhaustion scenario.
+  - **Known sharp edge, hit twice (superseded by the connection cap above):** because the worker is held for the whole loop regardless of client disconnects (confirmed via a logged `broken pipe` at `elapsed: 30148ms`), every page that subscribes to `/api/v1/events` tied up one RoadRunner worker for ~`MAX_ITERATIONS` seconds out of every `MAX_ITERATIONS + ~3`s reconnect cycle, for as long as that page stayed open. `.rr.yaml`'s `pool.num_workers` was bumped once (2 → 4) for this; Slice 4 adding a third SSE-subscribing page (Stash detail) used up that headroom, and with all workers busy, new page navigations (including the auth check) had no worker free to run on — intermittently bouncing users to `/login` in a way that looked like a recurrence of an old database-lock bug (`b841ea7`) but was actually worker-pool exhaustion, a different mechanism with the same symptom. Mitigated 2026-06-20 by dropping `MAX_ITERATIONS` 30 → 10 and raising `num_workers` 4 → 8; the hard cap above is the real fix for the exhaustion scenario.
   - Slice 5's bounded `awaitSseTerminal` consumer (Create Stash wizard) was unaffected either way — a short, explicitly-`.close()`d subscription, not a perpetual one.
 - [x] "Explain Generated Files" asset metadata — `AssetRegenerationGuidance` classifies assets as source vs. generated from the existing `broadcastId`/`derivedFromAssetId` columns (no new schema); `canRegenerate`/`safeToDelete`/`generatedBy` are now modelled and shown in the Vault item detail UI (T19, `35d88f4`)
 - [x] Stale branding doc pointer — fixed 2026-06-20: `AGENTS.md` and `x-stashd-layout.view.php`'s doc comment both already named the right canonical path (`docs/Stashd-Branding-Plan.md`); the staleness was in that file's *content*, which still described pre-rebrand terminology (Mirror/Collection/Destination — explicitly disavowed by the current direction). Promoted the current content from `docs/stashd-design-assets-phase6/docs/Stashd-Branding-Plan-2026-06-16.md` into the canonical path; the dated copy and its asset bundle are left untouched as the historical design-handoff record (per `ASSET-MANIFEST.md`). Carried over from the Slice 1 plan's sign-off list.
@@ -602,7 +602,7 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
   `create()` dropped its insert-then-`findById()` reload (Tempest persists client-set PKs as-is);
   dead `BroadcastTriggerRunRepository::save()` deleted, single-caller `UserRepository::count()`
   inlined. **Relations**: `#[HasMany] StashRecord::$items` / `#[BelongsTo] StashItemRecord::$stash`
-  declared and proven on SQLite (`tests/Feature/TempestRelationsTest.php`: `with()`, `load()`,
+  declared and proven on PostgreSQL (`tests/Feature/TempestRelationsTest.php`: `with()`, `load()`,
   `whereHas()`, BelongsTo hydration) — the `BelongsToStatement` stripping in
   `MigrationSchemaHelpers` affects only FK *constraints*, not relation joins. Gotchas: the FK
   column on the child table is the `ownerJoin` arg for **both** `#[BelongsTo]` and `#[HasMany]`
@@ -619,7 +619,7 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
   job-handler / broadcast-format / media-server-client registries, replacing today's manually-curated
   initializer registries
 - [x] Tempest relations audit (`docs/plans/tempest-relations-review.md`) — resolved by the
-  Tempest-native records slice (`cb5d4b1`): relations proven working on SQLite and declared on
+  Tempest-native records slice (`cb5d4b1`): relations proven working on PostgreSQL and declared on
   stash/stash-item, but the wholesale replacement of repository FK-list methods (`listForStash` &
   co., 18 methods) was **deliberately rejected** — every caller holds a typed ID from a command/job
   payload or route param, so the repo one-liner is already the minimal interface; relation access

@@ -35,8 +35,6 @@ services:
       start_period: 60s
 
   # Postgres is reachable only on the compose network -- no published ports.
-  # Upgrading from a SQLite release? Bring this up, then run the importer once:
-  #   docker compose run --rm stashd import-sqlite /data/stashd.sqlite
   postgres:
     image: postgres:18-alpine
     container_name: stashd-postgres

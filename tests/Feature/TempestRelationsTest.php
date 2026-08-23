@@ -14,9 +14,8 @@ use App\Vault\MediaItemRepository;
 
 /*
  * Proves Tempest declared relations (#[HasMany]/#[BelongsTo]) hydrate on
- * SQLite despite BelongsToStatement being stripped from SQLite schemas
- * (see MigrationSchemaHelpers) — the FK *constraint* and the relation
- * *join* are independent mechanisms.
+ * PostgreSQL, where the FK constraint and the relation join are independent
+ * mechanisms.
  */
 
 beforeEach(function (): void {
@@ -38,7 +37,7 @@ beforeEach(function (): void {
     }
 });
 
-test('HasMany eager-loads stash items via with() on SQLite', function (): void {
+test('HasMany eager-loads stash items via with() on PostgreSQL', function (): void {
     $loaded = StashRecord::select()->with('items')->get($this->stash->id);
 
     expect($loaded)->not->toBeNull()

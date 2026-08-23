@@ -272,7 +272,7 @@ directly — no separate `stashd/plugin-media-server` package, no
 ### `BroadcastRecord.type` — enum to string — ✅ done, simpler than drafted
 
 No SQL migration ever ran or was needed: `broadcasts.type` was already a plain
-`string` SQLite column in `CreateDomainSchema` (this project is SQLite-only —
+`string` PostgreSQL column in `CreateDomainSchema` (this project is
 the drafted `ALTER TABLE ... DROP CONSTRAINT` is Postgres syntax and never
 applied here). Only `BroadcastRecord::$type`'s PHP type changed, from
 `BroadcastType $type` to plain `string $type` — an application-layer change

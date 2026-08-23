@@ -61,7 +61,6 @@ jobs:
               composer test:static
               npm run typecheck
               composer test:parallel
-              composer test:sqlite:parallel
             '
 
   smoke:
@@ -74,8 +73,6 @@ jobs:
       - name: Run container smoke test
         run: composer test:docker-smoke
 
-      - name: Run SQLite -> PostgreSQL upgrade smoke test
-        run: STASHD_SMOKE_SKIP_BUILD=1 composer test:docker-upgrade
 
   e2e:
     needs: quality

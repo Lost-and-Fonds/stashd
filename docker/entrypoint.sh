@@ -57,39 +57,6 @@ ensure_writable() {
         fi
     done
 
-    # SqliteConfigurator creates the database file's own parent directory,
-    # but only once BootstrapService runs -- and Database is resolved (and
-    # connects eagerly) earlier than that, while the container is still
-    # building BootstrapService's other constructor dependencies. A
-    # DB_DATABASE pointing at a not-yet-existing nested path under DATA_DIR
-    # (e.g. "database/database.sqlite") needs its directory to exist before
-    # that first connection attempt, so it's created here too. DB_DATABASE
-    # isn't a real shell env var -- it only lives in .env, read by PHP's
-    # Dotenv at application boot -- so an explicit OS env var (matching
-    # Dotenv's immutable/already-set precedence) is preferred if present,
-    # falling back to reading .env directly.
-    db_connection="${DB_CONNECTION:-}"
-    if [ -z "$db_connection" ] && [ -f "$APP_DIR/.env" ]; then
-        db_connection=$(grep -m1 '^DB_CONNECTION=' "$APP_DIR/.env" | cut -d= -f2-)
-    fi
-
-    db_database="${DB_DATABASE:-}"
-    if [ -z "$db_database" ] && [ -f "$APP_DIR/.env" ]; then
-        db_database=$(grep -m1 '^DB_DATABASE=' "$APP_DIR/.env" | cut -d= -f2-)
-    fi
-    # On PostgreSQL, DB_DATABASE is a database name rather than a path, so there
-    # is no directory to pre-create.
-    if [ "${db_connection:-pgsql}" = 'sqlite' ] && [ -n "$db_database" ] && [ "$db_database" != ':memory:' ]; then
-        case "$db_database" in
-            /*) db_path="$db_database" ;;
-            *) db_path="${DATA_DIR}/${db_database}" ;;
-        esac
-        db_dir=$(dirname "$db_path")
-        mkdir -p "$db_dir"
-        if [ "$(id -u)" -eq 0 ]; then
-            chown -R "${PUID}:${PGID}" "$db_dir" || true
-        fi
-    fi
 }
 
 ensure_signing_key() {
@@ -236,19 +203,6 @@ case "$ROLE" in
         ;;
     boot)
         prepare_runtime
-        ;;
-    import-sqlite)
-        # One-shot upgrade from a SQLite release.
-        if [ -z "${2:-}" ]; then
-            log "import-sqlite requires a path, e.g. import-sqlite /data/stashd.sqlite" >&2
-            exit 1
-        fi
-        prepare_runtime_env
-        # Migrations only. stashd:boot would create storage locations plus a boot
-        # command and job, and the importer then (correctly) refuses to merge
-        # into a database that already holds rows. Normal startup boots after.
-        run_app php tempest migrate:up
-        run_app php tempest stashd:import-sqlite "$2" ${3:+"$3"}
         ;;
     *)
         log "unknown role: ${ROLE}" >&2

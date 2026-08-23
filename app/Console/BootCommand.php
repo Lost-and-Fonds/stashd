@@ -8,7 +8,6 @@ use App\System\Boot\BootstrapService;
 use Tempest\Console\ConsoleCommand;
 use Tempest\Console\ExitCode;
 use Tempest\Console\HasConsole;
-use Tempest\Database\Config\DatabaseConfig;
 
 final readonly class BootCommand
 {
@@ -16,7 +15,6 @@ final readonly class BootCommand
 
     public function __construct(
         private BootstrapService $bootstrap,
-        private DatabaseConfig $databaseConfig,
     ) {}
 
     #[ConsoleCommand(
@@ -25,7 +23,7 @@ final readonly class BootCommand
     )]
     public function __invoke(): ExitCode
     {
-        $result = $this->bootstrap->boot($this->databaseConfig);
+        $result = $this->bootstrap->boot();
 
         $this->console->success('Stashd boot completed.');
         $this->console->keyValue('Directories created', (string) count($result['directories_created']));

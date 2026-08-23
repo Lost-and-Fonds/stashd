@@ -198,19 +198,17 @@ worker process supervision
 
 ## Database
 
-Stashd v1 uses **SQLite only**.
+Stashd v1 uses **PostgreSQL only**.
 
-No PostgreSQL, Redis, RabbitMQ, or external queue system is required for v1.
+No Redis, RabbitMQ, or external queue system is required for v1.
 
-SQLite should be used seriously:
+PostgreSQL should be used seriously:
 
 - migrations from day one
 - foreign keys enabled
 - proper indexes
 - transactions
 - short write transactions
-- WAL mode
-- busy timeout
 - database backups before migrations
 
 ## Download Backend
@@ -306,7 +304,7 @@ stashd all
 
 The v1 default deployment should be one container.
 
-Advanced role splitting may be possible later, but SQLite + multi-container + NAS mounts can be tricky, so the all-in-one deployment is the recommended v1 path.
+Advanced role splitting may be possible later, but multi-container + NAS mounts can be tricky, so the all-in-one deployment is the recommended v1 path.
 
 ---
 
@@ -328,7 +326,7 @@ UMASK
 
 ## Application Configuration
 
-Application settings live in SQLite and are editable through the UI/API.
+Application settings live in PostgreSQL and are editable through the UI/API.
 
 Examples:
 
@@ -404,7 +402,7 @@ Default layout:
 
 ```text
 /data
-  stashd.sqlite
+  PostgreSQL data volume
   secrets/framework app key/config
   logs maybe
   backups
@@ -2439,7 +2437,7 @@ They must validate:
 container starts
 FrankenPHP and supervisord start
 Tempest boots
-SQLite database is created/migrated
+PostgreSQL schema is created/migrated
 storage roots are created
 storage checks pass
 health endpoint returns ok
@@ -2536,7 +2534,7 @@ The image includes:
 PHP 8.5+
 Tempest app
 FrankenPHP/Caddy
-SQLite extension
+PostgreSQL client and extension
 yt-dlp
 ytdlphp
 ca-certificates
@@ -2574,7 +2572,7 @@ Check ownership of ./media or set PUID/PGID.
 Before database migrations:
 
 ```text
-create automatic SQLite backup
+create a PostgreSQL backup with `pg_dump`
 run migration
 record app version
 record migration history
@@ -2583,7 +2581,7 @@ record migration history
 Example backup:
 
 ```text
-/data/backups/stashd-before-v1.0.4-2026-06-16.sqlite
+/data/backups/stashd-before-v1.0.4-2026-06-16.sql
 ```
 
 Keep a small rolling set of backups.
@@ -2626,7 +2624,7 @@ multi-arch build passes
 PHP 8.5+
 Tempest
 FrankenPHP/Caddy
-SQLite only
+PostgreSQL only
 Docker-first deployment
 default port 8474
 YouTube provider
@@ -2656,7 +2654,7 @@ filesystem drift tolerance
 single-owner auth
 encrypted secrets via Tempest app key
 Docker smoke tests
-automatic SQLite migration backups
+automatic PostgreSQL migration backups
 ```
 
 ## v1 Should Prepare For

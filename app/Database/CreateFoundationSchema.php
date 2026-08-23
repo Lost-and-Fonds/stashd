@@ -47,8 +47,6 @@ final class CreateFoundationSchema implements MigratesUp
             ->boolean('readable', default: false)
             ->boolean('writable', default: false)
             // BIGINT: byte counts overflow PostgreSQL's 32-bit INTEGER.
-            // SQLite ignores the size and is already 64-bit, so its
-            // compiled SQL (and migration hash) is unchanged.
             ->integer('freeBytes', nullable: true, size: DatabaseIntegerSize::BIG)
             ->integer('totalBytes', nullable: true, size: DatabaseIntegerSize::BIG)
             ->string('filesystemId', nullable: true)

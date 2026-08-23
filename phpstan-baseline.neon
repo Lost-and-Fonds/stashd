@@ -664,12 +664,6 @@ parameters:
 			path: app/System/Boot/MigrationRunner.php
 
 		-
-			message: '#^Method App\\System\\Boot\\SqliteConfigurator\:\:fetchPragma\(\) should return int\|string but returns mixed\.$#'
-			identifier: return.type
-			count: 1
-			path: app/System/Boot/SqliteConfigurator.php
-
-		-
 			message: '#^Method App\\System\\Secret\\SecretRepository\:\:findByKey\(\) should return App\\System\\Secret\\SecretRecord\|null but returns mixed\.$#'
 			identifier: return.type
 			count: 1

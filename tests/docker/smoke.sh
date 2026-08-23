@@ -48,7 +48,7 @@ media_host_path() {
 }
 
 # Stashd runs on PostgreSQL, so schema/state assertions go through psql in the
-# database container rather than a SQLite file on the host.
+# PostgreSQL database container rather than a local database file.
 db_query() {
     $CONTAINER exec -e PGPASSWORD="$PG_PASSWORD" "$PG_NAME" \
         psql -U "$PG_USER" -d "$PG_DB" -tAc "$1"

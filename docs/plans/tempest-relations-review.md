@@ -1,7 +1,7 @@
 # Tempest Relations Review
 
 > **Status (2026-07-03): resolved** by the Tempest-native records slice (`cb5d4b1`, PR #3) — see
-> the "Tempest relations audit" entry in `docs/TODO.md`. Relations were proven on SQLite and
+> the "Tempest relations audit" entry in `docs/TODO.md`. Relations were proven on PostgreSQL and
 > declared on stash/stash-item (`tests/Feature/TempestRelationsTest.php`); replacing the
 > ID-driven repository FK-list methods was deliberately rejected. Kept for the original
 > evaluation criteria.

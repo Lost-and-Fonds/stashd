@@ -296,8 +296,6 @@ final class CreateDomainSchema implements MigratesUp
             ->string('audioCodec', nullable: true)
             ->string('language', nullable: true)
             // BIGINT: byte counts overflow PostgreSQL's 32-bit INTEGER.
-            // SQLite ignores the size and is already 64-bit, so its
-            // compiled SQL (and migration hash) is unchanged.
             ->integer('sizeBytes', nullable: true, size: DatabaseIntegerSize::BIG)
             ->string('checksum', nullable: true)
             ->integer('durationSeconds', nullable: true)

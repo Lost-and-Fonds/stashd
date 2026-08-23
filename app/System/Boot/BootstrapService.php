@@ -11,26 +11,22 @@ use App\Jobs\JobIntent;
 use App\Jobs\JobRepository;
 use App\System\Storage\StorageCapabilityChecker;
 use App\System\Storage\StorageRootService;
-use Tempest\Database\Config\DatabaseConfig;
 
 final readonly class BootstrapService
 {
     public function __construct(
         private StorageRootService $storageRoots,
         private StorageCapabilityChecker $storageChecks,
-        private SqliteConfigurator $sqlite,
         private MigrationRunner $migrations,
         private CommandRepository $commands,
         private JobRepository $jobs,
     ) {}
 
     /** @return array{directories_created: list<string>, command_id: string, job_id: string} */
-    public function boot(DatabaseConfig $databaseConfig): array
+    public function boot(): array
     {
         $created = $this->storageRoots->ensureDirectories();
-        $this->sqlite->configure($databaseConfig);
-        $this->sqlite->enableWriteAheadLogging($databaseConfig);
-        $this->migrations->run($databaseConfig);
+        $this->migrations->run();
         $this->storageChecks->checkAll();
 
         $command = $this->commands->create(CommandType::SystemBoot);

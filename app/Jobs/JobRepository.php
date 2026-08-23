@@ -7,11 +7,7 @@ namespace App\Jobs;
 use App\Commands\CommandId;
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use Tempest\Database\Builder\QueryBuilders\WhereGroupBuilder;
-use Tempest\Database\Builder\WhereOperator;
-use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Connection\Connection;
-use Tempest\Database\Database;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -26,7 +22,6 @@ final class JobRepository
     public function __construct(
         private PrefixedUlidGenerator $ids,
         private Connection $connection,
-        private Database $database,
     ) {}
 
     /** @param array<string, mixed>|null $payload */
@@ -89,46 +84,13 @@ final class JobRepository
     }
 
     /**
-     * SQLite retries a guarded UPDATE after selecting candidates; PostgreSQL
-     * claims one locked candidate with SKIP LOCKED in a single statement.
-     *
-     * $ownerToken records which OS process claimed the job, so stale-job
-     * recovery can verify the owner is actually dead before re-queuing (see
-     * WorkerProcessProbe / JobWorkerService::recoverStaleJobs).
+     * PostgreSQL claims one locked candidate with SKIP LOCKED in a single
+     * statement. The owner token lets stale-job recovery verify the owning
+     * process is dead before re-queuing.
      */
     public function claimNextPending(?JobLane $lane = null, ?string $ownerToken = null): ?JobRecord
     {
-        if ($this->database->dialect === DatabaseDialect::POSTGRESQL) {
-            return $this->claimNextPendingPostgres($lane, $ownerToken);
-        }
-
-        $query = JobRecord::select()
-            ->where('state', JobState::Pending)
-            ->andWhereGroup(fn(WhereGroupBuilder $group) => $group
-                ->whereNull('scheduledAt')
-                ->orWhere('scheduledAt', DateTime::now(Timezone::UTC), WhereOperator::LESS_THAN_OR_EQUAL))
-            ->orderBy('priority', Direction::ASC)
-            ->orderBy('createdAt', Direction::ASC)
-            ->limit(5);
-
-        if ($lane !== null) {
-            $query = $query->whereIn('intent', array_map(
-                static fn(JobIntent $intent): string => $intent->value,
-                $lane->intents(),
-            ));
-        }
-
-        foreach ($query->all() as $candidate) {
-            $statement = $this->claimStatement((string) $candidate->id, $ownerToken);
-
-            if ($statement->rowCount() !== 1) {
-                continue;
-            }
-
-            return JobRecord::findById($candidate->id);
-        }
-
-        return null;
+        return $this->claimNextPendingPostgres($lane, $ownerToken);
     }
 
     private function claimNextPendingPostgres(?JobLane $lane, ?string $ownerToken): ?JobRecord
@@ -171,25 +133,6 @@ final class JobRepository
         $id = $statement->fetchColumn();
 
         return is_string($id) ? JobRecord::findById(new PrimaryKey($id)) : null;
-    }
-
-    private function claimStatement(string $id, ?string $ownerToken): \PDOStatement
-    {
-        $statement = $this->connection->prepare(
-            'UPDATE "jobs"
-             SET "state" = :processing, "attempts" = "attempts" + 1,
-                 "startedAt" = CURRENT_TIMESTAMP, "heartbeatAt" = CURRENT_TIMESTAMP,
-                 "updatedAt" = CURRENT_TIMESTAMP, "lastError" = NULL, "ownerToken" = :ownerToken
-             WHERE "id" = :id AND "state" = :pending',
-        );
-        $statement->execute([
-            'processing' => JobState::Processing->value,
-            'ownerToken' => $ownerToken,
-            'id' => $id,
-            'pending' => JobState::Pending->value,
-        ]);
-
-        return $statement;
     }
 
     public function parkForRetry(JobRecord $job, string $lastError, DateTime $scheduledAt): bool

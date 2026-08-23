@@ -129,7 +129,7 @@ preflight, `ResolvedInput`, or stash layers.** The new `ResolvedInput` fields ar
 - Serialize them in `PreflightExecutionResult::toResultArray()` (`source_title`, `source_avatar_uri`,
   `estimated_item_count`).
 - **Schema:** add denormalized `icon_uri` to `stashes` (list display) + populate it from the input's
-  avatar at commit. New dated migration; entrypoint auto-backs-up SQLite. Update `StashRecord` +
+  avatar at commit. New dated migration; entrypoint takes a PostgreSQL backup. Update `StashRecord` +
   `StashRepository::create`.
 - **Acceptance:** real `@handle` → that channel's own id, real name, avatar, and approx count
   surfaced in preflight review; an unresolvable owner yields no (not wrong) identity. **Verification

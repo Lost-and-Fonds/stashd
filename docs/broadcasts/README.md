@@ -276,7 +276,8 @@ item-scoped publication before advertising it.
 
 Media server connections: see `docs/media-servers/README.md`.
 
-JSON uses snake_case. SQLite columns remain camelCase. Broadcast `settings` JSON is stored snake_case.
+JSON uses snake_case. PostgreSQL columns retain camelCase record names.
+Broadcast `settings` JSON is stored snake_case.
 
 ## Assets
 

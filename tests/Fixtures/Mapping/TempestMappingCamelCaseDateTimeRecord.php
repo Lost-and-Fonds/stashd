@@ -9,9 +9,7 @@ use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 use Tempest\DateTime\DateTime;
 
-/**
- * Control fixture: Tempest DateTime properties against camelCase datetime columns.
- */
+/** PostgreSQL fixture for camelCase PHP properties and columns. */
 #[Table(name: 'tempest_mapping_camel')]
 final class TempestMappingCamelCaseDateTimeRecord
 {

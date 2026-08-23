@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Database;
 
-use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Database;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Query;
@@ -30,10 +29,6 @@ final class TempestPostgresCompatibilityTest extends IntegrationTestCase
         $this->useTestingDatabase();
         $this->db = $this->container->get(Database::class);
 
-        if ($this->db->dialect !== DatabaseDialect::POSTGRESQL) {
-            $this->markTestSkipped('Run with DB_CONNECTION=pgsql to exercise PostgreSQL compatibility.');
-        }
-
         $this->db->execute(new Query(new DropTableStatement('tempest_mapping_camel')));
 
         $table = new CreateTableStatement('tempest_mapping_camel')
@@ -53,7 +48,7 @@ final class TempestPostgresCompatibilityTest extends IntegrationTestCase
 
     protected function tearDown(): void
     {
-        if (isset($this->db) && $this->db->dialect === DatabaseDialect::POSTGRESQL) {
+        if (isset($this->db)) {
             $this->db->execute(new Query(new DropTableStatement('tempest_mapping_camel')));
         }
 

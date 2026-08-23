@@ -16,10 +16,10 @@ final class RemoveBroadcastPublicationTokenColumns implements MigratesUp
     public function up(): QueryStatement
     {
         return new CompoundStatement(
-            new MigrationSqlStatement('SELECT 1', 'ALTER TABLE "broadcasts" DROP COLUMN IF EXISTS "tokenSecretId"'),
-            new MigrationSqlStatement('SELECT 1', 'ALTER TABLE "broadcasts" DROP COLUMN IF EXISTS "tokenPreview"'),
-            new MigrationSqlStatement('SELECT 1', 'ALTER TABLE "broadcast_items" DROP COLUMN IF EXISTS "tokenSecretId"'),
-            new MigrationSqlStatement('SELECT 1', 'ALTER TABLE "broadcast_items" DROP COLUMN IF EXISTS "tokenPreview"'),
+            new MigrationSqlStatement('ALTER TABLE "broadcasts" DROP COLUMN IF EXISTS "tokenSecretId"'),
+            new MigrationSqlStatement('ALTER TABLE "broadcasts" DROP COLUMN IF EXISTS "tokenPreview"'),
+            new MigrationSqlStatement('ALTER TABLE "broadcast_items" DROP COLUMN IF EXISTS "tokenSecretId"'),
+            new MigrationSqlStatement('ALTER TABLE "broadcast_items" DROP COLUMN IF EXISTS "tokenPreview"'),
         );
     }
 }

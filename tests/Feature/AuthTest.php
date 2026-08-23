@@ -12,9 +12,6 @@ use App\Auth\UserRepository;
 use App\Config\TrustedProxyConfig;
 use App\Http\ClientAddressResolver;
 use InvalidArgumentException;
-use PDO;
-use PDOException;
-use Tempest\Database\Config\SQLiteConfig;
 use Tempest\Database\Database;
 use Tempest\Database\Query;
 use Tempest\DateTime\DateTime;
@@ -48,37 +45,6 @@ test('setup is rejected when owner already exists', function (): void {
 
     $response->assertStatus(Status::CONFLICT);
     expect($response->body['error']['code'])->toBe('setup_already_completed');
-});
-
-test('separate setup connections cannot create two owners after both observe an empty database', function (): void {
-    if (getenv('DB_CONNECTION') !== 'sqlite') {
-        $this->markTestSkipped('This test exercises SQLite file-lock behavior.');
-    }
-
-    $path = $this->container->get(SQLiteConfig::class)->path;
-    $firstConnection = new PDO('sqlite:' . $path);
-    $secondConnection = new PDO('sqlite:' . $path);
-
-    expect((int) $firstConnection->query('SELECT COUNT(*) FROM users')->fetchColumn())->toBe(0)
-        ->and((int) $secondConnection->query('SELECT COUNT(*) FROM users')->fetchColumn())->toBe(0);
-
-    $this->container->get(UserRepository::class)->createAdmin(
-        username: 'owner',
-        passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
-    );
-
-    $insert = $secondConnection->prepare(
-        'INSERT INTO users (id, username, passwordHash, role, createdAt, updatedAt)
-         VALUES (:id, :username, :passwordHash, :role, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
-    );
-
-    expect(fn() => $insert->execute([
-        'id' => 'user_01J00000000000000000000000',
-        'username' => 'other',
-        'passwordHash' => password_hash('other-password', PASSWORD_DEFAULT),
-        'role' => 'admin',
-    ]))->toThrow(PDOException::class)
-        ->and(UserRecord::count()->execute())->toBe(1);
 });
 
 test('the user repository reports the database single-owner constraint as setup completion', function (): void {

@@ -24,10 +24,8 @@ use App\Stashes\StashRepository;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use App\Vault\MediaItemRepository;
-use Tempest\Database\Builder\QueryBuilders\BuildsQuery;
 use Tempest\Database\Builder\QueryBuilders\WhereGroupBuilder;
 use Tempest\Database\Builder\WhereOperator;
-use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Database;
 use Tempest\Database\Direction;
 use Tempest\Database\Exceptions\QueryWasInvalid;
@@ -161,20 +159,6 @@ test('job workload indexes support pending, stale, and history queries', functio
         expect($builder->all())->toBeArray();
     }
 
-    // Plan assertions are SQLite-only on purpose: PostgreSQL's planner picks a
-    // sequential scan on the empty test tables no matter which indexes exist,
-    // so asserting index usage here would prove nothing and flake. Index
-    // *existence* is asserted above on both dialects.
-    if ($database->dialect !== DatabaseDialect::POSTGRESQL) {
-        expect(jobQueryPlan($database, $pending))->toContain('jobs_pending_claim')
-            ->not->toContain('SCAN jobs')
-            ->and(jobQueryPlan($database, $lane))->toContain('jobs_pending_claim')
-            ->not->toContain('SCAN jobs')
-            ->and(jobQueryPlan($database, $stale))->toContain('jobs_processing_heartbeat')
-            ->not->toContain('SCAN jobs')
-            ->and(jobQueryPlan($database, $history))->toContain('jobs_media_item_download_history')
-            ->not->toContain('SCAN jobs');
-    }
 });
 
 test('broadcast belongs to stash via foreign key', function (): void {
@@ -248,11 +232,3 @@ test('repository smoke creates stash with input media item stash item and broadc
         ->and((string) $stashItem->stashId)->toBe((string) $stash->id)
         ->and((string) $broadcast->stashId)->toBe((string) $stash->id);
 });
-
-function jobQueryPlan(Database $database, BuildsQuery $builder): string
-{
-    $query = $builder->build();
-    $rows = $database->fetch(new Query('EXPLAIN QUERY PLAN ' . $query->compile(), $query->bindings));
-
-    return implode("\n", array_column($rows, 'detail'));
-}

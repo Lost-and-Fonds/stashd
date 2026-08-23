@@ -7,29 +7,21 @@ namespace App\Database;
 use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\QueryStatement;
 
-/** Preserves legacy SQLite migration SQL while adapting identifiers for PostgreSQL. */
+/** Compiles a migration statement for the PostgreSQL schema. */
 final readonly class MigrationSqlStatement implements QueryStatement
 {
-    public function __construct(
-        private string|QueryStatement $sqlite,
-        private ?string $postgres = null,
-    ) {}
+    public function __construct(private string|QueryStatement $statement) {}
 
-    public function compile(DatabaseDialect $dialect): string
+    public function compile(DatabaseDialect $_dialect): string
     {
-        if ($dialect === DatabaseDialect::POSTGRESQL) {
-            $sql = $this->postgres ?? str_replace('`', '"', $this->sql($dialect));
+        $sql = str_replace(
+            '`',
+            '"',
+            $this->statement instanceof QueryStatement
+                ? $this->statement->compile(DatabaseDialect::POSTGRESQL)
+                : $this->statement,
+        );
 
-            return preg_replace('/"[^"]*\\\\[^"]*"/', 'TEXT', $sql) ?? $sql;
-        }
-
-        return $this->sql($dialect);
-    }
-
-    private function sql(DatabaseDialect $dialect): string
-    {
-        return $this->sqlite instanceof QueryStatement
-            ? $this->sqlite->compile($dialect)
-            : $this->sqlite;
+        return preg_replace('/"[^"]*\\\\[^"]*"/', 'TEXT', $sql) ?? $sql;
     }
 }

@@ -36,7 +36,7 @@ Important decisions:
 - Update tests where the stronger type changes expectations.
 
 Implementation scope:
-1. First inspect Tempest DateTime database hydration/serialization behavior against stashd's current camelCase SQLite datetime columns.
+1. First inspect Tempest DateTime database hydration/serialization behavior against Stashd's current camelCase PostgreSQL datetime columns.
 2. Add or update a focused mapping/database test proving:
    - SQL datetime values hydrate to `Tempest\DateTime\DateTime`,
    - `Tempest\DateTime\DateTime` persists back to the current SQL datetime format,

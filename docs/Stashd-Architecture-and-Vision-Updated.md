@@ -356,7 +356,7 @@ These decisions should be finalized before implementation begins.
 
 ## Database
 
--   SQLite for MVP?
+-   PostgreSQL for MVP?
 -   PostgreSQL support?
 -   Migration strategy?
 
@@ -563,4 +563,3 @@ Saved before it vanished.
 ```
 
 Official messaging should stay trustworthy and preservation-focused.
-

@@ -44,7 +44,7 @@ trait MigrationSchemaHelpers
         return array_values(array_filter($statements, static fn(mixed $statement): bool => $statement instanceof QueryStatement));
     }
 
-    /** Inline REFERENCES for SQLite (Tempest strips BelongsToStatement on SQLite). */
+    /** Inline PostgreSQL REFERENCES for schema statements built from raw SQL. */
     private function fkColumn(
         string $column,
         int $length,

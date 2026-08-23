@@ -22,10 +22,7 @@ final class ReplaceUserEmailWithUsername implements MigratesUp
     {
         return new CompoundStatement(
             new MigrationSqlStatement('ALTER TABLE `users` ADD COLUMN `username` VARCHAR(255) NULL'),
-            new MigrationSqlStatement(
-                "UPDATE `users` SET `username` = substr(`email`, 1, instr(`email`, '@') - 1) WHERE `username` IS NULL",
-                "UPDATE \"users\" SET \"username\" = split_part(\"email\", '@', 1) WHERE \"username\" IS NULL",
-            ),
+            new MigrationSqlStatement("UPDATE \"users\" SET \"username\" = split_part(\"email\", '@', 1) WHERE \"username\" IS NULL"),
             new MigrationSqlStatement('CREATE UNIQUE INDEX `users_username` ON `users` (`username`)'),
             new MigrationSqlStatement('DROP INDEX IF EXISTS `users_email`'),
             new MigrationSqlStatement('ALTER TABLE `users` DROP COLUMN `email`'),
