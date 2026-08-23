@@ -50,6 +50,8 @@ use Tempest\DateTime\Timezone;
 
 use function Tempest\Support\Filesystem\copy_file;
 use function Tempest\Support\Filesystem\create_directory;
+use function Tempest\Support\Filesystem\delete_directory;
+use function Tempest\Support\Filesystem\delete_file;
 use function Tempest\Support\Filesystem\is_directory;
 use function Tempest\Support\Filesystem\is_file;
 use function Tempest\Support\Filesystem\list_directory;
@@ -346,13 +348,13 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         if ($this->definition->outputPath !== null) {
             $path = $this->paths->broadcastFile($context->broadcast, ...explode('/', $this->definition->outputPath));
 
-            if (is_file($path) && @unlink($path)) {
+            if (is_file($path) && $this->tryDeleteFile($path)) {
                 $removed[] = $path;
             }
         }
 
         foreach ($this->items->listForBroadcast(BroadcastId::fromPrimaryKey($context->broadcast->id)) as $item) {
-            if ($item->publishedPath !== null && is_file($item->publishedPath) && @unlink($item->publishedPath)) {
+            if ($item->publishedPath !== null && is_file($item->publishedPath) && $this->tryDeleteFile($item->publishedPath)) {
                 $removed[] = $item->publishedPath;
             }
         }
@@ -376,7 +378,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     private function removeGeneratedPath(string $path, array &$removed): void
     {
         if (is_link($path) || is_file($path)) {
-            if (@unlink($path)) {
+            if ($this->tryDeleteFile($path)) {
                 $removed[] = $path;
             }
 
@@ -754,7 +756,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             }
 
             if ($existing instanceof AssetRecord && $existing->path !== null && is_file($existing->path)) {
-                @unlink($existing->path);
+                $this->tryDeleteFile($existing->path);
             }
             $this->mover->moveIntoPlace($stagePath, $destination);
 
@@ -804,10 +806,22 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
 
     private function removeStage(string $stage): void
     {
-        foreach (glob($stage . '/*') ?: [] as $path) {
-            is_dir($path) ? $this->removeStage($path) : @unlink($path);
+        try {
+            delete_directory($stage);
+        } catch (\Throwable) {
+            // Best-effort cleanup must not mask the publication result.
         }
-        @rmdir($stage);
+    }
+
+    private function tryDeleteFile(string $path): bool
+    {
+        try {
+            delete_file($path);
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /** @return list<array{key: string, value: array{kind: string, value: bool|int|string}}> */
