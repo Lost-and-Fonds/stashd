@@ -6,6 +6,7 @@ namespace App\Plugins;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
+use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
 use Stashd\PluginRuntime\Capabilities\HostHttpTransport;
 use Stashd\PluginRuntime\Capabilities\TransportResponse;
@@ -62,13 +63,19 @@ final readonly class PluginBroadcastHttpTransport implements HostHttpTransport
             throw new RuntimeException('Approved HTTP request could not be started.', 0, $exception);
         }
 
-        $responseHeaders = [];
+        return new TransportResponse($response->getStatusCode(), $this->responseHeaders($response), [$response->getBody()->getContents()]);
+    }
 
-        foreach ($response->getHeaders() as $name => $values) {
-            $responseHeaders[$name] = implode(', ', $values);
-        }
+    /** @return array<string, string> */
+    private function responseHeaders(ResponseInterface $response): array
+    {
+        $headers = $response->getHeaders();
+        $values = array_map(static fn(array $header): string => implode(', ', $header), $headers);
 
-        return new TransportResponse($response->getStatusCode(), $responseHeaders, [$response->getBody()->getContents()]);
+        /** @var array<string, string> $responseHeaders */
+        $responseHeaders = array_combine(array_keys($headers), $values) ?: [];
+
+        return $responseHeaders;
     }
 
     private function fixtureStatus(string $filename): int

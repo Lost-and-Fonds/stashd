@@ -9,8 +9,12 @@ use App\Support\PrefixedUlid;
 use RuntimeException;
 
 use function Tempest\Support\Filesystem\create_directory;
+use function Tempest\Support\Filesystem\delete_directory;
 
 use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
+
+use function Tempest\Support\Filesystem\is_directory;
+use function Tempest\Support\Filesystem\write_file;
 
 final readonly class StageDownloadFiles
 {
@@ -22,8 +26,8 @@ final readonly class StageDownloadFiles
     {
         $path = rtrim($this->config->tempPath(), '/') . '/downloads/' . $jobId->toString();
 
-        if (is_dir($path)) {
-            $this->removeDirectory($path);
+        if (is_directory($path)) {
+            delete_directory($path);
         }
 
         try {
@@ -37,43 +41,18 @@ final readonly class StageDownloadFiles
 
     public function cleanupSuccess(string $path): void
     {
-        if (is_dir($path)) {
-            $this->removeDirectory($path);
+        if (is_directory($path)) {
+            delete_directory($path);
         }
     }
 
     public function markFailed(string $path): void
     {
-        if (! is_dir($path)) {
+        if (! is_directory($path)) {
             return;
         }
 
         $marker = rtrim($path, '/') . '/.failed';
-        file_put_contents($marker, gmdate('c'));
-    }
-
-    private function removeDirectory(string $path): void
-    {
-        $entries = scandir($path);
-
-        if ($entries === false) {
-            return;
-        }
-
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..') {
-                continue;
-            }
-
-            $full = $path . '/' . $entry;
-
-            if (is_dir($full)) {
-                $this->removeDirectory($full);
-            } else {
-                unlink($full);
-            }
-        }
-
-        rmdir($path);
+        write_file($marker, gmdate('c'));
     }
 }
