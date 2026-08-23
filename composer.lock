@@ -3010,16 +3010,16 @@
         },
         {
             "name": "stashd/podcast",
-            "version": "v0.2.0",
+            "version": "v0.2.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Lost-and-Fonds/podcast.git",
-                "reference": "b7566b2a1f060b817c55f02e1e2de54bee029ed9"
+                "reference": "1a3561d1a59359a1139985b4d34a6a2e593e57d1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Lost-and-Fonds/podcast/zipball/b7566b2a1f060b817c55f02e1e2de54bee029ed9",
-                "reference": "b7566b2a1f060b817c55f02e1e2de54bee029ed9",
+                "url": "https://api.github.com/repos/Lost-and-Fonds/podcast/zipball/1a3561d1a59359a1139985b4d34a6a2e593e57d1",
+                "reference": "1a3561d1a59359a1139985b4d34a6a2e593e57d1",
                 "shasum": ""
             },
             "require": {
@@ -3048,10 +3048,10 @@
             ],
             "description": "Podcast Broadcast plugin for Stashd",
             "support": {
-                "source": "https://github.com/Lost-and-Fonds/podcast/tree/v0.2.0",
+                "source": "https://github.com/Lost-and-Fonds/podcast/tree/v0.2.1",
                 "issues": "https://github.com/Lost-and-Fonds/podcast/issues"
             },
-            "time": "2026-08-23T04:49:33+00:00"
+            "time": "2026-08-23T04:55:19+00:00"
         },
         {
             "name": "symfony/cache",
