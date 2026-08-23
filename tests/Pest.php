@@ -2,6 +2,30 @@
 
 declare(strict_types=1);
 
+$runningInLerd = getenv('LERD_SITE') === 'stashd' && getenv('container') === 'podman';
+$runningInCi = in_array(getenv('CI'), ['1', 'true'], true) || getenv('GITHUB_ACTIONS') === 'true';
+
+if (! $runningInLerd && ! $runningInCi) {
+    fwrite(
+        STDERR,
+        <<<'MESSAGE'
+Stashd backend tests must run inside the Lerd environment.
+Direct host-side test execution is intentionally blocked.
+
+Use:
+
+    ./bin/test
+
+For focused tests:
+
+    ./bin/test tests/Feature/FooTest.php
+    ./bin/test --filter some_test_name
+MESSAGE,
+    );
+    fwrite(STDERR, PHP_EOL);
+    exit(78);
+}
+
 use App\Auth\AuthService;
 use Tempest\Database\Database;
 use Tempest\Database\Query;

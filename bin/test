@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+
+if [ "${LERD_SITE:-}" = "stashd" ] && [ "${container:-}" = "podman" ]; then
+    exec "$ROOT/scripts/test-postgres.sh" "$@"
+fi
+
+if [ "${CI:-}" = "1" ] || [ "${CI:-}" = "true" ] || [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+    export ENVIRONMENT=testing
+    exec "$ROOT/vendor/bin/pest" "$@"
+fi
+
+exec lerd composer test -- "$@"

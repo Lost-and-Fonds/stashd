@@ -44,6 +44,11 @@ or public media catalogue.
 
 Do not rediscover the project's test strategy for every task.
 
+Backend tests must be run with `./bin/test`. Do not invoke Pest, PHPUnit, or
+the underlying test scripts directly on the host; direct host execution is
+intentionally blocked. Focused tests use the same wrapper, for example
+`./bin/test tests/Feature/FooTest.php` or `./bin/test --filter test_name`.
+
 Read [`docs/development/testing.md`](docs/development/testing.md) and use its
 verification ladder.
 

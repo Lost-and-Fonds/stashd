@@ -49,11 +49,11 @@
     "post-autoload-dump": [
       "@php ./tempest discovery:generate --no-interaction"
     ],
-    "test": "ENVIRONMENT=testing vendor/bin/pest",
-    "test:parallel": "ENVIRONMENT=testing vendor/bin/pest --parallel",
-    "test:unit": "ENVIRONMENT=testing vendor/bin/pest --testsuite=Unit",
-    "test:feature": "ENVIRONMENT=testing vendor/bin/pest --testsuite=Feature",
-    "test:feature:parallel": "ENVIRONMENT=testing vendor/bin/pest --testsuite=Feature --parallel",
+    "test": "./bin/test",
+    "test:parallel": "./bin/test --parallel",
+    "test:unit": "./bin/test --testsuite=Unit",
+    "test:feature": "./bin/test --testsuite=Feature",
+    "test:feature:parallel": "./bin/test --testsuite=Feature --parallel",
     "test:postgres": "scripts/test-postgres.sh",
     "test:docker-smoke": "tests/docker/smoke.sh",
     "test:docker-smoke:no-build": "STASHD_SMOKE_SKIP_BUILD=1 tests/docker/smoke.sh",
