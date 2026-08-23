@@ -1,10 +1,31 @@
 {
   "id": "jellyfin",
+  "broadcast_key": "jellyfin",
   "name": "Jellyfin Broadcast",
   "version": "0.1.0",
+  "application_runtime": "native",
   "runtime": "php",
   "api_version": "0.1",
   "entrypoint": "plugin.php",
+  "supported_file_kinds": ["video"],
+  "output_path": null,
+  "supports_item_rebuild": true,
+  "prunes_after_publish": false,
+  "connection_setting_key": "media_server_connection_id",
+  "credential": {"name": "jellyfin-api-token", "parameter": "X-Emby-Token", "placement": "header"},
+  "operations": {
+    "test_connection": "test-connection",
+    "list_libraries": "discover-libraries",
+    "refresh_library": "refresh-library"
+  },
+  "ui_options": [
+    {"key": "media_server_connection_id", "label": "Jellyfin connection", "type": "text", "required": true},
+    {"key": "captions", "label": "Captions", "type": "select", "default": "off", "choices": ["off", "creator_only", "creator_or_auto"]},
+    {"key": "caption_languages", "label": "Caption languages", "type": "text", "default": "en"}
+  ],
+  "actions": [
+    {"id": "refresh-library", "label": "Refresh Jellyfin library", "intent": "refresh_library", "operation": "refresh-library"}
+  ],
   "requires": {"php": ">=8.5", "extensions": []},
   "architectures": ["amd64", "arm64"]
 }

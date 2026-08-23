@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Connections;
 
 use App\Plugins\ExternalBroadcastPluginRegistry;
-use App\Plugins\PluginHostClient;
 use App\Plugins\PluginHttpGrantFactory;
 use App\Support\PrefixedUlid;
 use App\System\Secret\SecretRepository;
@@ -130,7 +129,8 @@ final readonly class PluginConnectionService
     {
         $definition = $this->plugins->findByLogicalKey($connection->type);
         $operation = $definition?->operations[$operationKey] ?? null;
-        if ($definition === null || ! $definition->available() || $operation === null) {
+        $runtime = $definition === null ? null : $this->plugins->runtimeFor($connection->type);
+        if ($definition === null || $runtime === null || $operation === null) {
             throw ConnectionException::withCode('connection_operation_unavailable', 'Connection operation is unavailable.');
         }
 
@@ -140,8 +140,7 @@ final readonly class PluginConnectionService
         }
 
         try {
-            return (new PluginHostClient($definition->socketPath))->broadcastOperation(
-                $definition->componentPath,
+            return $runtime->operation(
                 $stage,
                 [
                     'reference' => (string) $connection->id,

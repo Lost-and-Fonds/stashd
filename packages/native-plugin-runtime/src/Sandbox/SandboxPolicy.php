@@ -17,10 +17,15 @@ final readonly class SandboxPolicy
             'bwrap', '--die-with-parent', '--new-session', '--unshare-user', '--unshare-pid',
             '--unshare-ipc', '--unshare-uts', '--unshare-net', '--clearenv',
             '--ro-bind', $packageRoot, '/plugin', '--bind', $stagingRoot, '/staging',
-            '--tmpfs', '/tmp', '--dev', '/dev', '--ro-bind', '/usr', '/usr',
-            '--ro-bind', '/bin', '/bin', '--ro-bind', '/lib', '/lib', '--ro-bind', '/lib64', '/lib64',
-            '--ro-bind', '/sbin', '/sbin', '--dir', '/home', '--dir', '/root',
+            '--tmpfs', '/tmp', '--dev', '/dev', '--dir', '/home', '--dir', '/root',
         ];
+        foreach (['/usr', '/bin', '/lib', '/lib64', '/sbin'] as $directory) {
+            if (is_dir($directory)) {
+                $command[] = '--ro-bind';
+                $command[] = $directory;
+                $command[] = $directory;
+            }
+        }
         if ($sdkRoot !== null) {
             if (! is_dir($sdkRoot)) {
                 throw new RuntimeException('plugin SDK root is missing');

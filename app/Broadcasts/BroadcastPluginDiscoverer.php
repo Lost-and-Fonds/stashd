@@ -8,7 +8,6 @@ use App\Connections\ConnectionRepository;
 use App\Connections\ConnectionSecrets;
 use App\Plugins\ExternalBroadcastPlugin;
 use App\Plugins\ExternalBroadcastPluginRegistry;
-use App\Plugins\PluginHostClient;
 use App\System\State\StateTransitionService;
 use App\Vault\AssetRepository;
 use App\Vault\MoveFileIntoVault;
@@ -57,12 +56,12 @@ final class BroadcastPluginDiscoverer implements Discovery
         $externalPlugins = $this->container->get(ExternalBroadcastPluginRegistry::class);
 
         foreach ($externalPlugins->all() as $definition) {
-            if (! $definition->available()) {
+            $runtimes = $externalPlugins->runtimesFor($definition->logicalKey);
+            if ($runtimes === []) {
                 continue;
             }
 
             try {
-                $host = new PluginHostClient($definition->socketPath);
                 /** @var BroadcastContextFactory $contexts */
                 $contexts = $this->container->get(BroadcastContextFactory::class);
                 /** @var BroadcastPathBuilder $paths */
@@ -89,7 +88,7 @@ final class BroadcastPluginDiscoverer implements Discovery
                 $hardlinks = $this->container->get(HardlinkPublisher::class);
                 $instance = new ExternalBroadcastPlugin(
                     definition: $definition,
-                    host: $host,
+                    runtimes: $runtimes,
                     contexts: $contexts,
                     paths: $paths,
                     items: $items,

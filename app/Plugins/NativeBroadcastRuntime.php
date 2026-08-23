@@ -1,0 +1,329 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Plugins;
+
+use RuntimeException;
+use Stashd\NativeRuntime\Capabilities\CredentialGrant;
+use Stashd\NativeRuntime\Capabilities\Invocation;
+use Stashd\NativeRuntime\Package\PackageManager;
+use Stashd\NativeRuntime\Runner\NativePluginRunner;
+use Stashd\PluginSdk\ReadableResource;
+
+final readonly class NativeBroadcastRuntime implements BroadcastPluginRuntime
+{
+    public function __construct(
+        private NativePluginRunner $runner,
+        private PackageManager $packages,
+        private string $pluginId,
+    ) {}
+
+    /** @param list<PluginHttpGrant>|null $httpGrants */
+    public function prepare(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory): PluginBroadcastResult
+    {
+        return $this->invoke('broadcast.prepare', $stagingDirectory, $broadcast, $httpGrants, $fixtureDirectory);
+    }
+
+    /** @param list<PluginHttpGrant>|null $httpGrants */
+    public function publish(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory): PluginBroadcastResult
+    {
+        return $this->invoke('broadcast.publish', $stagingDirectory, $broadcast, $httpGrants, $fixtureDirectory);
+    }
+
+    /** @param list<PluginHttpGrant>|null $httpGrants */
+    public function finalize(string $stagingDirectory, array $broadcast, array $publication, ?array $httpGrants, ?string $fixtureDirectory): PluginBroadcastResult
+    {
+        return $this->invoke('broadcast.finalize', $stagingDirectory, ['request' => $broadcast, 'publication' => $publication], $httpGrants, $fixtureDirectory);
+    }
+
+    /** @param list<PluginHttpGrant>|null $httpGrants */
+    public function operation(string $stagingDirectory, array $broadcast, string $operation, ?array $httpGrants, ?string $fixtureDirectory): array
+    {
+        /** @var array<string, mixed> $params */
+        $params = [...$broadcast, 'name' => $operation];
+
+        $result = $this->invokeRaw('broadcast.operation', $params, $stagingDirectory, $httpGrants, $fixtureDirectory);
+        if (is_array($result['choices'] ?? null)) {
+            $result['choices'] = array_map(static function (mixed $choice): mixed {
+                if (! is_array($choice) || ! array_key_exists('label', $choice) || ! array_key_exists('value', $choice)) {
+                    return $choice;
+                }
+
+                return ['label' => $choice['label'], 'value' => $choice['value']];
+            }, $result['choices']);
+        }
+
+        return $result;
+    }
+
+    /** @param array<string, mixed> $broadcast
+     * @param  list<PluginHttpGrant>|null  $httpGrants
+     */
+    private function invoke(string $method, string $stagingDirectory, array $broadcast, ?array $httpGrants, ?string $fixtureDirectory): PluginBroadcastResult
+    {
+        return new PluginBroadcastResult([], [], $this->normalizePublication($this->invokeRaw($method, $broadcast, $stagingDirectory, $httpGrants, $fixtureDirectory)));
+    }
+
+    /** @param array<string, mixed> $params
+     * @param  list<PluginHttpGrant>|null  $httpGrants
+     * @return array<string, mixed>
+     */
+    private function invokeRaw(string $method, array $params, string $stagingDirectory, ?array $httpGrants, ?string $fixtureDirectory): array
+    {
+        $package = $this->packages->activePath($this->pluginId);
+        if ($package === null) {
+            throw new RuntimeException('Native Broadcast plugin is not active: ' . $this->pluginId);
+        }
+
+        $credentials = [];
+        $origins = [];
+        foreach ($httpGrants ?? [] as $grant) {
+            foreach ($grant->allowedPrefixes as $prefix) {
+                $parts = parse_url($prefix);
+                if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
+                    continue;
+                }
+                $origin = strtolower($parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : ''));
+                $origins[] = $origin;
+                if ($grant->credential !== null) {
+                    if ($grant->credential->placement !== 'header') {
+                        throw new RuntimeException('Native Broadcast credentials require header placement.');
+                    }
+                    $credentials[] = new CredentialGrant(
+                        $grant->credential->name,
+                        $origin,
+                        $grant->credential->parameter,
+                        $grant->credential->value,
+                    );
+                }
+            }
+        }
+
+        $nativeStage = $stagingDirectory . '/.native-' . bin2hex(random_bytes(6));
+        if (! mkdir($nativeStage, 0700, true) && ! is_dir($nativeStage)) {
+            throw new RuntimeException('Native Broadcast staging could not be created.');
+        }
+        $invocation = new Invocation(
+            $package,
+            $nativeStage,
+            array_values(array_unique($origins)),
+            $credentials,
+            transport: new NativeBroadcastHttpTransport($fixtureDirectory),
+        );
+        $resources = [];
+        $process = null;
+        try {
+            $process = $this->runner->start($this->pluginId, $nativeStage);
+            /** @var array<string, mixed> $nativeParams */
+            $nativeParams = $this->nativeParams($params);
+            $result = $process->invoke($method, $nativeParams, function (array $message) use ($invocation, &$resources): array {
+                $method = is_string($message['method'] ?? null) ? $message['method'] : '';
+                $params = $this->stringKeyed($message['params'] ?? null);
+
+                return match ($method) {
+                    'http.request' => $this->http($invocation, $params, $resources),
+                    'resource.read' => $this->readResource($resources, $params),
+                    'staging.write' => $this->writeStaging($invocation, $params),
+                    'event.log', 'event.progress' => ['accepted' => true],
+                    default => throw new RuntimeException('Native Broadcast capability is not supported: ' . $method),
+                };
+            });
+            if (isset($result['error'])) {
+                $error = is_array($result['error']) ? $result['error'] : [];
+                $message = is_string($error['message'] ?? null) ? $error['message'] : 'Native Broadcast plugin failed.';
+                $stderr = $process->stderr();
+                if (trim($stderr) !== '') {
+                    $message .= ' (' . trim($stderr) . ')';
+                }
+                throw new RuntimeException($message);
+            }
+
+            $this->copyOutputs($nativeStage, $stagingDirectory);
+
+            return $result;
+        } finally {
+            foreach ($resources as $resource) {
+                $resource->close();
+            }
+            if ($process !== null) {
+                $process->close();
+            }
+            $invocation->close();
+        }
+    }
+
+    /** @param array<string, mixed> $params
+     * @param  array<string, ReadableResource>  $resources
+     * @return array<string, mixed>
+     */
+    private function http(Invocation $invocation, array $params, array &$resources): array
+    {
+        $response = $invocation->http(
+            is_string($params['method'] ?? null) ? $params['method'] : 'GET',
+            is_string($params['url'] ?? null) ? $params['url'] : '',
+            $this->stringHeaders($params['headers'] ?? null),
+            is_string($params['body'] ?? null) ? $params['body'] : null,
+            is_string($params['credential'] ?? null) ? $params['credential'] : null,
+        );
+        if ($response->resource === null) {
+            return ['status' => $response->status, 'headers' => $response->headers, 'body' => $response->body()];
+        }
+        $reference = 'resource-' . count($resources) . '-' . bin2hex(random_bytes(4));
+        $resources[$reference] = $response->resource;
+
+        return ['status' => $response->status, 'headers' => $response->headers, 'resource' => $reference];
+    }
+
+    /** @param array<string, ReadableResource> $resources
+     * @param  array<string, mixed>  $params
+     * @return array<string, mixed>
+     */
+    private function readResource(array $resources, array $params): array
+    {
+        $reference = is_string($params['reference'] ?? null) ? $params['reference'] : '';
+        $resource = $resources[$reference] ?? throw new RuntimeException('Native HTTP resource is not granted.');
+
+        $maximumBytes = is_int($params['maximum_bytes'] ?? null) ? $params['maximum_bytes'] : 65536;
+
+        return ['data' => base64_encode($resource->read(max(1, $maximumBytes))), 'eof' => $resource->isEof()];
+    }
+
+    /** @param array<string, mixed> $params
+     * @return array<string, mixed>
+     */
+    private function writeStaging(Invocation $invocation, array $params): array
+    {
+        $content = is_string($params['content'] ?? null) ? base64_decode($params['content'], true) : false;
+        if ($content === false) {
+            throw new RuntimeException('Native staging content is invalid.');
+        }
+        $relativePath = is_string($params['relative_path'] ?? null) ? $params['relative_path'] : '';
+        $artifact = $invocation->staging()->write($relativePath, $content, is_string($params['media_type'] ?? null) ? $params['media_type'] : null);
+
+        return ['reference' => $artifact->reference, 'media_type' => $artifact->mediaType, 'size_bytes' => $artifact->sizeBytes];
+    }
+
+    /** @param array<string, mixed> $publication
+     * @return array<string, mixed>
+     */
+    private function normalizePublication(array $publication): array
+    {
+        $files = [];
+        foreach (is_array($publication['files'] ?? null) ? $publication['files'] : [] as $file) {
+            if (! is_array($file)) {
+                continue;
+            }
+            $files[] = [
+                'item_id' => $file['item-id'] ?? null,
+                'source_reference' => $file['source-reference'] ?? null,
+                'relative_path' => $file['relative-path'] ?? null,
+            ];
+        }
+        $publication['files'] = $files;
+
+        return $publication;
+    }
+
+    /** @return array<string, mixed> */
+    private function stringKeyed(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+        $result = [];
+        foreach ($value as $key => $item) {
+            if (is_string($key)) {
+                $result[$key] = $item;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  array<string, mixed>  $params
+     * @return array<string, mixed>
+     */
+    private function nativeParams(array $params): array
+    {
+        if (is_array($params['request'] ?? null)) {
+            /** @var array<string, mixed> $request */
+            $request = $params['request'];
+            $params['request'] = $this->nativeParams($request);
+        }
+        foreach (['settings', 'payload'] as $key) {
+            if (is_array($params[$key] ?? null)) {
+                $params[$key] = $this->nativeSettings($params[$key]);
+            }
+        }
+        if (is_array($params['sources'] ?? null)) {
+            foreach ($params['sources'] as $index => $source) {
+                if (! is_array($source)) {
+                    continue;
+                }
+                if (is_array($source['settings'] ?? null)) {
+                    $source['settings'] = $this->nativeSettings($source['settings']);
+                    $params['sources'][$index] = $source;
+                }
+            }
+        }
+
+        return $params;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function nativeSettings(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+        $settings = [];
+        foreach ($value as $setting) {
+            if (! is_array($setting)) {
+                continue;
+            }
+            /** @var array<string, mixed> $setting */
+            if (isset($setting['value']) && is_array($setting['value']) && isset($setting['value']['kind'])) {
+                $setting['value']['tag'] = $setting['value']['kind'];
+                unset($setting['value']['kind']);
+            }
+            $settings[] = $setting;
+        }
+
+        return $settings;
+    }
+
+    /** @return array<string, string> */
+    private function stringHeaders(mixed $value): array
+    {
+        $result = [];
+        foreach ($this->stringKeyed($value) as $key => $item) {
+            if (is_string($item)) {
+                $result[$key] = $item;
+            }
+        }
+
+        return $result;
+    }
+
+    private function copyOutputs(string $source, string $destination): void
+    {
+        foreach (scandir($source) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
+                continue;
+            }
+            $from = $source . '/' . $entry;
+            $to = $destination . '/' . $entry;
+            if (is_dir($from)) {
+                if (! is_dir($to)) {
+                    mkdir($to, 0700, true);
+                }
+                $this->copyOutputs($from, $to);
+
+                continue;
+            }
+            copy($from, $to);
+        }
+    }
+}

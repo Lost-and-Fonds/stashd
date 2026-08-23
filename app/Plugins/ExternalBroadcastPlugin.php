@@ -53,7 +53,8 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
 {
     public function __construct(
         private ExternalBroadcastPluginDefinition $definition,
-        private PluginHostClient $host,
+        /** @var array<string, BroadcastPluginRuntime> */
+        private array $runtimes,
         private BroadcastContextFactory $contexts,
         private BroadcastPathBuilder $paths,
         private BroadcastItemRepository $items,
@@ -194,8 +195,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 'sources' => $this->sources($context),
                 'items' => $items,
             ];
-            $prepared = $this->host->prepareBroadcast(
-                $this->definition->componentPath,
+            $prepared = $this->runtime()->prepare(
                 $stage,
                 $request,
                 $this->definition->prepareHelper === null ? null : $this->definition->helperGrant($this->definition->prepareHelper),
@@ -247,7 +247,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 ];
             }
 
-            $result = $this->host->publishBroadcast($this->definition->componentPath, $stage, [
+            $result = $this->runtime()->publish($stage, [
                 'reference' => (string) $context->broadcast->id,
                 'settings' => $settings,
                 'sources' => $this->sources($context),
@@ -264,8 +264,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 copy($stage . '/' . $reference, $outputPath);
             }
             $this->publishFiles($context, $publication['files'] ?? [], $stagedAssets);
-            $this->host->finalizeBroadcast(
-                $this->definition->componentPath,
+            $this->runtime()->finalize(
                 $stage,
                 [
                     'reference' => (string) $context->broadcast->id,
@@ -431,8 +430,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             $settings = $this->settings($context);
             $this->appendConnectionSettings($context, $settings);
 
-            return $this->host->broadcastOperation(
-                $this->definition->componentPath,
+            return $this->runtime()->operation(
                 sys_get_temp_dir(),
                 [
                     'reference' => (string) $broadcast->id,
@@ -481,6 +479,21 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         if ($this->definition->credentialName !== null) {
             $settings[] = ['key' => 'credential_name', 'value' => ['kind' => 'text', 'value' => $this->definition->credentialName]];
         }
+    }
+
+    private function runtime(): BroadcastPluginRuntime
+    {
+        $selected = 'wasmtime';
+        $configured = getenv('STASHD_BROADCAST_IMPLEMENTATIONS');
+        if (is_string($configured) && trim($configured) !== '') {
+            $map = json_decode($configured, true);
+            if (is_array($map) && is_string($map[$this->definition->logicalKey] ?? null)) {
+                $selected = $map[$this->definition->logicalKey];
+            }
+        }
+
+        return $this->runtimes[$selected]
+            ?? throw BroadcastException::withCode('broadcast_runtime_unavailable', "Broadcast runtime [{$selected}] is unavailable.");
     }
 
     /** @return list<PluginHttpGrant> */

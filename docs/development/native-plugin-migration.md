@@ -18,12 +18,13 @@ in [native plugin runtime](../architecture/native-plugin-runtime.md).
 
 ### M8 — Jellyfin
 
+- **Status:** Complete.
 - **Purpose:** Complete the Jellyfin native provider migration.
 - **Completion criterion:** Native provider implementation, application-level
   native/Wasmtime selection, and PostgreSQL lifecycle/rollback coverage are
-  complete.
-- **Hard stop:** Do not mark M8 complete or begin the next provider until
-  selection and lifecycle rollback are proven.
+  complete, with equivalent provider behavior through both runtimes.
+- **Hard stop:** Do not begin M9 or add another provider until this gate is
+  intentionally reopened.
 
 ### M9 — Plex
 

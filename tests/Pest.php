@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Auth\AuthService;
+use Stashd\NativeRuntime\Package\PackageManager;
 use Tempest\Database\Database;
 use Tempest\Database\Query;
 use Tempest\Framework\Testing\Http\TestResponseHelper;
@@ -101,6 +102,13 @@ if (! is_string(getenv('STASHD_PLUGIN_HELPER_EXECUTABLE')) || trim((string) gete
 
 if (! is_string(getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR')) || trim((string) getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR')) === '') {
     putenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR=' . dirname(__DIR__) . '/tests/fixtures/media_servers/http');
+}
+
+if (getenv('STASHD_NATIVE_PLUGIN_TEST') === '1') {
+    $nativeRoot = sys_get_temp_dir() . '/stashd-native-plugin-test';
+    putenv('STASHD_NATIVE_PLUGIN_ROOT=' . $nativeRoot);
+    putenv('STASHD_BROADCAST_IMPLEMENTATIONS={"jellyfin":"native"}');
+    (new PackageManager($nativeRoot))->link('jellyfin', dirname(__DIR__) . '/plugins/jellyfin-native');
 }
 
 foreach ([$data, $media] as $directory) {

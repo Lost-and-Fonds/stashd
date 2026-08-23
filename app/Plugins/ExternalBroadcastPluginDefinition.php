@@ -19,6 +19,7 @@ final readonly class ExternalBroadcastPluginDefinition
     public function __construct(
         public string $id,
         public string $logicalKey,
+        public string $runtime,
         public string $name,
         public string $version,
         public string $componentPath,
@@ -56,13 +57,18 @@ final readonly class ExternalBroadcastPluginDefinition
             return trim($value);
         };
 
+        $runtime = is_string($raw['application_runtime'] ?? null) && trim($raw['application_runtime']) !== '' ? trim($raw['application_runtime']) : 'wasmtime';
+        if (! in_array($runtime, ['wasmtime', 'native'], true)) {
+            throw new RuntimeException("Unsupported external Broadcast runtime [{$runtime}].");
+        }
+
         $component = null;
         if (is_string($raw['component_environment'] ?? null)) {
             $value = getenv($raw['component_environment']);
             $component = is_string($value) && trim($value) !== '' ? trim($value) : null;
         }
         $component ??= is_string($raw['component'] ?? null) ? trim($raw['component']) : '';
-        if ($component === '') {
+        if ($runtime === 'wasmtime' && $component === '') {
             throw new RuntimeException('External Broadcast plugin manifest requires component.');
         }
 
@@ -127,9 +133,10 @@ final readonly class ExternalBroadcastPluginDefinition
         return new self(
             id: $required('id'),
             logicalKey: trim($raw['broadcast_key']),
+            runtime: $runtime,
             name: is_string($raw['name'] ?? null) && trim($raw['name']) !== '' ? trim($raw['name']) : $required('id'),
             version: is_string($raw['version'] ?? null) && trim($raw['version']) !== '' ? trim($raw['version']) : '0.0.0',
-            componentPath: $componentPath,
+            componentPath: $runtime === 'native' ? '' : $componentPath,
             socketPath: $socketPath,
             uiOptions: $uiOptions,
             actions: $actions,
@@ -152,7 +159,7 @@ final readonly class ExternalBroadcastPluginDefinition
 
     public function available(): bool
     {
-        return is_file($this->componentPath) && file_exists($this->socketPath);
+        return $this->runtime === 'native' || (is_file($this->componentPath) && file_exists($this->socketPath));
     }
 
     public function helperGrant(string $name): ?PluginHelperGrant

@@ -88,6 +88,7 @@ RUN apt-get update \
         libpq-dev \
         libicu-dev \
         curl \
+        bubblewrap \
     && rm -rf /var/lib/apt/lists/*
 
 # install-php-extensions (bundled in the FrankenPHP image) compiles for ZTS
@@ -128,6 +129,9 @@ RUN case "${TARGETARCH}" in \
 COPY --from=composer /usr/bin/composer /usr/bin/composer
 COPY --from=plugin-runtime /plugin-build/target/release/stashd-plugin-host /usr/local/bin/stashd-plugin-host
 COPY --from=plugin-runtime /plugin-output /usr/local/share/stashd/plugins
+COPY plugins/jellyfin-native /usr/local/share/stashd/native-plugins/packages/jellyfin/0.1.0
+RUN mkdir -p /usr/local/share/stashd/native-plugins/active \
+    && ln -s ../packages/jellyfin/0.1.0 /usr/local/share/stashd/native-plugins/active/jellyfin
 
 WORKDIR /var/www/html
 
@@ -143,6 +147,7 @@ ENV STASHD_HTTP_PORT=8474 \
     STASHD_MEDIA_PATH=/media \
     STASHD_PUBLIC_URL=http://localhost:8474 \
     STASHD_PLUGIN_HOST_SOCKET=/tmp/stashd-plugin-host.sock \
+    STASHD_NATIVE_PLUGIN_ROOT=/usr/local/share/stashd/native-plugins \
     STASHD_PLUGIN_COMPONENT=/usr/local/share/stashd/plugins/youtube.wasm \
     STASHD_BROADCAST_PLUGIN_COMPONENT=/usr/local/share/stashd/plugins/podcast.wasm \
     STASHD_BROADCAST_PLUGIN_COMPONENT_JELLYFIN=/usr/local/share/stashd/plugins/jellyfin.wasm \
