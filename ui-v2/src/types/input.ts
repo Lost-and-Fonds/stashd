@@ -33,6 +33,7 @@ export interface StashInputApiResource extends InputOptionsApiResource {
   source_uri: string
   provider_input_id: string
   state: string
+  title?: string | null
   options?: StashInputOptionsApiResource | null
 }
 

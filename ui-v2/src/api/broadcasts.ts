@@ -1,4 +1,4 @@
-import type { BroadcastOptionValue, BroadcastPluginApiResource, CreatedBroadcastApiResource, StashApiResource } from '../types/broadcast-plugin'
+import type { BroadcastApiResource, BroadcastOptionValue, BroadcastPluginApiResource, CreatedBroadcastApiResource, StashApiResource } from '../types/broadcast-plugin'
 
 export async function fetchBroadcastPlugins(): Promise<BroadcastPluginApiResource[]> {
   const body = await responseBody<{ plugins?: BroadcastPluginApiResource[] }>(await fetch('/api/v1/broadcast-plugins'))
@@ -19,6 +19,23 @@ export async function createStashBroadcast(stashId: string, type: string, settin
     body: JSON.stringify({ type, settings })
   })
   const body = await responseBody<{ broadcast: CreatedBroadcastApiResource }>(response)
+
+  return body.broadcast
+}
+
+export async function fetchBroadcast(broadcastId: string): Promise<BroadcastApiResource> {
+  const body = await responseBody<{ broadcast: BroadcastApiResource }>(await fetch(`/api/v1/broadcasts/${encodeURIComponent(broadcastId)}`))
+
+  return body.broadcast
+}
+
+export async function updateBroadcastSourceSettings(broadcastId: string, sourceReference: string, settings: Record<string, BroadcastOptionValue>): Promise<BroadcastApiResource> {
+  const response = await fetch(`/api/v1/broadcasts/${encodeURIComponent(broadcastId)}/source-settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_reference: sourceReference, settings })
+  })
+  const body = await responseBody<{ broadcast: BroadcastApiResource }>(response)
 
   return body.broadcast
 }

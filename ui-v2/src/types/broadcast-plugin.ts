@@ -27,3 +27,13 @@ export interface CreatedBroadcastApiResource {
   id: string
   name: string
 }
+
+export interface BroadcastApiResource {
+  id: string
+  stash_id: string
+  name: string
+  settings?: {
+    source_settings?: Record<string, Record<string, BroadcastOptionValue>>
+  } | null
+  plugin_source_options?: BroadcastOptionDeclaration[]
+}
