@@ -11,11 +11,19 @@ release inputs in `stashd-plugin/helpers.lock.json`. Core's generic
 checksums, installs locked Composer dependencies, and emits a standard OCI
 layout with a single filesystem layer. No provider names occur in the builder.
 
-Core verifies the manifest and layer digests before installing the layer with
-`PackageManager::installOciLayout()`. Installed packages are immutable and
-discovered from the active package directory using the same manifest path as
-Composer packages. Helper grants are package-relative and sandboxed; the
-runtime never resolves provider tools from host `PATH`.
+Core invokes the pinned `/usr/local/libexec/stashd/umoci` v0.6.0 binary for
+layout creation, layer packing, digest inspection, and rootless unpacking.
+The image manifest digest is the OCI artifact identity returned by the builder
+and verified by `PackageManager::installOciLayout()`; the installed package
+store remains keyed by the plugin manifest's id and version. `umoci` is
+verified in the core image from the official release assets (the amd64 SHA-256
+is `b51c267ec394499e42c6fde47f240b7b7dba57ea49df0b5acd304378b82a3b71`; the
+arm64 SHA-256 is
+`5cfd17f2e7a4bcf9ed67ea1b955ca893d200349b9ce6a3d3707dba415f458a1f`).
+Installed packages are immutable and discovered from the active package
+directory using the same manifest path as Composer packages. Helper grants
+are package-relative and sandboxed; plugins never receive the core `umoci`
+path or its capability.
 
 Local edits may still use the documented sibling Composer workflow. OCI builds
 are the production-like path and require helper payloads explicitly.

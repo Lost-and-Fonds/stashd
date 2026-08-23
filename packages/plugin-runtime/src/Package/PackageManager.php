@@ -17,7 +17,9 @@ final class PackageManager
 
     private string $staging;
 
-    public function __construct(private string $root, private string $apiVersion = '0.1', private ?string $architecture = null)
+    private Umoci $umoci;
+
+    public function __construct(private string $root, private string $apiVersion = '0.1', private ?string $architecture = null, ?Umoci $umoci = null)
     {
         $this->packages = $root . '/packages';
         $this->active = $root . '/active';
@@ -31,48 +33,7 @@ final class PackageManager
                 throw new RuntimeException('package directory could not be created');
             }
         }
-    }
-
-    public function install(string $archive, string $expectedSha256): PackageManifest
-    {
-        if (! Filesystem\is_file($archive) || ! hash_equals(strtolower($expectedSha256), hash_file('sha256', $archive) ?: '')) {
-            throw new PackageValidationError('package checksum mismatch');
-        }
-        $temporary = $this->staging . '/install-' . bin2hex(random_bytes(10));
-        Filesystem\create_directory($temporary, 0700);
-
-        try {
-            TarArchive::extract($archive, $temporary);
-            $manifest = PackageManifest::fromFile($this->manifestPath($temporary), $this->apiVersion, $this->architecture ?? self::architecture());
-            $entrypoint = $temporary . '/' . $manifest->entrypoint;
-
-            if (! Filesystem\is_file($entrypoint)) {
-                throw new PackageValidationError('manifest entrypoint is missing');
-            }
-            $destination = $this->packages . '/' . $manifest->id . '/' . $manifest->version;
-
-            if (Filesystem\exists($destination) || is_link($destination)) {
-                throw new PackageStateError('plugin version is already installed');
-            }
-            $parent = dirname($destination);
-
-            try {
-                Filesystem\create_directory($parent, 0700);
-            } catch (\Throwable $exception) {
-                throw new PackageStateError('package version directory could not be created', 0, $exception);
-            }
-
-            if (! rename($temporary, $destination)) {
-                throw new PackageStateError('package version could not be committed');
-            }
-            $this->makeImmutable($destination);
-
-            return $manifest;
-        } finally {
-            if (is_dir($temporary)) {
-                $this->removeTree($temporary);
-            }
-        }
+        $this->umoci = $umoci ?? new Umoci();
     }
 
     /** Install a single-platform OCI image layout by its immutable manifest digest. */
@@ -82,59 +43,53 @@ final class PackageManager
             throw new PackageValidationError('OCI manifest digest is invalid');
         }
 
-        try {
-            $index = json_decode(Filesystem\read_file($layout . '/index.json'), true);
-        } catch (\Throwable) {
-            $index = null;
+        $stat = $this->umoci->stat($layout, 'stashd');
+        $manifestMetadata = $stat['manifest'] ?? null;
+        $descriptor = is_array($manifestMetadata) ? ($manifestMetadata['descriptor'] ?? null) : null;
+        $actualDigest = is_array($descriptor) ? ($descriptor['digest'] ?? null) : null;
+
+        if (! is_string($actualDigest) || ! hash_equals($manifestDigest, $actualDigest)) {
+            throw new PackageValidationError('OCI manifest digest does not match the requested package');
         }
+        $configMetadata = is_array($stat['config'] ?? null) ? $stat['config'] : [];
+        $config = is_array($configMetadata['blob'] ?? null) ? $configMetadata['blob'] : [];
+        $platformOs = is_string($config['os'] ?? null) ? $config['os'] : null;
+        $architecture = is_string($config['architecture'] ?? null) ? $config['architecture'] : null;
 
-        if (! is_array($index) || ! is_array($index['manifests'] ?? null)) {
-            throw new PackageValidationError('OCI index is invalid');
-        }
-        $entry = null;
-
-        foreach ($index['manifests'] as $candidate) {
-            if (is_array($candidate) && ($candidate['digest'] ?? null) === $manifestDigest) {
-                $entry = $candidate;
-
-                break;
-            }
-        }
-
-        if ($entry === null) {
-            throw new PackageValidationError('OCI manifest is not present in index');
-        }
-        $platform = is_array($entry['platform'] ?? null) ? $entry['platform'] : [];
-        $architecture = is_string($platform['architecture'] ?? null) ? $platform['architecture'] : null;
-        $platformOs = is_string($platform['os'] ?? null) ? $platform['os'] : 'linux';
-
-        if ($platformOs !== 'linux' || ($architecture !== null && $architecture !== self::architecture())) {
+        if ($platformOs !== 'linux' || $architecture !== ($this->architecture ?? self::architecture())) {
             throw new PackageValidationError('OCI plugin platform is incompatible');
         }
-        $manifestPath = $layout . '/blobs/sha256/' . substr($manifestDigest, 7);
-
-        if (! Filesystem\is_file($manifestPath) || ! hash_equals(substr($manifestDigest, 7), hash_file('sha256', $manifestPath) ?: '')) {
-            throw new PackageValidationError('OCI manifest checksum mismatch');
-        }
+        $temporary = $this->staging . '/install-' . bin2hex(random_bytes(10));
+        Filesystem\create_directory($temporary, 0700);
 
         try {
-            $manifest = json_decode(Filesystem\read_file($manifestPath), true);
-        } catch (\Throwable) {
-            $manifest = null;
-        }
+            $bundle = $temporary . '/bundle';
+            $this->umoci->unpack($layout, 'stashd', $bundle);
+            $rootfs = $bundle . '/rootfs';
+            $manifest = PackageManifest::fromFile($this->manifestPath($rootfs), $this->apiVersion, $this->architecture ?? self::architecture());
+            $entrypoint = $rootfs . '/' . $manifest->entrypoint;
 
-        if (! is_array($manifest) || ! is_array($manifest['layers'] ?? null) || count($manifest['layers']) !== 1) {
-            throw new PackageValidationError('OCI plugin manifest must contain one layer');
-        }
-        $layer = $manifest['layers'][0];
-        $digest = is_array($layer) && is_string($layer['digest'] ?? null) ? $layer['digest'] : '';
+            if (! Filesystem\is_file($entrypoint)) {
+                throw new PackageValidationError('manifest entrypoint is missing');
+            }
+            $destination = $this->packages . '/' . $manifest->id . '/' . $manifest->version;
 
-        if (! preg_match('/^sha256:[a-f0-9]{64}$/', $digest)) {
-            throw new PackageValidationError('OCI layer digest is invalid');
-        }
-        $archive = $layout . '/blobs/sha256/' . substr($digest, 7);
+            if (Filesystem\exists($destination) || is_link($destination)) {
+                throw new PackageStateError('plugin version is already installed');
+            }
+            Filesystem\create_directory(dirname($destination), 0700);
 
-        return $this->install($archive, substr($digest, 7));
+            if (! rename($rootfs, $destination)) {
+                throw new PackageStateError('package version could not be committed');
+            }
+            $this->makeImmutable($destination);
+
+            return $manifest;
+        } finally {
+            if (Filesystem\is_directory($temporary)) {
+                $this->removeTree($temporary);
+            }
+        }
     }
 
     public function activate(string $id, string $version): void
@@ -319,7 +274,8 @@ final class PackageManager
 
             return;
         }
-        chmod($path, $fileMode);
+        $mode = (fileperms($path) & 0111) !== 0 ? $fileMode | 0111 : $fileMode;
+        chmod($path, $mode);
     }
 
     private function removeTree(string $path): void

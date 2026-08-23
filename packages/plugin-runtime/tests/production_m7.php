@@ -9,6 +9,8 @@ use Stashd\PluginRuntime\Capabilities\HelperGrant;
 use Stashd\PluginRuntime\Capabilities\Invocation;
 use Stashd\PluginRuntime\Capabilities\TransportResponse;
 use Stashd\PluginRuntime\Package\PackageManager;
+use Stashd\PluginRuntime\Package\PluginBuilder;
+use Stashd\PluginRuntime\Package\Umoci;
 use Stashd\PluginRuntime\Rpc\FrameCodec;
 use Stashd\PluginRuntime\Runner\PluginRunner;
 use Stashd\PluginRuntime\Sandbox\SandboxPolicy;
@@ -43,7 +45,8 @@ require_once __DIR__ . '/../src/Capabilities/Invocation.php';
 require_once __DIR__ . '/../src/Package/PackageValidationError.php';
 require_once __DIR__ . '/../src/Package/PackageStateError.php';
 require_once __DIR__ . '/../src/Package/PackageManifest.php';
-require_once __DIR__ . '/../src/Package/TarArchive.php';
+require_once __DIR__ . '/../src/Package/Umoci.php';
+require_once __DIR__ . '/../src/Package/PluginBuilder.php';
 require_once __DIR__ . '/../src/Package/PackageManager.php';
 require_once __DIR__ . '/../src/Rpc/FrameCodec.php';
 require_once __DIR__ . '/../src/Sandbox/SandboxPolicy.php';
@@ -81,24 +84,35 @@ function m7Remove(string $path): void
     @rmdir($path);
 }
 
+function m7CopyTree(string $source, string $destination): void
+{
+    mkdir($destination, 0700, true);
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($source, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST) as $item) {
+        $target = $destination . '/' . substr($item->getPathname(), strlen($source) + 1);
+
+        if ($item->isLink()) {
+            if (! is_dir(dirname($target))) {
+                mkdir(dirname($target), 0700, true);
+            }
+            symlink(readlink($item->getPathname()) ?: '', $target);
+        } elseif ($item->isDir()) {
+            if (! is_dir($target)) {
+                mkdir($target, 0700, true);
+            }
+        } else {
+            if (! is_dir(dirname($target))) {
+                mkdir(dirname($target), 0700, true);
+            }
+            copy($item->getPathname(), $target);
+        }
+    }
+}
+
 function m7Assert(bool $condition, string $message): void
 {
     if (! $condition) {
         throw new RuntimeException($message);
-    }
-}
-
-function m7Archive(string $source, string $archive): void
-{
-    $files = ['plugin.json', 'plugin.php', 'rpc/FrameCodec.php', 'helpers/fixture-helper.php'];
-
-    foreach (glob($source . '/sdk/*.php') ?: [] as $sdkFile) {
-        $files[] = 'sdk/' . basename($sdkFile);
-    }
-    $process = proc_open(array_merge(['tar', '-czf', $archive, '-C', $source], $files), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-
-    if (! is_resource($process) || proc_close($process) !== 0) {
-        throw new RuntimeException('fixture archive failed');
     }
 }
 
@@ -340,6 +354,7 @@ try {
     mkdir($source . '/sdk', 0700, true);
     mkdir($source . '/rpc', 0700, true);
     mkdir($source . '/helpers', 0700, true);
+    mkdir($source . '/stashd-plugin', 0700, true);
     copy(__DIR__ . '/fixtures/fixture-plugin.php', $source . '/plugin.php');
     copy(__DIR__ . '/fixtures/fixture-helper.php', $source . '/helpers/fixture-helper.php');
 
@@ -347,19 +362,62 @@ try {
         copy($sdkFile, $source . '/sdk/' . basename($sdkFile));
     }
     copy(__DIR__ . '/fixtures/FrameCodec.php', $source . '/rpc/FrameCodec.php');
-    file_put_contents($source . '/plugin.json', json_encode([
+    file_put_contents($source . '/stashd-plugin/plugin.json', json_encode([
         'id' => 'm7-example', 'name' => 'M7 Example', 'version' => '1.0.0', 'runtime' => 'php',
         'api_version' => '0.1', 'entrypoint' => 'plugin.php',
         'requires' => ['php' => '>=8.5', 'extensions' => []], 'architectures' => ['amd64', 'arm64'],
     ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
-    $archive = $root . '/example.tar.gz';
-    m7Archive($source, $archive);
-    $manager = new PackageManager($root . '/plugins', '0.1', 'amd64');
-    $manifest = $manager->install($archive, hash_file('sha256', $archive));
+    file_put_contents($source . '/stashd-plugin/helpers.lock.json', '{"helpers":[]}');
+    file_put_contents($source . '/composer.json', '{"name":"stashd/m7-example","require":{"php":">=8.5"}}');
+    $composer = proc_open(['composer', 'update', '--working-dir=' . $source, '--no-install', '--no-interaction'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+
+    if (! is_resource($composer) || proc_close($composer) !== 0) {
+        throw new RuntimeException('fixture composer lock failed');
+    }
+    symlink('plugin.php', $source . '/plugin-link.php');
+    chmod($source . '/plugin.php', 0555);
+    $umociPath = getenv('STASHD_UMOCI_BINARY') ?: ((is_string(getenv('COMPOSER_HOME')) && is_file(getenv('COMPOSER_HOME') . '/umoci')) ? getenv('COMPOSER_HOME') . '/umoci' : Umoci::BINARY);
+    $umoci = new Umoci($umociPath);
+    $builder = new PluginBuilder($root . '/builds', $umoci);
+    $built = $builder->materialize($source, 'linux-amd64');
+    m7Assert(preg_match('/^sha256:[a-f0-9]{64}$/', $built['digest']) === 1, 'builder did not return a manifest digest');
+    $repeat = (new PluginBuilder($root . '/repeat-builds', $umoci))->materialize($source, 'linux-amd64');
+    m7Assert($repeat['digest'] === $built['digest'], 'deterministic plugin input changed the manifest digest');
+    $arm = (new PluginBuilder($root . '/arm-builds', $umoci))->materialize($source, 'linux-arm64');
+    m7Assert($arm['digest'] !== $built['digest'] && $arm['platform'] === 'linux-arm64', 'arm64 package metadata was not distinct');
+    $manager = new PackageManager($root . '/plugins', '0.1', 'amd64', $umoci);
+    $manifest = $manager->installOciLayout($built['layout'], $built['digest']);
     $manager->activate($manifest->id, $manifest->version);
     m7Assert($manager->activeVersion('m7-example') === '1.0.0', 'package was not activated');
     $package = $manager->activePath('m7-example');
     m7Assert($package !== null, 'active package path is missing');
+    m7Assert(is_link($package . '/plugin-link.php'), 'package symlink was not preserved');
+    m7Assert((fileperms($package . '/plugin.php') & 0111) !== 0, 'plugin executable mode was not preserved');
+
+    try {
+        $manager->installOciLayout($built['layout'], 'sha256:' . str_repeat('0', 64));
+
+        throw new RuntimeException('invalid OCI digest was accepted');
+    } catch (\Stashd\PluginRuntime\Package\PackageValidationError) {
+    }
+
+    try {
+        $manager->installOciLayout($arm['layout'], $arm['digest']);
+
+        throw new RuntimeException('arm64 package was accepted by an amd64 manager');
+    } catch (\Stashd\PluginRuntime\Package\PackageValidationError) {
+    }
+    $corrupt = $root . '/corrupt-layout';
+    m7CopyTree($built['layout'], $corrupt);
+    file_put_contents($corrupt . '/index.json', '{"schemaVersion":2,"manifests":[]}');
+
+    try {
+        $manager->installOciLayout($corrupt, $built['digest']);
+
+        throw new RuntimeException('corrupted OCI layout was accepted');
+    } catch (\Stashd\PluginRuntime\Package\PackageValidationError) {
+    }
+    m7Assert($manager->activeVersion('m7-example') === '1.0.0', 'failed install changed the active package');
     $runnerSmokeStage = m7Temp('stashd-production-runner');
     $productionRunner = new PluginRunner($manager, sdkRoot: $sdkRoot);
     $productionProcess = $productionRunner->start('m7-example', $runnerSmokeStage);
@@ -440,7 +498,7 @@ try {
     $retryRunner->close();
     m7Assert(count(glob($promotion . '/published/item-1.bin') ?: []) === 1, 'rebuild duplicated publication');
 
-    $empty = new PackageManager($root . '/empty/plugins', '0.1', 'amd64');
+    $empty = new PackageManager($root . '/empty/plugins', '0.1', 'amd64', $umoci);
     m7Assert($empty->activeVersion('missing-plugin') === null, 'absent plugin broke startup');
     m7Remove($root);
     echo "M7.5 production plugin runtime conformance: PASS\n";
