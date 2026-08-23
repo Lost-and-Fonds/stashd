@@ -12,11 +12,7 @@ use Stashd\PluginRuntime\Capabilities\Invocation;
 use Stashd\PluginRuntime\Package\PackageManager;
 use Stashd\PluginRuntime\Runner\PluginRunner;
 use Stashd\PluginSdk\ReadableResource;
-
-use function Tempest\Support\Filesystem\copy_file;
-use function Tempest\Support\Filesystem\create_directory;
-use function Tempest\Support\Filesystem\is_directory;
-use function Tempest\Support\Filesystem\list_directory;
+use Tempest\Support\Filesystem;
 
 final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
 {
@@ -113,7 +109,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
         $pluginStage = $stagingDirectory . '/.plugin-' . bin2hex(random_bytes(6));
 
         try {
-            create_directory($pluginStage, 0700);
+            Filesystem\create_directory($pluginStage, 0700);
         } catch (\Throwable $exception) {
             throw new RuntimeException('Plugin Broadcast staging could not be created.', 0, $exception);
         }
@@ -381,7 +377,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
 
     private function copyOutputs(string $source, string $destination): void
     {
-        foreach (list_directory($source) as $from) {
+        foreach (Filesystem\list_directory($source) as $from) {
             $entry = basename($from);
 
             if (str_starts_with($entry, '.')) {
@@ -389,15 +385,15 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             }
             $to = $destination . '/' . $entry;
 
-            if (is_directory($from)) {
-                if (! is_directory($to)) {
-                    create_directory($to, 0700);
+            if (Filesystem\is_directory($from)) {
+                if (! Filesystem\is_directory($to)) {
+                    Filesystem\create_directory($to, 0700);
                 }
                 $this->copyOutputs($from, $to);
 
                 continue;
             }
-            copy_file($from, $to, overwrite: true);
+            Filesystem\copy_file($from, $to, overwrite: true);
         }
     }
 }

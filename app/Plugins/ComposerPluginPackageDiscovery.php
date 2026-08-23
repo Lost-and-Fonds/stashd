@@ -6,10 +6,7 @@ namespace App\Plugins;
 
 use Composer\InstalledVersions;
 use RuntimeException;
-
-use function Tempest\Support\Filesystem\is_directory;
-use function Tempest\Support\Filesystem\list_directory;
-use function Tempest\Support\Filesystem\read_file;
+use Tempest\Support\Filesystem;
 
 final class ComposerPluginPackageDiscovery
 {
@@ -41,9 +38,9 @@ final class ComposerPluginPackageDiscovery
             $packages[] = ['name' => $name, 'root' => $root, 'manifest' => $manifest, 'manifest_path' => $manifestPath];
         }
 
-        if ($activeRoot !== null && is_directory($activeRoot)) {
-            foreach (list_directory($activeRoot) as $root) {
-                if (! is_directory($root)) {
+        if ($activeRoot !== null && Filesystem\is_directory($activeRoot)) {
+            foreach (Filesystem\list_directory($activeRoot) as $root) {
+                if (! Filesystem\is_directory($root)) {
                     continue;
                 }
                 $real = realpath($root);
@@ -77,7 +74,7 @@ final class ComposerPluginPackageDiscovery
     private function readJson(string $path): ?array
     {
         try {
-            $value = json_decode(read_file($path), true, 512, JSON_THROW_ON_ERROR);
+            $value = json_decode(Filesystem\read_file($path), true, 512, JSON_THROW_ON_ERROR);
         } catch (\Throwable) {
             return null;
         }

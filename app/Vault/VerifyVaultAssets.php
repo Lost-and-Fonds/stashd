@@ -11,9 +11,7 @@ use App\System\Storage\StorageLocationState;
 use Closure;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
-
-use function Tempest\Support\Filesystem\is_file;
-use function Tempest\Support\Filesystem\is_readable;
+use Tempest\Support\Filesystem;
 
 final readonly class VerifyVaultAssets
 {
@@ -110,7 +108,7 @@ final readonly class VerifyVaultAssets
             return VerifyAssetOutcome::Skipped;
         }
 
-        if (! is_file($asset->path) || ! is_readable($asset->path)) {
+        if (! Filesystem\is_file($asset->path) || ! Filesystem\is_readable($asset->path)) {
             return $this->markMissing($asset);
         }
 

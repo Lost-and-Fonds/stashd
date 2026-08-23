@@ -13,9 +13,7 @@ use App\Vault\AssetId;
 use App\Vault\AssetRecord;
 use RuntimeException;
 use SensitiveParameter;
-
-use function Tempest\Support\Filesystem\is_file;
-use function Tempest\Support\Filesystem\is_readable;
+use Tempest\Support\Filesystem;
 
 final readonly class PublishedResourceService
 {
@@ -177,7 +175,7 @@ final readonly class PublishedResourceService
             );
         }
 
-        if ($path === null || ! is_file($path) || ! is_readable($path)) {
+        if ($path === null || ! Filesystem\is_file($path) || ! Filesystem\is_readable($path)) {
             throw new RuntimeException('Published resource is unavailable.');
         }
 

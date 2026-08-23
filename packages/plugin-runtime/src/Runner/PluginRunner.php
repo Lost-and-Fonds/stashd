@@ -7,9 +7,7 @@ namespace Stashd\PluginRuntime\Runner;
 use RuntimeException;
 use Stashd\PluginRuntime\Package\PackageManager;
 use Stashd\PluginRuntime\Sandbox\SandboxPolicy;
-
-use function Tempest\Support\Filesystem\is_file;
-use function Tempest\Support\Filesystem\read_file;
+use Tempest\Support\Filesystem;
 
 final readonly class PluginRunner
 {
@@ -22,8 +20,8 @@ final readonly class PluginRunner
         if ($package === null) {
             throw new RuntimeException('plugin is not active: ' . $pluginId);
         }
-        $manifestPath = is_file($package . '/plugin.json') ? $package . '/plugin.json' : $package . '/stashd-plugin/plugin.json';
-        $manifest = json_decode(read_file($manifestPath), true, 512, JSON_THROW_ON_ERROR);
+        $manifestPath = Filesystem\is_file($package . '/plugin.json') ? $package . '/plugin.json' : $package . '/stashd-plugin/plugin.json';
+        $manifest = json_decode(Filesystem\read_file($manifestPath), true, 512, JSON_THROW_ON_ERROR);
 
         if (! is_array($manifest)) {
             throw new RuntimeException('active plugin manifest is invalid');

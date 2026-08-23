@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
-use function Tempest\Support\Filesystem\create_directory;
-
+use Tempest\Support\Filesystem;
 use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 /** Atomically writes generated broadcast sidecars (NFO, etc.). */
@@ -16,7 +15,7 @@ final class BroadcastSidecarWriter
         $directory = dirname($absolutePath);
 
         try {
-            create_directory($directory, 0o775);
+            Filesystem\create_directory($directory, 0o775);
         } catch (FilesystemException) {
             throw BroadcastException::withCode(
                 'broadcast_sidecar_write_failed',

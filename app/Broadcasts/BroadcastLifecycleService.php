@@ -11,8 +11,7 @@ use RecursiveIteratorIterator;
 use SplFileInfo;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
-
-use function Tempest\Support\Filesystem\is_directory;
+use Tempest\Support\Filesystem;
 
 final readonly class BroadcastLifecycleService
 {
@@ -237,7 +236,7 @@ final readonly class BroadcastLifecycleService
             throw BroadcastException::withCode('broadcast_destination_conflict', 'Broadcast root cannot be a symlink.');
         }
 
-        if (is_directory($root)) {
+        if (Filesystem\is_directory($root)) {
             /** @var SplFileInfo $entry */
             foreach (new RecursiveIteratorIterator(
                 new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS),

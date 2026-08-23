@@ -14,13 +14,7 @@ use Stashd\PluginSdk\ReadableResource;
 use Tempest\DateTime\Duration;
 use Tempest\Process\GenericProcessExecutor;
 use Tempest\Process\PendingProcess;
-
-use function Tempest\Support\Filesystem\create_directory;
-use function Tempest\Support\Filesystem\is_directory;
-use function Tempest\Support\Filesystem\is_file;
-use function Tempest\Support\Filesystem\list_directory;
-use function Tempest\Support\Filesystem\read_file;
-use function Tempest\Support\Filesystem\write_file;
+use Tempest\Support\Filesystem;
 
 final class Invocation
 {
@@ -65,13 +59,13 @@ final class Invocation
         $this->packageRoot = $this->withinRoot($packageRoot, 'package');
 
         try {
-            create_directory($stagingRoot, 0700);
+            Filesystem\create_directory($stagingRoot, 0700);
         } catch (\Throwable $exception) {
             throw new RuntimeException('staging root could not be created', 0, $exception);
         }
         $this->stagingRoot = $this->withinRoot($stagingRoot, 'staging');
         $this->resourceRoot = $this->stagingRoot . '/.resources';
-        create_directory($this->resourceRoot, 0700);
+        Filesystem\create_directory($this->resourceRoot, 0700);
 
         foreach ($credentials as $credential) {
             $this->credentials[$credential->reference] = $credential;
@@ -122,13 +116,13 @@ final class Invocation
             fclose($handle);
 
             if ($size <= $this->inlineLimit) {
-                $bodyValue = read_file($resourcePath);
+                $bodyValue = Filesystem\read_file($resourcePath);
                 unlink($resourcePath);
 
                 return new HttpResponse($response->status, $response->headers, $bodyValue);
             }
             $resource = new FileResource($resourcePath, function () use ($resourcePath): void {
-                if (is_file($resourcePath)) {
+                if (Filesystem\is_file($resourcePath)) {
                     unlink($resourcePath);
                 }
             });
@@ -156,7 +150,7 @@ final class Invocation
         $root = $this->withinRoot($this->assetRoot, 'asset root');
         $real = realpath($path);
 
-        if ($real === false || ! is_file($real) || ! $this->isBelow($real, $root)) {
+        if ($real === false || ! Filesystem\is_file($real) || ! $this->isBelow($real, $root)) {
             throw new CapabilityDenied('asset is outside the granted asset root');
         }
         $this->assets[$reference] = $real;
@@ -180,7 +174,7 @@ final class Invocation
         $relative = $this->safeRelative($grant->relativeExecutable);
         $package = realpath($this->packageRoot . '/' . $relative);
 
-        if ($package === false || ! $this->isBelow($package, $this->packageRoot) || ! is_file($package)) {
+        if ($package === false || ! $this->isBelow($package, $this->packageRoot) || ! Filesystem\is_file($package)) {
             throw new CapabilityDenied('helper is outside the package');
         }
 
@@ -190,9 +184,9 @@ final class Invocation
             }
         }
         $etc = $this->stagingRoot . '/.helper-etc';
-        create_directory($etc, 0700);
-        write_file($etc . '/passwd', "plugin:x:1000:1000:plugin:/tmp:/bin/sh\n");
-        write_file($etc . '/group', "plugin:x:1000:\n");
+        Filesystem\create_directory($etc, 0700);
+        Filesystem\write_file($etc . '/passwd', "plugin:x:1000:1000:plugin:/tmp:/bin/sh\n");
+        Filesystem\write_file($etc . '/group', "plugin:x:1000:\n");
         $command = $this->sandboxPolicy->command($this->packageRoot, $this->stagingRoot, $relative, $etc, null, $grant->network);
 
         if (! str_ends_with($relative, '.php')) {
@@ -367,7 +361,7 @@ final class Invocation
     {
         $real = realpath($path);
 
-        if ($real === false || ! is_directory($real)) {
+        if ($real === false || ! Filesystem\is_directory($real)) {
             throw new RuntimeException($label . ' does not exist');
         }
 
@@ -381,17 +375,17 @@ final class Invocation
 
     private function removeTree(string $path): void
     {
-        if (is_link($path) || is_file($path)) {
+        if (is_link($path) || Filesystem\is_file($path)) {
             @unlink($path);
 
             return;
         }
 
-        if (! is_directory($path)) {
+        if (! Filesystem\is_directory($path)) {
             return;
         }
 
-        foreach (list_directory($path) as $entry) {
+        foreach (Filesystem\list_directory($path) as $entry) {
             $this->removeTree($entry);
         }
         @rmdir($path);

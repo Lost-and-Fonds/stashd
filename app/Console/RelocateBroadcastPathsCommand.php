@@ -16,9 +16,7 @@ use Tempest\Console\ConsoleCommand;
 use Tempest\Console\ExitCode;
 use Tempest\Console\HasConsole;
 use Tempest\Console\Middleware\CautionMiddleware;
-
-use function Tempest\Support\Filesystem\create_directory;
-
+use Tempest\Support\Filesystem;
 use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 /**
@@ -80,7 +78,7 @@ final readonly class RelocateBroadcastPathsCommand
             }
 
             try {
-                create_directory(dirname($newRoot), 0o775);
+                Filesystem\create_directory(dirname($newRoot), 0o775);
             } catch (FilesystemException) {
                 $this->console->error("Skipping {$broadcast->name} ({$broadcast->id}): could not create {$newRoot}'s parent directory.");
                 $skipped++;

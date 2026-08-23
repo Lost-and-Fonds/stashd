@@ -16,8 +16,7 @@ use Tempest\Console\Middleware\CautionMiddleware;
 use Tempest\Console\Middleware\ForceMiddleware;
 use Tempest\Core\Environment;
 use Tempest\Framework\Commands\MigrateFreshCommand;
-
-use function Tempest\Support\Filesystem\ensure_directory_empty;
+use Tempest\Support\Filesystem;
 
 final readonly class RebuildCommand
 {
@@ -95,6 +94,6 @@ final readonly class RebuildCommand
 
     private function clearDirectory(string $root): void
     {
-        ensure_directory_empty($root);
+        Filesystem\ensure_directory_empty($root);
     }
 }

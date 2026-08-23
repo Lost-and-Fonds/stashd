@@ -7,14 +7,8 @@ namespace App\Vault;
 use App\Config\StashdConfig;
 use App\Support\PrefixedUlid;
 use RuntimeException;
-
-use function Tempest\Support\Filesystem\create_directory;
-use function Tempest\Support\Filesystem\delete_directory;
-
+use Tempest\Support\Filesystem;
 use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
-
-use function Tempest\Support\Filesystem\is_directory;
-use function Tempest\Support\Filesystem\write_file;
 
 final readonly class StageDownloadFiles
 {
@@ -26,12 +20,12 @@ final readonly class StageDownloadFiles
     {
         $path = rtrim($this->config->tempPath(), '/') . '/downloads/' . $jobId->toString();
 
-        if (is_directory($path)) {
-            delete_directory($path);
+        if (Filesystem\is_directory($path)) {
+            Filesystem\delete_directory($path);
         }
 
         try {
-            create_directory($path, 0o775);
+            Filesystem\create_directory($path, 0o775);
         } catch (FilesystemException) {
             throw new RuntimeException("Unable to create temp download directory: {$path}");
         }
@@ -41,18 +35,18 @@ final readonly class StageDownloadFiles
 
     public function cleanupSuccess(string $path): void
     {
-        if (is_directory($path)) {
-            delete_directory($path);
+        if (Filesystem\is_directory($path)) {
+            Filesystem\delete_directory($path);
         }
     }
 
     public function markFailed(string $path): void
     {
-        if (! is_directory($path)) {
+        if (! Filesystem\is_directory($path)) {
             return;
         }
 
         $marker = rtrim($path, '/') . '/.failed';
-        write_file($marker, gmdate('c'));
+        Filesystem\write_file($marker, gmdate('c'));
     }
 }

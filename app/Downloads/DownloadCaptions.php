@@ -15,9 +15,7 @@ use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 use App\Vault\MoveFileIntoVault;
 use App\Vault\VaultPathBuilder;
-
-use function Tempest\Support\Filesystem\create_directory;
-
+use Tempest\Support\Filesystem;
 use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 final readonly class DownloadCaptions
@@ -30,7 +28,7 @@ final readonly class DownloadCaptions
         $temp = sys_get_temp_dir() . '/stashd-captions-' . $jobId;
 
         try {
-            create_directory($temp, 0o775);
+            Filesystem\create_directory($temp, 0o775);
         } catch (FilesystemException) {
             throw DownloadException::withCode('temp_not_writable', 'Could not create caption staging directory.');
         }

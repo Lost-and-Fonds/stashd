@@ -16,10 +16,8 @@ use App\Vault\AssetRole;
 use App\Vault\VaultSidecarBuilder;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+use Tempest\Support\Filesystem;
 
-use function Tempest\Support\Filesystem\is_directory;
-use function Tempest\Support\Filesystem\is_writable;
-use function Tempest\Support\Filesystem\write_file;
 use function Tempest\Support\str;
 
 /**
@@ -56,7 +54,7 @@ final readonly class FakeDownloader implements DownloaderInterface
 
     public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult
     {
-        if (! is_directory($request->tempDirectory) || ! is_writable($request->tempDirectory)) {
+        if (! Filesystem\is_directory($request->tempDirectory) || ! Filesystem\is_writable($request->tempDirectory)) {
             throw DownloadException::withCode('temp_not_writable', 'Temp download directory is not writable.');
         }
 
@@ -99,7 +97,7 @@ final readonly class FakeDownloader implements DownloaderInterface
             $request->providerItemId,
             $request->downloadPolicy->value,
         );
-        write_file($path, $content);
+        Filesystem\write_file($path, $content);
 
         return new DownloadedFile(
             tempPath: $path,
@@ -117,7 +115,7 @@ final readonly class FakeDownloader implements DownloaderInterface
     {
         $path = $this->tempPath($request, 'source-thumbnail.jpg');
         $content = "fake-jpeg\n{$request->providerItemId}\n";
-        write_file($path, $content);
+        Filesystem\write_file($path, $content);
 
         return new DownloadedFile(
             tempPath: $path,
@@ -134,7 +132,7 @@ final readonly class FakeDownloader implements DownloaderInterface
     {
         $path = $this->tempPath($request, 'metadata.json');
         $payload = $this->sidecars->metadata($request, $capturedAt);
-        write_file($path, $payload);
+        Filesystem\write_file($path, $payload);
 
         return new DownloadedFile(
             tempPath: $path,
@@ -158,7 +156,7 @@ final readonly class FakeDownloader implements DownloaderInterface
             attemptedAt: $attemptedAt,
         );
         $payload = $this->sidecars->sourceJson($request, $result);
-        write_file($path, $payload);
+        Filesystem\write_file($path, $payload);
 
         return new DownloadedFile(
             tempPath: $path,

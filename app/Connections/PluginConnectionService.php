@@ -10,10 +10,7 @@ use App\Support\PrefixedUlid;
 use App\System\Secret\SecretRepository;
 use App\System\Secret\SecretsService;
 use App\System\Secret\SecretType;
-
-use function Tempest\Support\Filesystem\create_directory;
-use function Tempest\Support\Filesystem\delete_directory;
-use function Tempest\Support\Filesystem\is_directory;
+use Tempest\Support\Filesystem;
 
 final readonly class PluginConnectionService
 {
@@ -142,7 +139,7 @@ final readonly class PluginConnectionService
         $stage = sys_get_temp_dir() . '/stashd-external-connection-' . bin2hex(random_bytes(6));
 
         try {
-            create_directory($stage, 0o775);
+            Filesystem\create_directory($stage, 0o775);
         } catch (\Throwable $exception) {
             throw ConnectionException::withCode('connection_unavailable', 'Could not create operation staging directory.', $exception);
         }
@@ -169,8 +166,8 @@ final readonly class PluginConnectionService
         } catch (\Throwable $exception) {
             throw ConnectionException::withCode('connection_unavailable', 'Connection operation failed.', $exception);
         } finally {
-            if (is_directory($stage)) {
-                delete_directory($stage);
+            if (Filesystem\is_directory($stage)) {
+                Filesystem\delete_directory($stage);
             }
         }
     }

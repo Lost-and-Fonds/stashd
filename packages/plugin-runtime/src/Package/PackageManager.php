@@ -5,13 +5,7 @@ declare(strict_types=1);
 namespace Stashd\PluginRuntime\Package;
 
 use RuntimeException;
-
-use function Tempest\Support\Filesystem\create_directory;
-use function Tempest\Support\Filesystem\exists;
-use function Tempest\Support\Filesystem\is_directory;
-use function Tempest\Support\Filesystem\is_file;
-use function Tempest\Support\Filesystem\list_directory;
-use function Tempest\Support\Filesystem\read_file;
+use Tempest\Support\Filesystem;
 
 final class PackageManager
 {
@@ -32,7 +26,7 @@ final class PackageManager
 
         foreach ([$this->packages, $this->active, $this->links, $this->staging] as $directory) {
             try {
-                create_directory($directory, 0700);
+                Filesystem\create_directory($directory, 0700);
             } catch (\Throwable $exception) {
                 throw new RuntimeException('package directory could not be created');
             }
@@ -41,29 +35,29 @@ final class PackageManager
 
     public function install(string $archive, string $expectedSha256): PackageManifest
     {
-        if (! is_file($archive) || ! hash_equals(strtolower($expectedSha256), hash_file('sha256', $archive) ?: '')) {
+        if (! Filesystem\is_file($archive) || ! hash_equals(strtolower($expectedSha256), hash_file('sha256', $archive) ?: '')) {
             throw new PackageValidationError('package checksum mismatch');
         }
         $temporary = $this->staging . '/install-' . bin2hex(random_bytes(10));
-        create_directory($temporary, 0700);
+        Filesystem\create_directory($temporary, 0700);
 
         try {
             TarArchive::extract($archive, $temporary);
             $manifest = PackageManifest::fromFile($this->manifestPath($temporary), $this->apiVersion, $this->architecture ?? self::architecture());
             $entrypoint = $temporary . '/' . $manifest->entrypoint;
 
-            if (! is_file($entrypoint)) {
+            if (! Filesystem\is_file($entrypoint)) {
                 throw new PackageValidationError('manifest entrypoint is missing');
             }
             $destination = $this->packages . '/' . $manifest->id . '/' . $manifest->version;
 
-            if (exists($destination) || is_link($destination)) {
+            if (Filesystem\exists($destination) || is_link($destination)) {
                 throw new PackageStateError('plugin version is already installed');
             }
             $parent = dirname($destination);
 
             try {
-                create_directory($parent, 0700);
+                Filesystem\create_directory($parent, 0700);
             } catch (\Throwable $exception) {
                 throw new PackageStateError('package version directory could not be created', 0, $exception);
             }
@@ -89,7 +83,7 @@ final class PackageManager
         }
 
         try {
-            $index = json_decode(read_file($layout . '/index.json'), true);
+            $index = json_decode(Filesystem\read_file($layout . '/index.json'), true);
         } catch (\Throwable) {
             $index = null;
         }
@@ -119,12 +113,12 @@ final class PackageManager
         }
         $manifestPath = $layout . '/blobs/sha256/' . substr($manifestDigest, 7);
 
-        if (! is_file($manifestPath) || ! hash_equals(substr($manifestDigest, 7), hash_file('sha256', $manifestPath) ?: '')) {
+        if (! Filesystem\is_file($manifestPath) || ! hash_equals(substr($manifestDigest, 7), hash_file('sha256', $manifestPath) ?: '')) {
             throw new PackageValidationError('OCI manifest checksum mismatch');
         }
 
         try {
-            $manifest = json_decode(read_file($manifestPath), true);
+            $manifest = json_decode(Filesystem\read_file($manifestPath), true);
         } catch (\Throwable) {
             $manifest = null;
         }
@@ -149,7 +143,7 @@ final class PackageManager
         $this->validateVersion($version);
         $package = $this->packages . '/' . $id . '/' . $version;
 
-        if (! is_dir($package) || ! is_file($this->manifestPath($package))) {
+        if (! is_dir($package) || ! Filesystem\is_file($this->manifestPath($package))) {
             throw new PackageStateError('plugin version is not installed');
         }
         $current = $this->active . '/' . $id;
@@ -176,7 +170,7 @@ final class PackageManager
         $this->validateId($id);
         $path = $this->active . '/' . $id;
 
-        if (is_link($path) || is_file($path)) {
+        if (is_link($path) || Filesystem\is_file($path)) {
             unlink($path);
         }
     }
@@ -191,7 +185,7 @@ final class PackageManager
         }
         $path = $this->packages . '/' . $id . '/' . $version;
 
-        if (is_directory($path)) {
+        if (Filesystem\is_directory($path)) {
             $this->makeMutable($path);
             $this->removeTree($path);
         }
@@ -203,7 +197,7 @@ final class PackageManager
         $source = realpath($source) ?: throw new PackageValidationError('linked source does not exist');
         $manifest = PackageManifest::fromFile($this->manifestPath($source), $this->apiVersion, $this->architecture ?? self::architecture());
 
-        if (! is_file($source . '/' . $manifest->entrypoint)) {
+        if (! Filesystem\is_file($source . '/' . $manifest->entrypoint)) {
             throw new PackageValidationError('linked entrypoint is missing');
         }
         $this->disable($id);
@@ -248,7 +242,7 @@ final class PackageManager
         }
         $manifest = $this->manifestPath(realpath($path) ?: $path);
 
-        if (! is_file($manifest)) {
+        if (! Filesystem\is_file($manifest)) {
             return null;
         }
 
@@ -283,7 +277,7 @@ final class PackageManager
     {
         $root = rtrim($package, '/');
 
-        return is_file($root . '/plugin.json') ? $root . '/plugin.json' : $root . '/stashd-plugin/plugin.json';
+        return Filesystem\is_file($root . '/plugin.json') ? $root . '/plugin.json' : $root . '/stashd-plugin/plugin.json';
     }
 
     private function validateVersion(string $version): void
@@ -316,10 +310,10 @@ final class PackageManager
             return;
         }
 
-        if (is_directory($path)) {
+        if (Filesystem\is_directory($path)) {
             chmod($path, $directoryMode);
 
-            foreach (list_directory($path) as $entry) {
+            foreach (Filesystem\list_directory($path) as $entry) {
                 $this->walkMode($entry, $fileMode, $directoryMode);
             }
 
@@ -330,17 +324,17 @@ final class PackageManager
 
     private function removeTree(string $path): void
     {
-        if (is_link($path) || is_file($path)) {
+        if (is_link($path) || Filesystem\is_file($path)) {
             @unlink($path);
 
             return;
         }
 
-        if (! is_directory($path)) {
+        if (! Filesystem\is_directory($path)) {
             return;
         }
 
-        foreach (list_directory($path) as $entry) {
+        foreach (Filesystem\list_directory($path) as $entry) {
             $this->removeTree($entry);
         }
         @rmdir($path);

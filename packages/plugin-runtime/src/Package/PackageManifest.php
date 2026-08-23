@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Stashd\PluginRuntime\Package;
 
 use Composer\Semver\Semver;
-
-use function Tempest\Support\Filesystem\is_file;
-use function Tempest\Support\Filesystem\read_file;
+use Tempest\Support\Filesystem;
 
 final readonly class PackageManifest
 {
@@ -29,12 +27,12 @@ final readonly class PackageManifest
 
     public static function fromFile(string $path, string $apiVersion = '0.1', ?string $architecture = null): self
     {
-        if (! is_file($path)) {
+        if (! Filesystem\is_file($path)) {
             throw new PackageValidationError('plugin.json is missing');
         }
 
         try {
-            $data = json_decode(read_file($path), true, 512, JSON_THROW_ON_ERROR);
+            $data = json_decode(Filesystem\read_file($path), true, 512, JSON_THROW_ON_ERROR);
         } catch (\Throwable $exception) {
             throw new PackageValidationError('plugin.json is invalid JSON', 0, $exception);
         }

@@ -6,12 +6,8 @@ namespace App\System\Storage;
 
 use App\Config\StashdConfig;
 use RuntimeException;
-
-use function Tempest\Support\Filesystem\create_directory;
-
+use Tempest\Support\Filesystem;
 use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
-
-use function Tempest\Support\Filesystem\is_directory;
 
 final readonly class StorageRootService
 {
@@ -25,12 +21,12 @@ final readonly class StorageRootService
         $created = [];
 
         foreach ($this->requiredPaths() as $path) {
-            if (is_directory($path)) {
+            if (Filesystem\is_directory($path)) {
                 continue;
             }
 
             try {
-                create_directory($path, 0o775);
+                Filesystem\create_directory($path, 0o775);
             } catch (FilesystemException) {
                 throw new RuntimeException("Stashd cannot create directory: {$path}");
             }

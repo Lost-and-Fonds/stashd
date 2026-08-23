@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\Plugins;
 
 use RuntimeException;
-
-use function Tempest\Support\Filesystem\is_file;
+use Tempest\Support\Filesystem;
 
 /** Data-only registration for an external Broadcast Component. */
 final readonly class ExternalBroadcastPluginDefinition
@@ -102,7 +101,7 @@ final readonly class ExternalBroadcastPluginDefinition
 
                 $candidate = $packageRoot . '/' . ltrim($relative, '/');
 
-                if (! is_file($candidate)) {
+                if (! Filesystem\is_file($candidate)) {
                     $componentPackageRoot = dirname($componentPath);
                     $packageName = basename($packageRoot);
 
@@ -175,7 +174,7 @@ final readonly class ExternalBroadcastPluginDefinition
     {
         $executable = $this->helpers[$name] ?? null;
 
-        return $executable !== null && is_file($executable)
+        return $executable !== null && Filesystem\is_file($executable)
             ? new PluginHelperGrant($name, $executable, $this->packageRoot)
             : null;
     }

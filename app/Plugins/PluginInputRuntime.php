@@ -31,9 +31,7 @@ use Stashd\PluginRuntime\Package\PackageManager;
 use Stashd\PluginRuntime\Runner\PluginRunner;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
-
-use function Tempest\Support\Filesystem\is_directory;
-use function Tempest\Support\Filesystem\is_file;
+use Tempest\Support\Filesystem;
 
 final readonly class PluginInputRuntime implements Provider, DownloaderInterface
 {
@@ -116,7 +114,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
             $reference = (string) ($artifact['reference'] ?? '');
             $path = rtrim($request->tempDirectory, '/') . '/' . $reference;
 
-            if ($reference === '' || str_contains($reference, '..') || ! is_file($path)) {
+            if ($reference === '' || str_contains($reference, '..') || ! Filesystem\is_file($path)) {
                 continue;
             }
             $mime = is_string($artifact['media-type'] ?? null) ? $artifact['media-type'] : null;
@@ -223,7 +221,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
                 $source = $from . '/' . $file;
                 $target = $to . '/' . $file;
 
-                if (is_file($source)) {
+                if (Filesystem\is_file($source)) {
                     rename($source, $target);
                 }
             }

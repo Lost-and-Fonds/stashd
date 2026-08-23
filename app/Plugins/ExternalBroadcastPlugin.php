@@ -47,15 +47,7 @@ use App\Vault\VaultPathBuilder;
 use Tempest\Database\PrimaryKey;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
-
-use function Tempest\Support\Filesystem\copy_file;
-use function Tempest\Support\Filesystem\create_directory;
-use function Tempest\Support\Filesystem\delete_directory;
-use function Tempest\Support\Filesystem\delete_file;
-use function Tempest\Support\Filesystem\is_directory;
-use function Tempest\Support\Filesystem\is_file;
-use function Tempest\Support\Filesystem\is_readable;
-use function Tempest\Support\Filesystem\list_directory;
+use Tempest\Support\Filesystem;
 
 /** Generic application adapter for manifest-registered Broadcast Components. */
 final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, BroadcastPluginActions, BroadcastPluginPolicy, BroadcastPluginPresentation, BroadcastPluginSourceOptions
@@ -145,7 +137,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         $stage = sys_get_temp_dir() . '/stashd-broadcast-plugin-' . bin2hex(random_bytes(8));
 
         try {
-            create_directory($stage, 0o775);
+            Filesystem\create_directory($stage, 0o775);
         } catch (\Throwable $exception) {
             throw BroadcastException::withCode('broadcast_plugin_staging_failed', 'Broadcast plugin staging could not be created.', $exception);
         }
@@ -278,13 +270,13 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             $publication = $result->publication;
             $reference = $publication['artifact']['reference'] ?? null;
 
-            if ($this->definition->outputPath !== null && (! is_string($reference) || ! is_file($stage . '/' . $reference))) {
+            if ($this->definition->outputPath !== null && (! is_string($reference) || ! Filesystem\is_file($stage . '/' . $reference))) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned no valid output artifact.');
             }
 
             if ($this->definition->outputPath !== null) {
                 $outputPath = $this->paths->broadcastFile($context->broadcast, ...explode('/', $this->definition->outputPath));
-                copy_file($stage . '/' . $reference, $outputPath, overwrite: true);
+                Filesystem\copy_file($stage . '/' . $reference, $outputPath, overwrite: true);
             }
             $this->publishFiles($context, $publication['files'] ?? [], $stagedAssets);
             $this->runtime()->finalize(
@@ -321,13 +313,13 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         if ($this->definition->outputPath !== null) {
             $path = $this->paths->broadcastFile($context->broadcast, ...explode('/', $this->definition->outputPath));
 
-            if (! is_file($path) || ! is_readable($path)) {
+            if (! Filesystem\is_file($path) || ! Filesystem\is_readable($path)) {
                 $missing[] = $this->definition->outputPath;
             }
         }
 
         foreach ($this->items->listForBroadcast(BroadcastId::fromPrimaryKey($context->broadcast->id)) as $item) {
-            if ($item->publishedPath !== null && ! is_file($item->publishedPath)) {
+            if ($item->publishedPath !== null && ! Filesystem\is_file($item->publishedPath)) {
                 $missing[] = $item->publishedPath;
                 $item->lastError = 'broadcast_item_output_missing';
 
@@ -349,19 +341,19 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         if ($this->definition->outputPath !== null) {
             $path = $this->paths->broadcastFile($context->broadcast, ...explode('/', $this->definition->outputPath));
 
-            if (is_file($path) && $this->tryDeleteFile($path)) {
+            if (Filesystem\is_file($path) && $this->tryDeleteFile($path)) {
                 $removed[] = $path;
             }
         }
 
         foreach ($this->items->listForBroadcast(BroadcastId::fromPrimaryKey($context->broadcast->id)) as $item) {
-            if ($item->publishedPath !== null && is_file($item->publishedPath) && $this->tryDeleteFile($item->publishedPath)) {
+            if ($item->publishedPath !== null && Filesystem\is_file($item->publishedPath) && $this->tryDeleteFile($item->publishedPath)) {
                 $removed[] = $item->publishedPath;
             }
         }
         $root = $this->paths->claimRoot($context->broadcast);
 
-        foreach (list_directory($root) as $path) {
+        foreach (Filesystem\list_directory($root) as $path) {
             if (str_starts_with(basename($path), '.')) {
                 continue;
             }
@@ -378,7 +370,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     /** @param list<string> $removed */
     private function removeGeneratedPath(string $path, array &$removed): void
     {
-        if (is_link($path) || is_file($path)) {
+        if (is_link($path) || Filesystem\is_file($path)) {
             if ($this->tryDeleteFile($path)) {
                 $removed[] = $path;
             }
@@ -390,7 +382,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             return;
         }
 
-        foreach (list_directory($path) as $child) {
+        foreach (Filesystem\list_directory($path) as $child) {
             if (str_starts_with(basename($child), '.')) {
                 continue;
             }
@@ -593,7 +585,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             $source = $stagedAssets[$file['source_reference']] ?? null;
             $sourcePath = $source instanceof AssetRecord ? $source->path : null;
 
-            if (! $source instanceof AssetRecord || $sourcePath === null || ! is_file($sourcePath)) {
+            if (! $source instanceof AssetRecord || $sourcePath === null || ! Filesystem\is_file($sourcePath)) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an unavailable source resource.');
             }
             $item = null;
@@ -639,7 +631,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     ): void {
         $asset = $this->assets->findByBroadcastItemAndRole(BroadcastItemId::fromPrimaryKey($item->id), AssetRole::Hardlink);
         $sourcePath = $source->path;
-        $size = $sourcePath !== null && is_file($sourcePath) ? filesize($sourcePath) : null;
+        $size = $sourcePath !== null && Filesystem\is_file($sourcePath) ? filesize($sourcePath) : null;
 
         if ($asset === null) {
             $asset = $this->assets->create(
@@ -696,7 +688,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 $destination = $stage . '/' . $reference;
 
                 try {
-                    copy_file($asset->path, $destination, overwrite: true);
+                    Filesystem\copy_file($asset->path, $destination, overwrite: true);
                 } catch (\Throwable $exception) {
                     throw BroadcastException::withCode('broadcast_plugin_staging_failed', 'Broadcast asset could not be staged.', $exception);
                 }
@@ -734,7 +726,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             $sourceId = $source?->id;
             $stagePath = $stage . '/' . $reference;
 
-            if (! $source instanceof AssetRecord || $sourceId === null || ! is_file($stagePath)) {
+            if (! $source instanceof AssetRecord || $sourceId === null || ! Filesystem\is_file($stagePath)) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an unavailable derived artifact.');
             }
             $media = $context->mediaItems[$this->itemMediaId($context, $itemId)] ?? null;
@@ -751,12 +743,12 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             if ($existing instanceof AssetRecord
                 && $existing->state === AssetState::Ready
                 && $existing->path !== null
-                && is_file($existing->path)
+                && Filesystem\is_file($existing->path)
                 && (string) $existing->derivedFromAssetId === (string) $sourceId) {
                 continue;
             }
 
-            if ($existing instanceof AssetRecord && $existing->path !== null && is_file($existing->path)) {
+            if ($existing instanceof AssetRecord && $existing->path !== null && Filesystem\is_file($existing->path)) {
                 $this->tryDeleteFile($existing->path);
             }
             $this->mover->moveIntoPlace($stagePath, $destination);
@@ -808,7 +800,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     private function removeStage(string $stage): void
     {
         try {
-            delete_directory($stage);
+            Filesystem\delete_directory($stage);
         } catch (\Throwable) {
             // Best-effort cleanup must not mask the publication result.
         }
@@ -817,7 +809,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     private function tryDeleteFile(string $path): bool
     {
         try {
-            delete_file($path);
+            Filesystem\delete_file($path);
 
             return true;
         } catch (\Throwable) {

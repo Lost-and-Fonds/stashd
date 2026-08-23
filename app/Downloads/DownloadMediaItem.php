@@ -32,12 +32,7 @@ use App\Vault\VaultPathBuilder;
 use InvalidArgumentException;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
-
-use function Tempest\Support\Filesystem\delete_file;
-use function Tempest\Support\Filesystem\is_directory;
-use function Tempest\Support\Filesystem\is_file;
-use function Tempest\Support\Filesystem\is_readable;
-use function Tempest\Support\Filesystem\is_writable;
+use Tempest\Support\Filesystem;
 
 final readonly class DownloadMediaItem
 {
@@ -96,7 +91,7 @@ final readonly class DownloadMediaItem
         $existingOriginal = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::VaultOriginal);
 
         if ($existingOriginal !== null && $existingOriginal->state === AssetState::Ready) {
-            if ($existingOriginal->path !== null && is_file($existingOriginal->path)) {
+            if ($existingOriginal->path !== null && Filesystem\is_file($existingOriginal->path)) {
                 $this->ensureMediaItemReady($mediaItem);
 
                 return new DownloadExecutionResult(
@@ -181,7 +176,7 @@ final readonly class DownloadMediaItem
         }
 
         foreach ([$this->config->vaultPath(), $this->config->tempPath()] as $path) {
-            if (! is_directory($path) || ! is_writable($path)) {
+            if (! Filesystem\is_directory($path) || ! Filesystem\is_writable($path)) {
                 throw DownloadException::withCode(
                     'storage_unavailable',
                     sprintf('Storage path is not writable: %s', $path),
@@ -200,7 +195,7 @@ final readonly class DownloadMediaItem
     private function assertDownloadOutputsComplete(DownloadResult $download): void
     {
         foreach ($download->files as $file) {
-            if (! is_file($file->tempPath) || ! is_readable($file->tempPath)) {
+            if (! Filesystem\is_file($file->tempPath) || ! Filesystem\is_readable($file->tempPath)) {
                 throw DownloadException::withCode(
                     'download_missing_output',
                     'Downloaded file is missing or unreadable before Vault ingest.',
@@ -322,8 +317,8 @@ final readonly class DownloadMediaItem
     private function rollbackVaultFiles(array $paths): void
     {
         foreach ($paths as $path) {
-            if (is_file($path)) {
-                delete_file($path);
+            if (Filesystem\is_file($path)) {
+                Filesystem\delete_file($path);
             }
         }
     }

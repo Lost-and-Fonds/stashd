@@ -8,8 +8,7 @@ use App\Providers\InputOption;
 use App\Providers\InputOptionType;
 use App\System\Secret\SecretsService;
 use RuntimeException;
-
-use function Tempest\Support\Filesystem\is_file;
+use Tempest\Support\Filesystem;
 
 final readonly class PluginInputDefinition
 {
@@ -51,7 +50,7 @@ final readonly class PluginInputDefinition
             }
             $path = $root . '/' . $relative;
 
-            if (is_file($path)) {
+            if (Filesystem\is_file($path)) {
                 $helper ??= new PluginHelperGrant($name, $path, $root, (bool) ($definition['network'] ?? false));
             }
         }

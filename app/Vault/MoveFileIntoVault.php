@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Vault;
 
 use RuntimeException;
-
-use function Tempest\Support\Filesystem\create_directory;
-
+use Tempest\Support\Filesystem;
 use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 /** Moves staged files into Vault using rename when possible, copy+fsync otherwise. */
@@ -18,7 +16,7 @@ final class MoveFileIntoVault
         $directory = dirname($destination);
 
         try {
-            create_directory($directory, 0o775);
+            Filesystem\create_directory($directory, 0o775);
         } catch (FilesystemException) {
             throw new RuntimeException("Unable to create Vault directory: {$directory}");
         }
