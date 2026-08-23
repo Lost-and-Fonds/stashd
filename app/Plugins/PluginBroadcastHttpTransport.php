@@ -11,6 +11,8 @@ use RuntimeException;
 use Stashd\PluginRuntime\Capabilities\HostHttpTransport;
 use Stashd\PluginRuntime\Capabilities\TransportResponse;
 
+use function Tempest\Support\Filesystem\read_file;
+
 final readonly class PluginBroadcastHttpTransport implements HostHttpTransport
 {
     public function __construct(private ?string $fixtureDirectory = null) {}
@@ -22,7 +24,7 @@ final readonly class PluginBroadcastHttpTransport implements HostHttpTransport
         }
 
         if ($this->fixtureDirectory !== null && trim($this->fixtureDirectory) !== '') {
-            $map = json_decode((string) file_get_contents($this->fixtureDirectory . '/map.json'), true, 512, JSON_THROW_ON_ERROR);
+            $map = json_decode(read_file($this->fixtureDirectory . '/map.json'), true, 512, JSON_THROW_ON_ERROR);
 
             if (! is_array($map)) {
                 throw new RuntimeException('Broadcast HTTP fixture map is invalid.');
@@ -48,7 +50,7 @@ final readonly class PluginBroadcastHttpTransport implements HostHttpTransport
             }
             $path = $this->fixtureDirectory . '/' . $filename;
 
-            return new TransportResponse($this->fixtureStatus($filename), [], [file_get_contents($path) ?: '']);
+            return new TransportResponse($this->fixtureStatus($filename), [], [read_file($path)]);
         }
 
         try {

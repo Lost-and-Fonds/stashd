@@ -13,6 +13,11 @@ use Stashd\PluginRuntime\Package\PackageManager;
 use Stashd\PluginRuntime\Runner\PluginRunner;
 use Stashd\PluginSdk\ReadableResource;
 
+use function Tempest\Support\Filesystem\copy_file;
+use function Tempest\Support\Filesystem\create_directory;
+use function Tempest\Support\Filesystem\is_directory;
+use function Tempest\Support\Filesystem\list_directory;
+
 final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
 {
     public function __construct(
@@ -107,8 +112,10 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
 
         $pluginStage = $stagingDirectory . '/.plugin-' . bin2hex(random_bytes(6));
 
-        if (! mkdir($pluginStage, 0700, true) && ! is_dir($pluginStage)) {
-            throw new RuntimeException('Plugin Broadcast staging could not be created.');
+        try {
+            create_directory($pluginStage, 0700);
+        } catch (\Throwable $exception) {
+            throw new RuntimeException('Plugin Broadcast staging could not be created.', 0, $exception);
         }
         $invocation = new Invocation(
             $package,
@@ -374,22 +381,23 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
 
     private function copyOutputs(string $source, string $destination): void
     {
-        foreach (scandir($source) ?: [] as $entry) {
-            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
+        foreach (list_directory($source) as $from) {
+            $entry = basename($from);
+
+            if (str_starts_with($entry, '.')) {
                 continue;
             }
-            $from = $source . '/' . $entry;
             $to = $destination . '/' . $entry;
 
-            if (is_dir($from)) {
-                if (! is_dir($to)) {
-                    mkdir($to, 0700, true);
+            if (is_directory($from)) {
+                if (! is_directory($to)) {
+                    create_directory($to, 0700);
                 }
                 $this->copyOutputs($from, $to);
 
                 continue;
             }
-            copy($from, $to);
+            copy_file($from, $to, overwrite: true);
         }
     }
 }

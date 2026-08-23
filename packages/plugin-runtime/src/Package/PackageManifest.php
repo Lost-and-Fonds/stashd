@@ -6,6 +6,9 @@ namespace Stashd\PluginRuntime\Package;
 
 use Composer\Semver\Semver;
 
+use function Tempest\Support\Filesystem\is_file;
+use function Tempest\Support\Filesystem\read_file;
+
 final readonly class PackageManifest
 {
     /**
@@ -31,7 +34,7 @@ final readonly class PackageManifest
         }
 
         try {
-            $data = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+            $data = json_decode(read_file($path), true, 512, JSON_THROW_ON_ERROR);
         } catch (\Throwable $exception) {
             throw new PackageValidationError('plugin.json is invalid JSON', 0, $exception);
         }

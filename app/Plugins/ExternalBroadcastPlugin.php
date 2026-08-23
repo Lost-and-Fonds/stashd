@@ -48,6 +48,11 @@ use Tempest\Database\PrimaryKey;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
+use function Tempest\Support\Filesystem\copy_file;
+use function Tempest\Support\Filesystem\create_directory;
+use function Tempest\Support\Filesystem\is_directory;
+use function Tempest\Support\Filesystem\list_directory;
+
 /** Generic application adapter for manifest-registered Broadcast Components. */
 final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, BroadcastPluginActions, BroadcastPluginPolicy, BroadcastPluginPresentation, BroadcastPluginSourceOptions
 {
@@ -135,8 +140,10 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         $this->paths->claimRoot($context->broadcast);
         $stage = sys_get_temp_dir() . '/stashd-broadcast-plugin-' . bin2hex(random_bytes(8));
 
-        if (! mkdir($stage, 0o775, true) && ! is_dir($stage)) {
-            throw BroadcastException::withCode('broadcast_plugin_staging_failed', 'Broadcast plugin staging could not be created.');
+        try {
+            create_directory($stage, 0o775);
+        } catch (\Throwable $exception) {
+            throw BroadcastException::withCode('broadcast_plugin_staging_failed', 'Broadcast plugin staging could not be created.', $exception);
         }
 
         $settings = $this->settings($context);
@@ -273,7 +280,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
 
             if ($this->definition->outputPath !== null) {
                 $outputPath = $this->paths->broadcastFile($context->broadcast, ...explode('/', $this->definition->outputPath));
-                copy($stage . '/' . $reference, $outputPath);
+                copy_file($stage . '/' . $reference, $outputPath, overwrite: true);
             }
             $this->publishFiles($context, $publication['files'] ?? [], $stagedAssets);
             $this->runtime()->finalize(
@@ -350,7 +357,11 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         }
         $root = $this->paths->claimRoot($context->broadcast);
 
-        foreach (glob($root . '/*') ?: [] as $path) {
+        foreach (list_directory($root) as $path) {
+            if (str_starts_with(basename($path), '.')) {
+                continue;
+            }
+
             if (basename($path) === '.stashd-broadcast') {
                 continue;
             }
@@ -375,7 +386,10 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             return;
         }
 
-        foreach (glob($path . '/*') ?: [] as $child) {
+        foreach (list_directory($path) as $child) {
+            if (str_starts_with(basename($child), '.')) {
+                continue;
+            }
             $this->removeGeneratedPath($child, $removed);
         }
         @rmdir($path);
@@ -677,12 +691,10 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 $reference = 'resources/' . (string) $asset->id . '.' . $extension;
                 $destination = $stage . '/' . $reference;
 
-                if (! is_dir(dirname($destination))) {
-                    mkdir(dirname($destination), 0o775, true);
-                }
-
-                if (! copy($asset->path, $destination)) {
-                    throw BroadcastException::withCode('broadcast_plugin_staging_failed', 'Broadcast asset could not be staged.');
+                try {
+                    copy_file($asset->path, $destination, overwrite: true);
+                } catch (\Throwable $exception) {
+                    throw BroadcastException::withCode('broadcast_plugin_staging_failed', 'Broadcast asset could not be staged.', $exception);
                 }
                 $stagedAssets[$reference] = $asset;
             }

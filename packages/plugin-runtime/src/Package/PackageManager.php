@@ -6,6 +6,13 @@ namespace Stashd\PluginRuntime\Package;
 
 use RuntimeException;
 
+use function Tempest\Support\Filesystem\create_directory;
+use function Tempest\Support\Filesystem\exists;
+use function Tempest\Support\Filesystem\is_directory;
+use function Tempest\Support\Filesystem\is_file;
+use function Tempest\Support\Filesystem\list_directory;
+use function Tempest\Support\Filesystem\read_file;
+
 final class PackageManager
 {
     private string $packages;
@@ -24,7 +31,9 @@ final class PackageManager
         $this->staging = $root . '/staging';
 
         foreach ([$this->packages, $this->active, $this->links, $this->staging] as $directory) {
-            if (! is_dir($directory) && ! mkdir($directory, 0700, true) && ! is_dir($directory)) {
+            try {
+                create_directory($directory, 0700);
+            } catch (\Throwable $exception) {
                 throw new RuntimeException('package directory could not be created');
             }
         }
@@ -36,7 +45,7 @@ final class PackageManager
             throw new PackageValidationError('package checksum mismatch');
         }
         $temporary = $this->staging . '/install-' . bin2hex(random_bytes(10));
-        mkdir($temporary, 0700, true);
+        create_directory($temporary, 0700);
 
         try {
             TarArchive::extract($archive, $temporary);
@@ -48,13 +57,15 @@ final class PackageManager
             }
             $destination = $this->packages . '/' . $manifest->id . '/' . $manifest->version;
 
-            if (file_exists($destination) || is_link($destination)) {
+            if (exists($destination) || is_link($destination)) {
                 throw new PackageStateError('plugin version is already installed');
             }
             $parent = dirname($destination);
 
-            if (! is_dir($parent) && ! mkdir($parent, 0700, true) && ! is_dir($parent)) {
-                throw new PackageStateError('package version directory could not be created');
+            try {
+                create_directory($parent, 0700);
+            } catch (\Throwable $exception) {
+                throw new PackageStateError('package version directory could not be created', 0, $exception);
             }
 
             if (! rename($temporary, $destination)) {
@@ -76,7 +87,12 @@ final class PackageManager
         if (! preg_match('/^sha256:[a-f0-9]{64}$/', $manifestDigest)) {
             throw new PackageValidationError('OCI manifest digest is invalid');
         }
-        $index = json_decode((string) @file_get_contents($layout . '/index.json'), true);
+
+        try {
+            $index = json_decode(read_file($layout . '/index.json'), true);
+        } catch (\Throwable) {
+            $index = null;
+        }
 
         if (! is_array($index) || ! is_array($index['manifests'] ?? null)) {
             throw new PackageValidationError('OCI index is invalid');
@@ -94,9 +110,11 @@ final class PackageManager
         if ($entry === null) {
             throw new PackageValidationError('OCI manifest is not present in index');
         }
-        $architecture = is_array($entry['platform'] ?? null) ? ($entry['platform']['architecture'] ?? null) : null;
+        $platform = is_array($entry['platform'] ?? null) ? $entry['platform'] : [];
+        $architecture = is_string($platform['architecture'] ?? null) ? $platform['architecture'] : null;
+        $platformOs = is_string($platform['os'] ?? null) ? $platform['os'] : 'linux';
 
-        if (($entry['platform']['os'] ?? 'linux') !== 'linux' || ($architecture !== null && $architecture !== self::architecture())) {
+        if ($platformOs !== 'linux' || ($architecture !== null && $architecture !== self::architecture())) {
             throw new PackageValidationError('OCI plugin platform is incompatible');
         }
         $manifestPath = $layout . '/blobs/sha256/' . substr($manifestDigest, 7);
@@ -104,13 +122,18 @@ final class PackageManager
         if (! is_file($manifestPath) || ! hash_equals(substr($manifestDigest, 7), hash_file('sha256', $manifestPath) ?: '')) {
             throw new PackageValidationError('OCI manifest checksum mismatch');
         }
-        $manifest = json_decode((string) @file_get_contents($manifestPath), true);
+
+        try {
+            $manifest = json_decode(read_file($manifestPath), true);
+        } catch (\Throwable) {
+            $manifest = null;
+        }
 
         if (! is_array($manifest) || ! is_array($manifest['layers'] ?? null) || count($manifest['layers']) !== 1) {
             throw new PackageValidationError('OCI plugin manifest must contain one layer');
         }
         $layer = $manifest['layers'][0];
-        $digest = is_array($layer) ? (string) ($layer['digest'] ?? '') : '';
+        $digest = is_array($layer) && is_string($layer['digest'] ?? null) ? $layer['digest'] : '';
 
         if (! preg_match('/^sha256:[a-f0-9]{64}$/', $digest)) {
             throw new PackageValidationError('OCI layer digest is invalid');
@@ -168,7 +191,7 @@ final class PackageManager
         }
         $path = $this->packages . '/' . $id . '/' . $version;
 
-        if (is_dir($path)) {
+        if (is_directory($path)) {
             $this->makeMutable($path);
             $this->removeTree($path);
         }
@@ -293,13 +316,11 @@ final class PackageManager
             return;
         }
 
-        if (is_dir($path)) {
+        if (is_directory($path)) {
             chmod($path, $directoryMode);
 
-            foreach (scandir($path) ?: [] as $entry) {
-                if ($entry !== '.' && $entry !== '..') {
-                    $this->walkMode($path . '/' . $entry, $fileMode, $directoryMode);
-                }
+            foreach (list_directory($path) as $entry) {
+                $this->walkMode($entry, $fileMode, $directoryMode);
             }
 
             return;
@@ -315,14 +336,12 @@ final class PackageManager
             return;
         }
 
-        if (! is_dir($path)) {
+        if (! is_directory($path)) {
             return;
         }
 
-        foreach (scandir($path) ?: [] as $entry) {
-            if ($entry !== '.' && $entry !== '..') {
-                $this->removeTree($path . '/' . $entry);
-            }
+        foreach (list_directory($path) as $entry) {
+            $this->removeTree($entry);
         }
         @rmdir($path);
     }

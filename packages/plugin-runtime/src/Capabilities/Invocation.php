@@ -15,6 +15,13 @@ use Tempest\DateTime\Duration;
 use Tempest\Process\GenericProcessExecutor;
 use Tempest\Process\PendingProcess;
 
+use function Tempest\Support\Filesystem\create_directory;
+use function Tempest\Support\Filesystem\is_directory;
+use function Tempest\Support\Filesystem\is_file;
+use function Tempest\Support\Filesystem\list_directory;
+use function Tempest\Support\Filesystem\read_file;
+use function Tempest\Support\Filesystem\write_file;
+
 final class Invocation
 {
     private bool $active = true;
@@ -57,12 +64,14 @@ final class Invocation
     ) {
         $this->packageRoot = $this->withinRoot($packageRoot, 'package');
 
-        if (! is_dir($stagingRoot) && ! mkdir($stagingRoot, 0700, true) && ! is_dir($stagingRoot)) {
-            throw new RuntimeException('staging root could not be created');
+        try {
+            create_directory($stagingRoot, 0700);
+        } catch (\Throwable $exception) {
+            throw new RuntimeException('staging root could not be created', 0, $exception);
         }
         $this->stagingRoot = $this->withinRoot($stagingRoot, 'staging');
         $this->resourceRoot = $this->stagingRoot . '/.resources';
-        mkdir($this->resourceRoot, 0700, true);
+        create_directory($this->resourceRoot, 0700);
 
         foreach ($credentials as $credential) {
             $this->credentials[$credential->reference] = $credential;
@@ -113,7 +122,7 @@ final class Invocation
             fclose($handle);
 
             if ($size <= $this->inlineLimit) {
-                $bodyValue = (string) file_get_contents($resourcePath);
+                $bodyValue = read_file($resourcePath);
                 unlink($resourcePath);
 
                 return new HttpResponse($response->status, $response->headers, $bodyValue);
@@ -181,9 +190,9 @@ final class Invocation
             }
         }
         $etc = $this->stagingRoot . '/.helper-etc';
-        mkdir($etc, 0700, true);
-        file_put_contents($etc . '/passwd', "plugin:x:1000:1000:plugin:/tmp:/bin/sh\n");
-        file_put_contents($etc . '/group', "plugin:x:1000:\n");
+        create_directory($etc, 0700);
+        write_file($etc . '/passwd', "plugin:x:1000:1000:plugin:/tmp:/bin/sh\n");
+        write_file($etc . '/group', "plugin:x:1000:\n");
         $command = $this->sandboxPolicy->command($this->packageRoot, $this->stagingRoot, $relative, $etc, null, $grant->network);
 
         if (! str_ends_with($relative, '.php')) {
@@ -358,7 +367,7 @@ final class Invocation
     {
         $real = realpath($path);
 
-        if ($real === false || ! is_dir($real)) {
+        if ($real === false || ! is_directory($real)) {
             throw new RuntimeException($label . ' does not exist');
         }
 
@@ -378,14 +387,12 @@ final class Invocation
             return;
         }
 
-        if (! is_dir($path)) {
+        if (! is_directory($path)) {
             return;
         }
 
-        foreach (scandir($path) ?: [] as $entry) {
-            if ($entry !== '.' && $entry !== '..') {
-                $this->removeTree($path . '/' . $entry);
-            }
+        foreach (list_directory($path) as $entry) {
+            $this->removeTree($entry);
         }
         @rmdir($path);
     }

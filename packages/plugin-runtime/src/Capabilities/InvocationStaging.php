@@ -7,6 +7,11 @@ namespace Stashd\PluginRuntime\Capabilities;
 use Stashd\PluginSdk\StagedArtifact;
 use Stashd\PluginSdk\StagingArea;
 
+use function Tempest\Support\Filesystem\create_directory;
+use function Tempest\Support\Filesystem\exists;
+use function Tempest\Support\Filesystem\is_directory;
+use function Tempest\Support\Filesystem\is_file;
+
 final class InvocationStaging implements StagingArea
 {
     public function __construct(private string $root) {}
@@ -63,12 +68,16 @@ final class InvocationStaging implements StagingArea
                 throw new UnsafePath('staging path crosses a symlink');
             }
 
-            if (file_exists($cursor) && ! is_dir($cursor)) {
+            if (exists($cursor) && ! is_directory($cursor)) {
                 throw new UnsafePath('staging path crosses a file');
             }
 
-            if (! is_dir($cursor) && ! mkdir($cursor, 0700, true) && ! is_dir($cursor)) {
-                throw new UnsafePath('staging directory could not be created');
+            if (! is_directory($cursor)) {
+                try {
+                    create_directory($cursor, 0700);
+                } catch (\Throwable $exception) {
+                    throw new UnsafePath('staging directory could not be created', 0, $exception);
+                }
             }
         }
         $path = $cursor . '/' . $last;

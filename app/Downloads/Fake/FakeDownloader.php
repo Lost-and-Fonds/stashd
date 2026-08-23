@@ -17,6 +17,7 @@ use App\Vault\VaultSidecarBuilder;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
+use function Tempest\Support\Filesystem\write_file;
 use function Tempest\Support\str;
 
 /**
@@ -96,7 +97,7 @@ final readonly class FakeDownloader implements DownloaderInterface
             $request->providerItemId,
             $request->downloadPolicy->value,
         );
-        file_put_contents($path, $content);
+        write_file($path, $content);
 
         return new DownloadedFile(
             tempPath: $path,
@@ -114,7 +115,7 @@ final readonly class FakeDownloader implements DownloaderInterface
     {
         $path = $this->tempPath($request, 'source-thumbnail.jpg');
         $content = "fake-jpeg\n{$request->providerItemId}\n";
-        file_put_contents($path, $content);
+        write_file($path, $content);
 
         return new DownloadedFile(
             tempPath: $path,
@@ -131,7 +132,7 @@ final readonly class FakeDownloader implements DownloaderInterface
     {
         $path = $this->tempPath($request, 'metadata.json');
         $payload = $this->sidecars->metadata($request, $capturedAt);
-        file_put_contents($path, $payload);
+        write_file($path, $payload);
 
         return new DownloadedFile(
             tempPath: $path,
@@ -155,7 +156,7 @@ final readonly class FakeDownloader implements DownloaderInterface
             attemptedAt: $attemptedAt,
         );
         $payload = $this->sidecars->sourceJson($request, $result);
-        file_put_contents($path, $payload);
+        write_file($path, $payload);
 
         return new DownloadedFile(
             tempPath: $path,

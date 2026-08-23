@@ -17,6 +17,8 @@ use Tempest\Console\Middleware\ForceMiddleware;
 use Tempest\Core\Environment;
 use Tempest\Framework\Commands\MigrateFreshCommand;
 
+use function Tempest\Support\Filesystem\ensure_directory_empty;
+
 final readonly class RebuildCommand
 {
     use HasConsole;
@@ -93,17 +95,6 @@ final readonly class RebuildCommand
 
     private function clearDirectory(string $root): void
     {
-        if (! is_dir($root)) {
-            return;
-        }
-
-        /** @var SplFileInfo $entry */
-        foreach (new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST,
-        ) as $entry) {
-            $path = $entry->getPathname();
-            $entry->isDir() ? @rmdir($path) : @unlink($path);
-        }
+        ensure_directory_empty($root);
     }
 }

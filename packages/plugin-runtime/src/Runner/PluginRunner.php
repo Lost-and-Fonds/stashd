@@ -8,6 +8,9 @@ use RuntimeException;
 use Stashd\PluginRuntime\Package\PackageManager;
 use Stashd\PluginRuntime\Sandbox\SandboxPolicy;
 
+use function Tempest\Support\Filesystem\is_file;
+use function Tempest\Support\Filesystem\read_file;
+
 final readonly class PluginRunner
 {
     public function __construct(private PackageManager $packages, private SandboxPolicy $policy = new SandboxPolicy(), private ?string $sdkRoot = null) {}
@@ -20,7 +23,7 @@ final readonly class PluginRunner
             throw new RuntimeException('plugin is not active: ' . $pluginId);
         }
         $manifestPath = is_file($package . '/plugin.json') ? $package . '/plugin.json' : $package . '/stashd-plugin/plugin.json';
-        $manifest = json_decode((string) file_get_contents($manifestPath), true, 512, JSON_THROW_ON_ERROR);
+        $manifest = json_decode(read_file($manifestPath), true, 512, JSON_THROW_ON_ERROR);
 
         if (! is_array($manifest)) {
             throw new RuntimeException('active plugin manifest is invalid');
