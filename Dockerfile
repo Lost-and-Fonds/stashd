@@ -19,7 +19,7 @@ ARG PGID=1000
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        git unzip gosu supervisor libpq-dev libicu-dev curl bubblewrap \
+        git unzip gosu supervisor libpq-dev libicu-dev curl bubblewrap ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 RUN install-php-extensions pdo_pgsql sockets intl \

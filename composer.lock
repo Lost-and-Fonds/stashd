@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "5f61c4e357cd1c58f262449c53964e4e",
+    "content-hash": "c46da821c90203b17c4de9b2738c8f5b",
     "packages": [
         {
             "name": "composer/semver",
@@ -3007,6 +3007,51 @@
                 "issues": "https://github.com/Lost-and-Fonds/plugin-sdk/issues"
             },
             "time": "2026-08-23T04:34:54+00:00"
+        },
+        {
+            "name": "stashd/podcast",
+            "version": "v0.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Lost-and-Fonds/podcast.git",
+                "reference": "b7566b2a1f060b817c55f02e1e2de54bee029ed9"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Lost-and-Fonds/podcast/zipball/b7566b2a1f060b817c55f02e1e2de54bee029ed9",
+                "reference": "b7566b2a1f060b817c55f02e1e2de54bee029ed9",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.5",
+                "stashd/plugin-sdk": "^0.2"
+            },
+            "type": "stashd-plugin",
+            "extra": {
+                "stashd-plugin": {
+                    "manifest": "stashd-plugin/plugin.json",
+                    "entrypoint": "stashd-plugin/plugin.php"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Podcast\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Podcast\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Podcast Broadcast plugin for Stashd",
+            "support": {
+                "source": "https://github.com/Lost-and-Fonds/podcast/tree/v0.2.0",
+                "issues": "https://github.com/Lost-and-Fonds/podcast/issues"
+            },
+            "time": "2026-08-23T04:49:33+00:00"
         },
         {
             "name": "symfony/cache",
