@@ -23,6 +23,7 @@ use App\Stashes\DownloadPolicy;
 use App\System\Secret\SecretsService;
 use App\Vault\AssetKind;
 use App\Vault\AssetRole;
+use GuzzleHttp\Psr7\Uri;
 use RuntimeException;
 use Stashd\PluginRuntime\Capabilities\CredentialGrant;
 use Stashd\PluginRuntime\Capabilities\Invocation;
@@ -140,24 +141,25 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         if (! mkdir($stage, 0700, true) && ! is_dir($stage)) {
             throw new RuntimeException('plugin staging could not be created');
         }
-        $origins = [];
+        $prefixes = [];
         $credentials = [];
 
         foreach ($this->definition->httpGrants($this->secrets, $operation) as $grant) {
             foreach ($grant->allowedPrefixes as $prefix) {
-                $p = parse_url($prefix);
+                $uri = new Uri($prefix);
 
-                if (! is_array($p) || ! isset($p['scheme'], $p['host'])) {
+                if ($uri->getScheme() === '' || $uri->getHost() === '') {
                     continue;
-                } $origin = strtolower($p['scheme'] . '://' . $p['host']);
-                $origins[] = $origin;
+                }
+                $prefixes[] = $prefix;
+                $origin = strtolower($uri->getScheme() . '://' . $uri->getHost() . ($uri->getPort() === null ? '' : ':' . $uri->getPort()));
 
                 if ($grant->credential !== null) {
                     $credentials[] = new CredentialGrant($grant->credential->name, $origin, $grant->credential->parameter, $grant->credential->value, $grant->credential->placement);
                 }
             }
         }
-        $invocation = new Invocation($package, $stage, array_values(array_unique($origins)), $credentials, helpers: $helper === null ? [] : [new \Stashd\PluginRuntime\Capabilities\HelperGrant($helper->name, substr($helper->executable, strlen($package) + 1), $helper->network)], transport: new PluginBroadcastHttpTransport());
+        $invocation = new Invocation($package, $stage, array_values(array_unique($prefixes)), $credentials, helpers: $helper === null ? [] : [new \Stashd\PluginRuntime\Capabilities\HelperGrant($helper->name, substr($helper->executable, strlen($package) + 1), $helper->network)], transport: new PluginBroadcastHttpTransport());
         $process = $this->runner->start($this->definition->id, $stage);
 
         try {

@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Stashd\PluginRuntime\Package;
 
 use RuntimeException;
+use Tempest\DateTime\Duration;
+use Tempest\Process\GenericProcessExecutor;
+use Tempest\Process\PendingProcess;
 
 /** Materializes a declared plugin and its locked helper inputs into an OCI layout. */
 final class PluginBuilder
@@ -68,14 +71,10 @@ final class PluginBuilder
         $command = [$composer, 'install', '--working-dir=' . $root, '--no-dev', '--no-scripts', '--no-plugins', '--no-interaction', '--prefer-dist', '--optimize-autoloader'];
         $environment = getenv();
         $environment['COMPOSER_VENDOR_DIR'] = $root . '/vendor';
-        $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $environment);
-
-        if (! is_resource($process)) {
-            throw new PackageValidationError('Composer could not start');
-        }
-        $error = stream_get_contents($pipes[2]);
-        $output = stream_get_contents($pipes[1]);
-        $exit = proc_close($process);
+        $result = (new GenericProcessExecutor())->run(new PendingProcess($command, Duration::seconds(300), environment: $environment));
+        $error = $result->errorOutput;
+        $output = $result->output;
+        $exit = $result->exitCode;
 
         if ($exit !== 0) {
             throw new PackageValidationError('locked Composer install failed: ' . trim((string) $error . ' ' . (string) $output));
@@ -117,9 +116,9 @@ final class PluginBuilder
                 $extract = $root . '/.helper-extract-' . bin2hex(random_bytes(4));
                 mkdir($extract, 0700, true);
                 $command = ['tar', '-xJf', $download, '-C', $extract, $artifact['archive_binary']];
-                $pipe = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-                $error = is_resource($pipe) ? stream_get_contents($pipes[2]) : '';
-                $exit = is_resource($pipe) ? proc_close($pipe) : 1;
+                $result = (new GenericProcessExecutor())->run(new PendingProcess($command, Duration::seconds(60)));
+                $error = $result->errorOutput;
+                $exit = $result->exitCode;
                 $extracted = $extract . '/' . $artifact['archive_binary'];
 
                 if ($exit !== 0 || ! is_file($extracted)) {
@@ -141,9 +140,8 @@ final class PluginBuilder
         mkdir($layout . '/blobs/sha256', 0700, true);
         $archive = $layout . '/layer.tar';
         $command = ['sh', '-c', 'find "$1" -exec touch -h -d @0 {} + && cd "$1" && tar --format=ustar --sort=name --mtime="UTC 1970-01-01" --owner=0 --group=0 --numeric-owner -cf "$2" .', 'builder', $root, $archive];
-        $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
 
-        if (! is_resource($process) || proc_close($process) !== 0) {
+        if (! (new GenericProcessExecutor())->run(new PendingProcess($command, Duration::seconds(300)))->successful()) {
             throw new PackageValidationError('plugin layer creation failed');
         }
         $layer = hash_file('sha256', $archive) ?: '';

@@ -16,6 +16,15 @@ use Stashd\PluginSdk\ReadableResource;
 
 $sdkRoot = getenv('STASHD_PLUGIN_SDK_ROOT');
 $sdkRoot = is_string($sdkRoot) && trim($sdkRoot) !== '' ? trim($sdkRoot) : dirname(__DIR__, 3) . '/vendor/stashd/plugin-sdk';
+$autoload = __DIR__ . '/../vendor/autoload.php';
+
+if (! is_file($autoload)) {
+    $autoload = dirname(__DIR__, 3) . '/vendor/autoload.php';
+}
+
+if (is_file($autoload)) {
+    require_once $autoload;
+}
 spl_autoload_register(static function (string $class) use ($sdkRoot): void {
     foreach ([
         'Stashd\\PluginRuntime\\' => __DIR__ . '/../src/',

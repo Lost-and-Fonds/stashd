@@ -31,6 +31,7 @@ or public media catalogue.
   inventing a pattern.
 - Keep changes small and feature-first. Preserve unrelated worktree changes.
 - Prefer deletion and existing project patterns over speculative abstractions.
+- Prefer Tempest components first, including package code where coupling is reasonable. Use maintained dependencies for commodity filesystem, HTTP, URI, process, archive/OCI, schema, semver, cryptography, and identifier work; custom infrastructure needs a concrete project-specific reason.
 - Controllers adapt HTTP; long-running work belongs in commands/jobs.
 - Use explicit API resources/arrays at public boundaries; do not serialize
   internal records directly.

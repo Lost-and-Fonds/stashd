@@ -4,10 +4,16 @@ declare(strict_types=1);
 
 namespace Stashd\PluginRuntime\Capabilities;
 
+use GuzzleHttp\Psr7\Query;
+use GuzzleHttp\Psr7\Uri;
+use GuzzleHttp\Psr7\UriResolver;
 use RuntimeException;
 use Stashd\PluginRuntime\Sandbox\SandboxPolicy;
 use Stashd\PluginSdk\HttpResponse;
 use Stashd\PluginSdk\ReadableResource;
+use Tempest\DateTime\Duration;
+use Tempest\Process\GenericProcessExecutor;
+use Tempest\Process\PendingProcess;
 
 final class Invocation
 {
@@ -33,14 +39,14 @@ final class Invocation
     private string $resourceRoot;
 
     /**
-     * @param  list<string>  $allowedOrigins
+     * @param  list<string>  $allowedPrefixes
      * @param  list<CredentialGrant>  $credentials
      * @param  list<HelperGrant>  $helpers
      */
     public function __construct(
         private string $packageRoot,
         private string $stagingRoot,
-        private array $allowedOrigins,
+        private array $allowedPrefixes,
         array $credentials = [],
         private ?string $assetRoot = null,
         array $helpers = [],
@@ -76,8 +82,9 @@ final class Invocation
         $grant = $credential === null ? null : ($this->credentials[$credential] ?? throw new CapabilityDenied('credential is not granted'));
 
         for ($redirect = 0; ; $redirect++) {
+            $current = $this->normalizeUrl($current);
             $origin = $this->origin($current);
-            $this->assertAllowedOrigin($origin);
+            $this->assertAllowedDestination($current);
             $requestUrl = $this->safeUrl($current, $grant, $origin);
             $requestHeaders = $this->safeHeaders($headers, $grant, $origin);
             $response = $this->transport->request(strtoupper($method), $requestUrl, $requestHeaders, $body);
@@ -87,7 +94,7 @@ final class Invocation
                 if ($redirect >= $this->maxRedirects) {
                     throw new CapabilityDenied('redirect limit exceeded');
                 }
-                $current = $this->resolveUrl($current, $location);
+                $current = (string) UriResolver::resolve(new Uri($current), new Uri($location));
 
                 continue;
             }
@@ -184,40 +191,9 @@ final class Invocation
         }
         $command = array_values($command);
         array_push($command, ...$arguments);
-        $pipes = [];
-        $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $result = (new GenericProcessExecutor())->run(new PendingProcess($command, Duration::seconds((int) ceil($timeout))));
 
-        if (! is_resource($process)) {
-            throw new RuntimeException('helper could not start: ' . implode(' ', $command));
-        }
-        fclose($pipes[0]);
-        stream_set_blocking($pipes[1], false);
-        stream_set_blocking($pipes[2], false);
-        $stdout = '';
-        $stderr = '';
-        $deadline = microtime(true) + $timeout;
-
-        do {
-            $stdout .= stream_get_contents($pipes[1]);
-            $stderr .= stream_get_contents($pipes[2]);
-            $status = proc_get_status($process);
-
-            if (! $status['running']) {
-                break;
-            }
-
-            if (microtime(true) >= $deadline) {
-                proc_terminate($process, 9);
-
-                throw new RuntimeException('helper timed out');
-            }
-            usleep(10_000);
-        } while (true);
-        $stdout .= stream_get_contents($pipes[1]);
-        $stderr .= stream_get_contents($pipes[2]);
-        $exit = proc_close($process);
-
-        return new HelperResult($exit, $stdout, $stderr);
+        return new HelperResult($result->exitCode, $result->output, $result->errorOutput);
     }
 
     public function log(string $message): void
@@ -314,41 +290,54 @@ final class Invocation
         if ($grant === null || $grant->placement !== 'query' || $grant->origin !== $origin) {
             return $url;
         }
-        $separator = str_contains($url, '?') ? '&' : '?';
+        $uri = new Uri($url);
+        $query = Query::parse($uri->getQuery());
+        $query[$grant->parameter] = $grant->secret;
 
-        return $url . $separator . rawurlencode($grant->parameter) . '=' . rawurlencode($grant->secret);
+        return (string) $uri->withQuery(Query::build($query));
     }
 
-    private function assertAllowedOrigin(string $origin): void
+    private function assertAllowedDestination(string $url): void
     {
-        if (! in_array($origin, $this->allowedOrigins, true)) {
-            throw new CapabilityDenied('HTTP destination is not granted');
+        $destination = new Uri($url);
+
+        foreach ($this->allowedPrefixes as $prefix) {
+            $grant = new Uri($this->normalizeUrl($prefix));
+
+            if ($grant->getScheme() !== $destination->getScheme() || strtolower($grant->getHost()) !== strtolower($destination->getHost()) || $grant->getPort() !== $destination->getPort()) {
+                continue;
+            }
+            $path = $grant->getPath() === '' ? '/' : $grant->getPath();
+            $destinationPath = $destination->getPath() === '' ? '/' : $destination->getPath();
+
+            if ($destinationPath === rtrim($path, '/') || str_starts_with($destinationPath, rtrim($path, '/') . '/')) {
+                return;
+            }
         }
+
+        throw new CapabilityDenied('HTTP destination is not granted');
     }
 
     private function origin(string $url): string
     {
-        $parts = parse_url($url);
+        $uri = new Uri($url);
 
-        if ($parts === false || ! isset($parts['scheme'], $parts['host']) || ! in_array(strtolower($parts['scheme']), ['http', 'https'], true)) {
+        if (! in_array(strtolower($uri->getScheme()), ['http', 'https'], true) || $uri->getHost() === '') {
             throw new CapabilityDenied('HTTP URL is invalid');
         }
 
-        return strtolower($parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : ''));
+        return strtolower($uri->getScheme() . '://' . $uri->getHost() . ($uri->getPort() === null ? '' : ':' . $uri->getPort()));
     }
 
-    private function resolveUrl(string $base, string $location): string
+    private function normalizeUrl(string $url): string
     {
-        if (str_starts_with($location, 'http://') || str_starts_with($location, 'https://')) {
-            return $location;
-        }
-        $parts = parse_url($base);
+        $uri = new Uri($url);
 
-        if ($parts === false || ! isset($parts['scheme'], $parts['host'])) {
-            throw new CapabilityDenied('redirect URL is invalid');
+        if (! in_array(strtolower($uri->getScheme()), ['http', 'https'], true) || $uri->getHost() === '') {
+            throw new CapabilityDenied('HTTP URL is invalid');
         }
 
-        return $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '') . '/' . ltrim($location, '/');
+        return (string) UriResolver::resolve($uri, new Uri(''));
     }
 
     private function safeRelative(string $path): string

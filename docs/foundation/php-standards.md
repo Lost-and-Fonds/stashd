@@ -32,6 +32,8 @@ file; Composer checks the actual PSR-4 namespace-to-path mappings.
 
 ## Non-negotiables
 
+Before implementing generic infrastructure, check Tempest first. If Tempest does not provide the needed behavior, use an established maintained dependency or tool; custom implementations require a concrete project-specific reason. Prefer Tempest over Symfony where practical. Approved choices include Tempest Storage/filesystem/Process/Validator/Cache/Scheduler/EventBus/Logger, `guzzlehttp/guzzle`, `guzzlehttp/psr7`, `composer/semver`, `symfony/uid`, `umoci` if its packaging spike succeeds, and `opis/json-schema` as approved-to-investigate only.
+
 1. **One type per file** — enums, records, services, exceptions each get their own file matching the type name (see `database-conventions.md`). Multi-type files break Tempest discovery with fatal redeclare errors.
 2. **`declare(strict_types=1)`** on every new PHP file.
 3. **Import types** — no `\Fully\Qualified\Class` in method bodies when a `use` statement suffices.

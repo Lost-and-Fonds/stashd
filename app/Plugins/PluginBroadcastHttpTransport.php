@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
-use App\Support\Http\CurlClient;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use RuntimeException;
 use Stashd\PluginRuntime\Capabilities\HostHttpTransport;
 use Stashd\PluginRuntime\Capabilities\TransportResponse;
@@ -49,13 +50,25 @@ final readonly class PluginBroadcastHttpTransport implements HostHttpTransport
             return new TransportResponse($this->fixtureStatus($filename), [], [file_get_contents($path) ?: '']);
         }
 
-        $response = CurlClient::send($method, $url, $headers, $body, timeoutSeconds: 30);
-
-        if ($response === null) {
-            throw new RuntimeException('Approved HTTP request could not be started.');
+        try {
+            $response = (new Client())->request($method, $url, [
+                'allow_redirects' => false,
+                'body' => $body,
+                'headers' => $headers,
+                'http_errors' => false,
+                'timeout' => 30,
+            ]);
+        } catch (GuzzleException $exception) {
+            throw new RuntimeException('Approved HTTP request could not be started.', 0, $exception);
         }
 
-        return new TransportResponse($response['status'], [], [$response['body']]);
+        $responseHeaders = [];
+
+        foreach ($response->getHeaders() as $name => $values) {
+            $responseHeaders[$name] = implode(', ', $values);
+        }
+
+        return new TransportResponse($response->getStatusCode(), $responseHeaders, [$response->getBody()->getContents()]);
     }
 
     private function fixtureStatus(string $filename): int

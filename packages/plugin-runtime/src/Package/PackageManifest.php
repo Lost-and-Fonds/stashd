@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Stashd\PluginRuntime\Package;
 
+use Composer\Semver\Semver;
+
 final readonly class PackageManifest
 {
     /**
@@ -110,10 +112,10 @@ final readonly class PackageManifest
 
     private static function phpSatisfies(string $constraint): bool
     {
-        if (preg_match('/^>=\s*(\d+\.\d+)(?:\.\d+)?$/', $constraint, $match) === 1) {
-            return version_compare(PHP_VERSION, $match[1], '>=');
+        try {
+            return Semver::satisfies(PHP_VERSION, $constraint);
+        } catch (\UnexpectedValueException) {
+            return false;
         }
-
-        return false;
     }
 }

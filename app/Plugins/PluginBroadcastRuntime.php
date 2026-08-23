@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
+use GuzzleHttp\Psr7\Uri;
 use RuntimeException;
 use Stashd\PluginRuntime\Capabilities\CredentialGrant;
 use Stashd\PluginRuntime\Capabilities\HelperGrant;
@@ -80,17 +81,17 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
         }
 
         $credentials = [];
-        $origins = [];
+        $prefixes = [];
 
         foreach ($httpGrants ?? [] as $grant) {
             foreach ($grant->allowedPrefixes as $prefix) {
-                $parts = parse_url($prefix);
+                $uri = new Uri($prefix);
 
-                if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
+                if ($uri->getScheme() === '' || $uri->getHost() === '') {
                     continue;
                 }
-                $origin = strtolower($parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : ''));
-                $origins[] = $origin;
+                $prefixes[] = $prefix;
+                $origin = strtolower($uri->getScheme() . '://' . $uri->getHost() . ($uri->getPort() === null ? '' : ':' . $uri->getPort()));
 
                 if ($grant->credential !== null) {
                     $credentials[] = new CredentialGrant(
@@ -112,7 +113,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
         $invocation = new Invocation(
             $package,
             $pluginStage,
-            array_values(array_unique($origins)),
+            array_values(array_unique($prefixes)),
             $credentials,
             helpers: $this->helperGrants($package, $helper),
             transport: new PluginBroadcastHttpTransport($fixtureDirectory),
