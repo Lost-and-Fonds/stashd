@@ -144,7 +144,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
                 }
             }
         }
-        $invocation = new Invocation($package, $stage, array_values(array_unique($origins)), $credentials, helpers: $helper === null ? [] : [new \Stashd\PluginRuntime\Capabilities\HelperGrant($helper->name, substr($helper->executable, strlen($package) + 1))]);
+        $invocation = new Invocation($package, $stage, array_values(array_unique($origins)), $credentials, helpers: $helper === null ? [] : [new \Stashd\PluginRuntime\Capabilities\HelperGrant($helper->name, substr($helper->executable, strlen($package) + 1))], transport: new PluginBroadcastHttpTransport());
         $process = $this->runner->start($this->definition->id, $stage);
         try {
             $result = $process->invoke($method, $params, function (array $message) use ($invocation): array {
