@@ -3055,16 +3055,16 @@
         },
         {
             "name": "stashd/youtube",
-            "version": "v0.3.3",
+            "version": "v0.3.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Lost-and-Fonds/youtube.git",
-                "reference": "564b7e0be515050a2a5810de431879b14734d1cb"
+                "reference": "3c4235e74ac2add5c7b88dd4edd04ab43a7b86d8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Lost-and-Fonds/youtube/zipball/564b7e0be515050a2a5810de431879b14734d1cb",
-                "reference": "564b7e0be515050a2a5810de431879b14734d1cb",
+                "url": "https://api.github.com/repos/Lost-and-Fonds/youtube/zipball/3c4235e74ac2add5c7b88dd4edd04ab43a7b86d8",
+                "reference": "3c4235e74ac2add5c7b88dd4edd04ab43a7b86d8",
                 "shasum": ""
             },
             "require": {
@@ -3088,10 +3088,10 @@
             ],
             "description": "YouTube Input plugin for Stashd",
             "support": {
-                "source": "https://github.com/Lost-and-Fonds/youtube/tree/v0.3.3",
+                "source": "https://github.com/Lost-and-Fonds/youtube/tree/v0.3.4",
                 "issues": "https://github.com/Lost-and-Fonds/youtube/issues"
             },
-            "time": "2026-08-23T05:32:49+00:00"
+            "time": "2026-08-23T05:33:35+00:00"
         },
         {
             "name": "symfony/cache",
