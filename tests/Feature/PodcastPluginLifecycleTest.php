@@ -29,7 +29,7 @@ test('Podcast plugin is discovered and publishes an audio feed from PostgreSQL l
     $audioPath = $this->container->get(VaultPathBuilder::class)->vaultFile(
         (string) $media->providerKey,
         (string) $media->providerItemId,
-        'episode.wav',
+        'episode.mp4',
     );
 
     if (! is_dir(dirname($audioPath))) {
@@ -41,12 +41,12 @@ test('Podcast plugin is discovered and publishes an audio feed from PostgreSQL l
     $this->container->get(AssetRepository::class)->create(
         mediaItemId: MediaItemId::parse($mediaItemId),
         role: AssetRole::VaultOriginal,
-        kind: AssetKind::Audio,
+        kind: AssetKind::Video,
         state: AssetState::Ready,
         path: $audioPath,
-        relativePath: 'episode.wav',
-        mimeType: 'audio/wav',
-        container: 'wav',
+        relativePath: 'episode.mp4',
+        mimeType: 'video/mp4',
+        container: 'mp4',
         sizeBytes: filesize($audioPath) ?: null,
         checksum: hash_file('sha256', $audioPath) ?: null,
     );
