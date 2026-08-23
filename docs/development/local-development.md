@@ -27,17 +27,18 @@ explicit local SDK/provider development session, add temporary global path
 repositories from `core/`:
 
 ```bash
-composer config --global repositories.lost-and-fonds-api \
-  '{"type":"path","url":"../plugin-api","options":{"symlink":true}}'
-composer config --global repositories.lost-and-fonds-sdk \
-  '{"type":"path","url":"../plugin-sdk","options":{"symlink":true}}'
-composer config --global repositories.lost-and-fonds-jellyfin \
-  '{"type":"path","url":"../plugins/jellyfin","options":{"symlink":true}}'
-composer config --global repositories.lost-and-fonds-plex \
-  '{"type":"path","url":"../plugins/plex","options":{"symlink":true}}'
+composer config repositories.local-api \
+  '{"type":"path","url":"../plugin-api","options":{"symlink":true,"versions":{"stashd/plugin-api":"0.1.0"}}}'
+composer config repositories.local-sdk \
+  '{"type":"path","url":"../plugin-sdk","options":{"symlink":true,"versions":{"stashd/plugin-sdk":"0.1.0"}}}'
+composer config repositories.local-jellyfin \
+  '{"type":"path","url":"../plugins/jellyfin","options":{"symlink":true,"versions":{"stashd/jellyfin":"0.1.2"}}}'
+composer config repositories.local-plex \
+  '{"type":"path","url":"../plugins/plex","options":{"symlink":true,"versions":{"stashd/plex":"0.1.2"}}}'
 composer update stashd/plugin-sdk stashd/jellyfin stashd/plex --with-all-dependencies
 ```
 
-Do not commit the resulting lockfile changes. Remove the global overrides when
-the session ends with `composer config --global --unset repositories.<name>`;
-normal installs then use the released packages again.
+Do not commit the resulting `composer.json` or lockfile changes. Remove the
+overrides when the session ends with `composer config --unset
+repositories.local-<name>`; normal installs then use the released packages
+again.
