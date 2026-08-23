@@ -33,6 +33,10 @@ use InvalidArgumentException;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
+use function Tempest\Support\Filesystem\delete_file;
+use function Tempest\Support\Filesystem\is_directory;
+use function Tempest\Support\Filesystem\is_file;
+
 final readonly class DownloadMediaItem
 {
     public function __construct(
@@ -175,7 +179,7 @@ final readonly class DownloadMediaItem
         }
 
         foreach ([$this->config->vaultPath(), $this->config->tempPath()] as $path) {
-            if (! is_dir($path) || ! is_writable($path)) {
+            if (! is_directory($path) || ! is_writable($path)) {
                 throw DownloadException::withCode(
                     'storage_unavailable',
                     sprintf('Storage path is not writable: %s', $path),
@@ -317,7 +321,7 @@ final readonly class DownloadMediaItem
     {
         foreach ($paths as $path) {
             if (is_file($path)) {
-                unlink($path);
+                delete_file($path);
             }
         }
     }

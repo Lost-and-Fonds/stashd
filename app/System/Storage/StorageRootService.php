@@ -11,6 +11,8 @@ use function Tempest\Support\Filesystem\create_directory;
 
 use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
+use function Tempest\Support\Filesystem\is_directory;
+
 final readonly class StorageRootService
 {
     public function __construct(
@@ -23,7 +25,7 @@ final readonly class StorageRootService
         $created = [];
 
         foreach ($this->requiredPaths() as $path) {
-            if (is_dir($path)) {
+            if (is_directory($path)) {
                 continue;
             }
 

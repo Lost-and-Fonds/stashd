@@ -12,6 +12,8 @@ use Closure;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
+use function Tempest\Support\Filesystem\is_file;
+
 final readonly class VerifyVaultAssets
 {
     private const int PAGE_SIZE = 100;

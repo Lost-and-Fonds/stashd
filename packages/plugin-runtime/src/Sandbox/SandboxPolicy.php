@@ -6,6 +6,8 @@ namespace Stashd\PluginRuntime\Sandbox;
 
 use RuntimeException;
 
+use function Tempest\Support\Filesystem\is_directory;
+
 final readonly class SandboxPolicy
 {
     /** @return list<string> */
@@ -25,7 +27,7 @@ final readonly class SandboxPolicy
         }
 
         foreach (['/usr', '/bin', '/lib', '/lib64', '/sbin'] as $directory) {
-            if (is_dir($directory)) {
+            if (is_directory($directory)) {
                 $command[] = '--ro-bind';
                 $command[] = $directory;
                 $command[] = $directory;
@@ -33,7 +35,7 @@ final readonly class SandboxPolicy
         }
 
         if ($sdkRoot !== null) {
-            if (! is_dir($sdkRoot)) {
+            if (! is_directory($sdkRoot)) {
                 throw new RuntimeException('plugin SDK root is missing');
             }
             $command = array_merge($command, ['--ro-bind', $sdkRoot, '/sdk']);

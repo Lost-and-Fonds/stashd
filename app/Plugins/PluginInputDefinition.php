@@ -9,6 +9,8 @@ use App\Providers\InputOptionType;
 use App\System\Secret\SecretsService;
 use RuntimeException;
 
+use function Tempest\Support\Filesystem\is_file;
+
 final readonly class PluginInputDefinition
 {
     public function __construct(public string $id, public string $providerKey, public string $name, public string $version, public string $root, public array $prefixes, public array $grants, public array $options, public ?PluginHelperGrant $helper) {}

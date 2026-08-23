@@ -6,6 +6,8 @@ namespace App\Plugins;
 
 use RuntimeException;
 
+use function Tempest\Support\Filesystem\is_file;
+
 /** Data-only registration for an external Broadcast Component. */
 final readonly class ExternalBroadcastPluginDefinition
 {

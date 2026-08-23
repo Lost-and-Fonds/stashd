@@ -51,6 +51,7 @@ use Tempest\DateTime\Timezone;
 use function Tempest\Support\Filesystem\copy_file;
 use function Tempest\Support\Filesystem\create_directory;
 use function Tempest\Support\Filesystem\is_directory;
+use function Tempest\Support\Filesystem\is_file;
 use function Tempest\Support\Filesystem\list_directory;
 
 /** Generic application adapter for manifest-registered Broadcast Components. */

@@ -17,6 +17,7 @@ use App\Vault\VaultSidecarBuilder;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
+use function Tempest\Support\Filesystem\is_directory;
 use function Tempest\Support\Filesystem\write_file;
 use function Tempest\Support\str;
 
@@ -54,7 +55,7 @@ final readonly class FakeDownloader implements DownloaderInterface
 
     public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult
     {
-        if (! is_dir($request->tempDirectory) || ! is_writable($request->tempDirectory)) {
+        if (! is_directory($request->tempDirectory) || ! is_writable($request->tempDirectory)) {
             throw DownloadException::withCode('temp_not_writable', 'Temp download directory is not writable.');
         }
 
