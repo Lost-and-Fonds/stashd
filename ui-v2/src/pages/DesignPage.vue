@@ -135,6 +135,14 @@ const notifyOnFailure = ref(false)
 
     <USeparator class="max-w-3xl" />
 
+    <section class="max-w-3xl space-y-3">
+      <h2 class="font-mono text-xs uppercase tracking-wider text-dimmed">Plugin fields</h2>
+      <p class="text-sm text-muted">Reusable configuration controls, kept separate from plugin-specific pages.</p>
+      <UButton to="/design/plugin-fields" label="Open plugin field gallery" variant="soft" />
+    </section>
+
+    <USeparator class="max-w-3xl" />
+
     <!-- Typography -->
     <section class="max-w-3xl space-y-4">
       <h2 class="font-mono text-xs uppercase tracking-wider text-dimmed">Typography</h2>

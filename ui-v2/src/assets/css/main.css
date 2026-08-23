@@ -43,6 +43,17 @@
   --ui-radius: 0.25rem;
 }
 
+/* Keep the native number input, but remove its browser-specific chrome. */
+.plugin-field-number input[type='number'] {
+  appearance: textfield;
+}
+
+.plugin-field-number input[type='number']::-webkit-inner-spin-button,
+.plugin-field-number input[type='number']::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
 :root.dark {
   /* Surfaces — legacy's four real tones (espresso/panel/panel-raised/line),
      mapped directly rather than derived from a neutral 50-950 ramp. Legacy

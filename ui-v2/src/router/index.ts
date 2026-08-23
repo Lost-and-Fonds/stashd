@@ -6,6 +6,7 @@ import ConnectionsPage from '../pages/ConnectionsPage.vue'
 import DesignPage from '../pages/DesignPage.vue'
 import InputsPage from '../pages/InputsPage.vue'
 import NotFoundPage from '../pages/NotFoundPage.vue'
+import PluginFieldGalleryPage from '../pages/PluginFieldGalleryPage.vue'
 import SecretsPage from '../pages/SecretsPage.vue'
 import SettingsPage from '../pages/SettingsPage.vue'
 import StashCreatePage from '../pages/StashCreatePage.vue'
@@ -35,6 +36,7 @@ const router = createRouter({
     { path: '/broadcasts', name: 'broadcasts', component: BroadcastsPage },
     { path: '/settings', name: 'settings', component: SettingsPage },
     { path: '/design', name: 'design', component: DesignPage },
+    { path: '/design/plugin-fields', name: 'design-plugin-fields', component: PluginFieldGalleryPage },
     { path: '/design/stash-detail-concepts', name: 'design-stash-detail-concepts', component: StashDetailConceptsPage },
     { path: '/design/vault-item-concept', name: 'design-vault-item-concept', component: VaultItemConceptPage },
     { path: '/design/status-concept', name: 'design-status-concept', component: StatusConceptPage },
