@@ -1,41 +1,65 @@
 <script setup lang="ts">
-import MetaLine from '../components/MetaLine.vue'
-import OperationProgress from '../components/OperationProgress.vue'
-import { stashFixtures } from '../fixtures/stashes'
-import type { StashFixture, StashStatus } from '../types/stash'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { fetchStashes } from '../api/stashes'
+import { subscribeLiveUpdates, type LiveEvent } from '../live/mercure'
+import type { StashApiResource } from '../types/stash'
 
-// Status: quiet dot + label, matching the pattern established on /design —
-// deliberately not a badge/pill, and not the same enum as OperationStatus
-// (a Stash's health is independent of whether work is actively happening).
-const statusMeta: Record<StashStatus, { label: string, dot: string }> = {
-  active: { label: 'active', dot: 'bg-success' },
-  paused: { label: 'paused', dot: 'bg-neutral-400' },
-  'needs-attention': { label: 'needs attention', dot: 'bg-error' }
-}
-
-const stashActions = [
-  [{ label: 'Open stash', icon: 'i-lucide-external-link' }, { label: 'Rebuild broadcasts', icon: 'i-lucide-refresh-cw' }],
-  [{ label: 'Pause', icon: 'i-lucide-pause' }],
-  [{ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const }]
-]
+const stashes = ref<StashApiResource[]>([])
+const loading = ref(true)
+const error = ref<string>()
+let unsubscribe: (() => void) | undefined
+let refreshTimer: ReturnType<typeof setTimeout> | undefined
 
 function monogram(name: string) {
   return name.charAt(0).toUpperCase()
 }
 
-function pluralize(count: number, noun: string) {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`
+function statePresentation(state: string) {
+  const presentation = {
+    ready: { dot: 'bg-success', text: 'text-success' },
+    failed: { dot: 'bg-error', text: 'text-error' },
+    disabled: { dot: 'bg-neutral-400', text: 'text-dimmed' }
+  }[state] ?? { dot: 'bg-neutral-400', text: 'text-dimmed' }
+
+  return {
+    label: state.replaceAll('_', ' '),
+    ...presentation
+  }
 }
 
-// Naming the action beats a naked relative timestamp — see MetaLine.
-function stashMetaItems(s: StashFixture) {
-  const activityText = s.status === 'needs-attention' ? `Failed ${s.lastActivity}` : `Updated ${s.lastActivity}`
-  return [
-    { text: `${s.itemCount.toLocaleString()} items` },
-    { text: s.sizeLabel },
-    { text: activityText, datetime: s.lastActivityAt }
-  ]
+async function load() {
+  loading.value = true
+  error.value = undefined
+
+  try {
+    stashes.value = await fetchStashes()
+  } catch (exception) {
+    stashes.value = []
+    error.value = exception instanceof Error ? exception.message : 'Could not load Stashes.'
+  } finally {
+    loading.value = false
+  }
 }
+
+function refreshFromLiveEvent(event: LiveEvent) {
+  if (event.event === 'activity.created' || event.event === 'job.completed' || event.event === 'job.failed') {
+    if (refreshTimer) return
+    refreshTimer = setTimeout(() => {
+      refreshTimer = undefined
+      void load()
+    }, 0)
+  }
+}
+
+onMounted(() => {
+  unsubscribe = subscribeLiveUpdates(refreshFromLiveEvent)
+  void load()
+})
+
+onBeforeUnmount(() => {
+  unsubscribe?.()
+  if (refreshTimer) clearTimeout(refreshTimer)
+})
 </script>
 
 <template>
@@ -48,53 +72,31 @@ function stashMetaItems(s: StashFixture) {
       <UButton label="New stash" icon="i-lucide-plus" to="/stashes/new" />
     </header>
 
-    <div class="divide-y divide-default rounded-md border border-default">
-      <div v-for="stash in stashFixtures" :key="stash.id" class="p-4 transition-colors hover:bg-elevated/40 sm:p-5">
-        <div class="flex items-start gap-3">
-          <!-- Row navigates to the Stash; the action menu below is a separate
-               sibling control, not nested inside this link. -->
-          <RouterLink :to="`/stashes/${stash.id}`" class="flex min-w-0 flex-1 items-start gap-3">
-            <div class="flex size-11 shrink-0 items-center justify-center rounded-md bg-elevated font-mono text-sm text-muted">
-              {{ monogram(stash.name) }}
-            </div>
-
-            <div class="min-w-0 flex-1">
-              <p class="truncate font-mono text-base leading-tight text-highlighted">{{ stash.name }}</p>
-
-              <MetaLine class="mt-1" :status="statusMeta[stash.status]" :items="stashMetaItems(stash)">
-                <UTooltip :text="pluralize(stash.inputCount, 'input')">
-                  <span class="inline-flex items-center gap-1 font-mono text-xs text-dimmed">
-                    <UIcon name="i-lucide-download" class="size-3.5" />
-                    {{ stash.inputCount }}
-                  </span>
-                </UTooltip>
-                <UTooltip :text="pluralize(stash.broadcastCount, 'broadcast')">
-                  <span class="inline-flex items-center gap-1 font-mono text-xs text-dimmed">
-                    <UIcon name="i-lucide-radio" class="size-3.5" />
-                    {{ stash.broadcastCount }}
-                  </span>
-                </UTooltip>
-              </MetaLine>
-
-              <div v-if="stash.operation" class="mt-3 max-w-md">
-                <OperationProgress
-                  variant="compact"
-                  :label="stash.operation.label"
-                  :percent="stash.operation.percent"
-                  :stage="stash.operation.stage"
-                  status="active"
-                />
-              </div>
-            </div>
-          </RouterLink>
-
-          <!-- A sibling of the name/status block, not nested inside it — otherwise
-               the button's own min-height keeps that block from sitting tight
-               against the avatar. -->
-          <UDropdownMenu :items="stashActions">
-            <UButton icon="i-lucide-ellipsis-vertical" aria-label="More actions" title="More actions" variant="ghost" color="neutral" size="md" class="shrink-0" />
-          </UDropdownMenu>
-        </div>
+    <div v-if="loading" class="flex items-center gap-2 text-sm text-muted">
+      <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" />
+      Loading Stashes…
+    </div>
+    <UAlert v-else-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not load Stashes" :description="error" />
+    <div v-else-if="stashes.length === 0" class="rounded-md border border-dashed border-default p-8 text-center">
+      <p class="text-sm text-muted">No Stashes yet.</p>
+      <UButton label="Create your first Stash" to="/stashes/new" size="sm" class="mt-3" />
+    </div>
+    <div v-else class="divide-y divide-default rounded-md border border-default">
+      <div v-for="stash in stashes" :key="stash.id" class="p-4 transition-colors hover:bg-elevated/40 sm:p-5">
+        <RouterLink :to="`/stashes/${stash.id}`" class="flex items-start gap-3">
+          <div class="flex size-11 shrink-0 items-center justify-center rounded-md bg-elevated font-mono text-sm text-muted">
+            {{ monogram(stash.name) }}
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="truncate font-mono text-base leading-tight text-highlighted">{{ stash.name }}</p>
+            <p class="mt-1 flex items-center gap-1.5 text-xs" :class="statePresentation(stash.state).text">
+              <span class="size-1.5 rounded-full" :class="statePresentation(stash.state).dot" />
+              {{ statePresentation(stash.state).label }}
+              <span v-if="stash.updated_at" class="text-dimmed">· updated {{ new Date(stash.updated_at).toLocaleDateString() }}</span>
+            </p>
+            <p v-if="stash.description" class="mt-2 truncate text-sm text-muted">{{ stash.description }}</p>
+          </div>
+        </RouterLink>
       </div>
     </div>
   </main>

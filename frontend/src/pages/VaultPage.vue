@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref, resolveComponent, watch } from 'vue'
+import { computed, h, onBeforeUnmount, onMounted, ref, resolveComponent, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 
 import { fetchVaultItems, type VaultItemApiResource } from '../api/vault'
+import { subscribeLiveUpdates, type LiveEvent } from '../live/mercure'
 
 const router = useRouter()
 const items = ref<VaultItemApiResource[]>([])
@@ -120,9 +121,36 @@ const tableUi = { thead: 'bg-elevated/60', th: 'font-mono text-xs uppercase trac
 
 function onSelectRow(_event: Event, row: TableRow<VaultItemApiResource>) { openItem(row.original) }
 
+let refreshTimer: ReturnType<typeof setTimeout> | undefined
+let unsubscribe: (() => void) | undefined
+
+function scheduleLiveRefresh() {
+  if (refreshTimer) return
+  refreshTimer = setTimeout(() => {
+    refreshTimer = undefined
+    void load()
+  }, 50)
+}
+
+function handleLiveEvent(event: LiveEvent) {
+  if (event.event === 'activity.created') {
+    if (['download.completed', 'download.failed', 'stash.input_added', 'stash.input_synced', 'stash.retried_failed', 'vault.verify_completed'].includes(event.payload.type ?? '')) scheduleLiveRefresh()
+    return
+  }
+
+  if ((event.event === 'job.completed' || event.event === 'job.failed') && (event.payload.intent?.startsWith('download') || event.payload.entityType === 'media_item')) scheduleLiveRefresh()
+}
+
 watch([search, kind], () => { page.value = 1; void load() })
 watch(page, () => { void load() })
-onMounted(load)
+onMounted(() => {
+  void load()
+  unsubscribe = subscribeLiveUpdates(handleLiveEvent)
+})
+onBeforeUnmount(() => {
+  unsubscribe?.()
+  if (refreshTimer) clearTimeout(refreshTimer)
+})
 </script>
 
 <template>

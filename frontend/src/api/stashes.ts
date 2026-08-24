@@ -1,8 +1,15 @@
 import type { StashItemApiResource, StashItemsApiResponse } from '../types/item'
 import type { StashApiResource } from '../types/stash'
+import { apiFetch } from './auth'
+
+export async function fetchStashes(): Promise<StashApiResource[]> {
+  const body = await responseBody<{ stashes?: StashApiResource[] }>(await apiFetch('/api/v1/stashes'))
+
+  return body.stashes ?? []
+}
 
 export async function fetchStash(stashId: string): Promise<StashApiResource> {
-  const response = await fetch(`/api/v1/stashes/${encodeURIComponent(stashId)}`)
+  const response = await apiFetch(`/api/v1/stashes/${encodeURIComponent(stashId)}`)
   const body = await responseBody<{ stash: StashApiResource }>(response)
 
   return body.stash
@@ -20,7 +27,7 @@ export async function fetchStashItems(stashId: string, query: StashItemsQuery): 
   if (query.search) parameters.set('search', query.search)
   if (query.status) parameters.set('status', query.status)
 
-  const response = await fetch(`/api/v1/stashes/${encodeURIComponent(stashId)}/items?${parameters}`)
+  const response = await apiFetch(`/api/v1/stashes/${encodeURIComponent(stashId)}/items?${parameters}`)
   const body = await responseBody<Partial<StashItemsApiResponse> & { items?: StashItemApiResource[] }>(response)
 
   return {

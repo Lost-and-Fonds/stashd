@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { normalizeBroadcastActions, type PluginAction } from '../adapters/normalizeBroadcastActions'
 import { normalizeBroadcastDetailFields } from '../adapters/normalizeBroadcastDetailFields'
@@ -7,6 +7,7 @@ import { fetchBroadcast, invokeBroadcastAction } from '../api/broadcasts'
 import PluginActions from '../components/plugin/PluginActions.vue'
 import PluginDetailFields from '../components/plugin/PluginDetailFields.vue'
 import type { BroadcastApiResource } from '../types/broadcast-plugin'
+import { subscribeLiveUpdates, type LiveEvent } from '../live/mercure'
 
 const route = useRoute()
 const broadcastId = String(route.params.broadcastId)
@@ -18,6 +19,8 @@ const pendingActionId = ref<string>()
 const confirmingAction = ref<PluginAction>()
 const confirmationOpen = ref(false)
 const completedActionLabel = ref<string>()
+let refreshTimer: ReturnType<typeof setTimeout> | undefined
+let unsubscribe: (() => void) | undefined
 
 const details = computed(() => normalizeBroadcastDetailFields(broadcast.value?.plugin_detail_fields ?? []))
 const actions = computed(() => normalizeBroadcastActions(broadcast.value?.plugin_actions ?? []))
@@ -36,7 +39,38 @@ async function load() {
   }
 }
 
-onMounted(load)
+function scheduleLiveRefresh() {
+  if (refreshTimer) return
+  refreshTimer = setTimeout(() => {
+    refreshTimer = undefined
+    void load()
+  }, 50)
+}
+
+function handleLiveEvent(event: LiveEvent) {
+  const id = String(route.params.broadcastId)
+
+  if (event.event === 'activity.created') {
+    const type = event.payload.type ?? ''
+    const matches = event.payload.broadcastId === id
+      || (event.payload.entityType === 'broadcast' && event.payload.entityId === id)
+    if (matches && type.startsWith('broadcast.')) scheduleLiveRefresh()
+    return
+  }
+
+  if ((event.event === 'job.completed' || event.event === 'job.failed')
+    && event.payload.entityType === 'broadcast'
+    && event.payload.entityId === id) scheduleLiveRefresh()
+}
+
+onMounted(() => {
+  void load()
+  unsubscribe = subscribeLiveUpdates(handleLiveEvent)
+})
+onBeforeUnmount(() => {
+  unsubscribe?.()
+  if (refreshTimer) clearTimeout(refreshTimer)
+})
 
 function requestAction(action: PluginAction) {
   error.value = undefined

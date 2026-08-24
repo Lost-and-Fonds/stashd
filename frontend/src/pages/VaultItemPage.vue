@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { fetchVaultItem, type VaultItemDetailResponse } from '../api/vault'
+import { subscribeLiveUpdates, type LiveEvent } from '../live/mercure'
 
 const route = useRoute()
 const detail = ref<VaultItemDetailResponse>()
 const loading = ref(true)
 const error = ref<string>()
+let refreshTimer: ReturnType<typeof setTimeout> | undefined
+let unsubscribe: (() => void) | undefined
 
 const roleLabels: Record<string, string> = {
   vault_original: 'Original',
@@ -52,7 +55,38 @@ async function load() {
   }
 }
 
-onMounted(load)
+function scheduleLiveRefresh() {
+  if (refreshTimer) return
+  refreshTimer = setTimeout(() => {
+    refreshTimer = undefined
+    void load()
+  }, 50)
+}
+
+function handleLiveEvent(event: LiveEvent) {
+  const itemId = String(route.params.itemId)
+
+  if (event.event === 'activity.created') {
+    const type = event.payload.type ?? ''
+    const matchesItem = event.payload.entityType === 'media_item' && event.payload.entityId === itemId
+    if (matchesItem && ['download.completed', 'download.failed'].includes(type)) scheduleLiveRefresh()
+    if (type === 'vault.verify_completed') scheduleLiveRefresh()
+    return
+  }
+
+  if ((event.event === 'job.completed' || event.event === 'job.failed')
+    && event.payload.entityType === 'media_item'
+    && event.payload.entityId === itemId) scheduleLiveRefresh()
+}
+
+onMounted(() => {
+  void load()
+  unsubscribe = subscribeLiveUpdates(handleLiveEvent)
+})
+onBeforeUnmount(() => {
+  unsubscribe?.()
+  if (refreshTimer) clearTimeout(refreshTimer)
+})
 </script>
 
 <template>

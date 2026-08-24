@@ -6,9 +6,10 @@ import type { TableColumn } from '@nuxt/ui'
 
 import { fetchStashBroadcasts, rebuildBroadcast } from '../api/broadcasts'
 import { fetchStashInputs, syncStashInput } from '../api/inputs'
-import { fetchCommandOperation, type CommandOperation } from '../api/commands'
 import { fetchStash, fetchStashItems } from '../api/stashes'
+import { subscribeLiveUpdates, type JobLiveEvent, type LiveEvent } from '../live/mercure'
 import type { BroadcastApiResource } from '../types/broadcast-plugin'
+import type { CommandOperation } from '../api/commands'
 import type { StashInputApiResource } from '../types/input'
 import type { StashItemApiResource, StashItemsApiResponse } from '../types/item'
 import type { StashApiResource } from '../types/stash'
@@ -29,7 +30,8 @@ const itemsError = ref<string>()
 const copiedId = ref<string>()
 const inputOperations = ref<Record<string, CommandOperation | undefined>>({})
 const broadcastOperations = ref<Record<string, CommandOperation | undefined>>({})
-const operationTimers = new Set<ReturnType<typeof setTimeout>>()
+let unsubscribe: (() => void) | undefined
+let refreshTimer: ReturnType<typeof setTimeout> | undefined
 
 const stateMeta: Record<string, { label: string, dot: string, text: string }> = {
   ready: { label: 'ready', dot: 'bg-success', text: 'text-success' },
@@ -89,25 +91,51 @@ function operationText(operation: CommandOperation | undefined, verb: string) {
   return `${verb} failed. Try again.`
 }
 
-async function watchOperation(kind: 'input' | 'broadcast', resourceId: string, commandId: string) {
-  const operations = kind === 'input' ? inputOperations : broadcastOperations
+function operationFromEvent(event: LiveEvent): CommandOperation | undefined {
+  if (!event.event.startsWith('job.')) return undefined
+  const payload = event.payload as JobLiveEvent
 
-  try {
-    const operation = await fetchCommandOperation(commandId)
-    operations.value = { ...operations.value, [resourceId]: operation }
+  const state = event.event === 'job.created'
+    ? 'accepted'
+    : event.event === 'job.progress'
+      ? 'running'
+      : event.event === 'job.completed' ? 'completed' : 'failed'
 
-    if (!isTerminal(operation)) {
-      const timer = setTimeout(() => {
-        operationTimers.delete(timer)
-        void watchOperation(kind, resourceId, commandId)
-      }, 1500)
-      operationTimers.add(timer)
-    } else {
-      await load()
-    }
-  } catch {
-    operations.value = { ...operations.value, [resourceId]: { id: commandId, state: 'failed' } }
+  return {
+    id: payload.command_id ?? payload.id,
+    state,
+    label: payload.progress_label ?? undefined,
+    percent: payload.progress_percent ?? null
   }
+}
+
+function scheduleRefresh() {
+  if (refreshTimer) return
+  refreshTimer = setTimeout(() => {
+    refreshTimer = undefined
+    void load()
+  }, 0)
+}
+
+function handleLiveEvent(event: LiveEvent) {
+  if (event.event === 'activity.created') {
+    if (event.payload.stash_id === stash.value?.id) scheduleRefresh()
+    return
+  }
+
+  const operation = operationFromEvent(event)
+  if (!operation) return
+
+  const commandId = event.payload.command_id
+  const input = inputs.value.find(candidate => candidate.id === event.payload.entity_id)
+  const broadcast = broadcasts.value.find(candidate => candidate.id === event.payload.entity_id)
+  const inputId = input?.id ?? Object.entries(inputOperations.value).find(([, candidate]) => candidate?.id === commandId)?.[0]
+  const broadcastId = broadcast?.id ?? Object.entries(broadcastOperations.value).find(([, candidate]) => candidate?.id === commandId)?.[0]
+
+  if (inputId) inputOperations.value = { ...inputOperations.value, [inputId]: operation }
+  if (broadcastId) broadcastOperations.value = { ...broadcastOperations.value, [broadcastId]: operation }
+
+  if ((event.event === 'job.completed' || event.event === 'job.failed') && (inputId || broadcastId)) scheduleRefresh()
 }
 
 async function syncInput(input: StashInputApiResource) {
@@ -116,7 +144,6 @@ async function syncInput(input: StashInputApiResource) {
   try {
     const operation = await syncStashInput(stash.value.id, input.id)
     inputOperations.value = { ...inputOperations.value, [input.id]: operation }
-    void watchOperation('input', input.id, operation.id)
   } catch {
     inputOperations.value = { ...inputOperations.value, [input.id]: { id: '', state: 'failed' } }
   }
@@ -128,7 +155,6 @@ async function rebuild(broadcast: BroadcastApiResource) {
   try {
     const operation = await rebuildBroadcast(broadcast.id)
     broadcastOperations.value = { ...broadcastOperations.value, [broadcast.id]: operation }
-    void watchOperation('broadcast', broadcast.id, operation.id)
   } catch {
     broadcastOperations.value = { ...broadcastOperations.value, [broadcast.id]: { id: '', state: 'failed' } }
   }
@@ -289,10 +315,10 @@ async function load() {
   else broadcastsError.value = broadcastResult.reason instanceof Error ? broadcastResult.reason.message : 'Could not load Broadcasts.'
 
   for (const input of inputs.value) {
-    if (input.sync_operation && !isTerminal(input.sync_operation)) void watchOperation('input', input.id, input.sync_operation.id)
+    if (input.sync_operation && !isTerminal(input.sync_operation)) inputOperations.value = { ...inputOperations.value, [input.id]: input.sync_operation }
   }
   for (const broadcast of broadcasts.value) {
-    if (broadcast.rebuild_operation && !isTerminal(broadcast.rebuild_operation)) void watchOperation('broadcast', broadcast.id, broadcast.rebuild_operation.id)
+    if (broadcast.rebuild_operation && !isTerminal(broadcast.rebuild_operation)) broadcastOperations.value = { ...broadcastOperations.value, [broadcast.id]: broadcast.rebuild_operation }
   }
 
   loading.value = false
@@ -303,7 +329,11 @@ watch([itemSearch, itemStatusFilter], () => { itemsPage.value = 1 })
 watch([itemSearch, itemStatusFilter, itemsPage], () => { void loadItems() })
 watch(() => route.params.id, () => { void load() })
 onMounted(load)
-onBeforeUnmount(() => operationTimers.forEach(clearTimeout))
+onMounted(() => { unsubscribe = subscribeLiveUpdates(handleLiveEvent) })
+onBeforeUnmount(() => {
+  unsubscribe?.()
+  if (refreshTimer) clearTimeout(refreshTimer)
+})
 </script>
 
 <template>

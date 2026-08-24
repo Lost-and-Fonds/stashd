@@ -1,11 +1,13 @@
 import type { LifecycleOperation } from '../types/input'
+import { apiFetch } from './auth'
 
 export interface CommandOperation extends LifecycleOperation {
   label?: string | null
+  percent?: number | null
 }
 
 export async function fetchCommandOperation(commandId: string): Promise<CommandOperation> {
-  const response = await fetch(`/api/v1/commands/${encodeURIComponent(commandId)}`)
+  const response = await apiFetch(`/api/v1/commands/${encodeURIComponent(commandId)}`)
   const body = await response.json().catch(() => null) as {
     command?: { id?: unknown, state?: unknown }
     jobs?: Array<{ progress_label?: unknown }>
