@@ -14,9 +14,9 @@
 	root * public
 	encode zstd gzip
 
-	# Tempest-owned routes must be handled before the SPA fallback. Everything
-	# else is either a real ui-v2 asset or a client-side ui-v2 route.
-	@backend path /api/* /login /activity /published/* /health
+	# Tempest-owned operations must be handled before the SPA fallback. The
+	# frontend owns all page routes, including /login.
+	@backend path /api/* /published/* /health
 	handle @backend {
 		php_server
 	}
@@ -60,7 +60,7 @@
 		respond 404
 	}
 
-	# Vue Router history fallback for ui-v2. This block is reached only after
+	# Vue Router history fallback. This block is reached only after
 	# backend routes and existing files have been handled, so API errors cannot
 	# become HTML 200 responses.
 	handle {

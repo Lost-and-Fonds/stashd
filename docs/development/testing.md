@@ -146,9 +146,9 @@ behavior.
 
 Do not treat a stale local image as verification.
 
-### UI v2
+### Frontend
 
-From `ui-v2/` run:
+From the repository root run:
 
 ```bash
 npm run typecheck
@@ -179,7 +179,7 @@ plugin RPC framing
 Jellyfin application integration
 → Jellyfin parity + application lifecycle + PostgreSQL + plugin runtime
 
-CSS/layout tweak in ui-v2
+CSS/layout tweak in the frontend
 → typecheck + build
 ```
 

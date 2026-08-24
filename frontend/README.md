@@ -1,6 +1,6 @@
-# Stashd UI v2
+# Stashd frontend
 
-A deliberately isolated frontend rebuild for Stashd.
+The Vue frontend for Stashd.
 
 ## Stack
 
@@ -13,29 +13,16 @@ A deliberately isolated frontend rebuild for Stashd.
 
 This is a plain Vue/Vite application. **It is not a Nuxt application.** Nuxt UI supports Vue/Vite directly.
 
-## Why this exists separately
-
-The current Stashd UI stays intact while UI v2 is designed page-by-page.
-
-The rebuild is intentionally split into two large concerns:
-
-1. **Design the whole interface with fixtures/local state.**
-2. **Only then integrate it with the real Stashd backend and replace the legacy UI.**
-
-That keeps visual iteration fast and prevents backend/API work from swallowing the redesign.
-
 ## First run
 
 ```bash
-cd ui-v2
-npm install
+npm ci
 npm run dev
 ```
 
 Then open the Vite URL shown in the terminal (normally `http://localhost:5173`).
 
-The interface design is now recorded in `planning/DECISIONS.md` and is being
-worked through page-by-page with local fixtures before backend integration.
+The interface design is recorded in `planning/DECISIONS.md`.
 
 ## Important files
 

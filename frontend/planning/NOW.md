@@ -14,7 +14,7 @@ foundation, using fixtures/local state until the explicit integration phase.
 - the specifically requested page slice
 - fixture/local interactions needed to review that slice
 - responsive behavior for desktop and phone-sized layouts
-- build/typecheck fixes inside `ui-v2/`
+- build/typecheck fixes inside the frontend
 
 ## Explicitly not in this phase
 

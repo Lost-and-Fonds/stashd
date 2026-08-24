@@ -94,7 +94,7 @@ All tracked source remains in core except paths explicitly moved above or placed
 under Wasmtime reference below. In particular:
 
 ```text
-app/** bootstrap/** docker/** e2e/** public/** src/** tests/** ui-v2/**
+app/** bootstrap/** docker/** e2e/** frontend/** public/** tests/**
 scripts/**                         # except the listed Wasmtime spike scripts
 packages/plugin-runtime/**
 .github/**

@@ -8,6 +8,7 @@ import AddInputPage from '../pages/AddInputPage.vue'
 import ConnectionsPage from '../pages/ConnectionsPage.vue'
 import DesignPage from '../pages/DesignPage.vue'
 import InputsPage from '../pages/InputsPage.vue'
+import LoginPage from '../pages/LoginPage.vue'
 import InputConfigurationPage from '../pages/InputConfigurationPage.vue'
 import NotFoundPage from '../pages/NotFoundPage.vue'
 import PluginFieldGalleryPage from '../pages/PluginFieldGalleryPage.vue'
@@ -28,6 +29,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', redirect: '/stashes' },
+    { path: '/login', name: 'login', component: LoginPage },
     { path: '/status', name: 'status', component: StatusPage },
     { path: '/stashes', name: 'stashes', component: StashesPage },
     { path: '/stashes/new', name: 'stash-create', component: StashCreatePage },

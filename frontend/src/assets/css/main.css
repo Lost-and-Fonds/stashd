@@ -16,9 +16,9 @@
 /*
  * Stashd visual language.
  * Colour is a direct port of the legacy production palette (repo root
- * src/main.entrypoint.css — espresso/panel/panel-raised/line/cream/muted/
+ * the former frontend palette — espresso/panel/panel-raised/line/cream/muted/
  * amber/amber-dim/success/warn/error), converted to oklch so it plugs into
- * Nuxt UI's semantic surface/text/color-ramp variables. UI-v2 keeps its own
+ * Nuxt UI's semantic surface/text/color-ramp variables. The Vue frontend keeps its own
  * structure, components, density and typography (IBM Plex) — only the
  * colour character comes from the old UI. See planning/DECISIONS.md for the
  * hex → token mapping.
@@ -33,7 +33,7 @@
 
   /* Corner radii shifted down one step app-wide (mechanical/appliance feel
      over soft SaaS rounding): rounded-md — the size nearly everything in
-     ui-v2 is built with — now renders at Tailwind's default rounded-sm size. */
+     the frontend is built with — now renders at Tailwind's default rounded-sm size. */
   --radius-md: 0.25rem;
 }
 

@@ -2,21 +2,12 @@
 FROM docker.io/composer:2 AS composer
 FROM docker.io/node:22-bookworm-slim AS node
 
-FROM node AS legacy-assets
+FROM node AS frontend-assets
 WORKDIR /app
-ENV TEMPEST_PLUGIN_CONFIGURATION_OVERRIDE='{"build_directory":"build","bridge_file_name":"vite-tempest","manifest":"manifest.json","entrypoints":["src/main.entrypoint.ts"]}'
 COPY package.json package-lock.json ./
-RUN npm ci
-COPY vite.config.ts ./
-COPY src ./src
-COPY app ./app
-RUN npm run build
-
-FROM node AS ui-v2-assets
-WORKDIR /app
-COPY ui-v2/package.json ui-v2/package-lock.json ./
-RUN npm ci
-COPY ui-v2/ ./
+RUN npm ci --include=optional
+COPY index.html vite.config.ts tsconfig*.json ./
+COPY frontend ./frontend
 RUN npm run build
 
 FROM docker.io/dunglas/frankenphp:1-php8.5-bookworm AS base
@@ -109,9 +100,7 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
 
 COPY . .
-RUN rm -rf public/build
-COPY --from=ui-v2-assets /app/dist ./public
-COPY --from=legacy-assets /app/public/build ./public/build
+COPY --from=frontend-assets /app/dist ./public
 RUN git config --global --add safe.directory /var/www/html \
     && composer dump-autoload --optimize \
     && php vendor/bin/tempest discovery:generate --no-interaction \

@@ -1,7 +1,9 @@
 /vendor/
 /node_modules/
+/dist/
+/auto-imports.d.ts
+/components.d.ts
 /.tempest/
-/public/build/
 /public/vite-tempest
 /.env
 /data/

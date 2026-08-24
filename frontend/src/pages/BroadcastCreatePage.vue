@@ -32,6 +32,14 @@ const connectionKey = computed(() => selectedPlugin.value?.connection_setting_ke
 const libraryKey = computed(() => selectedPlugin.value?.library_setting_key ?? null)
 const connectionField = computed(() => connectionKey.value === null ? null : normalized.value.fields.find(field => field.key === connectionKey.value) ?? null)
 const settingFields = computed(() => normalized.value.fields.filter(field => field.key !== connectionKey.value))
+const connectionValue = computed<string | undefined>({
+  get: () => connectionKey.value === null ? undefined : typeof values[connectionKey.value] === 'string' ? values[connectionKey.value] as string : undefined,
+  set: (value: string | undefined) => { if (connectionKey.value !== null) values[connectionKey.value] = value }
+})
+const libraryValue = computed<string | undefined>({
+  get: () => libraryKey.value === null ? undefined : typeof values[libraryKey.value] === 'string' ? values[libraryKey.value] as string : undefined,
+  set: (value: string | undefined) => { if (libraryKey.value !== null) values[libraryKey.value] = value }
+})
 const typeItems = computed(() => plugins.value.map(plugin => ({
   label: plugin.label,
   description: plugin.description ?? '',
@@ -175,7 +183,7 @@ onMounted(load)
               />
               <UFormField v-if="connectionKey && connectionField" :name="connectionKey" :label="connectionField.label" :description="connectionField.description" required>
                 <USelect
-                  v-model="values[connectionKey]"
+                  v-model="connectionValue"
                   :items="connections.filter(connection => connection.plugin_key === selectedPlugin?.key).map(connection => ({ label: connection.name, value: connection.id }))"
                   value-key="value"
                   label-key="label"
@@ -184,7 +192,7 @@ onMounted(load)
                 <NuxtLink v-if="connections.filter(connection => connection.plugin_key === selectedPlugin?.key).length === 0" to="/connections" class="mt-1 block text-xs text-primary">Configure a Connection first.</NuxtLink>
               </UFormField>
               <UFormField v-if="libraryKey && connectionKey && values[connectionKey]" :name="libraryKey" label="Library" required>
-                <USelect v-model="values[libraryKey]" :items="libraries" value-key="value" label-key="label" :loading="loadingLibraries" placeholder="Choose a discovered library" />
+                <USelect v-model="libraryValue" :items="libraries" value-key="value" label-key="label" :loading="loadingLibraries" placeholder="Choose a discovered library" />
                 <p v-if="!loadingLibraries && libraries.length === 0" class="mt-1 text-xs text-muted">No compatible libraries were discovered.</p>
               </UFormField>
               <p v-if="settingFields.length === 0 && !connectionKey" class="text-sm text-muted">This Broadcast type has no configurable settings.</p>

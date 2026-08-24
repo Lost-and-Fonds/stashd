@@ -1,4 +1,4 @@
-# UI v2 roadmap
+# Frontend roadmap
 
 This roadmap describes phases, not autonomous tasks. Do not advance phases without being asked.
 

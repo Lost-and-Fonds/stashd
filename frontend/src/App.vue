@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+
 const primaryLinks = [
   { label: 'Status', icon: 'i-lucide-activity', to: '/status' },
   { label: 'Stashes', icon: 'i-lucide-inbox', to: '/stashes' },
@@ -22,7 +26,7 @@ const dropdownUi = { itemLabel: 'font-mono' }
 <template>
   <UApp>
     <div class="flex min-h-svh flex-col">
-      <header class="flex h-14 shrink-0 items-center gap-1 border-b border-default px-4 sm:px-6">
+      <header v-if="route.path !== '/login'" class="flex h-14 shrink-0 items-center gap-1 border-b border-default px-4 sm:px-6">
         <RouterLink to="/" class="mr-2 shrink-0 font-mono text-lg text-highlighted">
           stashd<span class="text-primary">_</span>
         </RouterLink>

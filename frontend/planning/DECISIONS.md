@@ -6,7 +6,7 @@ Avoid recording every small tweak. This is for durable direction such as navigat
 
 ## Confirmed
 
-- UI v2 is an isolated Vue 3 + Vite application using Nuxt UI v4.
+- The frontend is a Vue 3 + Vite application using Nuxt UI v4.
 - Nuxt framework itself is not being introduced for this rebuild.
 - Visual design happens before backend integration.
 - Fixture/local data is acceptable during design.
@@ -17,7 +17,7 @@ Avoid recording every small tweak. This is for durable direction such as navigat
 
 These are the directions we are now building real pages on top of. Exact numeric values (OKLCH shades, spacing scale, etc.) are implementation, not the decision, and can still be tuned without revisiting the direction itself.
 
-- **Colour is a direct port of the legacy production palette**, not a new invention. Source: repo root `src/main.entrypoint.css` (`--color-espresso/panel/panel-raised/line/cream/muted/amber/amber-dim/success/warn/error`). Converted to oklch and mapped onto Nuxt UI's semantic tokens in `ui-v2/src/assets/css/main.css` — surfaces (`--ui-bg`/`-muted`/`-elevated`/`-accented`, `--ui-border*`) and text (`--ui-text*`) set directly from the real legacy hex rather than derived from a generic neutral ramp; `primary`/`success`/`warning`/`error` 50-950 ramps each anchor their 400 (and, for primary, 600) shade at the exact legacy value and interpolate/extrapolate the rest. UI-v2's structure/density/typography/components are the new design — only the colour character is legacy. Full mapping table lives in the commit history of `main.css`; do not re-derive these values from memory, re-read the legacy source file if they need revisiting.
+- **Colour is a direct port of the legacy production palette**, not a new invention. The values are converted to oklch and mapped onto Nuxt UI's semantic tokens in `frontend/src/assets/css/main.css`; the frontend's structure/density/typography/components are the new design.
 - **Surfaces**: flat, subtle borders, no drop shadows. Legacy only provides four real lightness steps (page/panel/panel-raised/line) — object-level containers use `border`/`divide` for their boundary rather than a dedicated background fill; a warm surface is reserved for small, meaningful insets only (see "Chocolate is an accent" below).
 - **Typography**: IBM Plex Sans + IBM Plex Mono, self-hosted. Substantially mono-forward — mono is used for identity/content whose origin traces back to an Input or source (titles, names, IDs, paths, nav labels); sans is for Stashd-authored prose and explanatory copy.
 - **Navigation**: compact top bar, not a persistent sidebar. Primary destinations (Stashes, Inputs, Vault) horizontal; secondary/configuration destinations (Connections, Secrets, Settings) grouped behind a "Configure" menu; Design kept visually secondary. Broadcasts is intentionally omitted from top-level nav — where it lives contextually is still undecided. Mobile uses a drawer with all destinations reachable, no persistent sidebar, no hover dependency.
