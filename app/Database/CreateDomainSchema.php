@@ -9,7 +9,9 @@ use App\Broadcasts\BroadcastItemState;
 use App\Broadcasts\BroadcastState;
 use App\Broadcasts\BroadcastTriggerRunState;
 use App\Broadcasts\BroadcastTriggerState;
-use App\Connections\ConnectionState;
+use App\Broadcasts\BroadcastTriggerType;
+use App\MediaServers\MediaServerConnectionState;
+use App\MediaServers\MediaServerType;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\OrganizationMode;
 use App\Stashes\StashInputState;
@@ -105,12 +107,12 @@ final class CreateDomainSchema implements MigratesUp
     private function mediaServerConnections(): CreateTableStatement
     {
         return $this->prefixedIdTable('media_server_connections')
-            ->string('type')
+            ->enum('type', MediaServerType::class)
             ->string('name')
             ->text('baseUri')
             ->raw($this->fkColumn('tokenSecretId', 40, 'secrets', OnDelete::SET_NULL, nullable: true))
             ->text('settingsJson', nullable: true)
-            ->enum('state', ConnectionState::class, default: ConnectionState::Ready)
+            ->enum('state', MediaServerConnectionState::class, default: MediaServerConnectionState::Ready)
             ->datetime('lastCheckedAt', nullable: true)
             ->text('lastError', nullable: true)
             ->index('type')
@@ -222,6 +224,8 @@ final class CreateDomainSchema implements MigratesUp
             ->string('name')
             ->string('slug')
             ->enum('state', BroadcastState::class, default: BroadcastState::Pending)
+            ->raw($this->fkColumn('tokenSecretId', 40, 'secrets', OnDelete::SET_NULL, nullable: true))
+            ->string('tokenPreview', nullable: true)
             ->text('settingsJson', nullable: true)
             ->datetime('lastPlannedAt', nullable: true)
             ->datetime('lastBuiltAt', nullable: true)
@@ -254,7 +258,7 @@ final class CreateDomainSchema implements MigratesUp
     {
         return $this->prefixedIdTable('broadcast_triggers')
             ->raw($this->fkColumn('broadcastId', 40, 'broadcasts', OnDelete::CASCADE))
-            ->string('type')
+            ->enum('type', BroadcastTriggerType::class)
             ->boolean('enabled', default: true)
             ->text('settingsJson', nullable: true)
             ->enum('state', BroadcastTriggerState::class, default: BroadcastTriggerState::Ready)
@@ -296,6 +300,8 @@ final class CreateDomainSchema implements MigratesUp
             ->string('audioCodec', nullable: true)
             ->string('language', nullable: true)
             // BIGINT: byte counts overflow PostgreSQL's 32-bit INTEGER.
+            // SQLite ignores the size and is already 64-bit, so its
+            // compiled SQL (and migration hash) is unchanged.
             ->integer('sizeBytes', nullable: true, size: DatabaseIntegerSize::BIG)
             ->string('checksum', nullable: true)
             ->integer('durationSeconds', nullable: true)

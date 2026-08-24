@@ -42,6 +42,52 @@ psql() { podman exec -i "$CONTAINER" psql -X -v ON_ERROR_STOP=1 -U "$USER" -d "$
 if [ "$1" = restore ]; then
     podman exec "$CONTAINER" dropdb --if-exists --force -U "$USER" "$DATABASE"
     podman exec "$CONTAINER" createdb -U "$USER" "$DATABASE"
+    # The private dump intentionally excludes these tables.  Empty final-shape
+    # scaffolding lets migrations and local auth boot without restoring creds.
+    psql -d "$DATABASE" <<'SQL'
+CREATE TABLE users (
+    id VARCHAR(40) NOT NULL PRIMARY KEY,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    username VARCHAR(255) NOT NULL,
+    "passwordHash" VARCHAR(255) NOT NULL,
+    role TEXT NOT NULL
+);
+CREATE UNIQUE INDEX users_username ON users (username);
+CREATE UNIQUE INDEX users_single_owner ON users ((1));
+CREATE TABLE secrets (
+    id VARCHAR(40) NOT NULL PRIMARY KEY,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    key VARCHAR(255) NOT NULL UNIQUE,
+    type TEXT NOT NULL,
+    "encryptedValue" TEXT NOT NULL,
+    nonce VARCHAR(64) NOT NULL,
+    "tokenDigest" VARCHAR(64) UNIQUE,
+    metadata TEXT,
+    "lastUsedAt" TIMESTAMP,
+    "revokedAt" TIMESTAMP
+);
+CREATE TABLE api_tokens (
+    id VARCHAR(40) NOT NULL PRIMARY KEY,
+    "userId" VARCHAR(40) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    "tokenHash" VARCHAR(255) NOT NULL UNIQUE,
+    "tokenPreview" VARCHAR(255),
+    scopes TEXT,
+    "lastUsedAt" TIMESTAMP,
+    "expiresAt" TIMESTAMP,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "revokedAt" TIMESTAMP
+);
+CREATE INDEX api_tokens_user_id ON api_tokens ("userId");
+CREATE TABLE login_attempts (
+    "keyHash" VARCHAR(64) NOT NULL PRIMARY KEY,
+    attempts INTEGER NOT NULL,
+    "expiresAt" TIMESTAMP NOT NULL
+);
+CREATE INDEX login_attempts_expires_at ON login_attempts ("expiresAt");
+SQL
     podman exec -i "$CONTAINER" pg_restore --exit-on-error --no-owner --no-privileges -U "$USER" -d "$DATABASE" < "$SNAPSHOT/postgres.custom"
     echo "Restored immutable snapshot into disposable database $DATABASE in local container $CONTAINER."
     exit 0
