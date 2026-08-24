@@ -153,6 +153,7 @@ prepare_runtime_env() {
     ensure_mercure_secret
     export STASHD_DATA_PATH="$DATA_DIR"
     export STASHD_MEDIA_PATH="$MEDIA_DIR"
+    export STASHD_PLUGIN_PACKAGE_ROOT="${DATA_DIR}/plugins"
     export TEMPEST_INTERNAL_STORAGE="${DATA_DIR}/.tempest"
 }
 
@@ -168,6 +169,7 @@ cd "$APP_DIR"
 export_runtime_env() {
     export STASHD_DATA_PATH="$DATA_DIR"
     export STASHD_MEDIA_PATH="$MEDIA_DIR"
+    export STASHD_PLUGIN_PACKAGE_ROOT="${DATA_DIR}/plugins"
     export TEMPEST_INTERNAL_STORAGE="${DATA_DIR}/.tempest"
 }
 

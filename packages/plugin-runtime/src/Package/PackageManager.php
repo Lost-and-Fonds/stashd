@@ -37,7 +37,7 @@ final class PackageManager
     }
 
     /** Install a single-platform OCI image layout by its immutable manifest digest. */
-    public function installOciLayout(string $layout, string $manifestDigest): PackageManifest
+    public function installOciLayout(string $layout, string $manifestDigest, ?string $reference = null): PackageManifest
     {
         if (! preg_match('/^sha256:[a-f0-9]{64}$/', $manifestDigest)) {
             throw new PackageValidationError('OCI manifest digest is invalid');
@@ -75,13 +75,24 @@ final class PackageManager
             $destination = $this->packages . '/' . $manifest->id . '/' . $manifest->version;
 
             if (Filesystem\exists($destination) || is_link($destination)) {
-                throw new PackageStateError('plugin version is already installed');
+                $installed = $this->installedMetadata($destination);
+
+                if (($installed['digest'] ?? null) === $manifestDigest) {
+                    return $manifest;
+                }
+
+                throw new PackageStateError('a different plugin artifact already uses this version');
             }
             Filesystem\create_directory(dirname($destination), 0700);
 
             if (! rename($rootfs, $destination)) {
                 throw new PackageStateError('package version could not be committed');
             }
+            file_put_contents($destination . '/install.json', json_encode([
+                'reference' => $reference,
+                'digest' => $manifestDigest,
+                'installed_at' => gmdate(DATE_ATOM),
+            ], JSON_THROW_ON_ERROR));
             $this->makeImmutable($destination);
 
             return $manifest;
@@ -219,6 +230,51 @@ final class PackageManager
     public function activeRoot(): string
     {
         return $this->active;
+    }
+
+    /** @return list<array{id: string, version: string, runtime: string, api_version: string, reference: ?string, digest: ?string}> */
+    public function installed(): array
+    {
+        $plugins = [];
+
+        foreach (Filesystem\list_directory($this->active) as $path) {
+            $root = realpath($path);
+
+            if ($root === false) {
+                continue;
+            }
+
+            try {
+                $manifest = PackageManifest::fromFile($this->manifestPath($root), $this->apiVersion, $this->architecture ?? self::architecture());
+            } catch (PackageValidationError) {
+                continue;
+            }
+            $metadata = $this->installedMetadata($root);
+            $plugins[] = [
+                'id' => $manifest->id,
+                'version' => $manifest->version,
+                'runtime' => $manifest->runtime,
+                'api_version' => $manifest->apiVersion,
+                'reference' => is_string($metadata['reference'] ?? null) ? $metadata['reference'] : null,
+                'digest' => is_string($metadata['digest'] ?? null) ? $metadata['digest'] : null,
+            ];
+        }
+
+        usort($plugins, static fn(array $left, array $right): int => $left['id'] <=> $right['id']);
+
+        return $plugins;
+    }
+
+    /** @return array<string, mixed> */
+    private function installedMetadata(string $path): array
+    {
+        try {
+            $metadata = json_decode(Filesystem\read_file($path . '/install.json'), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        return is_array($metadata) ? $metadata : [];
     }
 
     private function validateId(string $id): void

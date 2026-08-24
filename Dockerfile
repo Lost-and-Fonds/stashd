@@ -49,6 +49,20 @@ RUN set -eux; \
     apt-get purge -y --auto-remove gnupg >/dev/null; \
     rm -rf /var/lib/apt/lists/*
 
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) oras_arch=amd64; oras_sha256=9ce999f8d2de03fc03968b29d743077a58783e545e5eaa53917ca177352d0e59 ;; \
+        arm64) oras_arch=arm64; oras_sha256=ac7156f93a21e903f7ad606c792f3560f17e0cd0e36365634701b1e7cc4e4eca ;; \
+        *) echo "unsupported ORAS architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    temporary="$(mktemp -d)"; \
+    trap 'rm -rf "${temporary}"' EXIT; \
+    curl -fsSL "https://github.com/oras-project/oras/releases/download/v1.3.3/oras_1.3.3_linux_${oras_arch}.tar.gz" -o "${temporary}/oras.tar.gz"; \
+    echo "${oras_sha256}  ${temporary}/oras.tar.gz" | sha256sum -c -; \
+    tar -xzf "${temporary}/oras.tar.gz" -C "${temporary}" oras; \
+    install -D -m 0555 "${temporary}/oras" /usr/local/libexec/stashd/oras; \
+    /usr/local/libexec/stashd/oras version | grep -F '1.3.3'
+
 COPY --from=composer /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html

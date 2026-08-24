@@ -20,6 +20,14 @@ verified in the core image from the official release assets (the amd64 SHA-256
 is `b51c267ec394499e42c6fde47f240b7b7dba57ea49df0b5acd304378b82a3b71`; the
 arm64 SHA-256 is
 `5cfd17f2e7a4bcf9ed67ea1b955ca893d200349b9ce6a3d3707dba415f458a1f`).
+Installed packages live under `${STASHD_DATA_PATH}/plugins` (normally
+`/data/plugins`), so they survive Core image replacement. `stashd:plugin-install
+ghcr.io/lost-and-fonds/jellyfin:<version>` pulls an OCI artifact, resolves its
+platform manifest digest, validates it, atomically stores it, and activates it.
+`stashd:plugin-list` shows the active plugin id, version, OCI reference, and
+resolved digest. Reinstalling the same digest is a no-op; a different artifact
+using the same plugin id/version is refused.
+
 Installed packages are immutable and discovered from the active package
 directory using the same manifest path as Composer packages. Helper grants
 are package-relative and sandboxed; plugins never receive the core `umoci`

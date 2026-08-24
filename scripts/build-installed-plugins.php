@@ -11,12 +11,14 @@ use Stashd\PluginRuntime\Package\Umoci;
 $root = getenv('STASHD_PLUGIN_PACKAGE_ROOT');
 $root = is_string($root) && trim($root) !== '' ? trim($root) : dirname(__DIR__) . '/.stashd/plugin-packages';
 $sources = array_values(array_filter([
+    getenv('STASHD_JELLYFIN_ROOT') ?: dirname(__DIR__, 2) . '/plugins/jellyfin',
+    getenv('STASHD_PLEX_ROOT') ?: dirname(__DIR__, 2) . '/plugins/plex',
     getenv('STASHD_PODCAST_ROOT') ?: dirname(__DIR__, 2) . '/plugins/podcast',
     getenv('STASHD_YOUTUBE_ROOT') ?: dirname(__DIR__, 2) . '/plugins/youtube',
 ], static fn(mixed $path): bool => is_string($path) && is_dir($path)));
 
-if (count($sources) !== 2) {
-    throw new RuntimeException('Podcast and YouTube source trees are required.');
+if (count($sources) !== 4) {
+    throw new RuntimeException('Jellyfin, Plex, Podcast, and YouTube source trees are required.');
 }
 
 $umoci = new Umoci();
