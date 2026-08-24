@@ -269,11 +269,28 @@ final readonly class StashController
     #[Post('/api/v1/stashes/{id}/inputs')]
     public function addInput(string $id, Request $request): Json
     {
-        if ($this->findStash($id) === null) {
+        $existing = $this->findStash($id);
+
+        if ($existing === null) {
             return $this->notFound('Stash not found.');
         }
 
         $body = ApiJson::normalizeRequest($request->body);
+
+        if (is_string($request->body['plugin'] ?? null) && is_array($request->body['source'] ?? null)) {
+            try {
+                $result = $this->initialInput->addToExisting(
+                    $existing,
+                    $request->body['plugin'],
+                    array_filter($request->body['source'], is_string(...), ARRAY_FILTER_USE_KEY),
+                    is_array($request->body['options'] ?? null) ? self::object($request->body['options']) : [],
+                );
+            } catch (\InvalidArgumentException|\RuntimeException $exception) {
+                return $this->validationError($exception->getMessage());
+            }
+
+            return new Json(ApiJson::encode($result->toArray()), Status::CREATED);
+        }
 
         $options = [
             'stash_id' => $id,

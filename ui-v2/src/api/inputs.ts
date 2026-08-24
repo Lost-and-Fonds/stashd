@@ -26,11 +26,21 @@ export async function updateStashInputOptions(stashId: string, inputId: string, 
   return body.input
 }
 
+export async function addInputToStash(stashId: string, plugin: string, source: Record<string, boolean | number | string>, options: Record<string, boolean | string>): Promise<void> {
+  const response = await fetch(`/api/v1/stashes/${encodeURIComponent(stashId)}/inputs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plugin, source, options: { provider: options } })
+  })
+  await responseBody<{ stash_input_id?: string }>(response)
+}
+
 async function responseBody<T>(response: Response): Promise<T> {
-  const body = await response.json().catch(() => null) as { message?: unknown } | null
+  const body = await response.json().catch(() => null) as { error?: { message?: unknown }, message?: unknown } | null
 
   if (!response.ok) {
-    throw new Error(typeof body?.message === 'string' ? body.message : `Request failed (${response.status}).`)
+    const message = body?.error?.message ?? body?.message
+    throw new Error(typeof message === 'string' ? message : `Request failed (${response.status}).`)
   }
 
   return body as T

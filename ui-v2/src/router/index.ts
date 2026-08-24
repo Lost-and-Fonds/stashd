@@ -4,6 +4,7 @@ import BroadcastCreatePage from '../pages/BroadcastCreatePage.vue'
 import BroadcastDetailPage from '../pages/BroadcastDetailPage.vue'
 import BroadcastSourceConfigurationPage from '../pages/BroadcastSourceConfigurationPage.vue'
 import BroadcastsPage from '../pages/BroadcastsPage.vue'
+import AddInputPage from '../pages/AddInputPage.vue'
 import ConnectionsPage from '../pages/ConnectionsPage.vue'
 import DesignPage from '../pages/DesignPage.vue'
 import InputsPage from '../pages/InputsPage.vue'
@@ -31,6 +32,7 @@ const router = createRouter({
     { path: '/stashes', name: 'stashes', component: StashesPage },
     { path: '/stashes/new', name: 'stash-create', component: StashCreatePage },
     { path: '/stashes/:id', name: 'stash-detail', component: StashDetailPage },
+    { path: '/stashes/:stashId/inputs/new', name: 'input-add', component: AddInputPage },
     { path: '/stashes/:stashId/broadcasts/new', name: 'broadcast-create', component: BroadcastCreatePage },
     { path: '/broadcasts/:broadcastId', name: 'broadcast-detail', component: BroadcastDetailPage },
     { path: '/broadcasts/:broadcastId/sources/:sourceId/configure', name: 'broadcast-source-configure', component: BroadcastSourceConfigurationPage },

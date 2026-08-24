@@ -284,6 +284,7 @@ onMounted(load)
           <h2 class="text-base font-medium text-highlighted">Inputs</h2>
           <span class="font-mono text-xs text-dimmed">{{ inputs.length }}</span>
         </div>
+        <UButton label="Add Input" icon="i-lucide-plus" variant="ghost" color="neutral" size="sm" :to="`/stashes/${stash.id}/inputs/new`" />
       </div>
 
       <UAlert v-if="inputsError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not load Inputs" :description="inputsError" />

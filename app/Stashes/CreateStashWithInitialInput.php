@@ -27,17 +27,7 @@ final readonly class CreateStashWithInitialInput
      */
     public function execute(string $name, SyncMode $syncMode, DownloadPolicy $downloadPolicy, OrganizationMode $organizationMode, ?string $description, string $pluginId, array $source, array $options): StashRecord
     {
-        $plugin = $this->plugins->definition($pluginId)
-            ?? throw new \InvalidArgumentException('Input plugin not found.');
-        $resolved = $this->plugins->resolveSource($pluginId, $plugin->normalizeSource($source));
-        $discovered = $this->discovery->executeResolved(
-            $resolved,
-            $resolved->sourceUri->toString(),
-            null,
-            PreflightOrigin::Api,
-            $options['provider'] ?? [],
-            JobIntent::InitialBackfill,
-        );
+        $discovered = $this->discover($pluginId, $source, $options);
 
         $stash = null;
         $input = null;
@@ -54,5 +44,44 @@ final readonly class CreateStashWithInitialInput
         $this->inputs->dispatchFollowups($stash, $input);
 
         return $stash;
+    }
+
+    /** @param array<string, mixed> $source
+     *  @param array<string, mixed> $options
+     */
+    public function addToExisting(StashRecord $stash, string $pluginId, array $source, array $options): StashInputCommitResult
+    {
+        $discovered = $this->discover($pluginId, $source, $options);
+        $result = null;
+        $committed = $this->database->withinTransaction(function () use ($stash, $discovered, $options, &$result): void {
+            $result = $this->inputs->persistDiscoveredInput($stash, $discovered, $options);
+        });
+
+        if (! $committed || ! $result instanceof StashInputCommitResult) {
+            throw new RuntimeException('Failed to create Input.');
+        }
+
+        $this->inputs->dispatchFollowups($stash, $result);
+
+        return $result;
+    }
+
+    /** @param array<string, mixed> $source
+     *  @param array<string, mixed> $options
+     */
+    private function discover(string $pluginId, array $source, array $options): PreflightExecutionResult
+    {
+        $plugin = $this->plugins->definition($pluginId)
+            ?? throw new \InvalidArgumentException('Input plugin not found.');
+        $resolved = $this->plugins->resolveSource($pluginId, $plugin->normalizeSource($source));
+
+        return $this->discovery->executeResolved(
+            $resolved,
+            $resolved->sourceUri->toString(),
+            null,
+            PreflightOrigin::Api,
+            $options['provider'] ?? [],
+            JobIntent::InitialBackfill,
+        );
     }
 }
