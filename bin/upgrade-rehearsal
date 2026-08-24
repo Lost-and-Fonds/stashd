@@ -88,7 +88,22 @@ CREATE TABLE login_attempts (
 );
 CREATE INDEX login_attempts_expires_at ON login_attempts ("expiresAt");
 SQL
-    podman exec -i "$CONTAINER" pg_restore --exit-on-error --no-owner --no-privileges -U "$USER" -d "$DATABASE" < "$SNAPSHOT/postgres.custom"
+    podman exec -i "$CONTAINER" pg_restore --exit-on-error --section=pre-data --no-owner --no-privileges -U "$USER" -d "$DATABASE" < "$SNAPSHOT/postgres.custom"
+    podman exec -i "$CONTAINER" pg_restore --disable-triggers --exit-on-error --section=data --no-owner --no-privileges -U "$USER" -d "$DATABASE" < "$SNAPSHOT/postgres.custom"
+    psql -d "$DATABASE" <<'SQL'
+INSERT INTO secrets (id, key, type, "encryptedValue", nonce)
+SELECT id, 'rehearsal-' || id, 'token', '', repeat('0', 64)
+FROM (
+    SELECT "tokenSecretId" AS id FROM broadcasts
+    UNION
+    SELECT "tokenSecretId" AS id FROM broadcast_items
+    UNION
+    SELECT "tokenSecretId" AS id FROM media_server_connections
+) token_references
+WHERE id IS NOT NULL
+ON CONFLICT (id) DO NOTHING;
+SQL
+    podman exec -i "$CONTAINER" pg_restore --exit-on-error --section=post-data --no-owner --no-privileges -U "$USER" -d "$DATABASE" < "$SNAPSHOT/postgres.custom"
     echo "Restored immutable snapshot into disposable database $DATABASE in local container $CONTAINER."
     exit 0
 fi

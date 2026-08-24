@@ -16,10 +16,12 @@ final readonly class MigrationRunner
         private MigrationManager $migrations,
         private RunnableMigrations $runnableMigrations,
         private Database $database,
+        private LegacyBaselineAdopter $baselineAdopter,
     ) {}
 
     public function run(): void
     {
+        $this->baselineAdopter->adopt();
         $this->migrations->up();
     }
 
