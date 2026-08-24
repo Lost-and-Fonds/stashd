@@ -4,5 +4,6 @@
     "app/Database/CreatePublishedResources.php": "85dfd6e3741b0961d2b2c99c5eb3f3c10c02ae575a686445d09b4970959bad91",
     "app/Database/RemoveBroadcastPublicationTokenColumns.php": "d574adf5d3c27e0f80060a483c6abc47da2c655ba80638b907cf57e8eaf02cc7",
     "app/Database/RemoveSponsorBlock.php": "280d7c319a7dbb9a20c53c6740384f08f0c86e044d93e80c0309dcada1c47c23",
-    "app/Database/AddAssetDerivationKey.php": "9d68804a649518b315baf477020d0ab47e2d20a2234b96afdc3f1da37083c470"
+    "app/Database/AddAssetDerivationKey.php": "9d68804a649518b315baf477020d0ab47e2d20a2234b96afdc3f1da37083c470",
+    "app/Database/NormalizeLegacyAssetRoles.php": "a886f408ca2b4f5d39a0fe95cb398af95f98c6f6c7e9e843b9064947c0bf452b"
 }

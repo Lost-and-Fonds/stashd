@@ -2,9 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Database\NormalizeLegacyAssetRoles;
 use App\Database\SupportedPostgresBaseline;
+use App\Support\PrefixedUlidGenerator;
 use App\System\Boot\LegacyBaselineAdopter;
 use App\System\Boot\MigrationRunner;
+use App\Vault\AssetId;
+use App\Vault\AssetRepository;
+use App\Vault\AssetRole;
+use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Database;
 use Tempest\Database\Migrations\Migration;
 use Tempest\Database\Migrations\RunnableMigrations;
@@ -18,6 +24,7 @@ test('fresh databases converge from the supported baseline', function (): void {
         ->toContain(SupportedPostgresBaseline::NAME)
         ->toContain('2026_08_21_remove_broadcast_publication_token_columns')
         ->toContain('2026_08_22_add_asset_derivation_key')
+        ->toContain('2026_08_23_normalize_legacy_asset_roles')
         ->not->toContain('2026_06_17_create_domain_schema')
         ->and(Migration::all())->toHaveCount(count($names));
 
@@ -29,6 +36,39 @@ test('fresh databases converge from the supported baseline', function (): void {
         ->not->toContain('tokenSecretId')
         ->not->toContain('tokenPreview')
         ->and($assetColumns)->toContain('derivationKey');
+});
+
+test('the historical podcast audio role is normalized to a derived asset', function (): void {
+    [, , $mediaItemId] = $this->bootstrapFakeDownloadStash('legacy-podcast-audio');
+    $database = $this->container->get(Database::class);
+    $assetId = $this->container->get(PrefixedUlidGenerator::class)->generate('asset')->toString();
+
+    $database->execute(new Query(
+        'INSERT INTO assets (id, role, kind, state, "mediaItemId") VALUES (?, ?, ?, ?, ?)',
+        bindings: [$assetId, 'podcast_audio', 'audio', 'ready', $mediaItemId],
+    ));
+
+    $database->execute(new Query(
+        (new NormalizeLegacyAssetRoles())->up()->compile(DatabaseDialect::POSTGRESQL),
+    ));
+
+    $asset = $this->container->get(AssetRepository::class)->find(AssetId::parse($assetId));
+
+    expect($asset?->role)->toBe(AssetRole::Derived);
+});
+
+test('an unknown asset role still fails instead of being coerced', function (): void {
+    [, , $mediaItemId] = $this->bootstrapFakeDownloadStash('unknown-asset-role');
+    $database = $this->container->get(Database::class);
+    $assetId = $this->container->get(PrefixedUlidGenerator::class)->generate('asset')->toString();
+
+    $database->execute(new Query(
+        'INSERT INTO assets (id, role, kind, state, "mediaItemId") VALUES (?, ?, ?, ?, ?)',
+        bindings: [$assetId, 'not_a_real_role', 'audio', 'ready', $mediaItemId],
+    ));
+
+    expect(fn() => $this->container->get(AssetRepository::class)->find(AssetId::parse($assetId)))
+        ->toThrow(ValueError::class);
 });
 
 test('known legacy history is adopted before post-baseline migrations run', function (): void {
