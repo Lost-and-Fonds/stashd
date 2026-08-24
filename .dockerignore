@@ -5,10 +5,6 @@
 .lerd.yaml
 
 vendor/
-!vendor/
-!vendor/stashd/
-!vendor/stashd/plugin-sdk/
-!vendor/stashd/plugin-sdk/**
 node_modules/
 .tempest/
 data/

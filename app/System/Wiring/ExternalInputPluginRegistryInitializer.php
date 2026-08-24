@@ -27,7 +27,7 @@ final class ExternalInputPluginRegistryInitializer implements Initializer
             if ($definition === null) {
                 continue;
             }
-            if (! str_starts_with($package['root'], rtrim($packages->activeRoot(), '/') . '/')) {
+            if ($packages->activePath($definition->id) !== (realpath($package['root']) ?: $package['root'])) {
                 $packages->link($definition->id, $package['root']);
             }
             $definitions[] = $definition;
