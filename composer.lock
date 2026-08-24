@@ -9456,7 +9456,7 @@
       "dist": {
         "type": "path",
         "url": "../plugins/jellyfin",
-        "reference": "b3d7c7574cfcfa35498f54f7c22fbd9edcdc7c7a"
+        "reference": "9e9b1cec0f7fda86b6b6fbabf1df915c9df970ca"
       },
       "require": {
         "php": "^8.5",
