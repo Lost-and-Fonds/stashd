@@ -3,17 +3,22 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { FormError } from '@nuxt/ui'
 import { useRoute } from 'vue-router'
 import { broadcastOptionValues, normalizeBroadcastOptions } from '../adapters/normalizeBroadcastOptions'
-import { createStashBroadcast, fetchBroadcastPlugins } from '../api/broadcasts'
+import { createStashBroadcast, fetchBroadcastPlugins, fetchConnectionLibraries } from '../api/broadcasts'
+import { fetchConnections } from '../api/connections'
 import { fetchStash } from '../api/stashes'
 import PluginField from '../components/plugin/PluginField.vue'
 import type { BroadcastOptionValue, BroadcastPluginApiResource, CreatedBroadcastApiResource } from '../types/broadcast-plugin'
 import type { StashApiResource } from '../types/stash'
 import type { PluginFieldValue } from '../types/plugin-ui'
+import type { ConnectionApiResource } from '../types/connection'
 
 const route = useRoute()
 const stashId = String(route.params.stashId)
 const stash = ref<StashApiResource>()
 const plugins = ref<BroadcastPluginApiResource[]>([])
+const connections = ref<ConnectionApiResource[]>([])
+const libraries = ref<{ value: string, label: string, kind?: string }[]>([])
+const loadingLibraries = ref(false)
 const loading = ref(true)
 const saving = ref(false)
 const error = ref<string>()
@@ -23,6 +28,10 @@ const values = reactive<Record<string, PluginFieldValue | undefined>>({})
 
 const selectedPlugin = computed(() => plugins.value.find(plugin => plugin.key === typeKey.value))
 const normalized = computed(() => normalizeBroadcastOptions(selectedPlugin.value?.ui_controls ?? []))
+const connectionKey = computed(() => selectedPlugin.value?.connection_setting_key ?? null)
+const libraryKey = computed(() => selectedPlugin.value?.library_setting_key ?? null)
+const connectionField = computed(() => connectionKey.value === null ? null : normalized.value.fields.find(field => field.key === connectionKey.value) ?? null)
+const settingFields = computed(() => normalized.value.fields.filter(field => field.key !== connectionKey.value))
 const typeItems = computed(() => plugins.value.map(plugin => ({
   label: plugin.label,
   description: plugin.description ?? '',
@@ -33,6 +42,7 @@ const typeItems = computed(() => plugins.value.map(plugin => ({
 function resetValues() {
   for (const key of Object.keys(values)) delete values[key]
   Object.assign(values, broadcastOptionValues(normalized.value.fields))
+  libraries.value = []
 }
 
 watch(typeKey, () => {
@@ -41,14 +51,32 @@ watch(typeKey, () => {
   resetValues()
 })
 
+watch(() => values[connectionKey.value ?? ''], async (connectionId) => {
+  libraries.value = []
+  if (typeof connectionId !== 'string' || connectionId === '' || libraryKey.value === null) return
+
+  loadingLibraries.value = true
+  error.value = undefined
+  delete values[libraryKey.value]
+
+  try {
+    libraries.value = await fetchConnectionLibraries(connectionId)
+  } catch (exception) {
+    error.value = exception instanceof Error ? exception.message : 'Could not discover media libraries.'
+  } finally {
+    loadingLibraries.value = false
+  }
+})
+
 async function load() {
   loading.value = true
   error.value = undefined
 
   try {
-    const [stashResource, pluginResources] = await Promise.all([fetchStash(stashId), fetchBroadcastPlugins()])
+    const [stashResource, pluginResources, connectionResources] = await Promise.all([fetchStash(stashId), fetchBroadcastPlugins(), fetchConnections()])
     stash.value = stashResource
     plugins.value = pluginResources
+    connections.value = connectionResources
   } catch (exception) {
     error.value = exception instanceof Error ? exception.message : 'Could not load broadcast configuration.'
   } finally {
@@ -57,17 +85,30 @@ async function load() {
 }
 
 function validate(state: Record<string, PluginFieldValue | undefined>): FormError[] {
-  return normalized.value.fields
+  const fields = normalized.value.fields.filter(field => field.key !== libraryKey.value)
+  const errors = fields
     .filter(field => field.required && (state[field.key] === undefined || state[field.key] === ''))
     .map(field => ({ name: field.key, message: `${field.label} is required.` }))
+
+  if (libraryKey.value !== null && connectionKey.value !== null && typeof state[connectionKey.value] === 'string' && state[connectionKey.value] !== '' && (state[libraryKey.value] === undefined || state[libraryKey.value] === '')) {
+    errors.push({ name: libraryKey.value, message: 'Choose a discovered library.' })
+  }
+
+  return errors
 }
 
 function settings(): Record<string, BroadcastOptionValue> {
-  return Object.fromEntries(normalized.value.fields.flatMap(field => {
+  const result = Object.fromEntries(normalized.value.fields.flatMap(field => {
     const value = values[field.key]
 
     return typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string' ? [[field.key, value]] : []
   }))
+
+  if (libraryKey.value !== null && typeof values[libraryKey.value] === 'string') {
+    result[libraryKey.value] = values[libraryKey.value] as string
+  }
+
+  return result
 }
 
 async function create() {
@@ -127,12 +168,26 @@ onMounted(load)
           <UCard :ui="{ body: 'p-4 sm:p-6' }">
             <div class="space-y-5">
               <PluginField
-                v-for="field in normalized.fields"
+                v-for="field in settingFields"
                 :key="field.key"
                 v-model="values[field.key]"
                 :field="field"
               />
-              <p v-if="normalized.fields.length === 0" class="text-sm text-muted">This Broadcast type has no configurable settings.</p>
+              <UFormField v-if="connectionKey && connectionField" :name="connectionKey" :label="connectionField.label" :description="connectionField.description" required>
+                <USelect
+                  v-model="values[connectionKey]"
+                  :items="connections.filter(connection => connection.plugin_key === selectedPlugin?.key).map(connection => ({ label: connection.name, value: connection.id }))"
+                  value-key="value"
+                  label-key="label"
+                  placeholder="Choose a Connection"
+                />
+                <NuxtLink v-if="connections.filter(connection => connection.plugin_key === selectedPlugin?.key).length === 0" to="/connections" class="mt-1 block text-xs text-primary">Configure a Connection first.</NuxtLink>
+              </UFormField>
+              <UFormField v-if="libraryKey && connectionKey && values[connectionKey]" :name="libraryKey" label="Library" required>
+                <USelect v-model="values[libraryKey]" :items="libraries" value-key="value" label-key="label" :loading="loadingLibraries" placeholder="Choose a discovered library" />
+                <p v-if="!loadingLibraries && libraries.length === 0" class="mt-1 text-xs text-muted">No compatible libraries were discovered.</p>
+              </UFormField>
+              <p v-if="settingFields.length === 0 && !connectionKey" class="text-sm text-muted">This Broadcast type has no configurable settings.</p>
             </div>
           </UCard>
         </template>

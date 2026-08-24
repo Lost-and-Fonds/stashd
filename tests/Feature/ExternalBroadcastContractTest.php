@@ -318,6 +318,47 @@ test('external operations return generic choices', function (): void {
     expect($libraries->body['choices'][0])->toBe(['label' => 'TV Shows', 'value' => 'shows-lib']);
 });
 
+test('media-server plugin metadata identifies connection and library settings', function (): void {
+    $plugins = $this->http->get('/api/v1/broadcast-plugins', headers: $this->authHeaders())->assertOk();
+
+    foreach (['plex', 'jellyfin'] as $key) {
+        $plugin = array_values(array_filter($plugins->body['plugins'], static fn(array $candidate): bool => $candidate['key'] === $key))[0] ?? [];
+
+        expect($plugin['connection_setting_key'] ?? null)->toBe('media_server_connection_id')
+            ->and($plugin['library_setting_key'] ?? null)->toBe('library_id');
+
+        if ($key === 'jellyfin') {
+            expect($plugin['source_options'][0]['name'] ?? null)->toBe('season');
+        }
+    }
+});
+
+test('a discovered library is persisted as an opaque Broadcast setting', function (): void {
+    [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('library-selection'), 0, 2);
+    $server = $this->http->post('/api/v1/connections', [
+        'plugin_key' => 'plex',
+        'name' => 'Fixture Plex',
+        'endpoint' => 'https://plex.test',
+        'token' => 'fixture-token',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $connectionId = $server->body['connection']['id'];
+    $libraries = $this->http->post('/api/v1/connections/' . $connectionId . '/operations/list_libraries', headers: $headers)->assertOk();
+    $libraryId = $libraries->body['choices'][0]['value'];
+
+    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'plex',
+        'settings' => [
+            'media_server_connection_id' => $connectionId,
+            'library_id' => $libraryId,
+        ],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    expect($broadcast->body['broadcast']['settings'])->toMatchArray([
+        'media_server_connection_id' => $connectionId,
+        'library_id' => $libraryId,
+    ]);
+});
+
 test('external jellyfin rebuild refreshes through the Component with POST after publication', function (): void {
     [$headers, $stashId, $mediaItemId, $broadcastId, $connectionId] = $this->bootstrapJellyfinDownloadBroadcast('trigger-success');
 

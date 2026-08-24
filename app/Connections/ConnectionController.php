@@ -153,7 +153,7 @@ final readonly class ConnectionController
             ], Status::BAD_REQUEST);
         }
 
-        return new Json(ApiJson::encode($result));
+        return new Json(ApiJson::encode($this->normalizeOperationResult($result)));
     }
 
     private function notFound(string $message): Json
@@ -205,5 +205,31 @@ final readonly class ConnectionController
     private function stringValue(mixed $value): string
     {
         return is_scalar($value) ? (string) $value : '';
+    }
+
+    /** @param array<string, mixed> $result
+     *  @return array<string, mixed>
+     */
+    private function normalizeOperationResult(array $result): array
+    {
+        if (! is_array($result['values'] ?? null)) {
+            return $result;
+        }
+
+        $result['values'] = array_values(array_filter(array_map(static function (mixed $value): ?array {
+            if (! is_array($value) || ! is_string($value['key'] ?? null)) {
+                return null;
+            }
+
+            $raw = $value['value'] ?? null;
+
+            if (is_array($raw) && array_key_exists('value', $raw)) {
+                $raw = $raw['value'];
+            }
+
+            return is_scalar($raw) ? ['key' => $value['key'], 'value' => $raw] : null;
+        }, $result['values'])));
+
+        return $result;
     }
 }

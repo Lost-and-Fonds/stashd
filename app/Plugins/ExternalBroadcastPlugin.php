@@ -75,6 +75,16 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         return [$this->definition->logicalKey];
     }
 
+    public function connectionSettingKey(): ?string
+    {
+        return $this->definition->connectionSettingKey;
+    }
+
+    public function librarySettingKey(): ?string
+    {
+        return $this->definition->librarySettingKey;
+    }
+
     public function supportedFileKinds(): array
     {
         return array_values(array_filter(array_map(

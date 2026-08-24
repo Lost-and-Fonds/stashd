@@ -11,6 +11,7 @@ use App\Commands\CommandType;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
+use App\Plugins\ExternalBroadcastPlugin;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\StashId;
 use App\Stashes\StashInputRepository;
@@ -554,6 +555,8 @@ final readonly class BroadcastController
                     $discovered->plugin->sourceUiControls(),
                 )
                 : [],
+            'connectionSettingKey' => $discovered->plugin instanceof ExternalBroadcastPlugin ? $discovered->plugin->connectionSettingKey() : null,
+            'librarySettingKey' => $discovered->plugin instanceof ExternalBroadcastPlugin ? $discovered->plugin->librarySettingKey() : null,
         ]);
     }
 }

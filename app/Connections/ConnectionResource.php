@@ -25,7 +25,10 @@ final readonly class ConnectionResource
             'plugin_key' => $this->connection->type,
             'name' => $this->connection->name,
             'endpoint' => $this->connection->baseUri,
+            'state' => $this->connection->state,
             'settings' => $this->connection->settings,
+            'lastCheckedAt' => $this->connection->lastCheckedAt,
+            'lastError' => $this->connection->lastError,
             'createdAt' => $this->connection->createdAt,
             'updatedAt' => $this->connection->updatedAt,
         ]);

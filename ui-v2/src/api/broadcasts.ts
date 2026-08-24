@@ -1,4 +1,5 @@
-import type { BroadcastApiResource, BroadcastOptionValue, BroadcastPluginApiResource, CreatedBroadcastApiResource } from '../types/broadcast-plugin'
+import type { BroadcastApiResource, BroadcastOptionValue, BroadcastPluginApiResource, CreatedBroadcastApiResource, MediaServerLibraryChoice } from '../types/broadcast-plugin'
+import { runConnectionOperation } from './connections'
 
 export async function fetchBroadcastPlugins(): Promise<BroadcastPluginApiResource[]> {
   const body = await responseBody<{ plugins?: BroadcastPluginApiResource[] }>(await fetch('/api/v1/broadcast-plugins'))
@@ -21,6 +22,12 @@ export async function createStashBroadcast(stashId: string, type: string, settin
   const body = await responseBody<{ broadcast: CreatedBroadcastApiResource }>(response)
 
   return body.broadcast
+}
+
+export async function fetchConnectionLibraries(connectionId: string): Promise<MediaServerLibraryChoice[]> {
+  const body = await runConnectionOperation(connectionId, 'list_libraries')
+
+  return body.choices ?? []
 }
 
 export async function fetchBroadcast(broadcastId: string): Promise<BroadcastApiResource> {

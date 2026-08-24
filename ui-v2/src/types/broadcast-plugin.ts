@@ -10,12 +10,20 @@ export interface BroadcastOptionDeclaration {
   required?: boolean
 }
 
+export interface MediaServerLibraryChoice {
+  value: string
+  label: string
+  kind?: string
+}
+
 export interface BroadcastPluginApiResource {
   key: string
   label: string
   description?: string | null
   supported_file_kinds?: string[]
   ui_controls?: BroadcastOptionDeclaration[]
+  connection_setting_key?: string | null
+  library_setting_key?: string | null
 }
 
 export interface CreatedBroadcastApiResource {
