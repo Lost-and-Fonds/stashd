@@ -10,7 +10,7 @@ trap restore EXIT INT TERM
 
 (cd "$ROOT" && composer install --no-dev --no-interaction --prefer-dist --no-progress)
 
-for package in jellyfin plex podcast youtube plugin-sdk plugin-api; do
+for package in jellyfin plex podcast youtube php-sdk plugin-api; do
     if [ -e "$ROOT/vendor/stashd/$package" ]; then
         echo "provider package remains installed: stashd/$package" >&2
         exit 1

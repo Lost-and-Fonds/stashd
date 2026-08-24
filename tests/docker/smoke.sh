@@ -483,6 +483,9 @@ if [ ! -f "$vault_file" ]; then
     exit 1
 fi
 
+# Provider behavior belongs to its OCI integration smoke. The production Core
+# smoke stays provider-free by default.
+if [ "${STASHD_SMOKE_PROVIDERS:-0}" = "1" ]; then
 echo "Creating jellyfin broadcast and running broadcast.rebuild..."
 broadcast_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/stashes/${stash_id}/broadcasts" \
     -H 'Content-Type: application/json' \
@@ -775,6 +778,8 @@ if [ "$episode_content_range" != "bytes 0-3/${podcast_fixture_size}" ]; then
     exit 1
 fi
 
+fi
+
 echo "Verifying operator-supplied SIGNING_KEY/MERCURE_JWT_SECRET are honored and auto-generation is skipped..."
 override_tmp="$(mktemp -d)"
 mkdir -p "$override_tmp/data" "$override_tmp/media"
@@ -827,4 +832,4 @@ $CONTAINER rm -f "$override_name" >/dev/null 2>&1 || true
 rm -rf "$override_tmp"
 echo "Operator-supplied SIGNING_KEY honored correctly."
 
-echo "docker smoke test passed (boot, health, storage layout, migrations, worker/scheduler, system health, restart persistence, SIGNING_KEY persisted across restart and container recreate, operator-supplied SIGNING_KEY override honored, fake preflight e2e, fake download → vault, jellyfin broadcast rebuild + verify, jellyfin_series rebuild + nfo, external podcast publication + Range request)"
+echo "docker smoke test passed (provider-free Core boot, health, storage layout, migrations, workers, auth, restart/recreate persistence, and fake Stash-to-Vault flow)"

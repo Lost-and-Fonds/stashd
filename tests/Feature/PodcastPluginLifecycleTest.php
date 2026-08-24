@@ -35,7 +35,7 @@ test('Podcast plugin is discovered and publishes an audio feed from PostgreSQL l
     if (! is_dir(dirname($audioPath))) {
         mkdir(dirname($audioPath), 0o775, true);
     }
-    $fixture = dirname(__DIR__, 2) . '/reference/wasmtime/providers/podcast/fixtures/video-with-audio.mp4';
+    $fixture = dirname(__DIR__, 2) . '/tests/fixtures/media/podcast-video-with-audio.mp4';
     file_put_contents($audioPath, file_get_contents($fixture));
     $this->container->get(AssetRepository::class)->create(
         mediaItemId: MediaItemId::parse($mediaItemId),

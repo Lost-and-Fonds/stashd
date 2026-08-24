@@ -15,9 +15,7 @@ const secondaryLinks = [
   { label: 'Settings', icon: 'i-lucide-settings', to: '/settings' }
 ]
 
-const designLink = { label: 'Design', icon: 'i-lucide-swatch-book', to: '/design' }
-
-const mobileItems = [primaryLinks, secondaryLinks, [designLink]]
+const mobileItems = [primaryLinks, secondaryLinks]
 
 const navUi = { linkLabel: 'font-mono' }
 const dropdownUi = { itemLabel: 'font-mono' }
@@ -37,13 +35,6 @@ const dropdownUi = { itemLabel: 'font-mono' }
           <UDropdownMenu :items="secondaryLinks" :ui="dropdownUi">
             <UButton label="Configure" icon="i-lucide-sliders-horizontal" trailing-icon="i-lucide-chevron-down" variant="ghost" color="neutral" size="sm" class="font-mono" />
           </UDropdownMenu>
-          <RouterLink
-            to="/design"
-            class="flex items-center gap-1 rounded-md px-2 py-1 font-mono text-xs text-dimmed transition-colors hover:text-muted"
-          >
-            <UIcon name="i-lucide-swatch-book" class="size-3.5" />
-            design
-          </RouterLink>
         </div>
 
         <UDrawer direction="left" :handle="false" class="ml-auto md:hidden">

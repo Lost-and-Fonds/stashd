@@ -1,3 +1,0 @@
-[workspace]
-members = ["plugin-host", "plugins/example", "plugins/youtube", "plugins/podcast", "plugins/jellyfin", "plugins/plex"]
-resolver = "2"

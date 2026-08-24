@@ -30,8 +30,8 @@ jobs:
       - name: Checkout plugin SDK
         uses: actions/checkout@v4
         with:
-          repository: Lost-and-Fonds/plugin-sdk
-          path: ../plugin-sdk
+          repository: Lost-and-Fonds/stashd-php-sdk
+          path: ../stashd-php-sdk
       - name: Checkout provider packages
         uses: actions/checkout@v4
         with:
@@ -86,7 +86,7 @@ jobs:
             -e DB_ADMIN_DATABASE=postgres \
             -v "$GITHUB_WORKSPACE:/var/www/html" \
             -v "$GITHUB_WORKSPACE/../plugin-api:/var/www/plugin-api:ro" \
-            -v "$GITHUB_WORKSPACE/../plugin-sdk:/var/www/plugin-sdk:ro" \
+            -v "$GITHUB_WORKSPACE/../stashd-php-sdk:/var/www/stashd-php-sdk:ro" \
             -v "$GITHUB_WORKSPACE/../plugins:/var/www/plugins:ro" \
             -w /var/www/html \
             stashd:ci -lc '

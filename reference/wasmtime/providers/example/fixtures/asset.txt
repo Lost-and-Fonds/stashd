@@ -1,1 +1,0 @@
-stashd plugin architecture spike fixture

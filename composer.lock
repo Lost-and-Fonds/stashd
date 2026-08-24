@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "34f432a1a98966944f1fb069511a2d14",
+  "content-hash": "3d7f975f0bab88e62a859013c7f334a8",
   "packages": [
     {
       "name": "composer/semver",
@@ -9499,6 +9499,54 @@
         "MIT"
       ],
       "description": "Jellyfin Broadcast plugin for Stashd",
+      "transport-options": {
+        "symlink": false,
+        "relative": true
+      }
+    },
+    {
+      "name": "stashd/php-sdk",
+      "version": "0.2.2",
+      "dist": {
+        "type": "path",
+        "url": "../stashd-php-sdk",
+        "reference": "9b1f76aa0922ea3c4b260e990238356128e8d093"
+      },
+      "require": {
+        "php": "^8.5",
+        "stashd/plugin-api": "^0.1"
+      },
+      "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.95",
+        "pestphp/pest": "^4.0",
+        "phpstan/phpstan": "^2.2",
+        "squizlabs/php_codesniffer": "^4.0"
+      },
+      "type": "library",
+      "autoload": {
+        "psr-4": {
+          "Stashd\\PluginSdk\\": "src/"
+        }
+      },
+      "scripts": {
+        "test": [
+          "vendor/bin/pest"
+        ],
+        "test:static": [
+          "vendor/bin/phpstan analyse"
+        ],
+        "format": [
+          "vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php"
+        ],
+        "lint": [
+          "composer dump-autoload --optimize --strict-psr --dry-run",
+          "vendor/bin/php-cs-fixer check --allow-risky=yes --config=.php-cs-fixer.dist.php"
+        ]
+      },
+      "license": [
+        "MIT"
+      ],
+      "description": "PHP authoring SDK for Stashd plugins",
       "transport-options": {
         "symlink": false,
         "relative": true
