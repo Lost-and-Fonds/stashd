@@ -10,6 +10,8 @@ vendor/stashd/*
 !vendor/stashd/plugin-sdk/
 !vendor/stashd/plugin-sdk/**
 node_modules/
+ui-v2/node_modules/
+ui-v2/dist/
 .tempest/
 data/
 media/
