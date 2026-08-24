@@ -6,16 +6,21 @@ namespace App\Stashes;
 
 use App\Auth\AuthContext;
 use App\Commands\CommandDispatchService;
+use App\Commands\CommandRecord;
+use App\Commands\CommandRepository;
 use App\Commands\CommandType;
 use App\Commands\InvalidCommandPayload;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
+use App\Jobs\JobIntent;
 use App\Jobs\JobRepository;
+use App\Jobs\JobState;
 use App\Stashes\Api\StashInputResource;
 use App\Stashes\Api\StashItemResource;
 use App\Stashes\Api\StashResource;
 use App\Support\Http\QueryPagination;
+use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventService;
 use App\Vault\AssetRepository;
 use App\Vault\MediaItemState;
@@ -39,6 +44,7 @@ final readonly class StashController
         private StashInputRepository $stashInputs,
         private UpdateStashInputOptions $inputOptions,
         private CommandDispatchService $dispatch,
+        private CommandRepository $commands,
         private AuthContext $context,
         private ActivityEventService $activity,
         private AssetRepository $assets,
@@ -260,7 +266,10 @@ final readonly class StashController
 
         return new Json([
             'inputs' => array_map(
-                fn($input): array => StashInputResource::fromRecord($input, $this->inputOptions->declaredOptions($input))->toArray(),
+                fn($input): array => [
+                    ...StashInputResource::fromRecord($input, $this->inputOptions->declaredOptions($input))->toArray(),
+                    'sync_operation' => $this->operation($this->commands->latestForTarget(CommandType::StashSyncInput, 'stash_input', (string) $input->id)),
+                ],
                 $this->stashInputs->listForStash(StashId::fromPrimaryKey($stash->id)),
             ),
         ]);
@@ -342,6 +351,50 @@ final readonly class StashController
 
         return new Json(ApiJson::encode([
             'command_ids' => array_values(array_filter($commandIds, is_string(...))),
+        ]), Status::ACCEPTED);
+    }
+
+    #[Post('/api/v1/stashes/{id}/inputs/{inputId}/sync')]
+    public function syncInput(string $id, string $inputId): Json
+    {
+        $stash = $this->findStash($id);
+
+        if ($stash === null) {
+            return $this->notFound('Stash not found.');
+        }
+
+        $input = $this->findStashInput($stash, $inputId);
+
+        if ($input === null) {
+            return $this->notFound('Stash input not found.');
+        }
+
+        $active = $this->jobs->pendingOrProcessing(JobIntent::SyncInput, PrefixedUlid::parse($inputId));
+
+        if ($active?->commandId !== null) {
+            return new Json([
+                'operation' => [
+                    'id' => (string) $active->commandId,
+                    'state' => $active->state === JobState::Processing ? 'running' : 'accepted',
+                ],
+            ], Status::ACCEPTED);
+        }
+
+        try {
+            $result = $this->dispatch->dispatch(
+                CommandType::StashSyncInput,
+                ['stash_input_id' => (string) $input->id],
+                $this->context->user(),
+            );
+        } catch (InvalidCommandPayload $exception) {
+            return $this->validationError($exception->getMessage());
+        }
+
+        return new Json(ApiJson::encode([
+            'operation' => [
+                'id' => (string) $result->command->id,
+                'state' => $result->command->state->value,
+            ],
         ]), Status::ACCEPTED);
     }
 
@@ -519,6 +572,15 @@ final readonly class StashController
                 'message' => $message,
             ],
         ], Status::BAD_REQUEST);
+    }
+
+    /** @return array{id: string, state: string}|null */
+    private function operation(?CommandRecord $command): ?array
+    {
+        return $command === null ? null : [
+            'id' => (string) $command->id,
+            'state' => $command->state->value,
+        ];
     }
 
     /** @param array<mixed, mixed> $value

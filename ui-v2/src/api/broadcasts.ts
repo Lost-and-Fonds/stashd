@@ -1,4 +1,5 @@
 import type { BroadcastApiResource, BroadcastOptionValue, BroadcastPluginApiResource, CreatedBroadcastApiResource, MediaServerLibraryChoice } from '../types/broadcast-plugin'
+import type { LifecycleOperation } from '../types/input'
 import { runConnectionOperation } from './connections'
 
 export async function fetchBroadcastPlugins(): Promise<BroadcastPluginApiResource[]> {
@@ -56,6 +57,13 @@ export async function invokeBroadcastAction(broadcastId: string, intent: string)
   const body = await responseBody<{ completed: true, broadcast: BroadcastApiResource }>(response)
 
   return body.broadcast
+}
+
+export async function rebuildBroadcast(broadcastId: string): Promise<LifecycleOperation> {
+  const response = await fetch(`/api/v1/broadcasts/${encodeURIComponent(broadcastId)}/rebuild`, { method: 'POST' })
+  const body = await responseBody<{ operation: LifecycleOperation }>(response)
+
+  return body.operation
 }
 
 async function responseBody<T>(response: Response): Promise<T> {

@@ -7,16 +7,23 @@ namespace App\Broadcasts;
 use App\Broadcasts\Api\BroadcastItemResource;
 use App\Broadcasts\Api\BroadcastResource;
 use App\Commands\CommandDispatchService;
+use App\Commands\CommandRecord;
+use App\Commands\CommandRepository;
 use App\Commands\CommandType;
+use App\Commands\InvalidCommandPayload;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
+use App\Jobs\JobIntent;
+use App\Jobs\JobRepository;
+use App\Jobs\JobState;
 use App\Plugins\ExternalBroadcastPlugin;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\StashId;
 use App\Stashes\StashInputRepository;
 use App\Stashes\StashRecord;
 use App\Stashes\StashRepository;
+use App\Support\PrefixedUlid;
 use App\System\Storage\PathSanitizer;
 use App\Vault\MediaItemRepository;
 use Tempest\Http\Request;
@@ -44,6 +51,8 @@ final readonly class BroadcastController
         private MediaItemRepository $mediaItems,
         private BroadcastPathBuilder $paths,
         private CommandDispatchService $commands,
+        private CommandRepository $commandRecords,
+        private JobRepository $jobs,
     ) {}
 
     #[Get('/api/v1/broadcast-plugins')]
@@ -241,6 +250,42 @@ final readonly class BroadcastController
         return new Json([
             'items' => $this->mapBroadcastItems($this->broadcastItems->listForBroadcast(BroadcastId::parse($id))),
         ]);
+    }
+
+    #[Post('/api/v1/broadcasts/{id}/rebuild')]
+    public function rebuild(string $id): Json
+    {
+        $broadcast = $this->findBroadcast($id);
+
+        if ($broadcast === null) {
+            return $this->notFound('Broadcast not found.');
+        }
+
+        $active = $this->jobs->pendingOrProcessing(JobIntent::Broadcast, PrefixedUlid::parse((string) $broadcast->id));
+
+        if ($active?->commandId !== null) {
+            return new Json([
+                'operation' => [
+                    'id' => (string) $active->commandId,
+                    'state' => $active->state === JobState::Processing ? 'running' : 'accepted',
+                ],
+            ], Status::ACCEPTED);
+        }
+
+        try {
+            $result = $this->commands->dispatch(CommandType::BroadcastRebuild, [
+                'broadcast_id' => (string) $broadcast->id,
+            ]);
+        } catch (InvalidCommandPayload $exception) {
+            return $this->validationError($exception->getMessage());
+        }
+
+        return new Json(ApiJson::encode([
+            'operation' => [
+                'id' => (string) $result->command->id,
+                'state' => $result->command->state->value,
+            ],
+        ]), Status::ACCEPTED);
     }
 
     #[Delete('/api/v1/broadcasts/{id}')]
@@ -496,6 +541,16 @@ final readonly class BroadcastController
                     $plugin->sourceUiControls(),
                 )
                 : [],
+            'rebuild_operation' => $this->operation($this->commandRecords->latestForTarget(CommandType::BroadcastRebuild, 'broadcast', (string) $broadcast->id)),
+        ];
+    }
+
+    /** @return array{id: string, state: string}|null */
+    private function operation(?CommandRecord $command): ?array
+    {
+        return $command === null ? null : [
+            'id' => (string) $command->id,
+            'state' => $command->state->value,
         ];
     }
 

@@ -49,12 +49,11 @@ final readonly class StashSyncInputCommandHandler implements CommandHandler
             throw InvalidCommandPayload::withErrors(['Stash input not found.']);
         }
 
-        $stashId = $input->stashId->toString();
         $payload = ['stash_input_id' => $stashInputId];
 
         $command->options = $payload;
-        $command->targetType = 'stash';
-        $command->targetId = $stashId;
+        $command->targetType = 'stash_input';
+        $command->targetId = $stashInputId;
         $this->commands->save($command);
 
         // Two syncs of one input would both discover, both realign positions

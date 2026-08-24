@@ -1,4 +1,4 @@
-import type { StashInputApiResource, StashInputOptionsApiResource } from '../types/input'
+import type { LifecycleOperation, StashInputApiResource, StashInputOptionsApiResource } from '../types/input'
 
 export async function fetchStashInput(stashId: string, inputId: string): Promise<StashInputApiResource> {
   const input = (await fetchStashInputs(stashId)).find(candidate => candidate.id === inputId)
@@ -33,6 +33,15 @@ export async function addInputToStash(stashId: string, plugin: string, source: R
     body: JSON.stringify({ plugin, source, options: { provider: options } })
   })
   await responseBody<{ stash_input_id?: string }>(response)
+}
+
+export async function syncStashInput(stashId: string, inputId: string): Promise<LifecycleOperation> {
+  const response = await fetch(`/api/v1/stashes/${encodeURIComponent(stashId)}/inputs/${encodeURIComponent(inputId)}/sync`, {
+    method: 'POST'
+  })
+  const body = await responseBody<{ operation: LifecycleOperation }>(response)
+
+  return body.operation
 }
 
 async function responseBody<T>(response: Response): Promise<T> {

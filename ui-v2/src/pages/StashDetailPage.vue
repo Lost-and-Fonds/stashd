@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref, resolveComponent, watch } from 'vue'
+import { computed, h, onBeforeUnmount, onMounted, ref, resolveComponent, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useClipboard } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
 
-import { fetchStashBroadcasts } from '../api/broadcasts'
-import { fetchStashInputs } from '../api/inputs'
+import { fetchStashBroadcasts, rebuildBroadcast } from '../api/broadcasts'
+import { fetchStashInputs, syncStashInput } from '../api/inputs'
+import { fetchCommandOperation, type CommandOperation } from '../api/commands'
 import { fetchStash, fetchStashItems } from '../api/stashes'
 import type { BroadcastApiResource } from '../types/broadcast-plugin'
 import type { StashInputApiResource } from '../types/input'
@@ -26,6 +27,9 @@ const inputsError = ref<string>()
 const broadcastsError = ref<string>()
 const itemsError = ref<string>()
 const copiedId = ref<string>()
+const inputOperations = ref<Record<string, CommandOperation | undefined>>({})
+const broadcastOperations = ref<Record<string, CommandOperation | undefined>>({})
+const operationTimers = new Set<ReturnType<typeof setTimeout>>()
 
 const stateMeta: Record<string, { label: string, dot: string, text: string }> = {
   ready: { label: 'ready', dot: 'bg-success', text: 'text-success' },
@@ -71,6 +75,63 @@ function broadcastFacts(broadcast: BroadcastApiResource) {
     { label: 'Type', value: broadcast.type },
     ...(broadcast.last_built_at ? [{ label: 'Last built', value: relativeDate(broadcast.last_built_at) }] : [])
   ]
+}
+
+function isTerminal(operation: CommandOperation | undefined) {
+  return operation?.state === 'completed' || operation?.state === 'failed' || operation?.state === 'rejected'
+}
+
+function operationText(operation: CommandOperation | undefined, verb: string) {
+  if (!operation) return undefined
+  if (operation.state === 'accepted') return `${verb} queued…`
+  if (operation.state === 'running') return operation.label || `${verb}…`
+  if (operation.state === 'completed') return `${verb} complete`
+  return `${verb} failed. Try again.`
+}
+
+async function watchOperation(kind: 'input' | 'broadcast', resourceId: string, commandId: string) {
+  const operations = kind === 'input' ? inputOperations : broadcastOperations
+
+  try {
+    const operation = await fetchCommandOperation(commandId)
+    operations.value = { ...operations.value, [resourceId]: operation }
+
+    if (!isTerminal(operation)) {
+      const timer = setTimeout(() => {
+        operationTimers.delete(timer)
+        void watchOperation(kind, resourceId, commandId)
+      }, 1500)
+      operationTimers.add(timer)
+    } else {
+      await load()
+    }
+  } catch {
+    operations.value = { ...operations.value, [resourceId]: { id: commandId, state: 'failed' } }
+  }
+}
+
+async function syncInput(input: StashInputApiResource) {
+  if (!stash.value || inputOperations.value[input.id] && !isTerminal(inputOperations.value[input.id])) return
+
+  try {
+    const operation = await syncStashInput(stash.value.id, input.id)
+    inputOperations.value = { ...inputOperations.value, [input.id]: operation }
+    void watchOperation('input', input.id, operation.id)
+  } catch {
+    inputOperations.value = { ...inputOperations.value, [input.id]: { id: '', state: 'failed' } }
+  }
+}
+
+async function rebuild(broadcast: BroadcastApiResource) {
+  if (broadcastOperations.value[broadcast.id] && !isTerminal(broadcastOperations.value[broadcast.id])) return
+
+  try {
+    const operation = await rebuildBroadcast(broadcast.id)
+    broadcastOperations.value = { ...broadcastOperations.value, [broadcast.id]: operation }
+    void watchOperation('broadcast', broadcast.id, operation.id)
+  } catch {
+    broadcastOperations.value = { ...broadcastOperations.value, [broadcast.id]: { id: '', state: 'failed' } }
+  }
 }
 
 function copyPublishedUrl(broadcast: BroadcastApiResource) {
@@ -227,6 +288,13 @@ async function load() {
   if (broadcastResult.status === 'fulfilled') broadcasts.value = broadcastResult.value
   else broadcastsError.value = broadcastResult.reason instanceof Error ? broadcastResult.reason.message : 'Could not load Broadcasts.'
 
+  for (const input of inputs.value) {
+    if (input.sync_operation && !isTerminal(input.sync_operation)) void watchOperation('input', input.id, input.sync_operation.id)
+  }
+  for (const broadcast of broadcasts.value) {
+    if (broadcast.rebuild_operation && !isTerminal(broadcast.rebuild_operation)) void watchOperation('broadcast', broadcast.id, broadcast.rebuild_operation.id)
+  }
+
   loading.value = false
   await loadItems()
 }
@@ -235,6 +303,7 @@ watch([itemSearch, itemStatusFilter], () => { itemsPage.value = 1 })
 watch([itemSearch, itemStatusFilter, itemsPage], () => { void loadItems() })
 watch(() => route.params.id, () => { void load() })
 onMounted(load)
+onBeforeUnmount(() => operationTimers.forEach(clearTimeout))
 </script>
 
 <template>
@@ -304,7 +373,13 @@ onMounted(load)
               <span v-if="inputFilterCount(input)">· {{ inputFilterCount(input) }} filters</span>
             </p>
           </div>
-          <UButton label="Configure" icon="i-lucide-settings" :to="`/stashes/${stash.id}/inputs/${input.id}/configure`" variant="ghost" color="neutral" size="sm" />
+          <div class="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
+            <p v-if="operationText(inputOperations[input.id], 'Sync')" class="text-xs" :class="inputOperations[input.id]?.state === 'failed' ? 'text-error' : 'text-dimmed'">
+              {{ operationText(inputOperations[input.id], 'Sync') }}
+            </p>
+            <UButton :label="inputOperations[input.id] && !isTerminal(inputOperations[input.id]) ? 'Syncing…' : 'Sync now'" icon="i-lucide-refresh-cw" :loading="inputOperations[input.id]?.state === 'running'" :disabled="Boolean(inputOperations[input.id] && !isTerminal(inputOperations[input.id]))" variant="ghost" color="neutral" size="sm" @click="syncInput(input)" />
+            <UButton label="Configure" icon="i-lucide-settings" :to="`/stashes/${stash.id}/inputs/${input.id}/configure`" variant="ghost" color="neutral" size="sm" />
+          </div>
         </div>
       </template>
 
@@ -337,7 +412,13 @@ onMounted(load)
                 {{ statePresentation(broadcast.state).label }}
               </p>
             </div>
-            <UButton label="Details" icon="i-lucide-arrow-up-right" :to="`/broadcasts/${broadcast.id}`" variant="subtle" color="neutral" size="sm" />
+            <div class="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
+              <p v-if="operationText(broadcastOperations[broadcast.id], 'Rebuild')" class="text-xs" :class="broadcastOperations[broadcast.id]?.state === 'failed' ? 'text-error' : 'text-dimmed'">
+                {{ operationText(broadcastOperations[broadcast.id], 'Rebuild') }}
+              </p>
+              <UButton :label="broadcastOperations[broadcast.id] && !isTerminal(broadcastOperations[broadcast.id]) ? 'Rebuilding…' : 'Rebuild'" icon="i-lucide-refresh-cw" :loading="broadcastOperations[broadcast.id]?.state === 'running'" :disabled="Boolean(broadcastOperations[broadcast.id] && !isTerminal(broadcastOperations[broadcast.id]))" variant="ghost" color="neutral" size="sm" @click="rebuild(broadcast)" />
+              <UButton label="Details" icon="i-lucide-arrow-up-right" :to="`/broadcasts/${broadcast.id}`" variant="subtle" color="neutral" size="sm" />
+            </div>
           </div>
 
           <div class="mt-3 rounded-md bg-elevated p-3">

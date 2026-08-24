@@ -17,6 +17,7 @@ export interface InputOptionDeclaration {
 export interface InputOptionsApiResource {
   input_options: InputOptionDeclaration[]
   options?: StashInputOptionsApiResource | null
+  sync_operation?: LifecycleOperation | null
 }
 
 export interface StashInputOptionsApiResource {
@@ -38,6 +39,11 @@ export interface StashInputApiResource extends InputOptionsApiResource {
   last_checked_at?: string | null
   last_success_at?: string | null
   options?: StashInputOptionsApiResource | null
+}
+
+export interface LifecycleOperation {
+  id: string
+  state: 'accepted' | 'running' | 'completed' | 'failed' | 'rejected'
 }
 
 /**

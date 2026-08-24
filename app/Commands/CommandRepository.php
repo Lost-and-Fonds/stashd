@@ -61,6 +61,16 @@ final class CommandRepository
         return $record;
     }
 
+    public function latestForTarget(CommandType $type, string $targetType, string $targetId): ?CommandRecord
+    {
+        return CommandRecord::select()
+            ->where('type', $type)
+            ->where('targetType', $targetType)
+            ->where('targetId', $targetId)
+            ->orderBy('createdAt', Direction::DESC)
+            ->first();
+    }
+
     /** @return list<CommandRecord> */
     public function listRecent(int $limit = 50): array
     {

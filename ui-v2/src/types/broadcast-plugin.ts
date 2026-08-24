@@ -47,6 +47,7 @@ export interface BroadcastApiResource {
   plugin_actions?: BroadcastPluginActionApiResource[]
   plugin_detail_fields?: BroadcastDetailFieldApiResource[]
   plugin_source_options?: BroadcastOptionDeclaration[]
+  rebuild_operation?: import('./input').LifecycleOperation | null
 }
 
 export interface BroadcastDetailFieldApiResource {

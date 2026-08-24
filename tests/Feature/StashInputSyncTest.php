@@ -121,6 +121,46 @@ test('the manual check endpoint syncs every input of the stash', function (): vo
         ->and(commandsOfType(CommandType::StashSyncInput))->toHaveCount(1);
 });
 
+test('the input sync endpoint dispatches only the requested input', function (): void {
+    $stashId = $this->bootstrapFakeChannelStash('one-input-sync');
+    $input = $this->container->get(StashInputRepository::class)->listForStash(StashId::parse($stashId))[0];
+
+    $response = $this->http->post('/api/v1/stashes/' . $stashId . '/inputs/' . $input->id . '/sync', [], headers: $this->authHeaders())
+        ->assertStatus(Status::ACCEPTED);
+
+    expect($response->body['operation']['state'])->toBe('accepted')
+        ->and(commandsOfType(CommandType::StashSyncInput))->toHaveCount(1)
+        ->and(commandsOfType(CommandType::StashSyncInput)[0]->targetType)->toBe('stash_input')
+        ->and(commandsOfType(CommandType::StashSyncInput)[0]->targetId)->toBe((string) $input->id);
+
+    $listed = $this->http->get('/api/v1/stashes/' . $stashId . '/inputs', headers: $this->authHeaders())->assertOk();
+    expect($listed->body['inputs'][0]['sync_operation']['id'])->toBe($response->body['operation']['id']);
+});
+
+test('the input sync endpoint returns the existing operation while a sync is queued', function (): void {
+    $stashId = $this->bootstrapFakeChannelStash('dedupe-one-input');
+    $input = $this->container->get(StashInputRepository::class)->listForStash(StashId::parse($stashId))[0];
+
+    $first = $this->http->post('/api/v1/stashes/' . $stashId . '/inputs/' . $input->id . '/sync', [], headers: $this->authHeaders())
+        ->assertStatus(Status::ACCEPTED);
+    $second = $this->http->post('/api/v1/stashes/' . $stashId . '/inputs/' . $input->id . '/sync', [], headers: $this->authHeaders())
+        ->assertStatus(Status::ACCEPTED);
+
+    expect($second->body['operation']['id'])->toBe($first->body['operation']['id'])
+        ->and(commandsOfType(CommandType::StashSyncInput))->toHaveCount(1);
+});
+
+test('the input sync endpoint refuses an input from another stash', function (): void {
+    $stashId = $this->bootstrapFakeChannelStash('sync-owner-a');
+    $otherStashId = $this->bootstrapFakeChannelStash('sync-owner-b');
+    $otherInput = $this->container->get(StashInputRepository::class)->listForStash(StashId::parse($otherStashId))[0];
+
+    $this->http->post('/api/v1/stashes/' . $stashId . '/inputs/' . $otherInput->id . '/sync', [], headers: $this->authHeaders())
+        ->assertStatus(Status::NOT_FOUND);
+
+    expect(commandsOfType(CommandType::StashSyncInput))->toHaveCount(0);
+});
+
 test('a second check while one is still queued does not run twice', function (): void {
     $stashId = $this->bootstrapFakeChannelStash('dedupe-sync');
     $headers = $this->authHeaders();

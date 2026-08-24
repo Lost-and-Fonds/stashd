@@ -60,11 +60,18 @@ final class JobRepository
 
     public function hasPendingOrProcessing(JobIntent $intent, PrefixedUlid $entityId): bool
     {
-        return JobRecord::select()
+        return $this->pendingOrProcessing($intent, $entityId) !== null;
+    }
+
+    public function pendingOrProcessing(JobIntent $intent, PrefixedUlid $entityId): ?JobRecord
+    {
+        $job = JobRecord::select()
             ->where('intent', $intent)
             ->where('entityId', $entityId->toString())
             ->whereIn('state', [JobState::Pending, JobState::Processing])
-            ->first() !== null;
+            ->first();
+
+        return $job instanceof JobRecord ? $job : null;
     }
 
     public function hasPendingOrProcessingIntent(JobIntent $intent): bool
