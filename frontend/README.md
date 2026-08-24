@@ -33,7 +33,6 @@ planning/PAGE-INVENTORY.md    pages/surfaces to work through
 planning/STATE-MATRIX.md      states discovered but not necessarily built yet
 planning/INTEGRATION-GAPS.md  missing backend/API capabilities discovered by design
 planning/DECISIONS.md         durable UI decisions
-src/fixtures/                 page-boundary fixture data
 src/pages/                    route-level UI
 ```
 
@@ -52,18 +51,11 @@ Examples:
 
 Avoid prompts such as "build the new frontend" or even "finish the Stashes page" until you genuinely want a large slice.
 
-## Page-boundary fixtures
-
-Fixtures are intentionally simple. A page may import from `src/fixtures/` while being designed.
-
-Do not add a mock HTTP service merely to make the fake data feel more realistic. Integration is a later phase.
-
 ## Working rules
 
-- Design the UI before integrating backend data or endpoints.
+- Keep production pages backed by the real API; use test-only data only in test sources.
 - Treat phone-sized layouts as first-class; check completed slices at desktop
   and approximately 390px wide.
-- Keep fixture data at page boundaries while designing.
 - The current task is the maximum scope; stop at its requested slice.
 - Treat approved pages and slices as frozen unless the task explicitly revisits
   them.

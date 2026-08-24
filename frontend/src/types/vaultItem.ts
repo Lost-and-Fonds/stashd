@@ -17,7 +17,7 @@ export interface VaultItemFixture {
   type: VaultItemType
   sourceFamily: VaultSourceFamily
   sourceLabel: string
-  /** A specific source/Input within `sourceFamily` — key into the Source picker hierarchy (fixtures/vaultSources.ts). */
+  /** A specific source/Input within `sourceFamily` — key into the Source picker hierarchy. */
   sourceId: string
   /** Tailwind gradient classes; omitted falls back to a type icon — not every Item has recognizable artwork. */
   art?: string
