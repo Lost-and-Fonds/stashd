@@ -17,11 +17,17 @@ it('keeps valid input option shapes and helper declarations', function (): void 
             'input_options' => [
                 ['key' => 'include_shorts', 'label' => 'Include Shorts', 'type' => 'bool', 'default' => false],
             ],
+            'source_fields' => [
+                ['key' => 'account', 'label' => 'Account', 'type' => 'text', 'required' => true],
+                ['key' => 'collection', 'label' => 'Collection', 'type' => 'enum', 'choices' => ['one', 'two']],
+                ['key' => 'recursive', 'label' => 'Recursive', 'type' => 'bool'],
+            ],
             'helpers' => ['yt-dlp' => ['executable' => 'helpers/yt-dlp', 'network' => true]],
         ], $root);
 
         expect($definition?->options[0]->type)->toBe(InputOptionType::Bool)
-            ->and($definition?->helper?->name)->toBe('yt-dlp');
+            ->and($definition?->helper?->name)->toBe('yt-dlp')
+            ->and($definition?->normalizeSource(['account' => 'hazel', 'collection' => 'one', 'recursive' => true]))->toBe(['account' => 'hazel', 'collection' => 'one', 'recursive' => true]);
     } finally {
         unlink($root . '/helpers/yt-dlp');
         rmdir($root . '/helpers');

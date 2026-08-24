@@ -56,8 +56,17 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     }
     public function resolveInput(StashdUri $uri): ResolvedInput
     {
-        $result = $this->invoke('input.resolve', ['source' => $uri->toString()], 'resolve');
-        $reference = self::string($result['canonical-reference'] ?? null, $uri->toString());
+        return $this->resolveSource(['url' => $uri->toString()]);
+    }
+    /** @param array<string, bool|int|string> $source */
+    public function resolveSource(array $source): ResolvedInput
+    {
+        $result = $this->invoke('input.resolve', ['source' => $this->wireSource($source)], 'resolve');
+        $reference = self::string($result['canonical-reference'] ?? null);
+
+        if ($reference === '') {
+            throw new RuntimeException('Plugin did not return a canonical source reference.');
+        }
         $title = self::nullableString($result['title'] ?? null);
         $artwork = self::nullableString($result['artwork-reference'] ?? null);
 
@@ -277,6 +286,16 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     private function wireOptions(array $options): array
     {
         return array_map(static fn($key, $value): array => ['key' => $key, 'value' => is_bool($value) ? ['tag' => 'boolean', 'value' => $value] : ['tag' => 'text', 'value' => (string) $value]], array_keys($options), array_values($options));
+    }
+    /** @param array<string, bool|int|string> $source
+     * @return list<array{key: string, value: array{tag: string, value: bool|int|string}}>
+     */
+    private function wireSource(array $source): array
+    {
+        return array_map(static fn(string $key, bool|int|string $value): array => [
+            'key' => $key,
+            'value' => ['tag' => is_bool($value) ? 'boolean' : (is_int($value) ? 'number' : 'text'), 'value' => $value],
+        ], array_keys($source), $source);
     }
     private function assetKind(?string $mime): AssetKind
     {

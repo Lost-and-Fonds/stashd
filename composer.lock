@@ -9564,7 +9564,7 @@
       "dist": {
         "type": "path",
         "url": "../plugin-api",
-        "reference": "55280efaafd045e15b243bad32ca6f4761721cbd"
+        "reference": "57222f8a265b7770f23b823ead6a9cb6fe2c4f25"
       },
       "type": "library",
       "license": [
@@ -9582,7 +9582,7 @@
       "dist": {
         "type": "path",
         "url": "../plugin-sdk",
-        "reference": "78a2a033c9c5c26fbe26b7eabb8c7cdccd372bde"
+        "reference": "b28263015a8bae7839e67184cd52904dcea1694f"
       },
       "require": {
         "php": "^8.5",
@@ -9684,7 +9684,7 @@
       "dist": {
         "type": "path",
         "url": "../plugins/youtube",
-        "reference": "fe5499be5355eabba9e052d7317a870dc0b58940"
+        "reference": "796f599d45513b9bd38dc10cbf6b6f8ccc837af6"
       },
       "require": {
         "php": "^8.5",

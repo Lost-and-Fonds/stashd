@@ -18,8 +18,9 @@ final readonly class PluginInputDefinition
     /** @param list<string> $prefixes
      * @param list<mixed> $grants
      * @param list<InputOption> $options
+     * @param list<PluginSourceField> $sourceFields
      */
-    public function __construct(public string $id, public string $providerKey, public string $name, public string $version, public string $root, public array $prefixes, public array $grants, public array $options, public ?PluginHelperGrant $helper) {}
+    public function __construct(public string $id, public string $providerKey, public string $name, public string $version, public string $root, public array $prefixes, public array $grants, public array $options, public array $sourceFields, public ?PluginHelperGrant $helper) {}
 
     /** @param array<string, mixed> $manifest */
     public static function from(array $manifest, string $root): ?self
@@ -54,6 +55,27 @@ final readonly class PluginInputDefinition
                 continue;
             }
             $options[] = new InputOption($raw['key'], $raw['label'], $type, $raw['default'], $choices === null ? null : array_values(array_filter($choices, static fn(mixed $value): bool => is_string($value))), array_values(array_filter($applicableInputTypes, static fn(mixed $value): bool => is_string($value))), [], $description);
+        }
+        $sourceFields = [];
+
+        foreach (is_array($manifest['source_fields'] ?? null) ? $manifest['source_fields'] : [] as $raw) {
+            if (! is_array($raw)) {
+                continue;
+            }
+            $raw = self::object($raw);
+            $key = $raw['key'] ?? null;
+            $label = $raw['label'] ?? null;
+            $type = $raw['type'] ?? null;
+            $choices = $raw['choices'] ?? null;
+            $description = $raw['description'] ?? null;
+
+            if (! is_string($key) || ! is_string($label) || ! in_array($type, ['bool', 'number', 'text', 'enum'], true)
+                || $choices !== null && (! is_array($choices) || array_filter($choices, 'is_string') !== $choices)
+                || $description !== null && ! is_string($description)) {
+                continue;
+            }
+
+            $sourceFields[] = new PluginSourceField($key, $label, $type, $raw['required'] === true, $choices === null ? null : array_values($choices), $description);
         }
         $helper = null;
         $declared = is_array($manifest['helpers'] ?? null) ? $manifest['helpers'] : [];
@@ -92,7 +114,40 @@ final readonly class PluginInputDefinition
         $prefixes = is_array($manifest['source_prefixes'] ?? null) ? array_values(array_filter($manifest['source_prefixes'], static fn(mixed $value): bool => is_string($value))) : [];
         $grants = is_array($manifest['http_grants'] ?? null) ? array_values(array_filter($manifest['http_grants'], 'is_array')) : [];
 
-        return new self($id, $providerKey, $name, $version, $root, $prefixes, $grants, $options, $helper);
+        return new self($id, $providerKey, $name, $version, $root, $prefixes, $grants, $options, $sourceFields, $helper);
+    }
+
+    /** @param array<string, mixed> $source
+     * @return array<string, bool|int|string>
+     */
+    public function normalizeSource(array $source): array
+    {
+        $fields = [];
+
+        foreach ($this->sourceFields as $field) {
+            $fields[$field->key] = $field;
+        }
+
+        foreach ($source as $key => $value) {
+            if (! isset($fields[$key])) {
+                throw new \InvalidArgumentException('Unknown source field.');
+            }
+        }
+
+        $normalized = [];
+
+        foreach ($fields as $key => $field) {
+            if (! array_key_exists($key, $source)) {
+                if ($field->required) {
+                    throw new \InvalidArgumentException("Source field {$key} is required.");
+                }
+
+                continue;
+            }
+            $normalized[$key] = $field->normalize($source[$key]);
+        }
+
+        return $normalized;
     }
 
     /** @param array<mixed, mixed> $value
