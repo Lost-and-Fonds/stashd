@@ -9,6 +9,7 @@ use App\Plugins\PluginInputDefinition;
 use App\Providers\Fake\FakeProvider;
 use App\Stashes\CreateStashWithInitialInput;
 use App\Stashes\DownloadPolicy;
+use App\Stashes\InitialInputPersistence;
 use App\Stashes\OrganizationMode;
 use App\Stashes\StashInputRecord;
 use App\Stashes\StashRecord;
@@ -25,8 +26,14 @@ test('a declared Input source creates a stash and initial input atomically', fun
     ], [$definition]));
 
     $created = $this->container->get(CreateStashWithInitialInput::class)->execute(
-        'Atomic Input', SyncMode::Automatic, DownloadPolicy::ManualDownload, OrganizationMode::Flat, null,
-        'fake-input', ['reference' => 'fake://channel/atomic-input'], ['provider' => ['include_archived' => false]],
+        'Atomic Input',
+        SyncMode::Automatic,
+        DownloadPolicy::ManualDownload,
+        OrganizationMode::Flat,
+        null,
+        'fake-input',
+        ['reference' => 'fake://channel/atomic-input'],
+        ['provider' => ['include_archived' => false]],
     );
 
     expect((string) $created->id)->toStartWith('stash_');
@@ -44,5 +51,43 @@ test('an unknown Input plugin cannot leave a stash behind', function (): void {
 
     $response->assertStatus(Status::BAD_REQUEST);
     expect(StashRecord::count()->execute())->toBe(0)
+        ->and(StashInputRecord::count()->execute())->toBe(0);
+});
+
+test('initial Input failure after Stash insert rolls the whole transaction back', function (): void {
+    $definition = PluginInputDefinition::from([
+        'kind' => 'input', 'id' => 'fake-input', 'provider_key' => 'fake', 'name' => 'Fake Input',
+        'source_fields' => [['key' => 'reference', 'label' => 'Reference', 'type' => 'text', 'required' => true]],
+    ], __DIR__) ?? throw new \RuntimeException('Failed to create fake Input definition.');
+    $this->container->singleton(ExternalInputPluginRegistry::class, new ExternalInputPluginRegistry([
+        $this->container->get(FakeProvider::class),
+    ], [$definition]));
+    $failure = new class implements InitialInputPersistence {
+        public bool $stashWasInserted = false;
+
+        public function persistDiscoveredInput(\App\Stashes\StashRecord $stash, \App\Stashes\PreflightExecutionResult $discovered, array $options = []): \App\Stashes\StashInputCommitResult
+        {
+            $this->stashWasInserted = StashRecord::count()->execute() === 1;
+
+            throw new \RuntimeException('injected initial Input failure');
+        }
+
+        public function dispatchFollowups(\App\Stashes\StashRecord $stash, \App\Stashes\StashInputCommitResult $result): void {}
+    };
+    $this->container->singleton(InitialInputPersistence::class, $failure);
+
+    expect(fn() => $this->container->get(CreateStashWithInitialInput::class)->execute(
+        'Rollback Input',
+        SyncMode::Automatic,
+        DownloadPolicy::ManualDownload,
+        OrganizationMode::Flat,
+        null,
+        'fake-input',
+        ['reference' => 'fake://channel/rollback-input'],
+        [],
+    ))->toThrow(\RuntimeException::class, 'Failed to create stash and initial input.');
+
+    expect($failure->stashWasInserted)->toBeTrue()
+        ->and(StashRecord::count()->execute())->toBe(0)
         ->and(StashInputRecord::count()->execute())->toBe(0);
 });

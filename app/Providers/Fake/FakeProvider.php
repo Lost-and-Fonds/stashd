@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Providers\Fake;
 
+use App\Plugins\SourceResolvingInputProvider;
 use App\Providers\Core\DiscoveredItem;
 use App\Providers\Provider;
 use App\Providers\ProviderDates;
 use App\Providers\ProviderStrategy;
 use App\Providers\ResolvedInput;
 use App\Providers\StashdUri;
-use App\Plugins\SourceResolvingInputProvider;
 use App\Providers\StrategyCost;
 use App\Providers\StrategyPurpose;
 use InvalidArgumentException;

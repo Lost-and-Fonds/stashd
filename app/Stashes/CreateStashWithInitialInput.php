@@ -16,7 +16,7 @@ final readonly class CreateStashWithInitialInput
     public function __construct(
         private ExternalInputPluginRegistry $plugins,
         private DiscoverStashInput $discovery,
-        private CreateStashFromDiscovery $inputs,
+        private InitialInputPersistence $inputs,
         private StashRepository $stashes,
         private ActivityEventService $activity,
         private Database $database,

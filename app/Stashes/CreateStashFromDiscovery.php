@@ -28,7 +28,7 @@ use function Tempest\Support\str;
  * stash input, media items, sources, and stash items, deduplicating against
  * whatever the stash (and the wider Vault) already has.
  */
-final readonly class CreateStashFromDiscovery
+final readonly class CreateStashFromDiscovery implements InitialInputPersistence
 {
     public function __construct(
         private CommandRepository $commands,
