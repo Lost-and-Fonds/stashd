@@ -1,7 +1,19 @@
 <script setup lang="ts">
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { logout } from './api/auth'
+import { stopLiveUpdates } from './live/mercure'
 
 const route = useRoute()
+const router = useRouter()
+
+async function signOut(): Promise<void> {
+  try {
+    await logout()
+  } finally {
+    stopLiveUpdates()
+    await router.push({ name: 'login' })
+  }
+}
 
 const primaryLinks = [
   { label: 'Status', icon: 'i-lucide-activity', to: '/status' },
@@ -35,6 +47,7 @@ const dropdownUi = { itemLabel: 'font-mono' }
           <UDropdownMenu :items="secondaryLinks" :ui="dropdownUi">
             <UButton label="Configure" icon="i-lucide-sliders-horizontal" trailing-icon="i-lucide-chevron-down" variant="ghost" color="neutral" size="sm" class="font-mono" />
           </UDropdownMenu>
+          <UButton label="Sign out" variant="ghost" color="neutral" size="sm" class="font-mono" @click="signOut" />
         </div>
 
         <UDrawer direction="left" :handle="false" class="ml-auto md:hidden">

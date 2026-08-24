@@ -4,6 +4,15 @@ import ui from '@nuxt/ui/vite'
 
 export default defineConfig({
   root: '.',
+  server: {
+    host: true,
+    port: 5174,
+    strictPort: true,
+    allowedHosts: ['stashd.test'],
+    watch: {
+      ignored: ['**/.env', '**/target/**', '**/vendor/**']
+    }
+  },
   plugins: [
     vue(),
     ui({

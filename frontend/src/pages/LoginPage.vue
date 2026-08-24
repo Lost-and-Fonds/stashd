@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { startLiveUpdates } from '../live/mercure'
 
 const route = useRoute()
 const router = useRouter()
@@ -18,12 +19,13 @@ async function submit(): Promise<void> {
     const response = await fetch(setupRequired.value ? '/api/v1/auth/setup' : '/api/v1/auth/login', {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ username: username.value, password: password.value })
     })
     const payload = await response.json().catch(() => ({})) as { error?: { code?: string; message?: string } }
 
     if (response.ok) {
+      startLiveUpdates()
       const returnTo = typeof route.query.return_to === 'string' && route.query.return_to.startsWith('/')
         ? route.query.return_to
         : '/stashes'

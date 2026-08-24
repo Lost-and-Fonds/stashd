@@ -18,6 +18,7 @@ import StashesPage from '../pages/StashesPage.vue'
 import StatusPage from '../pages/StatusPage.vue'
 import VaultItemPage from '../pages/VaultItemPage.vue'
 import VaultPage from '../pages/VaultPage.vue'
+import { currentUser } from '../api/auth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -42,6 +43,28 @@ const router = createRouter({
     { path: '/settings', name: 'settings', component: SettingsPage },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundPage }
   ]
+})
+
+router.beforeEach(async (to) => {
+  if (to.name === 'login') {
+    try {
+      if (await currentUser()) return { name: 'stashes' }
+    } catch {
+      // The login screen remains available when the auth check itself fails.
+    }
+    return true
+  }
+
+  try {
+    if (await currentUser()) return true
+  } catch {
+    return true
+  }
+
+  return {
+    name: 'login',
+    query: { return_to: to.fullPath }
+  }
 })
 
 export default router

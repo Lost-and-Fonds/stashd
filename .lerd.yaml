@@ -1,16 +1,16 @@
 domains:
-    - stashd
+  - stashd
 secured: true
 services:
-    - postgres
+  - postgres
 workers:
-    - schedule
+  - schedule
 custom_workers:
-    schedule:
-        label: Task Scheduler
-        command: php tempest schedule:run
-        schedule: minutely
+  schedule:
+    label: Task Scheduler
+    command: php tempest schedule:run
+    schedule: minutely
 container:
-    port: 8474
-    containerfile: Dockerfile
-    target: dev
+  port: 8474
+  containerfile: Dockerfile
+  target: dev
