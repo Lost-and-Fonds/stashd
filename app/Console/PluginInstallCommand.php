@@ -26,7 +26,7 @@ final readonly class PluginInstallCommand
         $packages = new PackageManager($root);
 
         try {
-            $digest = (new OciRegistry())->pull($reference, $layout, 'linux-' . match (php_uname('m')) {
+            $digest = (new OciRegistry())->pull($reference, $layout, 'linux/' . match (php_uname('m')) {
                 'x86_64', 'amd64' => 'amd64', 'aarch64', 'arm64' => 'arm64', default => throw new \RuntimeException('unsupported host architecture'),
             });
             $manifest = $packages->installOciLayout($layout, $digest, $reference);
