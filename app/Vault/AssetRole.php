@@ -15,4 +15,17 @@ enum AssetRole: string
     case MetadataJson = 'metadata_json';
     case SourceJson = 'source_json';
     case Derived = 'derived';
+
+    /** @return list<self> */
+    public static function preserved(): array
+    {
+        return [
+            self::VaultOriginal,
+            self::SourceThumbnail,
+            self::Subtitle,
+            self::Transcript,
+            self::MetadataJson,
+            self::SourceJson,
+        ];
+    }
 }

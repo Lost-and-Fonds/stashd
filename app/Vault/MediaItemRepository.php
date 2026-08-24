@@ -24,16 +24,6 @@ final class MediaItemRepository
         private Database $database,
     ) {}
 
-    /** @var list<AssetRole> */
-    private const array PRESERVED_ROLES = [
-        AssetRole::VaultOriginal,
-        AssetRole::SourceThumbnail,
-        AssetRole::Subtitle,
-        AssetRole::Transcript,
-        AssetRole::MetadataJson,
-        AssetRole::SourceJson,
-    ];
-
     public function create(
         string $providerKey,
         string $providerItemId,
@@ -117,7 +107,7 @@ final class MediaItemRepository
     public function listVaultSummary(int $limit, int $offset, ?string $search = null, ?string $kind = null): array
     {
         [$where, $bindings] = $this->vaultWhere($search, $kind);
-        $roles = array_map(static fn(AssetRole $role): string => $role->value, self::PRESERVED_ROLES);
+        $roles = array_map(static fn(AssetRole $role): string => $role->value, AssetRole::preserved());
         $placeholders = implode(', ', array_fill(0, count($roles), '?'));
         $rows = $this->database->fetch(new Query(
             'SELECT m."id",
@@ -191,7 +181,7 @@ final class MediaItemRepository
 
     public function totalPreservedSizeBytes(): int
     {
-        $roles = array_map(static fn(AssetRole $role): string => $role->value, self::PRESERVED_ROLES);
+        $roles = array_map(static fn(AssetRole $role): string => $role->value, AssetRole::preserved());
         $placeholders = implode(', ', array_fill(0, count($roles), '?'));
         $row = $this->database->fetchFirst(new Query(
             'SELECT COALESCE(SUM("sizeBytes"), 0) AS total

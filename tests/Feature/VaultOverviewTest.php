@@ -31,7 +31,7 @@ test('vault overview lists one canonical item with distinct stash membership', f
     $response = $this->http->get('/api/v1/items?limit=200', headers: $headers)->assertOk();
     $row = vaultRow($response->body, $mediaItemId);
 
-    expect($row['stashCount'])->toBe(2)
+    expect($row['stash_count'])->toBe(2)
         ->and(array_filter($response->body['items'], static fn(array $item): bool => $item['id'] === $mediaItemId))->toHaveCount(1)
         ->and($firstStash)->not->toBe($secondStash);
 });
@@ -59,10 +59,10 @@ test('vault overview counts persisted broadcast item membership and excludes der
     $afterResponse = $this->http->get('/api/v1/items?limit=200', headers: $headers)->assertOk();
     $after = vaultRow($afterResponse->body, $mediaItemId);
 
-    expect($before['broadcastCount'])->toBe(1)
-        ->and($after['broadcastCount'])->toBe(1)
-        ->and($after['preservedSizeBytes'])->toBe($before['preservedSizeBytes'])
-        ->and($afterResponse->body['preservedSizeBytes'])->toBe($beforeResponse->body['preservedSizeBytes']);
+    expect($before['broadcast_count'])->toBe(1)
+        ->and($after['broadcast_count'])->toBe(1)
+        ->and($after['preserved_size_bytes'])->toBe($before['preserved_size_bytes'])
+        ->and($afterResponse->body['preserved_size_bytes'])->toBe($beforeResponse->body['preserved_size_bytes']);
 });
 
 test('vault overview filters, paginates, and returns an empty collection honestly', function (): void {
@@ -78,5 +78,5 @@ test('vault overview filters, paginates, and returns an empty collection honestl
         ->and($filtered->body['offset'])->toBe(0)
         ->and($empty->body['items'])->toBe([])
         ->and($empty->body['total'])->toBe(0)
-        ->and($empty->body['vaultTotal'])->toBeGreaterThan(0);
+        ->and($empty->body['vault_total'])->toBeGreaterThan(0);
 });

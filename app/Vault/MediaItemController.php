@@ -16,6 +16,7 @@ use App\Stashes\StashRecord;
 use App\Stashes\StashRepository;
 use App\Support\Http\QueryPagination;
 use App\Vault\Api\AssetResource;
+use App\Vault\Api\MediaItemDetailResource;
 use App\Vault\Api\MediaItemResource;
 use App\Vault\Api\VaultItemSummaryResource;
 use Tempest\Http\Request;
@@ -52,8 +53,8 @@ final readonly class MediaItemController
                 $this->mediaItems->listVaultSummary($limit, $offset, $search === '' ? null : $search, $kind === '' ? null : $kind),
             ),
             'total' => $this->mediaItems->countVaultSummary($search === '' ? null : $search, $kind === '' ? null : $kind),
-            'vaultTotal' => $this->mediaItems->count(),
-            'preservedSizeBytes' => $this->mediaItems->totalPreservedSizeBytes(),
+            'vault_total' => $this->mediaItems->count(),
+            'preserved_size_bytes' => $this->mediaItems->totalPreservedSizeBytes(),
             'limit' => $limit,
             'offset' => $offset,
         ]);
@@ -68,8 +69,35 @@ final readonly class MediaItemController
             return $this->notFound();
         }
 
+        $mediaItemId = MediaItemId::fromPrimaryKey($item->id);
+        $stashIds = array_values(array_unique(array_map(
+            static fn($stashItem): string => (string) $stashItem->stashId,
+            $this->stashItems->listForMediaItem($mediaItemId),
+        )));
+        $broadcastIds = array_values(array_unique(array_map(
+            static fn($broadcastItem): string => (string) $broadcastItem->broadcastId,
+            $this->broadcastItems->listForMediaItem($mediaItemId),
+        )));
+        $stashesById = $this->stashes->listByIds($stashIds);
+        $broadcastsById = $this->broadcasts->listByIds($broadcastIds);
+
+        $stashes = array_values(array_filter(array_map(
+            static fn(string $stashId): ?StashRecord => $stashesById[$stashId] ?? null,
+            $stashIds,
+        )));
+        $broadcasts = array_values(array_filter(array_map(
+            static fn(string $broadcastId): ?BroadcastRecord => $broadcastsById[$broadcastId] ?? null,
+            $broadcastIds,
+        )));
+
         return new Json([
-            'item' => MediaItemResource::fromRecord($item)->toArray(),
+            ...MediaItemDetailResource::fromRecord(
+                item: $item,
+                assets: $this->assets->listReadyPreservedForMediaItem($mediaItemId),
+                stashes: $stashes,
+                broadcasts: $broadcasts,
+                preservedSizeBytes: $this->assets->preservedSizeBytesForMediaItem($mediaItemId),
+            )->toArray(),
         ]);
     }
 

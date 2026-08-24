@@ -143,6 +143,26 @@ final class AssetRepository
     }
 
     /** @return list<AssetRecord> */
+    public function listReadyPreservedForMediaItem(MediaItemId $mediaItemId): array
+    {
+        return array_values(array_filter(
+            $this->listForMediaItem($mediaItemId),
+            static fn(AssetRecord $asset): bool => $asset->state === AssetState::Ready
+                && in_array($asset->role, AssetRole::preserved(), true)
+                && $asset->broadcastId === null
+                && $asset->broadcastItemId === null,
+        ));
+    }
+
+    public function preservedSizeBytesForMediaItem(MediaItemId $mediaItemId): int
+    {
+        return array_sum(array_map(
+            static fn(AssetRecord $asset): int => $asset->sizeBytes ?? 0,
+            $this->listReadyPreservedForMediaItem($mediaItemId),
+        ));
+    }
+
+    /** @return list<AssetRecord> */
     public function listByBroadcastAndRole(BroadcastId $broadcastId, AssetRole $role): array
     {
         return AssetRecord::select()

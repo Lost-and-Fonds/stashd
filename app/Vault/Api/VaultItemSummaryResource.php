@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Vault\Api;
 
+use App\Http\Api\ApiJson;
 use App\Vault\VaultItemSummary;
 
 final readonly class VaultItemSummaryResource
@@ -18,12 +19,12 @@ final readonly class VaultItemSummaryResource
     /** @return array<string, mixed> */
     public function toArray(): array
     {
-        return [
+        return ApiJson::encode([
             ...MediaItemResource::fromRecord($this->summary->item)->toArray(),
             'kind' => $this->summary->kind,
             'stashCount' => $this->summary->stashCount,
             'broadcastCount' => $this->summary->broadcastCount,
             'preservedSizeBytes' => $this->summary->preservedSizeBytes,
-        ];
+        ]);
     }
 }
