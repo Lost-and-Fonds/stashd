@@ -9456,11 +9456,11 @@
       "dist": {
         "type": "path",
         "url": "../plugins/jellyfin",
-        "reference": "9e9b1cec0f7fda86b6b6fbabf1df915c9df970ca"
+        "reference": "2f34dff15528b29739e729a6f6dc8f3805cb6d71"
       },
       "require": {
         "php": "^8.5",
-        "stashd/plugin-sdk": "^0.2"
+        "stashd/php-sdk": "^0.2"
       },
       "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.95",
@@ -9510,7 +9510,7 @@
       "dist": {
         "type": "path",
         "url": "../stashd-php-sdk",
-        "reference": "9b1f76aa0922ea3c4b260e990238356128e8d093"
+        "reference": "531da350000ba9c34582af3ca60d3cbf535e7bcd"
       },
       "require": {
         "php": "^8.5",
@@ -9558,11 +9558,11 @@
       "dist": {
         "type": "path",
         "url": "../plugins/plex",
-        "reference": "8ad2afc6a0c1050790f079e3b544b01b7d97dd60"
+        "reference": "d3e02ab1d8d7d403e0e86fa9992b11b9f16972bc"
       },
       "require": {
         "php": "^8.5",
-        "stashd/plugin-sdk": "^0.2"
+        "stashd/php-sdk": "^0.2"
       },
       "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.95",
@@ -9612,7 +9612,7 @@
       "dist": {
         "type": "path",
         "url": "../plugin-api",
-        "reference": "57222f8a265b7770f23b823ead6a9cb6fe2c4f25"
+        "reference": "f4a1dbaf0a91f35ef140f3ac9067475f016c21fc"
       },
       "type": "library",
       "license": [
@@ -9625,64 +9625,16 @@
       }
     },
     {
-      "name": "stashd/plugin-sdk",
-      "version": "0.2.2",
-      "dist": {
-        "type": "path",
-        "url": "../plugin-sdk",
-        "reference": "b28263015a8bae7839e67184cd52904dcea1694f"
-      },
-      "require": {
-        "php": "^8.5",
-        "stashd/plugin-api": "^0.1"
-      },
-      "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.95",
-        "pestphp/pest": "^4.0",
-        "phpstan/phpstan": "^2.2",
-        "squizlabs/php_codesniffer": "^4.0"
-      },
-      "type": "library",
-      "autoload": {
-        "psr-4": {
-          "Stashd\\PluginSdk\\": "src/"
-        }
-      },
-      "scripts": {
-        "test": [
-          "vendor/bin/pest"
-        ],
-        "test:static": [
-          "vendor/bin/phpstan analyse"
-        ],
-        "format": [
-          "vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php"
-        ],
-        "lint": [
-          "composer dump-autoload --optimize --strict-psr --dry-run",
-          "vendor/bin/php-cs-fixer check --allow-risky=yes --config=.php-cs-fixer.dist.php"
-        ]
-      },
-      "license": [
-        "MIT"
-      ],
-      "description": "Independent PHP SDK for Stashd plugins",
-      "transport-options": {
-        "symlink": false,
-        "relative": true
-      }
-    },
-    {
       "name": "stashd/podcast",
       "version": "0.2.0",
       "dist": {
         "type": "path",
         "url": "../plugins/podcast",
-        "reference": "3864cdf24e793133892c2e4fe5e6f86e64716cd5"
+        "reference": "ef579ea137952e9ac4309eed444f88ef1af22075"
       },
       "require": {
         "php": "^8.5",
-        "stashd/plugin-sdk": "^0.2"
+        "stashd/php-sdk": "^0.2"
       },
       "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.95",
@@ -9732,11 +9684,11 @@
       "dist": {
         "type": "path",
         "url": "../plugins/youtube",
-        "reference": "796f599d45513b9bd38dc10cbf6b6f8ccc837af6"
+        "reference": "aefec5bcb88d38cc33676426184b9cc9844fa370"
       },
       "require": {
         "php": "^8.5",
-        "stashd/plugin-sdk": "^0.2"
+        "stashd/php-sdk": "^0.2"
       },
       "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.95",
