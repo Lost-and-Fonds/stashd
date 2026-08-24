@@ -65,6 +65,18 @@ final readonly class CreateStashFromDiscovery
             'provider_options' => is_array($options['provider'] ?? null) ? $options['provider'] : [],
         ], JobIntent::InitialBackfill);
 
+        return $this->commitDiscoveredInput($stash, $discovered, $options, (string) $preflight->id);
+    }
+
+    /**
+     * Persists a resolved Input and its discovered items. The caller may wrap
+     * this in a larger transaction when creating the Stash itself.
+     *
+     * @param array<string, mixed> $options
+     */
+    public function persistDiscoveredInput(StashRecord $stash, PreflightExecutionResult $discovered, array $options = []): StashInputCommitResult
+    {
+
         $resolved = $discovered->resolvedInput;
         $discoveredItems = $discovered->discoveredItems;
         $declaredInputOptions = $discovered->inputOptions;
@@ -78,60 +90,87 @@ final readonly class CreateStashFromDiscovery
         $stashInput = null;
         $counts = new DiscoveredItemCommitCounts();
 
-        $committed = $this->database->withinTransaction(function () use (
-            $stash,
+        $isFirstInput = $this->stashInputs->listForStash($stashId) === [];
+        $stashInput = $this->stashInputs->findByStashAndProviderInput(
             $stashId,
-            $resolved,
-            $inputType,
-            $syncMode,
-            $inputOptions,
-            $declaredInputOptions,
-            $discoveredItems,
-            &$stashInput,
-            &$counts,
-        ): void {
-            $isFirstInput = $this->stashInputs->listForStash($stashId) === [];
-            $stashInput = $this->stashInputs->findByStashAndProviderInput(
-                $stashId,
-                $resolved->providerKey,
-                $resolved->providerInputId,
-            ) ?? $this->stashInputs->create(
-                stashId: $stashId,
-                providerKey: $resolved->providerKey,
-                inputType: $inputType,
-                sourceUri: $resolved->sourceUri->toString(),
-                providerInputId: $resolved->providerInputId,
-                title: $resolved->title,
-                syncMode: $syncMode,
-                options: $inputOptions,
-            );
+            $resolved->providerKey,
+            $resolved->providerInputId,
+        ) ?? $this->stashInputs->create(
+            stashId: $stashId,
+            providerKey: $resolved->providerKey,
+            inputType: $inputType,
+            sourceUri: $resolved->sourceUri->toString(),
+            providerInputId: $resolved->providerInputId,
+            title: $resolved->title,
+            syncMode: $syncMode,
+            options: $inputOptions,
+        );
 
-            if ($stash->iconUri === null && $resolved->sourceAvatarUri !== null) {
-                $this->stashes->update($stash, iconUri: $resolved->sourceAvatarUri->toString());
-            }
+        if ($stash->iconUri === null && $resolved->sourceAvatarUri !== null) {
+            $this->stashes->update($stash, iconUri: $resolved->sourceAvatarUri->toString());
+        }
 
-            if ($isFirstInput && $stash->name === 'New Stash' && $resolved->sourceTitle !== null) {
-                $this->stashes->update($stash, name: $resolved->sourceTitle);
-            }
+        if ($isFirstInput && $stash->name === 'New Stash' && $resolved->sourceTitle !== null) {
+            $this->stashes->update($stash, name: $resolved->sourceTitle);
+        }
 
-            $counts = $this->committer->commit(
-                stashId: $stashId,
-                stashInputId: StashInputId::fromPrimaryKey($stashInput->id),
-                resolved: $resolved,
-                discoveredItems: $discoveredItems,
-                inputOptions: $inputOptions,
-                declaredInputOptions: $declaredInputOptions,
-            );
+        $counts = $this->committer->commit(
+            stashId: $stashId,
+            stashInputId: StashInputId::fromPrimaryKey($stashInput->id),
+            resolved: $resolved,
+            discoveredItems: $discoveredItems,
+            inputOptions: $inputOptions,
+            declaredInputOptions: $declaredInputOptions,
+        );
+
+        return new StashInputCommitResult(
+            stashId: (string) $stash->id,
+            stashInputId: (string) $stashInput->id,
+            mediaItemsCreated: $counts->mediaItemsCreated,
+            mediaItemsReused: $counts->mediaItemsReused,
+            stashItemsCreated: $counts->stashItemsCreated,
+            stashItemsReused: $counts->stashItemsReused,
+            preflightCommandId: '',
+            downloadableMediaItemIds: $counts->downloadableMediaItemIds,
+        );
+    }
+
+    /** @param array<string, mixed> $options */
+    public function commitDiscoveredInput(StashRecord $stash, PreflightExecutionResult $discovered, array $options = [], string $preflightCommandId = ''): StashInputCommitResult
+    {
+        $result = null;
+        $committed = $this->database->withinTransaction(function () use ($stash, $discovered, $options, &$result): void {
+            $result = $this->persistDiscoveredInput($stash, $discovered, $options);
         });
 
-        if (! $committed || $stashInput === null) {
+        if (! $committed || ! $result instanceof StashInputCommitResult) {
             throw new RuntimeException('Failed to commit stash input.');
         }
 
+        $result = new StashInputCommitResult(
+            stashId: $result->stashId,
+            stashInputId: $result->stashInputId,
+            mediaItemsCreated: $result->mediaItemsCreated,
+            mediaItemsReused: $result->mediaItemsReused,
+            stashItemsCreated: $result->stashItemsCreated,
+            stashItemsReused: $result->stashItemsReused,
+            preflightCommandId: $preflightCommandId,
+            downloadableMediaItemIds: $result->downloadableMediaItemIds,
+        );
+
+        $this->dispatchFollowups($stash, $result);
+
+        return $result;
+    }
+
+    public function dispatchFollowups(StashRecord $stash, StashInputCommitResult $result): void
+    {
+        $stashId = StashId::fromPrimaryKey($stash->id);
+
         if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
-            foreach ($counts->downloadableMediaItemIds as $downloadableMediaItemId) {
+            foreach ($result->downloadableMediaItemIds as $mediaItemId) {
                 $this->commandDispatch->dispatch(CommandType::ItemDownload, [
-                    'mediaItemId' => $downloadableMediaItemId,
+                    'mediaItemId' => $mediaItemId,
                     'stashId' => $stashId->toString(),
                 ]);
             }
@@ -142,16 +181,6 @@ final readonly class CreateStashFromDiscovery
                 'broadcast_id' => (string) $broadcast->id,
             ]);
         }
-
-        return new StashInputCommitResult(
-            stashId: (string) $stash->id,
-            stashInputId: (string) $stashInput->id,
-            mediaItemsCreated: $counts->mediaItemsCreated,
-            mediaItemsReused: $counts->mediaItemsReused,
-            stashItemsCreated: $counts->stashItemsCreated,
-            stashItemsReused: $counts->stashItemsReused,
-            preflightCommandId: (string) $preflight->id,
-        );
     }
 
     private function requireCompletedPreflight(CommandRecord $preflightCommand): CommandRecord

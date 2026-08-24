@@ -10,6 +10,7 @@ use App\Providers\ProviderDates;
 use App\Providers\ProviderStrategy;
 use App\Providers\ResolvedInput;
 use App\Providers\StashdUri;
+use App\Plugins\SourceResolvingInputProvider;
 use App\Providers\StrategyCost;
 use App\Providers\StrategyPurpose;
 use InvalidArgumentException;
@@ -34,7 +35,7 @@ use function Tempest\Support\str;
  *   fake://item/private     — private item simulation
  *   fake://item/deleted     — deleted item simulation
  */
-final class FakeProvider implements Provider
+final class FakeProvider implements Provider, SourceResolvingInputProvider
 {
     public const string KEY = 'fake';
 
@@ -72,6 +73,17 @@ final class FakeProvider implements Provider
             providerInputId: "{$type}:{$id}",
             title: "Fake {$type} {$id}",
         );
+    }
+
+    public function resolveSource(array $source): ResolvedInput
+    {
+        $reference = $source['reference'] ?? null;
+
+        if (! is_string($reference)) {
+            throw new InvalidArgumentException('Fake source reference is required.');
+        }
+
+        return $this->resolveInput(StashdUri::parse($reference));
     }
 
     public function discoveryStrategies(): array

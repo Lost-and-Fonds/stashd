@@ -64,7 +64,7 @@ final class ExternalInputPluginRegistry
             ?? throw new \InvalidArgumentException("Unknown external Input plugin: {$id}");
         $plugin = $this->find($definition->providerKey);
 
-        if (! $plugin instanceof PluginInputRuntime) {
+        if (! $plugin instanceof SourceResolvingInputProvider) {
             throw new \InvalidArgumentException("Input plugin {$id} cannot resolve sources.");
         }
 

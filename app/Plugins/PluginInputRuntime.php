@@ -33,7 +33,7 @@ use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 use Tempest\Support\Filesystem;
 
-final readonly class PluginInputRuntime implements Provider, DownloaderInterface
+final readonly class PluginInputRuntime implements Provider, DownloaderInterface, SourceResolvingInputProvider
 {
     public function __construct(private PluginInputDefinition $definition, private PluginRunner $runner, private PackageManager $packages, private SecretsService $secrets) {}
     public function key(): string

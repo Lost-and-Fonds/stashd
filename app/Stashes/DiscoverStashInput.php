@@ -35,6 +35,13 @@ final readonly class DiscoverStashInput
         $provider = $this->providers->resolveForUri($uri);
         $resolved = $provider->resolveInput($uri);
 
+        return $this->executeResolved($resolved, $sourceUri, $sourceTitle, $origin, $payload['provider_options'] ?? null, $intent);
+    }
+
+    public function executeResolved(ResolvedInput $resolved, string $sourceUri, ?string $sourceTitle, PreflightOrigin $origin, mixed $providerOptions, JobIntent $intent = JobIntent::Preflight): PreflightExecutionResult
+    {
+        $provider = $this->providers->get($resolved->providerKey);
+
         if ($sourceTitle !== null) {
             $resolved = new ResolvedInput(
                 providerKey: $resolved->providerKey,
@@ -62,7 +69,7 @@ final readonly class DiscoverStashInput
         };
         $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);
         /** @var list<DiscoveredItem> $discovered */
-        $discovered = $provider->discover($resolved, $strategy, self::providerOptions($payload['provider_options'] ?? null));
+        $discovered = $provider->discover($resolved, $strategy, self::providerOptions($providerOptions));
 
         if ($sourceTitle === null && $resolved->inputType === 'playlist') {
             $inputTitle = $this->playlistTitle($discovered);

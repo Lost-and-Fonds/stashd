@@ -27,6 +27,7 @@ final readonly class InputPluginController
             'key' => $plugin->id,
             'label' => $plugin->name,
             'source_fields' => array_map(static fn(PluginSourceField $field): array => $field->toArray(), $plugin->sourceFields),
+            'input_options' => array_map(static fn($option): array => $option->toArray(), $plugin->options),
         ], $this->plugins->definitions())]);
     }
 

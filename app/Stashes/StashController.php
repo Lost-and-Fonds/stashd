@@ -43,6 +43,7 @@ final readonly class StashController
         private ActivityEventService $activity,
         private AssetRepository $assets,
         private JobRepository $jobs,
+        private CreateStashWithInitialInput $initialInput,
     ) {}
 
     #[Get('/api/v1/stashes')]
@@ -110,6 +111,48 @@ final readonly class StashController
         return new Json([
             'stash' => StashResource::fromRecord($stash)->toArray(),
         ], Status::CREATED);
+    }
+
+    #[Post('/api/v1/stashes/with-input')]
+    public function createWithInput(Request $request): Json
+    {
+        $body = $request->body;
+        $name = is_string($body['name'] ?? null) ? trim($body['name']) : '';
+        $input = $request->body['input'] ?? null;
+
+        if ($name === '' || ! is_array($input)) {
+            return $this->validationError($name === '' ? 'name cannot be blank.' : 'input must be an object.');
+        }
+
+        $syncMode = SyncMode::tryFrom(is_string($body['syncMode'] ?? null) ? $body['syncMode'] : SyncMode::Automatic->value);
+        $downloadPolicy = DownloadPolicy::tryFrom(is_string($body['downloadPolicy'] ?? null) ? $body['downloadPolicy'] : DownloadPolicy::Video->value);
+        $organizationMode = OrganizationMode::tryFrom(is_string($body['organizationMode'] ?? null) ? $body['organizationMode'] : OrganizationMode::Flat->value);
+        $plugin = is_string($input['plugin'] ?? null) ? $input['plugin'] : '';
+        $source = is_array($input['source'] ?? null) ? self::object($input['source']) : null;
+        $options = is_array($input['options'] ?? null) ? self::object($input['options']) : [];
+
+        if ($syncMode === null || $downloadPolicy === null || $organizationMode === null || $plugin === '' || $source === null) {
+            return $this->validationError('Invalid stash or input settings.');
+        }
+
+        try {
+            $stash = $this->initialInput->execute(
+                $name,
+                $syncMode,
+                $downloadPolicy,
+                $organizationMode,
+                is_string($body['description'] ?? null) ? trim($body['description']) : null,
+                $plugin,
+                $source,
+                $options,
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return $this->validationError($exception->getMessage());
+        } catch (\RuntimeException $exception) {
+            return $this->validationError($exception->getMessage());
+        }
+
+        return new Json(['stash' => StashResource::fromRecord($stash)->toArray()], Status::CREATED);
     }
 
     #[Get('/api/v1/stashes/{id}')]
@@ -459,5 +502,13 @@ final readonly class StashController
                 'message' => $message,
             ],
         ], Status::BAD_REQUEST);
+    }
+
+    /** @param array<mixed, mixed> $value
+     * @return array<string, mixed>
+     */
+    private static function object(array $value): array
+    {
+        return array_filter($value, is_string(...), ARRAY_FILTER_USE_KEY);
     }
 }

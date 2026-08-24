@@ -14,6 +14,8 @@ final readonly class StashInputCommitResult
         public int $stashItemsCreated,
         public int $stashItemsReused,
         public string $preflightCommandId,
+        /** @var list<string> */
+        public array $downloadableMediaItemIds = [],
     ) {}
 
     /** @return array<string, mixed> */
