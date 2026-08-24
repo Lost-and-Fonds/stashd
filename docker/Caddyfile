@@ -14,8 +14,15 @@
 	root * public
 	encode zstd gzip
 
-	@buildAssets path /build/*
-	header @buildAssets Cache-Control "public, max-age=31536000, immutable"
+	# Tempest-owned routes must be handled before the SPA fallback. Everything
+	# else is either a real ui-v2 asset or a client-side ui-v2 route.
+	@backend path /api/* /login /activity /published/* /health
+	handle @backend {
+		php_server
+	}
+
+	@uiAssets path /assets/*
+	header @uiAssets Cache-Control "public, max-age=31536000, immutable"
 
 	# Embedded real-time hub at /.well-known/mercure. No `anonymous`: every
 	# subscriber needs a JWT minted by the authenticated
@@ -44,5 +51,20 @@
 		}
 	}
 
-	php_server
+	@static file
+	handle @static {
+		file_server
+	}
+	@missingAsset path_regexp \.[^/]+$
+	handle @missingAsset {
+		respond 404
+	}
+
+	# Vue Router history fallback for ui-v2. This block is reached only after
+	# backend routes and existing files have been handled, so API errors cannot
+	# become HTML 200 responses.
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
 }
