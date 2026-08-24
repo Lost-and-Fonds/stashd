@@ -10,6 +10,8 @@ use App\Support\PrefixedUlid;
 use App\System\Secret\SecretRepository;
 use App\System\Secret\SecretsService;
 use App\System\Secret\SecretType;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use Tempest\Support\Filesystem;
 
 final readonly class PluginConnectionService
@@ -90,7 +92,27 @@ final readonly class PluginConnectionService
 
         $token = $this->requireToken($record);
 
-        return $this->invoke($record, $operationKey, $token, $payload);
+        try {
+            $result = $this->invoke($record, $operationKey, $token, $payload);
+        } catch (ConnectionException $exception) {
+            if ($operationKey === 'test_connection') {
+                $record->state = ConnectionState::Failed;
+                $record->lastCheckedAt = DateTime::now(Timezone::UTC);
+                $record->lastError = $exception->getMessage();
+                $this->connections->save($record);
+            }
+
+            throw $exception;
+        }
+
+        if ($operationKey === 'test_connection') {
+            $record->state = ConnectionState::Ready;
+            $record->lastCheckedAt = DateTime::now(Timezone::UTC);
+            $record->lastError = null;
+            $this->connections->save($record);
+        }
+
+        return $result;
     }
 
     /** @return array<string, mixed> */

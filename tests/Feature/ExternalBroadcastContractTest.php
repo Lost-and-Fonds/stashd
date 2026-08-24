@@ -269,6 +269,10 @@ test('generic connection operation returns plugin values', function (): void {
     $result = $this->http->post('/api/v1/connections/' . $server->body['connection']['id'] . '/operations/test_connection', headers: $headers)
         ->assertOk();
     expect($result->body['values'])->toContain(['key' => 'ok', 'value' => 'true']);
+
+    $connection = $this->http->get('/api/v1/connections/' . $server->body['connection']['id'], headers: $headers)
+        ->assertOk();
+    expect($connection->body['connection']['state']->value)->toBe('ready');
 });
 
 test('generic connection operation failure does not leak token', function (): void {
