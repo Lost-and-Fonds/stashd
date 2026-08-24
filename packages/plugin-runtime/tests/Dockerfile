@@ -31,7 +31,7 @@ RUN set -eux; \
     install -D -m 0555 "${temporary}/umoci" /usr/local/libexec/stashd/umoci
 
 COPY packages/plugin-runtime /src/plugin-runtime
-COPY vendor/stashd/plugin-sdk /src/sdk
+COPY vendor/stashd/php-sdk /src/sdk
 COPY --from=plugin-runtime-dependencies /src/plugin-runtime/vendor /src/plugin-runtime/vendor
 COPY --from=plugin-runtime-dependencies /usr/bin/composer /usr/bin/composer
 RUN mkdir -p /vault /outer-app /outer-data \

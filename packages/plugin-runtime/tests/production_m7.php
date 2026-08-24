@@ -17,7 +17,7 @@ use Stashd\PluginRuntime\Sandbox\SandboxPolicy;
 use Stashd\PluginSdk\ReadableResource;
 
 $sdkRoot = getenv('STASHD_PLUGIN_SDK_ROOT');
-$sdkRoot = is_string($sdkRoot) && trim($sdkRoot) !== '' ? trim($sdkRoot) : dirname(__DIR__, 3) . '/vendor/stashd/plugin-sdk';
+$sdkRoot = is_string($sdkRoot) && trim($sdkRoot) !== '' ? trim($sdkRoot) : dirname(__DIR__, 3) . '/vendor/stashd/php-sdk';
 $autoload = __DIR__ . '/../vendor/autoload.php';
 
 if (! is_file($autoload)) {
