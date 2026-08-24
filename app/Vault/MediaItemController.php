@@ -17,6 +17,7 @@ use App\Stashes\StashRepository;
 use App\Support\Http\QueryPagination;
 use App\Vault\Api\AssetResource;
 use App\Vault\Api\MediaItemResource;
+use App\Vault\Api\VaultItemSummaryResource;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
@@ -40,13 +41,19 @@ final readonly class MediaItemController
     public function index(Request $request): Json
     {
         [$limit, $offset] = QueryPagination::parse($request);
+        $rawSearch = $request->get('search');
+        $rawKind = $request->get('kind');
+        $search = is_string($rawSearch) ? trim($rawSearch) : '';
+        $kind = is_string($rawKind) ? trim($rawKind) : '';
 
         return new Json([
             'items' => array_map(
-                static fn($item): array => MediaItemResource::fromRecord($item)->toArray(),
-                $this->mediaItems->list($limit, $offset),
+                static fn(VaultItemSummary $item): array => VaultItemSummaryResource::fromRecord($item)->toArray(),
+                $this->mediaItems->listVaultSummary($limit, $offset, $search === '' ? null : $search, $kind === '' ? null : $kind),
             ),
-            'total' => $this->mediaItems->count(),
+            'total' => $this->mediaItems->countVaultSummary($search === '' ? null : $search, $kind === '' ? null : $kind),
+            'vaultTotal' => $this->mediaItems->count(),
+            'preservedSizeBytes' => $this->mediaItems->totalPreservedSizeBytes(),
             'limit' => $limit,
             'offset' => $offset,
         ]);
