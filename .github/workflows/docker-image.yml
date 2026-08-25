@@ -26,32 +26,32 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/plugin-api
-          path: ../plugin-api
+          path: plugin-api
       - name: Checkout plugin SDK
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/stashd-php-sdk
-          path: ../stashd-php-sdk
+          path: stashd-php-sdk
       - name: Checkout provider packages
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/podcast
-          path: ../plugins/podcast
+          path: plugins/podcast
       - name: Checkout YouTube package
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/youtube
-          path: ../plugins/youtube
+          path: plugins/youtube
       - name: Checkout Jellyfin package
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/jellyfin
-          path: ../plugins/jellyfin
+          path: plugins/jellyfin
       - name: Checkout Plex package
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/plex
-          path: ../plugins/plex
+          path: plugins/plex
 
       - name: Build Lerd development image
         run: docker build --target dev -t stashd:ci .
@@ -85,9 +85,9 @@ jobs:
             -e DB_PASSWORD=stashd-ci \
             -e DB_ADMIN_DATABASE=postgres \
             -v "$GITHUB_WORKSPACE:/var/www/html" \
-            -v "$GITHUB_WORKSPACE/../plugin-api:/var/www/plugin-api:ro" \
-            -v "$GITHUB_WORKSPACE/../stashd-php-sdk:/var/www/stashd-php-sdk:ro" \
-            -v "$GITHUB_WORKSPACE/../plugins:/var/www/plugins:ro" \
+            -v "$GITHUB_WORKSPACE/plugin-api:/var/www/plugin-api:ro" \
+            -v "$GITHUB_WORKSPACE/stashd-php-sdk:/var/www/stashd-php-sdk:ro" \
+            -v "$GITHUB_WORKSPACE/plugins:/var/www/plugins:ro" \
             -w /var/www/html \
             stashd:ci -lc '
               git config --global --add safe.directory /var/www/html
