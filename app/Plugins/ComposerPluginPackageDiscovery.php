@@ -17,9 +17,9 @@ final class ComposerPluginPackageDiscovery
         $packages = [];
 
         foreach (InstalledVersions::getInstalledPackagesByType('stashd-plugin') as $name) {
-            $root = InstalledVersions::getInstallPath($name);
+            $root = realpath(InstalledVersions::getInstallPath($name));
 
-            if (! is_string($root) || trim($root) === '') {
+            if ($root === false || trim($root) === '') {
                 continue;
             }
             $composerPath = rtrim($root, '/') . '/composer.json';

@@ -196,7 +196,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
                 $p = self::stringKeyed($message['params'] ?? null);
 
                 return match ($message['method'] ?? '') {
-                    'http.request' => $this->capabilityHttp($invocation, $p), 'staging.stage' => $this->capabilityStage($invocation, $p), 'staging.write' => $this->capabilityWrite($invocation, $p), 'helper.run' => $this->capabilityHelper($invocation, $p), 'event.log', 'event.progress' => ['accepted' => true], default => throw new RuntimeException('unsupported plugin capability'),
+                    'http.request' => $this->capabilityHttp($invocation, $p), 'resource.read' => $this->capabilityResourceRead($invocation, $p), 'staging.stage' => $this->capabilityStage($invocation, $p), 'staging.write' => $this->capabilityWrite($invocation, $p), 'helper.run' => $this->capabilityHelper($invocation, $p), 'event.log', 'event.progress' => ['accepted' => true], default => throw new RuntimeException('unsupported plugin capability'),
                 };
             });
 
@@ -227,7 +227,21 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     {
         $r = $i->http(self::string($p['method'] ?? null, 'GET'), self::string($p['url'] ?? null), self::headers($p['headers'] ?? null), self::nullableString($p['body'] ?? null), self::nullableString($p['credential'] ?? null));
 
-        return ['status' => $r->status, 'headers' => $r->headers, 'body' => $r->body()];
+        if ($r->inlineBody !== null) {
+            return ['status' => $r->status, 'headers' => $r->headers, 'body' => $r->inlineBody];
+        }
+
+        if ($r->resource === null) {
+            throw new RuntimeException('Plugin HTTP response body was unavailable.');
+        }
+
+        return ['status' => $r->status, 'headers' => $r->headers, 'resource' => $i->resourceReference($r->resource)];
+    }
+
+    /** @param array<string, mixed> $p */
+    private function capabilityResourceRead(Invocation $i, array $p): array
+    {
+        return $i->readResource(self::string($p['reference'] ?? null), (int) ($p['maximum_bytes'] ?? 65536));
     }
     /** @param array<string, mixed> $p
      * @return array<string, mixed>
@@ -273,6 +287,10 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     }
     private function remove(string $path): void
     {
+        if (! is_dir($path)) {
+            return;
+        }
+
         foreach (scandir($path) ?: [] as $file) {
             if ($file !== '.' && $file !== '..') {
                 $p = $path . '/' . $file;

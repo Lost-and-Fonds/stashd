@@ -164,6 +164,28 @@ final class Invocation
         return $resource;
     }
 
+    public function resourceReference(ReadableResource $resource): string
+    {
+        foreach ($this->resources as $reference => $candidate) {
+            if ($candidate === $resource) {
+                return $reference;
+            }
+        }
+
+        throw new CapabilityDenied('resource is not granted');
+    }
+
+    /** @return array{data:string, eof:bool} */
+    public function readResource(string $reference, int $maximumBytes = 65536): array
+    {
+        $this->assertActive();
+        $resource = $this->resources[$reference] ?? throw new CapabilityDenied('resource is not granted');
+        // Base64 plus JSON framing must remain below the 64 KiB RPC frame limit.
+        $data = $resource->read(min(45000, max(1, $maximumBytes)));
+
+        return ['data' => base64_encode($data), 'eof' => $resource->isEof()];
+    }
+
     /** @param list<mixed> $arguments */
     public function runHelper(string $name, array $arguments = [], float $timeout = 3.0): HelperResult
     {
