@@ -75,7 +75,7 @@ test('migration runner detects pending migrations when a record is missing', fun
     $database = $this->container->get(Database::class);
     $database->execute(new Query(
         'DELETE FROM migrations WHERE name = ?',
-        bindings: ['2026_06_16_create_foundation_schema'],
+        bindings: ['2026_08_23_normalize_legacy_asset_roles'],
     ));
 
     expect($runner->hasPendingMigrations())->toBeTrue();

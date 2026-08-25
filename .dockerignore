@@ -7,8 +7,6 @@
 vendor/*
 !vendor/stashd/
 vendor/stashd/*
-!vendor/stashd/plugin-sdk/
-!vendor/stashd/plugin-sdk/**
 node_modules/
 dist/
 auto-imports.d.ts

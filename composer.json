@@ -75,7 +75,7 @@
   "prefer-stable": true,
   "repositories": [
     {"type": "path", "url": "../plugin-api", "options": {"symlink": false, "versions": {"stashd/plugin-api": "0.1.0"}}},
-    {"type": "path", "url": "../stashd-php-sdk", "options": {"symlink": false, "versions": {"stashd/php-sdk": "0.2.2"}}},
+    {"type": "path", "url": "../stashd-php-sdk", "options": {"symlink": false, "versions": {"stashd/php-sdk": "0.2.3"}}},
     {"type": "path", "url": "../plugins/jellyfin", "options": {"symlink": false, "versions": {"stashd/jellyfin": "0.2.0"}}},
     {"type": "path", "url": "../plugins/plex", "options": {"symlink": false, "versions": {"stashd/plex": "0.2.0"}}},
     {"type": "path", "url": "../plugins/podcast", "options": {"symlink": false, "versions": {"stashd/podcast": "0.2.0"}}},

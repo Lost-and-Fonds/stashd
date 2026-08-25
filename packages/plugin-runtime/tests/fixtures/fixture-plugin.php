@@ -42,6 +42,7 @@ use Stashd\PluginSdk\PublishRequest;
 use Stashd\PluginSdk\ReadableResource;
 use Stashd\PluginSdk\ResolvedInput;
 use Stashd\PluginSdk\Setting;
+use Stashd\PluginSdk\SourceDescriptor;
 use Stashd\PluginSdk\StagedArtifact;
 use Stashd\PluginSdk\StagingArea;
 use Stashd\PluginSdk\WireMapper;
@@ -246,9 +247,9 @@ final class M7ExampleInput implements InputPlugin
 {
     public function __construct(private PluginContext $context) {}
 
-    public function resolve(string $source): ResolvedInput
+    public function resolve(SourceDescriptor $source): ResolvedInput
     {
-        return new ResolvedInput('input-1', 'fixture:' . $source, 'fixture', 'Fixture input');
+        return new ResolvedInput('input-1', 'fixture:' . $source->text('url'), 'fixture', 'Fixture input');
     }
 
     public function discover(string $inputId, DiscoveryIntent $intent, array $options = []): array

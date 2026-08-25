@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "3d7f975f0bab88e62a859013c7f334a8",
+  "content-hash": "49bcf832eb744ab8a3ce377d39247444",
   "packages": [
     {
       "name": "composer/semver",
@@ -9506,11 +9506,11 @@
     },
     {
       "name": "stashd/php-sdk",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "dist": {
         "type": "path",
         "url": "../stashd-php-sdk",
-        "reference": "531da350000ba9c34582af3ca60d3cbf535e7bcd"
+        "reference": "111c922b950b3a56a38b87f62e9ee3fb28b054ef"
       },
       "require": {
         "php": "^8.5",

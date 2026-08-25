@@ -192,13 +192,14 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         $process = $this->runner->start($this->definition->id, $stage);
 
         try {
-            $result = $process->invoke($method, $params, function (array $message) use ($invocation): array {
+            $capabilityHandler = /** @param array<string, mixed> $message */ function (array $message) use ($invocation): array {
                 $p = self::stringKeyed($message['params'] ?? null);
 
                 return match ($message['method'] ?? '') {
                     'http.request' => $this->capabilityHttp($invocation, $p), 'resource.read' => $this->capabilityResourceRead($invocation, $p), 'staging.stage' => $this->capabilityStage($invocation, $p), 'staging.write' => $this->capabilityWrite($invocation, $p), 'helper.run' => $this->capabilityHelper($invocation, $p), 'event.log', 'event.progress' => ['accepted' => true], default => throw new RuntimeException('unsupported plugin capability'),
                 };
-            });
+            };
+            $result = $process->invoke($method, $params, $capabilityHandler);
 
             if (isset($result['error'])) {
                 $error = is_array($result['error']) ? $result['error'] : [];
@@ -238,10 +239,12 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         return ['status' => $r->status, 'headers' => $r->headers, 'resource' => $i->resourceReference($r->resource)];
     }
 
-    /** @param array<string, mixed> $p */
+    /** @param array<string, mixed> $p
+     * @return array{data: string, eof: bool}
+     */
     private function capabilityResourceRead(Invocation $i, array $p): array
     {
-        return $i->readResource(self::string($p['reference'] ?? null), (int) ($p['maximum_bytes'] ?? 65536));
+        return $i->readResource(self::string($p['reference'] ?? null), self::nullableInt($p['maximum_bytes'] ?? null) ?? 65536);
     }
     /** @param array<string, mixed> $p
      * @return array<string, mixed>

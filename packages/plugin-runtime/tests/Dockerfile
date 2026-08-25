@@ -6,6 +6,8 @@ RUN composer install --working-dir=/src/plugin-runtime --no-dev --no-interaction
 FROM php:8.5-cli-bookworm
 
 ARG TARGETARCH=amd64
+ARG SDK_COMMIT=111c922b950b3a56a38b87f62e9ee3fb28b054ef
+ARG SDK_ARCHIVE_SHA256=e8e7e1dcf3bf8c191f48f7a7aefe3caff91fd3e388dc72770900b04113520ef2
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends bubblewrap ca-certificates curl gnupg tar \
@@ -31,7 +33,12 @@ RUN set -eux; \
     install -D -m 0555 "${temporary}/umoci" /usr/local/libexec/stashd/umoci
 
 COPY packages/plugin-runtime /src/plugin-runtime
-COPY vendor/stashd/php-sdk /src/sdk
+RUN set -eux; \
+    curl -fsSL "https://github.com/Lost-and-Fonds/stashd-php-sdk/archive/${SDK_COMMIT}.tar.gz" -o /tmp/stashd-php-sdk.tar.gz; \
+    echo "${SDK_ARCHIVE_SHA256}  /tmp/stashd-php-sdk.tar.gz" | sha256sum -c -; \
+    mkdir -p /src/sdk; \
+    tar -xzf /tmp/stashd-php-sdk.tar.gz --strip-components=1 -C /src/sdk; \
+    rm /tmp/stashd-php-sdk.tar.gz
 COPY --from=plugin-runtime-dependencies /src/plugin-runtime/vendor /src/plugin-runtime/vendor
 COPY --from=plugin-runtime-dependencies /usr/bin/composer /usr/bin/composer
 RUN mkdir -p /vault /outer-app /outer-data \

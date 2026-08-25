@@ -28,7 +28,8 @@ final readonly class PluginRunner
         }
         $entrypoint = is_string($manifest['entrypoint'] ?? null) ? $manifest['entrypoint'] : 'stashd-plugin/plugin.php';
 
-        $sdkRoot = $this->sdkRoot ?? dirname(__DIR__, 4) . '/vendor/stashd/php-sdk';
+        $bundledSdk = $package . '/vendor/stashd/php-sdk';
+        $sdkRoot = $this->sdkRoot ?? (Filesystem\is_directory($bundledSdk) ? $bundledSdk : dirname(__DIR__, 4) . '/vendor/stashd/php-sdk');
 
         return new PluginProcess($package, $stagingRoot, $entrypoint, $this->policy, $sdkRoot);
     }
