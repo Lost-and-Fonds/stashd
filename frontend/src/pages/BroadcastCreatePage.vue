@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { FormError } from '@nuxt/ui'
 import { useRoute } from 'vue-router'
+import { normalizeBroadcastPreview } from '../adapters/normalizeCreationPreflight'
 import { broadcastOptionValues, normalizeBroadcastOptions } from '../adapters/normalizeBroadcastOptions'
-import { createStashBroadcast, fetchBroadcastPlugins, fetchConnectionLibraries } from '../api/broadcasts'
+import { createStashBroadcast, fetchBroadcastPlugins, fetchConnectionLibraries, previewBroadcast } from '../api/broadcasts'
 import { fetchConnections } from '../api/connections'
 import { fetchStash } from '../api/stashes'
 import PluginField from '../components/plugin/PluginField.vue'
+import PreflightSummary from '../components/PreflightSummary.vue'
 import type { BroadcastOptionValue, BroadcastPluginApiResource, CreatedBroadcastApiResource } from '../types/broadcast-plugin'
 import type { StashApiResource } from '../types/stash'
 import type { PluginFieldValue } from '../types/plugin-ui'
 import type { ConnectionApiResource } from '../types/connection'
+import type { PreflightState } from '../types/preflight'
 
 const route = useRoute()
 const stashId = String(route.params.stashId)
@@ -25,6 +28,10 @@ const error = ref<string>()
 const created = ref<CreatedBroadcastApiResource>()
 const typeKey = ref('')
 const values = reactive<Record<string, PluginFieldValue | undefined>>({})
+const preview = ref<PreflightState>()
+const previewError = ref<string>()
+let previewGeneration = 0
+let previewTimer: ReturnType<typeof setTimeout> | undefined
 
 const selectedPlugin = computed(() => plugins.value.find(plugin => plugin.key === typeKey.value))
 const normalized = computed(() => normalizeBroadcastOptions(selectedPlugin.value?.ui_controls ?? []))
@@ -39,6 +46,10 @@ const connectionValue = computed<string | undefined>({
 const libraryValue = computed<string | undefined>({
   get: () => libraryKey.value === null ? undefined : typeof values[libraryKey.value] === 'string' ? values[libraryKey.value] as string : undefined,
   set: (value: string | undefined) => { if (libraryKey.value !== null) values[libraryKey.value] = value }
+})
+const mediaKind = computed(() => {
+  const value = values.media_kind ?? values.mediaKind
+  return typeof value === 'string' && value !== '' ? value : undefined
 })
 const typeItems = computed(() => plugins.value.map(plugin => ({
   label: plugin.label,
@@ -56,7 +67,15 @@ function resetValues() {
 watch(typeKey, () => {
   error.value = undefined
   created.value = undefined
+  preview.value = undefined
+  previewError.value = undefined
+  previewGeneration++
   resetValues()
+})
+
+watch([typeKey, mediaKind], () => {
+  if (previewTimer) clearTimeout(previewTimer)
+  previewTimer = setTimeout(() => { void requestPreview() }, 100)
 })
 
 watch(() => values[connectionKey.value ?? ''], async (connectionId) => {
@@ -119,6 +138,24 @@ function settings(): Record<string, BroadcastOptionValue> {
   return result
 }
 
+async function requestPreview() {
+  if (!stash.value || !selectedPlugin.value) return
+  const generation = ++previewGeneration
+  previewError.value = undefined
+  preview.value = { status: 'analyzing', plan: { operations: [], storage: { kind: 'calculating' }, notes: [] } }
+
+  try {
+    const result = await previewBroadcast(stash.value.id, selectedPlugin.value.key, mediaKind.value)
+    if (generation !== previewGeneration) return
+    preview.value = normalizeBroadcastPreview(result)
+  } catch (exception) {
+    if (generation === previewGeneration) {
+      preview.value = undefined
+      previewError.value = exception instanceof Error ? exception.message : 'Broadcast planning is unavailable.'
+    }
+  }
+}
+
 async function create() {
   if (!stash.value || !selectedPlugin.value || normalized.value.diagnostics.length) return
 
@@ -136,6 +173,7 @@ async function create() {
 }
 
 onMounted(load)
+onBeforeUnmount(() => { if (previewTimer) clearTimeout(previewTimer); previewGeneration++ })
 </script>
 
 <template>
@@ -198,6 +236,8 @@ onMounted(load)
               <p v-if="settingFields.length === 0 && !connectionKey" class="text-sm text-muted">This Broadcast type has no configurable settings.</p>
             </div>
           </UCard>
+          <PreflightSummary v-if="preview" :state="preview" />
+          <UAlert v-if="previewError" color="warning" variant="subtle" icon="i-lucide-info" title="Planning unavailable" :description="`${previewError} You can still create this Broadcast.`" />
         </template>
 
         <UAlert

@@ -42,6 +42,7 @@ export interface BroadcastApiResource {
   created_at?: string
   updated_at?: string
   settings?: {
+    destination_path?: string | null
     source_settings?: Record<string, Record<string, BroadcastOptionValue>>
   } | null
   plugin_actions?: BroadcastPluginActionApiResource[]

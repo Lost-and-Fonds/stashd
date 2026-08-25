@@ -2,6 +2,14 @@ import type { BroadcastApiResource, BroadcastOptionValue, BroadcastPluginApiReso
 import type { LifecycleOperation } from '../types/input'
 import { runConnectionOperation } from './connections'
 
+export interface BroadcastPreview {
+  eligible_item_count: number
+  skipped_item_count: number
+  vault_size_bytes: number
+  hardlinked_item_count: number
+  transcode_item_count: number
+}
+
 export async function fetchBroadcastPlugins(): Promise<BroadcastPluginApiResource[]> {
   const body = await responseBody<{ plugins?: BroadcastPluginApiResource[] }>(await fetch('/api/v1/broadcast-plugins'))
 
@@ -25,6 +33,17 @@ export async function createStashBroadcast(stashId: string, type: string, settin
   return body.broadcast
 }
 
+export async function previewBroadcast(stashId: string, type: string, mediaKind?: string): Promise<BroadcastPreview> {
+  const response = await fetch(`/api/v1/stashes/${encodeURIComponent(stashId)}/broadcasts/preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, ...(mediaKind ? { media_kind: mediaKind } : {}) })
+  })
+  const body = await responseBody<{ preview: BroadcastPreview }>(response)
+
+  return body.preview
+}
+
 export async function fetchConnectionLibraries(connectionId: string): Promise<MediaServerLibraryChoice[]> {
   const body = await runConnectionOperation(connectionId, 'list_libraries')
 
@@ -33,6 +52,24 @@ export async function fetchConnectionLibraries(connectionId: string): Promise<Me
 
 export async function fetchBroadcast(broadcastId: string): Promise<BroadcastApiResource> {
   const body = await responseBody<{ broadcast: BroadcastApiResource }>(await fetch(`/api/v1/broadcasts/${encodeURIComponent(broadcastId)}`))
+
+  return body.broadcast
+}
+
+export async function deleteBroadcast(broadcastId: string): Promise<string> {
+  const response = await fetch(`/api/v1/broadcasts/${encodeURIComponent(broadcastId)}`, { method: 'DELETE' })
+  const body = await responseBody<{ command_id: string }>(response)
+
+  return body.command_id
+}
+
+export async function updateBroadcastDestination(broadcastId: string, destinationPath: string): Promise<BroadcastApiResource> {
+  const response = await fetch(`/api/v1/broadcasts/${encodeURIComponent(broadcastId)}/destination`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ destination_path: destinationPath })
+  })
+  const body = await responseBody<{ broadcast: BroadcastApiResource }>(response)
 
   return body.broadcast
 }

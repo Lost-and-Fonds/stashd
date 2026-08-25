@@ -37,4 +37,5 @@ export interface StashItemsApiResponse {
   limit: number
   offset: number
   stash_item_count: number
+  status_counts?: Record<string, number>
 }

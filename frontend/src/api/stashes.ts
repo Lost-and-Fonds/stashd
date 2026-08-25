@@ -1,6 +1,29 @@
 import type { StashItemApiResource, StashItemsApiResponse } from '../types/item'
-import type { StashApiResource } from '../types/stash'
+import type { StashApiResource, StashDeleteImpact } from '../types/stash'
 import { apiFetch } from './auth'
+
+export interface StashPreflightResponse {
+  command_id: string
+  command_state: string
+  review_url?: string
+}
+
+export interface StashPreflightReview {
+  command_id: string
+  state: string
+  preflight?: {
+    resolved_input?: {
+      provider_key?: string | null
+      title?: string | null
+      estimated_item_count?: number | null
+    }
+    discovery?: {
+      strategy_key?: string | null
+      estimated_item_count?: number | null
+      estimated_total_duration_seconds?: number | null
+    }
+  } | null
+}
 
 export async function fetchStashes(): Promise<StashApiResource[]> {
   const body = await responseBody<{ stashes?: StashApiResource[] }>(await apiFetch('/api/v1/stashes'))
@@ -13,6 +36,60 @@ export async function fetchStash(stashId: string): Promise<StashApiResource> {
   const body = await responseBody<{ stash: StashApiResource }>(response)
 
   return body.stash
+}
+
+export async function preflightStash(sourceUri: string, sourceTitle?: string | null): Promise<StashPreflightResponse> {
+  const response = await apiFetch('/api/v1/stashes/preflight', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_uri: sourceUri, source_title: sourceTitle ?? null, origin: 'create_stash' })
+  })
+
+  return responseBody<StashPreflightResponse>(response)
+}
+
+export async function fetchStashPreflightReview(commandId: string): Promise<StashPreflightReview> {
+  const response = await apiFetch(`/api/v1/stashes/preflight/${encodeURIComponent(commandId)}/review`)
+
+  return responseBody<StashPreflightReview>(response)
+}
+
+export interface UpdateStashInput {
+  name: string
+  description: string
+  sync_mode: string
+  download_policy: string
+  organization_mode: string
+}
+
+export async function updateStash(stashId: string, input: UpdateStashInput): Promise<StashApiResource> {
+  const response = await apiFetch(`/api/v1/stashes/${encodeURIComponent(stashId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input)
+  })
+  const body = await responseBody<{ stash: StashApiResource }>(response)
+  return body.stash
+}
+
+export async function fetchStashDeleteImpact(stashId: string): Promise<StashDeleteImpact> {
+  const response = await apiFetch(`/api/v1/stashes/${encodeURIComponent(stashId)}/delete-impact`)
+  const body = await responseBody<{ delete_impact: StashDeleteImpact }>(response)
+  return body.delete_impact
+}
+
+export async function deleteStash(stashId: string): Promise<void> {
+  await responseBody(await apiFetch(`/api/v1/stashes/${encodeURIComponent(stashId)}`, { method: 'DELETE' }))
+}
+
+export async function retryFailedStash(stashId: string): Promise<string> {
+  const response = await apiFetch('/api/v1/commands', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'stash.retry_failed', options: { stash_id: stashId } })
+  })
+  const body = await responseBody<{ command_id: string }>(response)
+  return body.command_id
 }
 
 export interface StashItemsQuery {
@@ -35,7 +112,8 @@ export async function fetchStashItems(stashId: string, query: StashItemsQuery): 
     total: body.total ?? 0,
     limit: body.limit ?? query.limit,
     offset: body.offset ?? 0,
-    stash_item_count: body.stash_item_count ?? body.total ?? 0
+    stash_item_count: body.stash_item_count ?? body.total ?? 0,
+    status_counts: body.status_counts ?? {}
   }
 }
 

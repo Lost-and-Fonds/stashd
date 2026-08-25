@@ -1,20 +1,21 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, ref, resolveComponent, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useClipboard } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
 
 import { fetchStashBroadcasts, rebuildBroadcast } from '../api/broadcasts'
 import { fetchStashInputs, syncStashInput } from '../api/inputs'
-import { fetchStash, fetchStashItems } from '../api/stashes'
+import { deleteStash, fetchStash, fetchStashDeleteImpact, fetchStashItems, retryFailedStash, updateStash, type UpdateStashInput } from '../api/stashes'
 import { subscribeLiveUpdates, type JobLiveEvent, type LiveEvent } from '../live/mercure'
 import type { BroadcastApiResource } from '../types/broadcast-plugin'
 import type { CommandOperation } from '../api/commands'
 import type { StashInputApiResource } from '../types/input'
 import type { StashItemApiResource, StashItemsApiResponse } from '../types/item'
-import type { StashApiResource } from '../types/stash'
+import type { StashApiResource, StashDeleteImpact } from '../types/stash'
 
 const route = useRoute()
+const router = useRouter()
 const { copy } = useClipboard()
 
 const stash = ref<StashApiResource>()
@@ -28,10 +29,39 @@ const inputsError = ref<string>()
 const broadcastsError = ref<string>()
 const itemsError = ref<string>()
 const copiedId = ref<string>()
+const actionError = ref<string>()
+const actionNotice = ref<string>()
+const editOpen = ref(false)
+const editSaving = ref(false)
+const editError = ref<string>()
+const editForm = ref<UpdateStashInput>({ name: '', description: '', sync_mode: '', download_policy: '', organization_mode: '' })
+const deleteOpen = ref(false)
+const deleteImpactLoading = ref(false)
+const deleteImpact = ref<StashDeleteImpact>()
+const deleteConfirming = ref(false)
+const retrying = ref(false)
+const stashOperation = ref<CommandOperation>()
 const inputOperations = ref<Record<string, CommandOperation | undefined>>({})
 const broadcastOperations = ref<Record<string, CommandOperation | undefined>>({})
 let unsubscribe: (() => void) | undefined
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
+
+const syncModeOptions = [
+  { label: 'Automatic', value: 'automatic' },
+  { label: 'Manual', value: 'manual' }
+]
+const downloadPolicyOptions = [
+  { label: 'Video', value: 'video' },
+  { label: 'Audio only', value: 'audio_only' },
+  { label: 'Metadata only', value: 'metadata_only' },
+  { label: 'Manual download', value: 'manual_download' }
+]
+const organizationModeOptions = [
+  { label: 'Flat', value: 'flat' },
+  { label: 'Chronological', value: 'chronological' },
+  { label: 'Series', value: 'series' },
+  { label: 'Series and season', value: 'seasoned_series' }
+]
 
 const stateMeta: Record<string, { label: string, dot: string, text: string }> = {
   ready: { label: 'ready', dot: 'bg-success', text: 'text-success' },
@@ -91,6 +121,86 @@ function operationText(operation: CommandOperation | undefined, verb: string) {
   return `${verb} failed. Try again.`
 }
 
+const failedItemCount = computed(() => items.value.status_counts?.failed ?? 0)
+
+function openEdit() {
+  if (!stash.value) return
+  editForm.value = {
+    name: stash.value.name,
+    description: stash.value.description ?? '',
+    sync_mode: stash.value.sync_mode ?? '',
+    download_policy: stash.value.download_policy ?? '',
+    organization_mode: stash.value.organization_mode ?? ''
+  }
+  editError.value = undefined
+  editOpen.value = true
+}
+
+async function saveEdit() {
+  if (!stash.value || editSaving.value) return
+  editSaving.value = true
+  editError.value = undefined
+
+  try {
+    stash.value = await updateStash(stash.value.id, editForm.value)
+    editOpen.value = false
+    actionNotice.value = 'Stash updated.'
+  } catch (exception) {
+    editError.value = exception instanceof Error ? exception.message : 'Could not update this Stash.'
+  } finally {
+    editSaving.value = false
+  }
+}
+
+async function openDelete() {
+  if (!stash.value || deleteImpactLoading.value) return
+  deleteOpen.value = true
+  deleteImpact.value = undefined
+  actionError.value = undefined
+  deleteImpactLoading.value = true
+
+  try {
+    deleteImpact.value = await fetchStashDeleteImpact(stash.value.id)
+  } catch (exception) {
+    actionError.value = exception instanceof Error ? exception.message : 'Could not review the deletion impact.'
+  } finally {
+    deleteImpactLoading.value = false
+  }
+}
+
+async function confirmDelete() {
+  if (!stash.value || !deleteImpact.value || deleteConfirming.value) return
+  deleteConfirming.value = true
+  actionError.value = undefined
+
+  try {
+    await deleteStash(stash.value.id)
+    await router.push('/stashes')
+  } catch (exception) {
+    actionError.value = exception instanceof Error ? exception.message : 'Could not delete this Stash.'
+  } finally {
+    deleteConfirming.value = false
+  }
+}
+
+async function retryFailed() {
+  if (!stash.value || retrying.value || failedItemCount.value === 0) return
+  retrying.value = true
+  actionError.value = undefined
+  actionNotice.value = undefined
+
+  try {
+    const commandId = await retryFailedStash(stash.value.id)
+    stashOperation.value = { id: commandId, state: 'accepted' }
+    actionNotice.value = 'Retry queued.'
+    await loadItems()
+  } catch (exception) {
+    actionError.value = exception instanceof Error ? exception.message : 'Could not retry failed downloads.'
+  } finally {
+    retrying.value = false
+  }
+}
+
 function operationFromEvent(event: LiveEvent): CommandOperation | undefined {
   if (!event.event.startsWith('job.')) return undefined
   const payload = event.payload as JobLiveEvent
@@ -102,10 +212,10 @@ function operationFromEvent(event: LiveEvent): CommandOperation | undefined {
       : event.event === 'job.completed' ? 'completed' : 'failed'
 
   return {
-    id: payload.command_id ?? payload.id,
+    id: payload.commandId ?? payload.command_id ?? payload.id,
     state,
-    label: payload.progress_label ?? undefined,
-    percent: payload.progress_percent ?? null
+    label: payload.progressLabel ?? payload.progress_label ?? undefined,
+    percent: payload.progressPercent ?? payload.progress_percent ?? null
   }
 }
 
@@ -119,16 +229,23 @@ function scheduleRefresh() {
 
 function handleLiveEvent(event: LiveEvent) {
   if (event.event === 'activity.created') {
-    if (event.payload.stash_id === stash.value?.id) scheduleRefresh()
+    if ((event.payload.stashId ?? event.payload.stash_id) === stash.value?.id) scheduleRefresh()
     return
   }
 
   const operation = operationFromEvent(event)
   if (!operation) return
 
-  const commandId = event.payload.command_id
-  const input = inputs.value.find(candidate => candidate.id === event.payload.entity_id)
-  const broadcast = broadcasts.value.find(candidate => candidate.id === event.payload.entity_id)
+  const commandId = event.payload.commandId ?? event.payload.command_id
+  const entityType = event.payload.entityType ?? event.payload.entity_type
+  const entityId = event.payload.entityId ?? event.payload.entity_id
+  if (entityType === 'stash' && entityId === stash.value?.id) {
+    stashOperation.value = operation
+    if (event.event === 'job.completed' || event.event === 'job.failed') scheduleRefresh()
+    return
+  }
+  const input = inputs.value.find(candidate => candidate.id === entityId)
+  const broadcast = broadcasts.value.find(candidate => candidate.id === entityId)
   const inputId = input?.id ?? Object.entries(inputOperations.value).find(([, candidate]) => candidate?.id === commandId)?.[0]
   const broadcastId = broadcast?.id ?? Object.entries(broadcastOperations.value).find(([, candidate]) => candidate?.id === commandId)?.[0]
 
@@ -373,7 +490,22 @@ onBeforeUnmount(() => {
           <p v-if="stash.description" class="mt-2 max-w-md text-sm text-muted">{{ stash.description }}</p>
         </div>
       </div>
+      <UDropdownMenu
+        :items="[
+          { label: 'Edit Stash', icon: 'i-lucide-pencil', onSelect: openEdit },
+          ...(failedItemCount > 0 ? [{ label: `Retry failed downloads (${failedItemCount})`, icon: 'i-lucide-refresh-cw', onSelect: retryFailed, disabled: retrying }] : []),
+          { type: 'separator' },
+          { label: 'Delete Stash', icon: 'i-lucide-trash-2', color: 'error', onSelect: openDelete }
+        ]"
+        :content="{ align: 'end' }"
+      >
+        <UButton icon="i-lucide-ellipsis" aria-label="Stash actions" title="Stash actions" variant="ghost" color="neutral" />
+      </UDropdownMenu>
     </header>
+
+    <UAlert v-if="actionError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Stash action failed" :description="actionError" />
+    <UAlert v-if="actionNotice" color="success" variant="subtle" icon="i-lucide-check" :description="actionNotice" />
+    <p v-if="operationText(stashOperation, 'Retry')" class="text-xs text-dimmed">{{ operationText(stashOperation, 'Retry') }}</p>
 
     <USeparator />
 
@@ -537,5 +669,45 @@ onBeforeUnmount(() => {
         <UButton v-if="itemSearch || itemStatusFilter !== 'all'" label="Clear filters" variant="ghost" color="neutral" size="sm" class="mt-2" @click="clearItemFilters" />
       </div>
     </section>
+
+    <UModal v-model:open="editOpen" title="Edit Stash" :ui="{ content: 'max-w-lg' }">
+      <template #body>
+        <UForm class="space-y-4" @submit="saveEdit">
+          <UAlert v-if="editError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not update Stash" :description="editError" />
+          <UFormField label="Name" required><UInput v-model="editForm.name" required /></UFormField>
+          <UFormField label="Description"><UTextarea v-model="editForm.description" :rows="3" /></UFormField>
+          <UFormField label="Sync mode"><USelect v-model="editForm.sync_mode" :items="syncModeOptions" value-key="value" /></UFormField>
+          <UFormField label="Download policy"><USelect v-model="editForm.download_policy" :items="downloadPolicyOptions" value-key="value" /></UFormField>
+          <UFormField label="Organisation mode"><USelect v-model="editForm.organization_mode" :items="organizationModeOptions" value-key="value" /></UFormField>
+          <div class="flex justify-end gap-2">
+            <UButton label="Cancel" variant="ghost" color="neutral" :disabled="editSaving" @click="editOpen = false" />
+            <UButton type="submit" label="Save changes" :loading="editSaving" :disabled="!editForm.name.trim()" />
+          </div>
+        </UForm>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="deleteOpen" title="Delete Stash" :ui="{ content: 'max-w-lg' }">
+      <template #body>
+        <div v-if="deleteImpactLoading" class="flex items-center gap-2 text-sm text-muted">
+          <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" />
+          Reviewing what will be affected…
+        </div>
+        <div v-else-if="deleteImpact" class="space-y-4">
+          <p class="text-sm text-muted">This removes the Stash, its Inputs, and its Broadcasts. Preserved Vault items are retained.</p>
+          <div class="space-y-2 text-sm">
+            <p v-if="deleteImpact.orphaned_items.length"><span class="font-mono text-highlighted">{{ deleteImpact.orphaned_items.length }}</span> Vault item{{ deleteImpact.orphaned_items.length === 1 ? '' : 's' }} will no longer belong to a Stash.</p>
+            <p v-if="deleteImpact.shared_items.length"><span class="font-mono text-highlighted">{{ deleteImpact.shared_items.length }}</span> Vault item{{ deleteImpact.shared_items.length === 1 ? '' : 's' }} are shared with another Stash and will remain linked there.</p>
+            <p v-if="!deleteImpact.orphaned_items.length && !deleteImpact.shared_items.length" class="text-muted">No Vault item relationships will be affected.</p>
+          </div>
+          <UAlert v-if="actionError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not delete Stash" :description="actionError" />
+          <div class="flex justify-end gap-2">
+            <UButton label="Cancel" variant="ghost" color="neutral" :disabled="deleteConfirming" @click="deleteOpen = false" />
+            <UButton label="Delete Stash" color="error" :loading="deleteConfirming" @click="confirmDelete" />
+          </div>
+        </div>
+        <UAlert v-else color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not review deletion" :description="actionError ?? 'Try again.'" />
+      </template>
+    </UModal>
   </main>
 </template>

@@ -103,7 +103,7 @@ onMounted(load)
   <main class="mx-auto max-w-2xl space-y-8 px-4 py-8 sm:px-8">
     <RouterLink :to="`/broadcasts/${broadcastId}`" class="inline-flex items-center gap-1 font-mono text-xs text-dimmed transition-colors hover:text-muted">
       <UIcon name="i-lucide-arrow-left" class="size-3.5" />
-      Broadcasts
+      Broadcast
     </RouterLink>
 
     <header class="space-y-1.5">

@@ -31,3 +31,15 @@ export interface StashApiResource {
   created_at?: string
   updated_at?: string
 }
+
+export interface StashDeleteImpact {
+  shared_items: Array<{
+    media_item_id: string
+    title: string
+    shared_with_stashes: Array<{ id: string, name: string }>
+  }>
+  orphaned_items: Array<{
+    media_item_id: string
+    title: string
+  }>
+}
