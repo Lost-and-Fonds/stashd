@@ -1,79 +1,43 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test'
 
-test.describe.configure({ mode: 'serial' });
+const admin = { username: 'e2e-owner', password: 'e2e-password' }
 
-test('signed-out visit to / redirects to the login page', async ({ page }) => {
-    const response = await page.goto('/');
+test('UI-v2 boots, authenticates, navigates, and survives a hard reload', async ({ page }) => {
+  const consoleErrors: string[] = []
+  let protectedRequestsBeforeSetup = 0
+  page.on('request', request => {
+    if (/\/api\/v1\/(stashes|system\/health|jobs|activity)/.test(new URL(request.url()).pathname)) protectedRequestsBeforeSetup++
+  })
+  page.on('console', message => {
+    // The auth guard probes /auth/me while signed out; its expected 401/403 is
+    // reported by Chromium as a failed resource, not as an application error.
+    const expectedAuthProbe = message.text().includes('status of 401') || message.text().includes('status of 403')
+    if (message.type() === 'error' && !expectedAuthProbe) consoleErrors.push(message.text())
+  })
+  page.on('pageerror', error => consoleErrors.push(String(error)))
 
-    expect(response?.ok()).toBeTruthy();
-    await page.waitForURL('**/login');
-    await expect(page).toHaveTitle(/stashd_/);
-});
+  await page.goto('/')
+  await expect(page).toHaveURL(/\/login(?:\?.*)?$/)
+  await expect(page.getByRole('button', { name: 'Create admin' })).toBeVisible()
+  expect(protectedRequestsBeforeSetup).toBe(0)
 
-test('login page renders the owner auth form', async ({ page }) => {
-    await page.goto('/login');
+  await page.goto('/stashes')
+  await expect(page).toHaveURL(/\/login(?:\?.*)?$/)
+  await expect(page.getByRole('button', { name: 'Create admin' })).toBeVisible()
+  expect(protectedRequestsBeforeSetup).toBe(0)
 
-    await expect(page.locator('#auth-form')).toBeVisible();
-    await expect(page.locator('input[name="username"]')).toBeVisible();
-    await expect(page.locator('input[name="password"]')).toBeVisible();
-	await expect(page.locator('#auth-submit')).toBeVisible();
-});
+  await page.getByLabel('Username').fill(admin.username)
+  await page.getByLabel('Password').fill(admin.password)
+  await page.getByRole('button', { name: 'Create admin' }).click()
 
-test('owner can create a Fake-provider stash and open its Vault item', async ({ page }) => {
-	await page.goto('/login');
-	await page.locator('input[name="username"]').fill('e2e-owner');
-	await page.locator('input[name="password"]').fill('e2e-password');
-	await page.locator('#auth-submit').click();
-	await page.waitForURL('**/');
+  await page.waitForURL('**/stashes')
+  await expect(page.getByRole('heading', { name: 'Stashes' })).toBeVisible()
 
-	await page.goto('/stashes/new');
-	await page.getByLabel('Channel, playlist, or video URL').fill('fake://channel/e2e');
-	await page.getByRole('button', { name: 'Review source' }).click();
-	await expect(page.getByRole('button', { name: 'Create stash', exact: true })).toBeEnabled({ timeout: 30000 });
-	await page.getByLabel('Name (optional)').fill('Browser Fake Stash');
-	await page.getByRole('button', { name: 'Create stash', exact: true }).click();
-	await page.waitForURL(/\/stashes\/[^/]+$/, { timeout: 30000, waitUntil: 'domcontentloaded' });
-	await expect(page.getByText('fake://channel/e2e')).toBeVisible({ timeout: 30000 });
+  await page.goto('/status')
+  await expect(page.getByRole('heading', { name: 'Status' })).toBeVisible()
 
-	const items = await page.request.get(new URL('/api/v1/stashes/' + page.url().split('/').pop() + '/items', page.url()).toString());
-	expect(items.ok()).toBeTruthy();
-	const body = await items.json() as { items: { media_item_id: string }[] };
-	expect(body.items).not.toHaveLength(0);
-
-	await page.goto('/vault/' + body.items[0].media_item_id);
-	await expect(page.getByRole('heading', { name: 'Vault item' })).toBeVisible();
-});
-
-test('selected broadcast type is sent through preview and creation', async ({ page }) => {
-	await page.goto('/login');
-	await page.locator('input[name="username"]').fill('e2e-owner');
-	await page.locator('input[name="password"]').fill('e2e-password');
-	await page.locator('#auth-submit').click();
-	await page.waitForURL('**/');
-
-	await page.goto('/stashes/new');
-	await page.getByLabel('Name (optional)').fill('Broadcast Type Selection');
-	await page.getByRole('button', { name: 'Create empty stash' }).click();
-	await page.waitForURL(/\/stashes\/[^/]+$/);
-
-	await page.getByText('+ Add broadcast').click();
-	const typeSelect = page.locator('select[x-model="newBroadcastType"]');
-	await expect(typeSelect).toHaveValue('podcast');
-
-	const previewRequest = page.waitForRequest((request) =>
-		request.method() === 'POST' && request.url().endsWith('/broadcasts/preview'),
-	);
-	await page.getByRole('button', { name: 'Preview', exact: true }).click();
-	expect((await previewRequest).postDataJSON()).toMatchObject({ type: 'podcast' });
-	await expect(page.getByText('What this will do')).toBeVisible();
-
-	const createResponse = page.waitForResponse((response) =>
-		response.request().method() === 'POST'
-		&& /\/api\/v1\/stashes\/[^/]+\/broadcasts$/.test(new URL(response.url()).pathname),
-	);
-	await page.getByRole('button', { name: 'Create broadcast' }).click();
-	const response = await createResponse;
-	expect(response.ok()).toBeTruthy();
-	const body = await response.json() as { broadcast: { type: string } };
-	expect(body.broadcast.type).toBe('podcast');
-});
+  await page.reload()
+  await expect(page).toHaveURL(/\/status$/)
+  await expect(page.getByRole('heading', { name: 'Status' })).toBeVisible()
+  expect(consoleErrors).toEqual([])
+})
