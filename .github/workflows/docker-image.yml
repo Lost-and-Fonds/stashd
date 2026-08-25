@@ -76,6 +76,7 @@ jobs:
       - name: Run quality checks in Lerd
         run: |
           docker run --rm --entrypoint sh --network stashd-ci \
+            -e CI=true \
             -e MERCURE_JWT_SECRET=ci-mercure-jwt-secret-for-tests-32-bytes \
             -e DB_CONNECTION=pgsql \
             -e DB_HOST=postgres \
