@@ -22,11 +22,15 @@ it('keeps valid input option shapes and helper declarations', function (): void 
                 ['key' => 'collection', 'label' => 'Collection', 'type' => 'enum', 'choices' => ['one', 'two']],
                 ['key' => 'recursive', 'label' => 'Recursive', 'type' => 'bool'],
             ],
+            'credentials' => [
+                ['key' => 'data-api', 'label' => 'Data API key', 'secret_key' => 'example.data_api', 'secret_type' => 'api_key'],
+            ],
             'helpers' => ['yt-dlp' => ['executable' => 'helpers/yt-dlp', 'network' => true]],
         ], $root);
 
         expect($definition?->options[0]->type)->toBe(InputOptionType::Bool)
             ->and($definition?->helper?->name)->toBe('yt-dlp')
+            ->and($definition?->credentials[0]->key)->toBe('data-api')
             ->and($definition?->normalizeSource(['account' => 'hazel', 'collection' => 'one', 'recursive' => true]))->toBe(['account' => 'hazel', 'collection' => 'one', 'recursive' => true]);
     } finally {
         unlink($root . '/helpers/yt-dlp');

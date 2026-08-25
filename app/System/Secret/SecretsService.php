@@ -65,6 +65,11 @@ final readonly class SecretsService
         return $plaintext;
     }
 
+    public function has(string $key): bool
+    {
+        return $this->secrets->findByKey($key) !== null;
+    }
+
     public function revoke(string $key): void
     {
         $record = $this->secrets->findByKey($key);

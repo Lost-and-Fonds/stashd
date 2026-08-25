@@ -7,6 +7,7 @@ namespace App\Plugins;
 use App\Providers\InputOption;
 use App\Providers\InputOptionType;
 use App\System\Secret\SecretsService;
+use App\System\Secret\SecretType;
 use RuntimeException;
 use Tempest\Support\Filesystem;
 use Tempest\Validation\Rules\IsArray;
@@ -19,8 +20,9 @@ final readonly class PluginInputDefinition
      * @param list<mixed> $grants
      * @param list<InputOption> $options
      * @param list<PluginSourceField> $sourceFields
+     * @param list<PluginCredentialDefinition> $credentials
      */
-    public function __construct(public string $id, public string $providerKey, public string $name, public string $version, public string $root, public array $prefixes, public array $grants, public array $options, public array $sourceFields, public ?PluginHelperGrant $helper) {}
+    public function __construct(public string $id, public string $providerKey, public string $name, public string $version, public string $root, public array $prefixes, public array $grants, public array $options, public array $sourceFields, public array $credentials, public ?PluginHelperGrant $helper) {}
 
     /** @param array<string, mixed> $manifest */
     public static function from(array $manifest, string $root): ?self
@@ -75,7 +77,26 @@ final readonly class PluginInputDefinition
                 continue;
             }
 
-            $sourceFields[] = new PluginSourceField($key, $label, $type, $raw['required'] === true, $choices === null ? null : array_values($choices), $description);
+            $sourceFields[] = new PluginSourceField($key, $label, $type, ($raw['required'] ?? false) === true, $choices === null ? null : array_values($choices), $description);
+        }
+        $credentials = [];
+
+        foreach (is_array($manifest['credentials'] ?? null) ? $manifest['credentials'] : [] as $raw) {
+            if (! is_array($raw)) {
+                continue;
+            }
+            $raw = self::object($raw);
+            $key = $raw['key'] ?? null;
+            $label = $raw['label'] ?? null;
+            $secretKey = $raw['secret_key'] ?? null;
+            $description = $raw['description'] ?? null;
+            $secretType = is_string($raw['secret_type'] ?? null) ? SecretType::tryFrom($raw['secret_type']) : SecretType::Generic;
+
+            if (! is_string($key) || trim($key) === '' || ! is_string($label) || trim($label) === '' || ! is_string($secretKey) || trim($secretKey) === '' || $description !== null && ! is_string($description) || $secretType === null) {
+                continue;
+            }
+
+            $credentials[] = new PluginCredentialDefinition(trim($key), trim($label), trim($secretKey), $secretType, ($raw['required'] ?? false) === true, $description);
         }
         $helper = null;
         $declared = is_array($manifest['helpers'] ?? null) ? $manifest['helpers'] : [];
@@ -114,7 +135,7 @@ final readonly class PluginInputDefinition
         $prefixes = is_array($manifest['source_prefixes'] ?? null) ? array_values(array_filter($manifest['source_prefixes'], static fn(mixed $value): bool => is_string($value))) : [];
         $grants = is_array($manifest['http_grants'] ?? null) ? array_values(array_filter($manifest['http_grants'], 'is_array')) : [];
 
-        return new self($id, $providerKey, $name, $version, $root, $prefixes, $grants, $options, $sourceFields, $helper);
+        return new self($id, $providerKey, $name, $version, $root, $prefixes, $grants, $options, $sourceFields, $credentials, $helper);
     }
 
     /** @param array<string, mixed> $source
@@ -185,7 +206,9 @@ final readonly class PluginInputDefinition
 
             if (is_array($raw['credential'] ?? null)) {
                 $c = $raw['credential'];
-                $value = is_string($c['secret_key'] ?? null) ? $secrets->get($c['secret_key']) : null;
+                $declared = $this->credential(self::scalarString($c['name'] ?? null, ''));
+                $secretKey = $declared->secretKey ?? self::scalarString($c['secret_key'] ?? null, '');
+                $value = $secretKey === '' ? null : $secrets->get($secretKey);
 
                 if ($value !== null && $value !== '') {
                     $credential = new PluginCredentialGrant(self::scalarString($c['name'] ?? null, ''), $value, self::scalarString($c['parameter'] ?? null, 'key'), self::scalarString($c['placement'] ?? null, 'query'));
@@ -195,6 +218,17 @@ final readonly class PluginInputDefinition
         }
 
         return $result;
+    }
+
+    public function credential(string $key): ?PluginCredentialDefinition
+    {
+        foreach ($this->credentials as $credential) {
+            if ($credential->key === $key) {
+                return $credential;
+            }
+        }
+
+        return null;
     }
 
     private static function scalarString(mixed $value, string $default): string

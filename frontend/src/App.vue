@@ -21,16 +21,9 @@ const primaryLinks = [
   { label: 'Vault', icon: 'i-lucide-archive', to: '/vault' }
 ]
 
-const secondaryLinks = [
-  { label: 'Connections', icon: 'i-lucide-plug', to: '/connections' },
-  { label: 'Secrets', icon: 'i-lucide-key-round', to: '/secrets' },
-  { label: 'Settings', icon: 'i-lucide-settings', to: '/settings' }
-]
-
-const mobileItems = [primaryLinks, secondaryLinks]
+const mobileItems = [primaryLinks, [{ label: 'Configure', icon: 'i-lucide-sliders-horizontal', to: '/settings' }]]
 
 const navUi = { linkLabel: 'font-mono' }
-const dropdownUi = { itemLabel: 'font-mono' }
 </script>
 
 <template>
@@ -44,9 +37,7 @@ const dropdownUi = { itemLabel: 'font-mono' }
         <UNavigationMenu :items="primaryLinks" :ui="navUi" class="hidden md:flex" />
 
         <div class="ml-auto hidden items-center gap-2 md:flex">
-          <UDropdownMenu :items="secondaryLinks" :ui="dropdownUi">
-            <UButton label="Configure" icon="i-lucide-sliders-horizontal" trailing-icon="i-lucide-chevron-down" variant="ghost" color="neutral" size="sm" class="font-mono" />
-          </UDropdownMenu>
+          <UButton label="Configure" icon="i-lucide-sliders-horizontal" to="/settings" variant="ghost" color="neutral" size="sm" class="font-mono" />
           <UButton label="Sign out" variant="ghost" color="neutral" size="sm" class="font-mono" @click="signOut" />
         </div>
 

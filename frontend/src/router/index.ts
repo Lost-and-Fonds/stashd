@@ -10,7 +10,6 @@ import InputsPage from '../pages/InputsPage.vue'
 import LoginPage from '../pages/LoginPage.vue'
 import InputConfigurationPage from '../pages/InputConfigurationPage.vue'
 import NotFoundPage from '../pages/NotFoundPage.vue'
-import SecretsPage from '../pages/SecretsPage.vue'
 import SettingsPage from '../pages/SettingsPage.vue'
 import StashCreatePage from '../pages/StashCreatePage.vue'
 import StashDetailPage from '../pages/StashDetailPage.vue'
@@ -37,8 +36,9 @@ const router = createRouter({
     { path: '/stashes/:stashId/inputs/:inputId/configure', name: 'input-configure', component: InputConfigurationPage },
     { path: '/vault', name: 'vault', component: VaultPage },
     { path: '/vault/:itemId', name: 'vault-item', component: VaultItemPage },
-    { path: '/connections', name: 'connections', component: ConnectionsPage },
-    { path: '/secrets', name: 'secrets', component: SecretsPage },
+    { path: '/settings/connections', name: 'connections', component: ConnectionsPage },
+    { path: '/connections', redirect: { name: 'connections' } },
+    { path: '/secrets', redirect: { name: 'settings' } },
     { path: '/broadcasts', name: 'broadcasts', component: BroadcastsPage },
     { path: '/settings', name: 'settings', component: SettingsPage },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundPage }

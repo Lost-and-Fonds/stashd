@@ -17,6 +17,22 @@
     "helpers_lock": {"type": "string", "minLength": 1},
     "supported_file_kinds": {"type": "array", "items": {"type": "string"}},
     "source_prefixes": {"type": "array", "items": {"type": "string"}},
+    "credentials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "label", "secret_key"],
+        "properties": {
+          "key": {"type": "string", "minLength": 1},
+          "label": {"type": "string", "minLength": 1},
+          "description": {"type": "string"},
+          "required": {"type": "boolean"},
+          "secret_key": {"type": "string", "minLength": 1},
+          "secret_type": {"enum": ["api_key", "oauth_token", "password", "generic"]}
+        },
+        "additionalProperties": false
+      }
+    },
     "http_grants": {
       "type": "array",
       "items": {
