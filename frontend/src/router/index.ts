@@ -17,7 +17,7 @@ import StashesPage from '../pages/StashesPage.vue'
 import StatusPage from '../pages/StatusPage.vue'
 import VaultItemPage from '../pages/VaultItemPage.vue'
 import VaultPage from '../pages/VaultPage.vue'
-import { currentUser } from '../api/auth'
+import { authState } from '../api/auth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -46,20 +46,20 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  let state: Awaited<ReturnType<typeof authState>>
+
+  try {
+    state = await authState()
+  } catch {
+    state = 'unauthenticated'
+  }
+
   if (to.name === 'login') {
-    try {
-      if (await currentUser()) return { name: 'stashes' }
-    } catch {
-      // The login screen remains available when the auth check itself fails.
-    }
+    if (state === 'authenticated') return { name: 'stashes' }
     return true
   }
 
-  try {
-    if (await currentUser()) return true
-  } catch {
-    return true
-  }
+  if (state === 'authenticated') return true
 
   return {
     name: 'login',

@@ -4,6 +4,25 @@ export interface AuthUser {
   role: string
 }
 
+export type AuthState = 'authenticated' | 'unauthenticated' | 'setup-required'
+
+export async function authState(): Promise<AuthState> {
+  const response = await fetch('/api/v1/auth/me', {
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json' }
+  })
+
+  if (response.status === 401) return 'unauthenticated'
+
+  if (response.status === 403) {
+    const body = await response.json().catch(() => ({})) as { error?: { code?: string } }
+    if (body.error?.code === 'setup_required') return 'setup-required'
+  }
+
+  if (!response.ok) throw new Error(`Authentication check failed (${response.status}).`)
+  return 'authenticated'
+}
+
 export async function currentUser(): Promise<AuthUser | null> {
   const response = await fetch('/api/v1/auth/me', {
     credentials: 'same-origin',

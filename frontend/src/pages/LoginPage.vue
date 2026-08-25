@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { authState } from '../api/auth'
 import { startLiveUpdates } from '../live/mercure'
 
 const route = useRoute()
@@ -8,8 +9,18 @@ const router = useRouter()
 const username = ref('')
 const password = ref('')
 const error = ref('')
-const loading = ref(false)
-const setupRequired = ref(false)
+const loading = ref(true)
+const setupRequired = ref<boolean | null>(null)
+
+onMounted(async () => {
+  try {
+    setupRequired.value = (await authState()) === 'setup-required'
+  } catch {
+    setupRequired.value = false
+  } finally {
+    loading.value = false
+  }
+})
 
 async function submit(): Promise<void> {
   error.value = ''
@@ -54,14 +65,17 @@ async function submit(): Promise<void> {
       </div>
 
       <form class="space-y-3 rounded-lg border border-default bg-elevated/60 p-5" @submit.prevent="submit">
-        <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="error" />
-        <UFormField label="Username" required>
-          <UInput v-model="username" autocomplete="username" required class="w-full" />
-        </UFormField>
-        <UFormField label="Password" required>
-          <UInput v-model="password" type="password" :autocomplete="setupRequired ? 'new-password' : 'current-password'" required class="w-full" />
-        </UFormField>
-        <UButton block type="submit" :loading="loading" :label="setupRequired ? 'Create admin' : 'Sign in'" />
+        <template v-if="setupRequired !== null">
+          <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="error" />
+          <UFormField label="Username" required>
+            <UInput v-model="username" autocomplete="username" required class="w-full" />
+          </UFormField>
+          <UFormField label="Password" required>
+            <UInput v-model="password" type="password" :autocomplete="setupRequired ? 'new-password' : 'current-password'" required class="w-full" />
+          </UFormField>
+          <UButton block type="submit" :loading="loading" :label="setupRequired ? 'Create admin' : 'Sign in'" />
+        </template>
+        <UIcon v-else name="i-lucide-loader-circle" class="mx-auto size-5 animate-spin" aria-label="Checking account setup" />
       </form>
     </div>
   </main>
