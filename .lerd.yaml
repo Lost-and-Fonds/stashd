@@ -3,8 +3,6 @@ domains:
 secured: true
 services:
   - postgres
-workers:
-  - schedule
 custom_workers:
   schedule:
     label: Task Scheduler
