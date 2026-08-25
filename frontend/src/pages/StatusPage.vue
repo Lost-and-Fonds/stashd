@@ -18,16 +18,30 @@ let jobsRefreshTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJobs = computed(() => jobs.value.filter(job => job.state === 'pending' || job.state === 'processing'))
 const attention = computed(() => {
-  const failedJobs = jobs.value.filter(job => job.state === 'failed')
-  const failedJobIds = new Set(failedJobs.map(job => job.id))
+  const recentCutoff = Date.now() - 24 * 60 * 60 * 1000
+  const failedJobs = jobs.value
+    .filter(job => job.state === 'failed' && Date.parse(job.finished_at ?? job.updated_at ?? job.created_at ?? '') >= recentCutoff)
+    .sort((left, right) => Date.parse(right.finished_at ?? right.updated_at ?? right.created_at ?? '') - Date.parse(left.finished_at ?? left.updated_at ?? left.created_at ?? ''))
+  const visibleFailedJobs = [] as JobApiResource[]
+  const failureKeys = new Set<string>()
+
+  for (const job of failedJobs) {
+    const key = `${job.intent}:${job.entity_type ?? ''}:${job.entity_id ?? ''}`
+    if (failureKeys.has(key)) continue
+    failureKeys.add(key)
+    visibleFailedJobs.push(job)
+    if (visibleFailedJobs.length === 8) break
+  }
+  const failedJobIds = new Set(visibleFailedJobs.map(job => job.id))
 
   return [
     ...(health.value && health.value.status !== 'ok' ? [{ id: 'health', label: 'System health is degraded', context: health.value.storage.message ?? 'One or more health checks are not ready.' }] : []),
     ...(health.value && !health.value.database.writable ? [{ id: 'database', label: 'Database is not writable', context: 'System health' }] : []),
     ...(health.value && !health.value.storage.ready ? [{ id: 'storage', label: 'Storage is not ready', context: health.value.storage.message ?? 'System health' }] : []),
-    ...failedJobs.map(job => ({ id: `job-${job.id}`, label: `${intentLabel(job.intent)} failed`, context: job.last_error ?? entityLabel(job) })),
+    ...visibleFailedJobs.map(job => ({ id: `job-${job.id}`, label: `${intentLabel(job.intent)} failed`, context: job.last_error ?? entityLabel(job) })),
     ...activity.value
-      .filter(event => event.level === 'error' && (!event.job_id || !failedJobIds.has(event.job_id)))
+      .filter(event => event.level === 'error' && Date.parse(event.created_at) >= recentCutoff && (!event.job_id || !failedJobIds.has(event.job_id)))
+      .slice(0, 8)
       .map(event => ({ id: `activity-${event.id}`, label: event.message, context: activityContext(event) }))
   ]
 })
