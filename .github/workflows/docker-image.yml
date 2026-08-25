@@ -81,8 +81,9 @@ jobs:
 
       - name: Run quality checks in Lerd
         run: |
-          docker run --rm --entrypoint sh --network stashd-ci \
+          docker run --rm --security-opt seccomp=unconfined --cap-add SYS_ADMIN --entrypoint sh --network stashd-ci \
             -e CI=true \
+            -e STASHD_PLUGIN_PACKAGE_ROOT=/tmp/stashd-plugin-packages \
             -e MERCURE_JWT_SECRET=ci-mercure-jwt-secret-for-tests-32-bytes \
             -e DB_CONNECTION=pgsql \
             -e DB_HOST=postgres \
@@ -97,6 +98,7 @@ jobs:
             -v "$GITHUB_WORKSPACE/plugins:/var/www/plugins:ro" \
             -w /var/www/html \
             stashd:ci -lc '
+              rm -rf /tmp/stashd-plugin-packages
               git config --global --add safe.directory /var/www/html
               composer install --no-interaction --prefer-dist --no-progress
               npm ci
@@ -104,7 +106,7 @@ jobs:
               composer lint
               composer test:static
               npm run typecheck
-              composer test:parallel
+              COMPOSER_PROCESS_TIMEOUT=0 composer test
               composer test:naked-core
               composer test:packaged
             '

@@ -52,6 +52,63 @@ paths:
       responses:
         "200": { description: Credential replaced }
 
+  /api/v1/input-plugins:
+    get:
+      operationId: listInputPlugins
+      tags: [Providers]
+      summary: List installed Input plugins
+      responses:
+        "200": { description: Input plugins returned }
+
+  /api/v1/input-plugins/{id}/preflight:
+    post:
+      operationId: preflightInputPlugin
+      tags: [Providers]
+      summary: Run an Input plugin preflight
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Preflight result returned }
+
+  /api/v1/broadcasts/{id}/rebuild:
+    post:
+      operationId: rebuildBroadcast
+      tags: [Broadcasts]
+      summary: Rebuild a broadcast
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "202": { description: Rebuild queued }
+
+  /api/v1/broadcasts/{id}/actions:
+    post:
+      operationId: runBroadcastAction
+      tags: [Broadcasts]
+      summary: Run a broadcast action
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "202": { description: Action queued }
+
+  /api/v1/stashes/with-input:
+    post:
+      operationId: createStashWithInput
+      tags: [Stashes]
+      summary: Create a Stash with an input
+      responses:
+        "201": { description: Stash created }
+
+  /api/v1/stashes/{id}/inputs/{inputId}/sync:
+    post:
+      operationId: syncStashInput
+      tags: [Stashes]
+      summary: Synchronize a Stash input
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: inputId, in: path, required: true, schema: { type: string } }
+      responses:
+        "202": { description: Sync queued }
+
   /api/v1/connections:
     get:
       operationId: listConnections

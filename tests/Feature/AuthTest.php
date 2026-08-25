@@ -487,6 +487,10 @@ test('legacy empty-scope tokens retain full owner access', function (): void {
 });
 
 test('concurrent login attempts cannot exceed the allowance', function (): void {
+    if (! function_exists('pcntl_fork')) {
+        $this->markTestSkipped('pcntl is required for concurrent login coverage.');
+    }
+
     $username = 'concurrent-owner';
     $clientAddress = '198.51.100.20';
     $dsn = sprintf(

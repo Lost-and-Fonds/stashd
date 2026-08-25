@@ -68,6 +68,7 @@ final class CommandRepository
             ->where('targetType', $targetType)
             ->where('targetId', $targetId)
             ->orderBy('createdAt', Direction::DESC)
+            ->orderBy('id', Direction::DESC)
             ->first();
 
         return $command instanceof CommandRecord ? $command : null;
