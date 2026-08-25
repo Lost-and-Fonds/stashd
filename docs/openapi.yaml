@@ -33,6 +33,25 @@ security:
   - sessionCookie: []
 
 paths:
+  /api/v1/plugin-credentials:
+    get:
+      operationId: listPluginCredentials
+      tags: [Providers]
+      summary: List declared plugin credentials
+      responses:
+        "200": { description: Credential metadata returned }
+
+  /api/v1/plugin-credentials/{pluginKey}/{credentialKey}:
+    put:
+      operationId: replacePluginCredential
+      tags: [Providers]
+      summary: Replace a plugin credential
+      parameters:
+        - { name: pluginKey, in: path, required: true, schema: { type: string } }
+        - { name: credentialKey, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Credential replaced }
+
   /api/v1/connections:
     get:
       operationId: listConnections

@@ -56,7 +56,7 @@ function useSessionCookieFrom(TestResponseHelper $response): void
 
 function requireExternalInputPluginRuntime(object $test): void
 {
-    if ($test->container->get(\App\Plugins\ExternalInputPluginRegistry::class)->providers() === []) {
+    if (! $test->hasExternalInputPlugins()) {
         $test->markTestSkipped('Optional YouTube package is not installed.');
     }
 }

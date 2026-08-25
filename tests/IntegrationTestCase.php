@@ -19,6 +19,11 @@ abstract class IntegrationTestCase extends IntegrationTest
 {
     protected string $root = __DIR__ . '/../';
 
+    public function hasExternalInputPlugins(): bool
+    {
+        return $this->container->get(\App\Plugins\ExternalInputPluginRegistry::class)->providers() !== [];
+    }
+
     /** @return array{Authorization: string} */
     public function authHeaders(): array
     {
