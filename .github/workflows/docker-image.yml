@@ -100,8 +100,10 @@ jobs:
               composer test:parallel
               composer test:naked-core
               composer test:packaged
-              composer test:plugin-runtime
             '
+
+      - name: Run plugin runtime conformance
+        run: packages/plugin-runtime/tests/run.sh
 
   smoke:
     needs: quality

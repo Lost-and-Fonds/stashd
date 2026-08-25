@@ -1,5 +1,5 @@
 #!/bin/sh
-set -euo pipefail
+set -eu
 
 export ENVIRONMENT="${ENVIRONMENT:-testing}"
 export DB_CONNECTION=pgsql
