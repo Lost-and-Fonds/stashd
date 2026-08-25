@@ -26,31 +26,37 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/plugin-api
+          ref: v0.1.0
           path: plugin-api
       - name: Checkout plugin SDK
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/stashd-php-sdk
+          ref: v0.2.3
           path: stashd-php-sdk
       - name: Checkout provider packages
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/podcast
+          ref: v0.2.3
           path: plugins/podcast
       - name: Checkout YouTube package
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/youtube
+          ref: v0.3.9
           path: plugins/youtube
       - name: Checkout Jellyfin package
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/jellyfin
+          ref: v0.2.2
           path: plugins/jellyfin
       - name: Checkout Plex package
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/plex
+          ref: v0.2.2
           path: plugins/plex
 
       - name: Build Lerd development image
