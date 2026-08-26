@@ -210,7 +210,8 @@ final class Invocation
         $command = $this->sandboxPolicy->command($this->packageRoot, $this->stagingRoot, $relative, $etc, null, $grant->network);
 
         if (! str_ends_with($relative, '.php')) {
-            $command[count($command) - 1] = '/plugin/' . $relative;
+            $command[count($command) - 2] = '/plugin/' . $relative;
+            array_pop($command);
         }
         $command = array_values($command);
         array_push($command, ...$arguments);

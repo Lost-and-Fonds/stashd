@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "49bcf832eb744ab8a3ce377d39247444",
+  "content-hash": "117c4fe0e04805214b68d3af8b86f744",
   "packages": [
     {
       "name": "composer/semver",
@@ -9506,11 +9506,11 @@
     },
     {
       "name": "stashd/php-sdk",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dist": {
         "type": "path",
         "url": "../stashd-php-sdk",
-        "reference": "111c922b950b3a56a38b87f62e9ee3fb28b054ef"
+        "reference": "0a35f317777962d5735be81c2f7996b4c29ee861"
       },
       "require": {
         "php": "^8.5",
@@ -9626,11 +9626,11 @@
     },
     {
       "name": "stashd/podcast",
-      "version": "0.2.0",
+      "version": "0.2.4",
       "dist": {
         "type": "path",
         "url": "../plugins/podcast",
-        "reference": "ef579ea137952e9ac4309eed444f88ef1af22075"
+        "reference": "5a1f24cdbd0121dbe0e351f2c5c7eb7bb7c61450"
       },
       "require": {
         "php": "^8.5",
@@ -9680,11 +9680,11 @@
     },
     {
       "name": "stashd/youtube",
-      "version": "0.3.0",
+      "version": "0.3.10",
       "dist": {
         "type": "path",
         "url": "../plugins/youtube",
-        "reference": "aefec5bcb88d38cc33676426184b9cc9844fa370"
+        "reference": "d20b9b9770972d856890f71f3ee6366316c647b6"
       },
       "require": {
         "php": "^8.5",

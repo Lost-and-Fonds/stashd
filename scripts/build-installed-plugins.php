@@ -41,6 +41,17 @@ foreach ($sources as $source) {
     }
     $declaration = json_decode((string) file_get_contents($active . '/stashd-plugin/plugin.json'), true, 512, JSON_THROW_ON_ERROR);
 
+    $youtubeHelperFixture = getenv('STASHD_YOUTUBE_HELPER_FIXTURE');
+
+    if ($manifest->id === 'youtube' && is_string($youtubeHelperFixture) && is_file($youtubeHelperFixture)) {
+        $helper = $declaration['helpers']['yt-dlp']['executable'] ?? null;
+
+        if (is_string($helper)) {
+            copy($youtubeHelperFixture, $active . '/' . ltrim($helper, '/'));
+            chmod($active . '/' . ltrim($helper, '/'), 0755);
+        }
+    }
+
     foreach (is_array($declaration['helpers'] ?? null) ? $declaration['helpers'] : [] as $helper) {
         $executable = is_array($helper) && is_string($helper['executable'] ?? null) ? $active . '/' . $helper['executable'] : '';
 

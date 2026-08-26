@@ -1,4 +1,5 @@
 #!/bin/sh
+cd /staging
 
 url=""
 for argument in "$@"; do
@@ -12,14 +13,16 @@ case "$url" in
         ;;
 esac
 
-printf 'stub-ytdlp-media\nurl=%s\n' "$url" > stashd-original.mp4
-printf '{"id":"fixture-video","title":"Fixture Video"}\n' > stashd-original.info.json
-printf 'fixture thumbnail\n' > stashd-original.jpg
+printf 'stub-ytdlp-media\nurl=%s\n' "$url" > youtube-stashd-original.mp4
+printf '{"id":"fixture-video","title":"Fixture Video"}\n' > youtube-stashd-original.info.json
+printf 'fixture thumbnail\n' > youtube-stashd-original.jpg
 
 case " $* " in
     *" --write-subs "*)
-        printf 'WEBVTT\n\n00:00.000 --> 00:01.000\nFixture caption\n' > stashd-original.en.vtt
+        printf 'WEBVTT\n\n00:00.000 --> 00:01.000\nFixture caption\n' > youtube-stashd-original.en.vtt
         ;;
 esac
 
-printf '%s\n' "$(pwd)/stashd-original.mp4"
+printf '%s\n' "$(pwd)/youtube-stashd-original.mp4"
+printf '%s\n' "$(pwd)/youtube-stashd-original.info.json"
+printf '%s\n' "$(pwd)/youtube-stashd-original.jpg"

@@ -32,19 +32,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/stashd-php-sdk
-          ref: v0.2.3
+          ref: v0.2.4
           path: stashd-php-sdk
       - name: Checkout provider packages
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/podcast
-          ref: v0.2.3
+          ref: v0.2.4
           path: plugins/podcast
       - name: Checkout YouTube package
         uses: actions/checkout@v4
         with:
           repository: Lost-and-Fonds/youtube
-          ref: v0.3.9
+          ref: v0.3.10
           path: plugins/youtube
       - name: Checkout Jellyfin package
         uses: actions/checkout@v4
@@ -84,6 +84,7 @@ jobs:
           docker run --rm --security-opt seccomp=unconfined --cap-add SYS_ADMIN --entrypoint sh --network stashd-ci \
             -e CI=true \
             -e STASHD_PLUGIN_PACKAGE_ROOT=/tmp/stashd-plugin-packages \
+            -e STASHD_YOUTUBE_HELPER_FIXTURE=/var/www/html/tests/fixtures/providers/youtube/fake-yt-dlp.sh \
             -e MERCURE_JWT_SECRET=ci-mercure-jwt-secret-for-tests-32-bytes \
             -e DB_CONNECTION=pgsql \
             -e DB_HOST=postgres \

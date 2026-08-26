@@ -112,6 +112,10 @@ if (! is_string(getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR')) || trim((string) ge
     putenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR=' . dirname(__DIR__) . '/tests/fixtures/media_servers/http');
 }
 
+if (! is_string(getenv('STASHD_PLUGIN_HTTP_FIXTURE_DIR')) || trim((string) getenv('STASHD_PLUGIN_HTTP_FIXTURE_DIR')) === '') {
+    putenv('STASHD_PLUGIN_HTTP_FIXTURE_DIR=' . dirname(__DIR__) . '/tests/fixtures/providers/youtube/http');
+}
+
 foreach ([$data, $media] as $directory) {
     if (! is_dir($directory)) {
         mkdir($directory, 0775, true);

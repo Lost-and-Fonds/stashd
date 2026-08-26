@@ -32,7 +32,7 @@ final class InvocationStaging implements StagingArea
     {
         $path = $this->safePath($relativePath, true);
 
-        return new StagedArtifact('staging:' . hash('sha256', $relativePath), $mediaType ?? 'application/octet-stream', (int) filesize($path));
+        return new StagedArtifact($relativePath, $mediaType ?? 'application/octet-stream', (int) filesize($path));
     }
 
     public function output(string $relativePath, ?string $mediaType = null): PublishedOutput

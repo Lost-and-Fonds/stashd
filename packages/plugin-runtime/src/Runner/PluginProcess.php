@@ -101,6 +101,11 @@ final class PluginProcess
             if (! is_array($result)) {
                 return [];
             }
+
+            if (array_is_list($result)) {
+                return $result;
+            }
+
             $normalizedResult = [];
 
             foreach ($result as $key => $value) {

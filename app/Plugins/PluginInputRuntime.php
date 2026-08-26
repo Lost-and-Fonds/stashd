@@ -188,7 +188,20 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
                 }
             }
         }
-        $invocation = new Invocation($package, $stage, array_values(array_unique($prefixes)), $credentials, helpers: $helper === null ? [] : [new \Stashd\PluginRuntime\Capabilities\HelperGrant($helper->name, substr($helper->executable, strlen($package) + 1), $helper->network)], transport: new PluginBroadcastHttpTransport());
+        $helperGrant = null;
+
+        if ($helper !== null) {
+            $root = realpath($helper->packageRoot ?? '');
+            $executable = realpath($helper->executable);
+
+            if ($root === false || $executable === false || ! str_starts_with($executable, $root . '/')) {
+                throw new RuntimeException('Plugin helper is outside the active plugin package.');
+            }
+
+            $helperGrant = new \Stashd\PluginRuntime\Capabilities\HelperGrant($helper->name, substr($executable, strlen($root) + 1), $helper->network);
+        }
+
+        $invocation = new Invocation($package, $stage, array_values(array_unique($prefixes)), $credentials, helpers: $helperGrant === null ? [] : [$helperGrant], transport: new PluginBroadcastHttpTransport(getenv('STASHD_PLUGIN_HTTP_FIXTURE_DIR') ?: null));
         $process = $this->runner->start($this->definition->id, $stage);
 
         try {
