@@ -25,6 +25,11 @@ test('Podcast plugin is discovered and publishes an audio feed from PostgreSQL l
     ], headers: $headers);
     $this->processAllJobs();
 
+    $assets = $this->container->get(AssetRepository::class);
+    $fakeOriginal = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::VaultOriginal);
+    $fakeOriginal->state = AssetState::Stale;
+    $assets->save($fakeOriginal);
+
     $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
     $audioPath = $this->container->get(VaultPathBuilder::class)->vaultFile(
         (string) $media->providerKey,
@@ -37,7 +42,7 @@ test('Podcast plugin is discovered and publishes an audio feed from PostgreSQL l
     }
     $fixture = dirname(__DIR__, 2) . '/tests/fixtures/media/podcast-video-with-audio.mp4';
     file_put_contents($audioPath, file_get_contents($fixture));
-    $this->container->get(AssetRepository::class)->create(
+    $assets->create(
         mediaItemId: MediaItemId::parse($mediaItemId),
         role: AssetRole::VaultOriginal,
         kind: AssetKind::Video,

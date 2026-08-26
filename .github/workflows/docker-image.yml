@@ -108,6 +108,7 @@ jobs:
               composer lint
               composer test:static
               npm run typecheck
+              php scripts/build-installed-plugins.php
               COMPOSER_PROCESS_TIMEOUT=0 composer test
               composer test:naked-core
               composer test:packaged

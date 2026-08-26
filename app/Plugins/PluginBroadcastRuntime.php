@@ -113,6 +113,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
         } catch (\Throwable $exception) {
             throw new RuntimeException('Plugin Broadcast staging could not be created.', 0, $exception);
         }
+        $this->copyOutputs($stagingDirectory, $pluginStage);
         $invocation = new Invocation(
             $package,
             $pluginStage,
@@ -255,9 +256,19 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             return [];
         }
         $root = realpath($package);
-        $executable = realpath($helper->executable);
 
-        if ($root === false || $executable === false || ! str_starts_with($executable, $root . '/')) {
+        if ($root === false || $helper->packageRoot === null) {
+            throw new RuntimeException('Plugin helper is outside the active plugin package.');
+        }
+        $sourceRoot = realpath($helper->packageRoot);
+
+        if ($sourceRoot === false || ! str_starts_with($helper->executable, $sourceRoot . '/')) {
+            throw new RuntimeException('Plugin helper is outside the active plugin package.');
+        }
+
+        $executable = realpath($root . '/' . substr($helper->executable, strlen($sourceRoot) + 1));
+
+        if ($executable === false || ! str_starts_with($executable, $root . '/')) {
             throw new RuntimeException('Plugin helper is outside the active plugin package.');
         }
 
@@ -270,6 +281,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
     private function normalizePublication(array $publication): array
     {
         $files = [];
+        $artifacts = [];
 
         foreach (is_array($publication['files'] ?? null) ? $publication['files'] : [] as $file) {
             if (! is_array($file)) {
@@ -282,6 +294,20 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             ];
         }
         $publication['files'] = $files;
+
+        foreach (is_array($publication['artifacts'] ?? null) ? $publication['artifacts'] : [] as $artifact) {
+            if (! is_array($artifact)) {
+                continue;
+            }
+            $artifacts[] = [
+                'item_id' => $artifact['item-id'] ?? null,
+                'reference' => $artifact['reference'] ?? null,
+                'derived_from_reference' => $artifact['derived-from-reference'] ?? null,
+                'derivation_key' => $artifact['derivation-key'] ?? null,
+                'kind' => $artifact['kind'] ?? null,
+            ];
+        }
+        $publication['artifacts'] = $artifacts;
 
         return $publication;
     }
