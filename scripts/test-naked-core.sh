@@ -8,7 +8,7 @@ restore() {
 }
 trap restore EXIT INT TERM
 
-(cd "$ROOT" && composer install --no-dev --no-interaction --prefer-dist --no-progress)
+(cd "$ROOT" && composer install --no-interaction --prefer-dist --no-progress)
 
 for package in jellyfin plex podcast youtube php-sdk plugin-api; do
     if [ -e "$ROOT/vendor/stashd/$package" ]; then

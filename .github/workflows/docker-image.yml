@@ -83,6 +83,7 @@ jobs:
         run: |
           docker run --rm --security-opt seccomp=unconfined --cap-add SYS_ADMIN --entrypoint sh --network stashd-ci \
             -e CI=true \
+            -e STASHD_RESET_TEST_DATABASE=1 \
             -e STASHD_PLUGIN_PACKAGE_ROOT=/tmp/stashd-plugin-packages \
             -e STASHD_YOUTUBE_HELPER_FIXTURE=/var/www/html/tests/fixtures/providers/youtube/fake-yt-dlp.sh \
             -e MERCURE_JWT_SECRET=ci-mercure-jwt-secret-for-tests-32-bytes \
