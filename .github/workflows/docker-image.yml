@@ -81,7 +81,7 @@ jobs:
 
       - name: Run quality checks in Lerd
         run: |
-          docker run --rm --security-opt seccomp=unconfined --cap-add SYS_ADMIN --entrypoint sh --network stashd-ci \
+          docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=unconfined --cap-add SYS_ADMIN --entrypoint sh --network stashd-ci \
             -e CI=true \
             -e STASHD_RESET_TEST_DATABASE=1 \
             -e STASHD_PLUGIN_PACKAGE_ROOT=/tmp/stashd-plugin-packages \
