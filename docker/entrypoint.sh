@@ -148,13 +148,13 @@ ensure_mercure_secret() {
 prepare_runtime_env() {
     cd "$APP_DIR"
     git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
-    ensure_writable
-    ensure_signing_key
-    ensure_mercure_secret
     export STASHD_DATA_PATH="$DATA_DIR"
     export STASHD_MEDIA_PATH="$MEDIA_DIR"
     export STASHD_PLUGIN_PACKAGE_ROOT="${DATA_DIR}/plugins"
     export TEMPEST_INTERNAL_STORAGE="${DATA_DIR}/.tempest"
+    ensure_writable
+    ensure_signing_key
+    ensure_mercure_secret
 }
 
 prepare_runtime() {
