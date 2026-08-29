@@ -132,8 +132,10 @@ final class PluginProcess
         }
         $this->closed = true;
 
-        if (is_resource($this->pipes[0])) {
-            fclose($this->pipes[0]);
+        foreach ($this->pipes as $pipe) {
+            if (is_resource($pipe)) {
+                fclose($pipe);
+            }
         }
 
         return proc_close($this->process);

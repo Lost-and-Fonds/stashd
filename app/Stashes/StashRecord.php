@@ -17,7 +17,7 @@ final class StashRecord
 
     public PrimaryKey $id;
 
-    /** @var StashItemRecord[] */
+    /** @var list<\App\Stashes\StashItemRecord> */
     #[HasMany(ownerJoin: 'stashId')]
     public array $items;
 

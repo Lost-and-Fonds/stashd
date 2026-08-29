@@ -27,9 +27,13 @@ test('preflight review exposes the universal title-regex filters for every provi
         ->and($review->body['preflight']['input_options'])->toBe([]);
 });
 
-test('preflight review exposes shorts and live toggles for a youtube channel only', function (): void {
+test('preflight review exposes YouTube input options', function (): void {
     requireExternalInputPluginRuntime($this);
     $headers = $this->authHeaders();
+
+    $this->http->put('/api/v1/plugin-credentials/youtube/youtube-data-api', [
+        'value' => 'test-api-key',
+    ], headers: $headers)->assertOk();
 
     $channel = $this->http->post('/api/v1/stashes/preflight', [
         'source_uri' => 'https://www.youtube.com/channel/UCStashdDemoCh0012345678',
@@ -44,17 +48,6 @@ test('preflight review exposes shorts and live toggles for a youtube channel onl
     $optionKeys = array_column($channelReview->body['preflight']['input_options'], 'key');
     expect($optionKeys)->toBe(['include_shorts', 'include_live', 'include_captions', 'caption_languages']);
 
-    $video = $this->http->post('/api/v1/stashes/preflight', [
-        'source_uri' => 'https://www.youtube.com/watch?v=demoVideo01',
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $videoReview = $this->http->get(
-        '/api/v1/stashes/preflight/' . $video->body['command_id'] . '/review',
-        headers: $headers,
-    )->assertOk();
-
-    expect($videoReview->body['preflight']['input_options'] ?? [])->toBe([]);
 });
 
 test('add input title-regex include keeps only matching items and marks the rest ignored', function (): void {

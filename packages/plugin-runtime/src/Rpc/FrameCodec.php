@@ -82,12 +82,19 @@ final class FrameCodec
             return;
         }
 
-        $read = [$stream];
-        $write = null;
-        $except = null;
-        $seconds = (int) floor($timeout);
-        $microseconds = (int) (($timeout - $seconds) * 1_000_000);
-        $ready = stream_select($read, $write, $except, $seconds, $microseconds);
+        $deadline = microtime(true) + $timeout;
+
+        do {
+            $remaining = max(0.0, $deadline - microtime(true));
+            $read = [$stream];
+            $write = null;
+            $except = null;
+            $seconds = (int) floor($remaining);
+            $microseconds = (int) (($remaining - $seconds) * 1_000_000);
+            error_clear_last();
+            $ready = @stream_select($read, $write, $except, $seconds, $microseconds);
+            $error = error_get_last()['message'] ?? '';
+        } while ($ready === false && str_contains($error, 'Interrupted system call') && microtime(true) < $deadline);
 
         if ($ready === 0) {
             throw new FrameTimeout('frame read timed out');
