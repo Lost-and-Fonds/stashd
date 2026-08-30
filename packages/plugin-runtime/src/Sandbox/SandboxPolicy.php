@@ -25,7 +25,7 @@ final readonly class SandboxPolicy
             array_splice($command, 5, 0, ['--unshare-net']);
         }
 
-        foreach (['/usr', '/bin', '/lib', '/lib64', '/sbin'] as $directory) {
+        foreach (['/usr/local', '/usr', '/bin', '/lib', '/lib64', '/sbin'] as $directory) {
             if (Filesystem\is_directory($directory)) {
                 $command[] = '--ro-bind';
                 $command[] = $directory;
