@@ -219,7 +219,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
                     'http.request' => $this->capabilityHttp($invocation, $p), 'resource.read' => $this->capabilityResourceRead($invocation, $p), 'staging.stage' => $this->capabilityStage($invocation, $p), 'staging.write' => $this->capabilityWrite($invocation, $p), 'helper.run' => $this->capabilityHelper($invocation, $p, $onActivity), 'event.log', 'event.progress' => ['accepted' => true], default => throw new RuntimeException('unsupported plugin capability'),
                 };
             };
-            $result = $process->invoke($method, $params, $capabilityHandler);
+            $result = $process->invoke($method, $params, $capabilityHandler, $operation === 'acquire' ? 300.0 : 30.0);
 
             if (isset($result['error'])) {
                 $error = is_array($result['error']) ? $result['error'] : [];
