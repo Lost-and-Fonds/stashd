@@ -1,0 +1,13 @@
+# Experimental FrankenPHP worker-mode configuration.
+# The imported site definition is the classic configuration; this global
+# worker block only changes how its PHP requests are executed.
+{
+	frankenphp {
+		worker {
+			file /var/www/html/public/worker.php
+			env MAX_REQUESTS 100
+		}
+	}
+}
+
+import Caddyfile

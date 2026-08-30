@@ -2,11 +2,9 @@
 
 declare(strict_types=1);
 
-use Tempest\Router\HttpApplication;
-
 require_once __DIR__.'/../vendor/autoload.php';
-require_once __DIR__.'/../bootstrap/tempest_internal_storage.php';
+require_once __DIR__.'/../bootstrap/stashd_application.php';
 
-HttpApplication::boot(__DIR__.'/..', [], tempest_internal_storage())->run();
+stashd_classic_application()->run();
 
 exit();
