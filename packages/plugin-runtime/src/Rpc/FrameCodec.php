@@ -119,7 +119,7 @@ final class FrameCodec
             if ($deadline !== null) {
                 self::waitForRead($stream, max(0.0, $deadline - microtime(true)));
             }
-            $chunk = fread($stream, max(1, $length - strlen($result)));
+            $chunk = fread($stream, min(65_536, max(1, $length - strlen($result))));
 
             if ($chunk === false || $chunk === '') {
                 if (feof($stream)) {
@@ -141,7 +141,7 @@ final class FrameCodec
         $offset = 0;
 
         while ($offset < strlen($value)) {
-            $written = fwrite($stream, substr($value, $offset));
+            $written = fwrite($stream, substr($value, $offset, 65_536));
 
             if ($written === false || $written === 0) {
                 throw new FrameProtocolError('frame write failed');
