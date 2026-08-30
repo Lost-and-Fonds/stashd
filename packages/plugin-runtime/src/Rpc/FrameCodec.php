@@ -8,7 +8,7 @@ use JsonException;
 
 final class FrameCodec
 {
-    public const MAX_FRAME_BYTES = 67_108_864;
+    public const MAX_FRAME_BYTES = 268_435_456;
 
     /** @param resource $stream */
     /**
