@@ -201,10 +201,12 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
             $helperGrant = new \Stashd\PluginRuntime\Capabilities\HelperGrant($helper->name, substr($executable, strlen($root) + 1), $helper->network);
         }
 
-        $invocation = new Invocation($package, $stage, array_values(array_unique($prefixes)), $credentials, helpers: $helperGrant === null ? [] : [$helperGrant], transport: new PluginBroadcastHttpTransport(getenv('STASHD_PLUGIN_HTTP_FIXTURE_DIR') ?: null));
-        $process = $this->runner->start($this->definition->id, $stage);
+        $invocation = null;
+        $process = null;
 
         try {
+            $invocation = new Invocation($package, $stage, array_values(array_unique($prefixes)), $credentials, helpers: $helperGrant === null ? [] : [$helperGrant], transport: new PluginBroadcastHttpTransport(getenv('STASHD_PLUGIN_HTTP_FIXTURE_DIR') ?: null));
+            $process = $this->runner->start($this->definition->id, $stage);
             $capabilityHandler = /** @param array<string, mixed> $message */ function (array $message) use ($invocation): array {
                 $p = self::stringKeyed($message['params'] ?? null);
 
@@ -226,10 +228,15 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
 
             return $result;
         } finally {
-            $process->close();
-            $invocation->close();
+            if ($process !== null) {
+                $process->close();
+            }
 
-            if ($staging === null) {
+            if ($invocation !== null) {
+                $invocation->close();
+            }
+
+            if ($staging === null || $invocation === null) {
                 $this->remove($stage);
             }
         }

@@ -117,6 +117,15 @@ function m7Assert(bool $condition, string $message): void
     }
 }
 
+function m7FdCount(): ?int
+{
+    if (! is_dir('/proc/self/fd')) {
+        return null;
+    }
+
+    return max(0, count(scandir('/proc/self/fd') ?: []) - 2);
+}
+
 final class M7Metrics
 {
     public int $invocations = 0;
@@ -428,6 +437,32 @@ try {
     m7Assert(($operation['choices'][0]['value'] ?? null) === 'fixture', 'production runner invocation failed');
     $productionProcess->close();
     m7Remove($runnerSmokeStage);
+
+    $repeatRoot = m7Temp('stashd-production-repeat');
+    $fdBefore = m7FdCount();
+
+    for ($attempt = 0; $attempt < 25; $attempt++) {
+        $stage = $repeatRoot . '/stage-' . $attempt;
+        mkdir($stage, 0700, true);
+        $process = null;
+
+        try {
+            $process = $productionRunner->start('m7-example', $stage);
+            $result = $process->invoke($attempt % 2 === 0 ? 'broadcast.operation' : 'unknown', [], static fn(array $message): array => []);
+            m7Assert($attempt % 2 === 0 ? isset($result['choices']) : isset($result['error']), 'repeated plugin invocation result was unexpected');
+        } finally {
+            if ($process !== null) {
+                $process->close();
+            }
+
+            m7Remove($stage);
+        }
+    }
+
+    $fdAfter = m7FdCount();
+    m7Assert($fdBefore === null || $fdAfter === null || abs($fdAfter - $fdBefore) <= 2, 'repeated plugin invocations leaked file descriptors');
+    m7Assert((scandir($repeatRoot) ?: []) === ['.', '..'], 'repeated plugin invocations leaked staging entries');
+    m7Remove($repeatRoot);
 
     $assetRoot = $root . '/assets';
     mkdir($assetRoot, 0700, true);
