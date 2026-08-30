@@ -207,7 +207,17 @@ final class Invocation
         Filesystem\create_directory($etc, 0700);
         Filesystem\write_file($etc . '/passwd', "plugin:x:1000:1000:plugin:/tmp:/bin/sh\n");
         Filesystem\write_file($etc . '/group', "plugin:x:1000:\n");
+
+        if ($grant->network && is_file('/etc/resolv.conf')) {
+            Filesystem\copy('/etc/resolv.conf', $etc . '/resolv.conf', overwrite: true);
+        }
+
         $command = $this->sandboxPolicy->command($this->packageRoot, $this->stagingRoot, $relative, $etc, null, $grant->network);
+        $chdir = array_search('--chdir', $command, true);
+
+        if ($chdir !== false && isset($command[$chdir + 1])) {
+            $command[$chdir + 1] = '/staging';
+        }
 
         if (! str_ends_with($relative, '.php')) {
             $command[count($command) - 2] = '/plugin/' . $relative;

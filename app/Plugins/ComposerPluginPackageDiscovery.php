@@ -69,16 +69,17 @@ final class ComposerPluginPackageDiscovery
                 }
             }
 
-            $activeIds = array_values(array_filter(array_map(
-                static fn(array $package): ?string => is_string($package['manifest']['id'] ?? null) ? $package['manifest']['id'] : null,
-                array_filter($packages, static fn(array $package): bool => str_starts_with($package['root'], rtrim($activeRoot, '/') . '/')),
+            $activePaths = array_values(array_filter(array_map(
+                static fn(string $path): ?string => realpath($path) ?: null,
+                Filesystem\list_directory($activeRoot),
             )));
+            $activeIds = array_map('basename', Filesystem\list_directory($activeRoot));
 
             if ($activeIds !== []) {
                 $packages = array_values(array_filter(
                     $packages,
-                    static fn(array $package): bool => ! in_array($package['manifest']['id'] ?? null, $activeIds, true)
-                        || str_starts_with($package['root'], rtrim($activeRoot, '/') . '/'),
+                    static fn(array $package): bool => in_array($package['root'], $activePaths, true)
+                        || ! in_array($package['manifest']['id'] ?? null, $activeIds, true),
                 ));
             }
         }

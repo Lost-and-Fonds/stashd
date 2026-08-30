@@ -40,9 +40,11 @@ final readonly class SandboxPolicy
             $command = array_merge($command, ['--ro-bind', $sdkRoot, '/sdk']);
         }
 
+        $helperPath = '/plugin/' . trim(dirname($entrypoint), '.');
+
         return array_merge($command, $etcMount, [
             '--dir', '/run', '--chdir', '/plugin', '--setenv', 'HOME', '/tmp', '--setenv',
-            'PATH', '/usr/local/bin:/usr/bin:/bin', '--', 'php', '/plugin/' . $entrypoint,
+            'PATH', $helperPath . ':/usr/local/bin:/usr/bin:/bin', '--', 'php', '/plugin/' . $entrypoint,
         ]);
     }
 
