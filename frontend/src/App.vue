@@ -23,7 +23,6 @@ const primaryLinks = [
 
 const mobileItems = [primaryLinks, [{ label: 'Configure', icon: 'i-lucide-sliders-horizontal', to: '/settings' }]]
 
-const navUi = { linkLabel: 'font-mono' }
 </script>
 
 <template>
@@ -34,7 +33,11 @@ const navUi = { linkLabel: 'font-mono' }
           stashd<span class="text-primary">_</span>
         </RouterLink>
 
-        <UNavigationMenu :items="primaryLinks" :ui="navUi" class="hidden md:flex" />
+        <nav class="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
+          <RouterLink v-for="item in primaryLinks" :key="item.to" :to="item.to" class="rounded-md px-2.5 py-1.5 font-mono text-sm text-muted transition-colors hover:bg-elevated/50 hover:text-highlighted">
+            {{ item.label }}
+          </RouterLink>
+        </nav>
 
         <div class="ml-auto hidden items-center gap-2 md:flex">
           <UButton label="Configure" icon="i-lucide-sliders-horizontal" to="/settings" variant="ghost" color="neutral" size="sm" class="font-mono" />
@@ -48,7 +51,11 @@ const navUi = { linkLabel: 'font-mono' }
               <p class="font-mono text-lg text-highlighted">
                 stashd<span class="text-primary">_</span>
               </p>
-              <UNavigationMenu :items="mobileItems" :ui="navUi" orientation="vertical" />
+              <nav class="flex flex-col gap-1" aria-label="Primary navigation">
+                <RouterLink v-for="item in mobileItems.flat()" :key="item.to" :to="item.to" class="rounded-md px-2.5 py-2 font-mono text-sm text-muted transition-colors hover:bg-elevated/50 hover:text-highlighted">
+                  {{ item.label }}
+                </RouterLink>
+              </nav>
             </div>
           </template>
         </UDrawer>
