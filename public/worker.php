@@ -9,7 +9,15 @@ $application = stashd_worker_application();
 $maxRequests = (int) ($_SERVER['MAX_REQUESTS'] ?? 100);
 
 $handler = static function () use ($application): void {
-    $application->run();
+    try {
+        $application->run();
+    } catch (Throwable $e) {
+        // A lifecycle/reset failure leaves application state untrusted. Do not
+        // return to FrankenPHP's request loop: a non-zero exit lets it replace
+        // this worker instead of reusing dirty state for the next request.
+        error_log((string) $e);
+        exit(1);
+    }
 };
 
 for ($request = 0; ! $maxRequests || $request < $maxRequests; $request++) {
