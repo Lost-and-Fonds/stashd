@@ -1,6 +1,6 @@
 services:
   stashd:
-    image: ghcr.io/hipsterjazzbo/stashd:latest
+    image: ghcr.io/lost-and-fonds/stashd:latest
     container_name: stashd
     depends_on:
       postgres:
