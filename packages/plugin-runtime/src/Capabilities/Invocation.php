@@ -207,6 +207,11 @@ final class Invocation
         Filesystem\create_directory($etc, 0700);
         Filesystem\write_file($etc . '/passwd', "plugin:x:1000:1000:plugin:/tmp:/bin/sh\n");
         Filesystem\write_file($etc . '/group', "plugin:x:1000:\n");
+
+        if ($grant->network && Filesystem\is_file('/etc/resolv.conf')) {
+            Filesystem\write_file($etc . '/resolv.conf', Filesystem\read_file('/etc/resolv.conf'));
+        }
+
         $command = $this->sandboxPolicy->command($this->packageRoot, $this->stagingRoot, $relative, $etc, null, $grant->network);
 
         if (! str_ends_with($relative, '.php')) {

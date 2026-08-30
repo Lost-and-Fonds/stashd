@@ -367,6 +367,7 @@ try {
     mkdir($source . '/stashd-plugin', 0700, true);
     copy(__DIR__ . '/fixtures/fixture-plugin.php', $source . '/plugin.php');
     copy(__DIR__ . '/fixtures/fixture-helper.php', $source . '/helpers/fixture-helper.php');
+    copy(__DIR__ . '/fixtures/resolver-helper.php', $source . '/helpers/resolver-helper.php');
 
     foreach (glob($sdkRoot . '/src/*.php') ?: [] as $sdkFile) {
         copy($sdkFile, $source . '/sdk/' . basename($sdkFile));
@@ -506,6 +507,14 @@ try {
     $helperReport = json_decode((string) file_get_contents($staging . '/helper-report.json'), true, 512, JSON_THROW_ON_ERROR);
     m7Assert($helperReport === ['vault' => 'denied', 'network' => 'denied', 'secret' => 'absent'], 'helper sandbox invariant failed');
     m7Assert(! file_exists($package . '/HELPER_MUTATION'), 'plugin package was writable');
+
+    $resolverStage = m7Temp('stashd-m7-resolver');
+    $resolverInvocation = new Invocation($package, $resolverStage, [], helpers: [new HelperGrant('resolver-helper', 'helpers/resolver-helper.php', network: true)]);
+    $resolverInvocation->runHelper('resolver-helper');
+    m7Assert(file_get_contents($resolverStage . '/resolver-present') === 'yes', 'network helper resolver configuration was not mounted');
+    $resolverInvocation->close();
+    m7Remove($resolverStage);
+
     $published = promote($staging, 'published/item-1.bin', $promotion);
     $finalized = $runner->invoke('broadcast.finalize');
     m7Assert(isset($finalized['artifact']), 'Broadcast finalize failed');
