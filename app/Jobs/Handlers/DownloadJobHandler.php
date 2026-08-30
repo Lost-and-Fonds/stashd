@@ -61,6 +61,7 @@ final readonly class DownloadJobHandler implements JobHandler
                 stashId: $stashId,
                 jobId: PrefixedUlid::parse((string) $job->id),
                 force: $force,
+                onProgress: fn() => $context->heartbeat($job),
             );
 
             $command->result = $result->toArray();

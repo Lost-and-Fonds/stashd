@@ -118,7 +118,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     {
         $item = ['id' => $request->providerItemId, 'reference' => $request->canonicalUri->toString(), 'title' => $request->title, 'description' => null, 'published-at' => $request->publishedAt?->toRfc3339(useZ: true), 'artwork-reference' => $request->thumbnailUri?->toString(), 'duration-seconds' => $request->durationSeconds];
         $kind = $request->downloadPolicy === DownloadPolicy::AudioOnly ? 'audio' : 'video';
-        $result = $this->invoke('input.acquire', ['item' => $item, 'media_kind' => $kind, 'options' => $this->wireOptions($request->providerOptions)], 'acquire', $request->tempDirectory, $this->definition->helper);
+        $result = $this->invoke('input.acquire', ['item' => $item, 'media_kind' => $kind, 'options' => $this->wireOptions($request->providerOptions)], 'acquire', $request->tempDirectory, $this->definition->helper, $onProgress);
         $files = $this->filesFromResult($result, $request->tempDirectory);
 
         if (! array_filter($files, static fn(DownloadedFile $file): bool => $file->role === AssetRole::VaultOriginal)) {
@@ -162,7 +162,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     /** @param array<string, mixed> $params
      * @return array<string, mixed>
      */
-    private function invoke(string $method, array $params, string $operation, ?string $staging = null, ?PluginHelperGrant $helper = null): array
+    private function invoke(string $method, array $params, string $operation, ?string $staging = null, ?PluginHelperGrant $helper = null, ?callable $onActivity = null): array
     {
         $package = $this->packages->activePath($this->definition->id) ?? throw new RuntimeException('YouTube plugin is not active');
         $stage = $staging === null ? sys_get_temp_dir() . '/stashd-plugin-' . bin2hex(random_bytes(5)) : $staging . '/.plugin-' . bin2hex(random_bytes(5));
@@ -205,11 +205,11 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         $process = $this->runner->start($this->definition->id, $stage);
 
         try {
-            $capabilityHandler = /** @param array<string, mixed> $message */ function (array $message) use ($invocation): array {
+            $capabilityHandler = /** @param array<string, mixed> $message */ function (array $message) use ($invocation, $onActivity): array {
                 $p = self::stringKeyed($message['params'] ?? null);
 
                 return match ($message['method'] ?? '') {
-                    'http.request' => $this->capabilityHttp($invocation, $p), 'resource.read' => $this->capabilityResourceRead($invocation, $p), 'staging.stage' => $this->capabilityStage($invocation, $p), 'staging.write' => $this->capabilityWrite($invocation, $p), 'helper.run' => $this->capabilityHelper($invocation, $p), 'event.log', 'event.progress' => ['accepted' => true], default => throw new RuntimeException('unsupported plugin capability'),
+                    'http.request' => $this->capabilityHttp($invocation, $p), 'resource.read' => $this->capabilityResourceRead($invocation, $p), 'staging.stage' => $this->capabilityStage($invocation, $p), 'staging.write' => $this->capabilityWrite($invocation, $p), 'helper.run' => $this->capabilityHelper($invocation, $p, $onActivity), 'event.log', 'event.progress' => ['accepted' => true], default => throw new RuntimeException('unsupported plugin capability'),
                 };
             };
             $result = $process->invoke($method, $params, $capabilityHandler);
@@ -281,10 +281,10 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     /** @param array<string, mixed> $p
      * @return array<string, mixed>
      */
-    private function capabilityHelper(Invocation $i, array $p): array
+    private function capabilityHelper(Invocation $i, array $p, ?callable $onActivity = null): array
     {
         $arguments = is_array($p['arguments'] ?? null) ? array_values($p['arguments']) : [];
-        $r = $i->runHelper(self::string($p['name'] ?? null), $arguments);
+        $r = $i->runHelper(self::string($p['name'] ?? null), $arguments, $onActivity);
 
         return ['exit_code' => $r->exitCode, 'stdout' => $r->stdout, 'stderr' => $r->stderr];
     }

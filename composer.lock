@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "117c4fe0e04805214b68d3af8b86f744",
+  "content-hash": "93e7bee5f84a6950ce06f666ea387a2b",
   "packages": [
     {
       "name": "composer/semver",
@@ -9680,11 +9680,11 @@
     },
     {
       "name": "stashd/youtube",
-      "version": "0.3.10",
+      "version": "0.3.18",
       "dist": {
         "type": "path",
         "url": "../plugins/youtube",
-        "reference": "d20b9b9770972d856890f71f3ee6366316c647b6"
+        "reference": "a5e6bc3beac64e4422b2771271eecd51027514f5"
       },
       "require": {
         "php": "^8.5",

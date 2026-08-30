@@ -9,8 +9,8 @@ use GuzzleHttp\Psr7\Uri;
 use GuzzleHttp\Psr7\UriResolver;
 use RuntimeException;
 use Stashd\PluginRuntime\Sandbox\SandboxPolicy;
-use Tempest\DateTime\Duration;
 use Tempest\Process\GenericProcessExecutor;
+use Tempest\Process\OutputChannel;
 use Tempest\Process\PendingProcess;
 use Tempest\Support\Filesystem;
 
@@ -187,7 +187,7 @@ final class Invocation
     }
 
     /** @param list<mixed> $arguments */
-    public function runHelper(string $name, array $arguments = [], float $timeout = 3.0): HelperResult
+    public function runHelper(string $name, array $arguments = [], ?callable $onOutput = null): HelperResult
     {
         $this->assertActive();
         $grant = $this->helpers[$name] ?? throw new CapabilityDenied('helper is not declared');
@@ -215,7 +215,12 @@ final class Invocation
         }
         $command = array_values($command);
         array_push($command, ...$arguments);
-        $result = (new GenericProcessExecutor())->run(new PendingProcess($command, Duration::seconds((int) ceil($timeout))));
+        $process = (new GenericProcessExecutor())->start(new PendingProcess($command));
+        $result = $process->wait($onOutput === null ? null : static function (OutputChannel $channel, string $buffer) use ($onOutput): void {
+            if ($buffer !== '') {
+                $onOutput();
+            }
+        });
 
         return new HelperResult($result->exitCode, $result->output, $result->errorOutput);
     }
