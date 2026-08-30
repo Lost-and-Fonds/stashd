@@ -48,7 +48,7 @@ final readonly class StorageCapabilityChecker
             ? $this->probe->probeHardlinkWithinRoot($path)
             : FilesystemProbeResult::failed('Skipped hardlink probe because root is not writable.');
 
-        if ($writable && is_int($freeBytes) && is_int($totalBytes) && $totalBytes > 0) {
+        if ($writable && is_numeric($freeBytes) && is_numeric($totalBytes) && $totalBytes > 0) {
             $freeRatio = $freeBytes / $totalBytes;
 
             if ($freeRatio < 0.05) {
@@ -65,8 +65,8 @@ final readonly class StorageCapabilityChecker
             state: $state,
             readable: $readable,
             writable: $writable,
-            freeBytes: is_int($freeBytes) ? $freeBytes : null,
-            totalBytes: is_int($totalBytes) ? $totalBytes : null,
+            freeBytes: is_numeric($freeBytes) ? (int) $freeBytes : null,
+            totalBytes: is_numeric($totalBytes) ? (int) $totalBytes : null,
             filesystemId: $writable ? $this->filesystemId($path) : null,
             supportsHardlinks: $withinRootHardlink->ok,
             supportsSymlinks: $writable && $this->probeSymlinks($path),

@@ -9,13 +9,13 @@ use App\Stashes\StashRecord;
 
 final readonly class StashResource
 {
-    public function __construct(
-        private StashRecord $stash,
-    ) {}
+    /** @param array<string, mixed> $summary */
+    public function __construct(private StashRecord $stash, private array $summary = []) {}
 
-    public static function fromRecord(StashRecord $stash): self
+    /** @param array<string, mixed> $summary */
+    public static function fromRecord(StashRecord $stash, array $summary = []): self
     {
-        return new self($stash);
+        return new self($stash, $summary);
     }
 
     /** @return array<string, mixed> */
@@ -32,6 +32,7 @@ final readonly class StashResource
             'iconUri' => $this->stash->iconUri,
             'createdAt' => $this->stash->createdAt,
             'updatedAt' => $this->stash->updatedAt,
+            ...$this->summary,
         ]);
     }
 }

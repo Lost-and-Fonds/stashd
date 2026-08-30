@@ -18,9 +18,10 @@ const error = ref<string>()
 const saved = ref(false)
 const values = reactive<Record<string, PluginFieldValue | undefined>>({})
 const originalValues = ref<Record<string, InputOptionValue>>({})
+const filters = reactive({ include: '', exclude: '' })
 
 const normalized = computed(() => input.value ? normalizeInputOptions(input.value.input_options) : { fields: [], diagnostics: [] })
-const dirty = computed(() => normalized.value.fields.some(field => values[field.key] !== originalValues.value[field.key]))
+const dirty = computed(() => normalized.value.fields.some(field => values[field.key] !== originalValues.value[field.key]) || filters.include !== (input.value?.options?.title_regex_include ?? '') || filters.exclude !== (input.value?.options?.title_regex_exclude ?? ''))
 
 function resetValues(resource: StashInputApiResource) {
   const next = inputOptionValues(normalized.value.fields, resource.options?.provider)
@@ -28,6 +29,8 @@ function resetValues(resource: StashInputApiResource) {
   for (const key of Object.keys(values)) delete values[key]
   Object.assign(values, next)
   originalValues.value = { ...next }
+  filters.include = resource.options?.title_regex_include ?? ''
+  filters.exclude = resource.options?.title_regex_exclude ?? ''
 }
 
 async function load() {
@@ -45,9 +48,16 @@ async function load() {
 }
 
 function validate(state: Record<string, PluginFieldValue | undefined>): FormError[] {
-  return normalized.value.fields
+  const errors = normalized.value.fields
     .filter(field => field.required && (state[field.key] === undefined || state[field.key] === ''))
     .map(field => ({ name: field.key, message: `${field.label} is required.` }))
+
+  for (const [name, value] of [['title_regex_include', filters.include], ['title_regex_exclude', filters.exclude] ] as const) {
+    if (!value) continue
+    try { new RegExp(value) } catch { errors.push({ name, message: 'That does not look like a valid regular expression.' }) }
+  }
+
+  return errors
 }
 
 function providerOptions(): Record<string, InputOptionValue> {
@@ -74,6 +84,8 @@ async function save() {
   try {
     const updated = await updateStashInputOptions(stashId, inputId, {
       ...(input.value.options ?? {}),
+      title_regex_include: filters.include.trim() || null,
+      title_regex_exclude: filters.exclude.trim() || null,
       provider: providerOptions()
     })
     input.value = updated
@@ -122,6 +134,8 @@ onMounted(load)
       <UForm :state="values" :validate="validate" class="space-y-6" @submit="save">
         <UCard :ui="{ body: 'p-4 sm:p-6' }">
           <div class="space-y-5">
+            <UFormField label="Include title regex" description="Only matching titles are preserved."><UInput v-model="filters.include" placeholder="e.g. season 2|s02" /></UFormField>
+            <UFormField label="Exclude title regex" description="Matching titles are ignored."><UInput v-model="filters.exclude" placeholder="e.g. trailer|shorts" /></UFormField>
             <PluginField
               v-for="field in normalized.fields"
               :key="field.key"

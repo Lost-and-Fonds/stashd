@@ -13,6 +13,9 @@ import type { CommandOperation } from '../api/commands'
 import type { StashInputApiResource } from '../types/input'
 import type { StashItemApiResource, StashItemsApiResponse } from '../types/item'
 import type { StashApiResource, StashDeleteImpact } from '../types/stash'
+import OperationProgress from '../components/OperationProgress.vue'
+import { fetchJobs, type JobApiResource } from '../api/status'
+import { formatExactDate, formatRelativeDate } from '../utils/formatDate'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,6 +25,7 @@ const stash = ref<StashApiResource>()
 const inputs = ref<StashInputApiResource[]>([])
 const broadcasts = ref<BroadcastApiResource[]>([])
 const items = ref<StashItemsApiResponse>({ items: [], total: 0, limit: 20, offset: 0, stash_item_count: 0 })
+const jobs = ref<JobApiResource[]>([])
 const loading = ref(true)
 const itemsLoading = ref(false)
 const error = ref<string>()
@@ -87,11 +91,11 @@ function monogram(name: string) {
 }
 
 function absoluteTime(value?: string | null) {
-  return value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : ''
+  return formatExactDate(value)
 }
 
 function relativeDate(value?: string | null) {
-  return value ? new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+  return formatRelativeDate(value)
 }
 
 function inputTitle(input: StashInputApiResource) {
@@ -122,6 +126,8 @@ function operationText(operation: CommandOperation | undefined, verb: string) {
 }
 
 const failedItemCount = computed(() => items.value.status_counts?.failed ?? 0)
+const activeJobs = computed(() => jobs.value.filter(job => job.entity_type === 'media_item' && (job.state === 'processing' || job.state === 'pending')))
+const itemSort = ref({ key: 'published', direction: 'desc' as 'asc' | 'desc' })
 
 function openEdit() {
   if (!stash.value) return
@@ -309,10 +315,41 @@ function itemSize(item: StashItemApiResource) {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
 }
 
-function itemThumbnail() {
+function itemThumbnail(item: StashItemApiResource) {
+  if (item.media_item?.thumbnail_uri) return h('img', { src: item.media_item.thumbnail_uri, alt: '', class: 'aspect-video w-14 shrink-0 rounded-md object-cover sm:w-16' })
   return h('div', { class: 'flex aspect-video w-14 shrink-0 items-center justify-center rounded-md bg-elevated sm:w-16' }, [
     h(resolveComponent('UIcon'), { name: 'i-lucide-play', class: 'size-3.5 text-dimmed' })
   ])
+}
+
+function activeJobFor(item: StashItemApiResource) {
+  return jobs.value.find(job => job.entity_type === 'media_item' && job.entity_id === item.media_item_id && (job.state === 'processing' || job.state === 'pending'))
+}
+
+function itemSortValue(item: StashItemApiResource, key: string): string | number {
+  if (key === 'title') return itemTitle(item).toLowerCase()
+  if (key === 'published') return item.media_item?.published_at ? Date.parse(item.media_item.published_at) : 0
+  if (key === 'duration') return item.media_item?.duration_seconds ?? -1
+  if (key === 'size') return item.total_asset_size_bytes ?? -1
+  return itemState(item)
+}
+
+function sortItems(key: string) {
+  itemSort.value = itemSort.value.key === key ? { key, direction: itemSort.value.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: key === 'published' ? 'desc' : 'asc' }
+}
+
+function sortedItems(itemsToSort: StashItemApiResource[]) {
+  const direction = itemSort.value.direction === 'asc' ? 1 : -1
+  return [...itemsToSort].sort((left, right) => {
+    const a = itemSortValue(left, itemSort.value.key)
+    const b = itemSortValue(right, itemSort.value.key)
+    return a < b ? -direction : a > b ? direction : 0
+  })
+}
+
+function sortHeader(label: string, key: string) {
+  const arrow = itemSort.value.key === key ? itemSort.value.direction === 'asc' ? ' ↑' : ' ↓' : ''
+  return h('button', { type: 'button', class: 'transition-colors hover:text-highlighted', onClick: () => sortItems(key) }, label + arrow)
 }
 
 function itemStatusCell(item: StashItemApiResource) {
@@ -325,25 +362,24 @@ function itemStatusCell(item: StashItemApiResource) {
 
 const itemColumns: TableColumn<StashItemApiResource>[] = [
   {
-    accessorKey: 'id',
-    header: 'Title',
+    id: 'title',
+    header: () => sortHeader('Title', 'title'),
     cell: ({ row }) => h('div', { class: 'flex items-center gap-2.5' }, [
-      itemThumbnail(),
-      h(resolveComponent('UTooltip'), { text: itemTitle(row.original) }, () =>
-        h('span', { class: 'block max-w-[280px] truncate font-mono text-sm text-highlighted' }, itemTitle(row.original)))
+      itemThumbnail(row.original),
+      h('span', { class: 'block whitespace-normal font-mono text-sm text-highlighted' }, itemTitle(row.original))
     ])
   },
   {
     id: 'published',
-    header: 'Published',
+    header: () => sortHeader('Published', 'published'),
     cell: ({ row }) => row.original.media_item?.published_at
       ? h(resolveComponent('UTooltip'), { text: absoluteTime(row.original.media_item.published_at) }, () =>
         h('time', { datetime: row.original.media_item?.published_at, class: 'whitespace-nowrap font-mono text-xs text-dimmed' }, relativeDate(row.original.media_item?.published_at)))
       : h('span', { class: 'font-mono text-xs text-dimmed' }, '—')
   },
-  { id: 'duration', header: 'Duration', cell: ({ row }) => h('span', { class: 'font-mono text-xs text-muted' }, itemDuration(row.original)) },
-  { id: 'size', header: 'Size', cell: ({ row }) => h('span', { class: 'font-mono text-xs text-muted' }, itemSize(row.original)) },
-  { id: 'status', header: 'Status', cell: ({ row }) => itemStatusCell(row.original) }
+  { id: 'duration', header: () => sortHeader('Duration', 'duration'), cell: ({ row }) => h('span', { class: 'font-mono text-xs text-muted' }, itemDuration(row.original)) },
+  { id: 'size', header: () => sortHeader('Size', 'size'), cell: ({ row }) => h('span', { class: 'font-mono text-xs text-muted' }, itemSize(row.original)) },
+  { id: 'status', header: () => sortHeader('Status', 'status'), cell: ({ row }) => h('div', { class: 'space-y-1' }, [itemStatusCell(row.original), ...(activeJobFor(row.original) ? [h(OperationProgress, { variant: 'compact', percent: activeJobFor(row.original)?.progress_percent ?? null, status: 'active', class: 'w-24' })] : [])]) }
 ]
 
 const itemTableUi = {
@@ -399,6 +435,10 @@ async function loadItems() {
   }
 }
 
+async function loadJobs() {
+  try { jobs.value = await fetchJobs() } catch { jobs.value = [] }
+}
+
 async function load() {
   const stashId = String(route.params.id)
   loading.value = true
@@ -439,7 +479,7 @@ async function load() {
   }
 
   loading.value = false
-  await loadItems()
+  await Promise.all([loadItems(), loadJobs()])
 }
 
 watch([itemSearch, itemStatusFilter], () => { itemsPage.value = 1 })
@@ -477,9 +517,8 @@ onBeforeUnmount(() => {
 
     <header class="flex items-start justify-between gap-4">
       <div class="flex items-start gap-4">
-        <div class="flex size-14 shrink-0 items-center justify-center rounded-md bg-elevated font-mono text-lg text-muted">
-          {{ monogram(stash.name) }}
-        </div>
+        <img v-if="stash.icon_uri" :src="stash.icon_uri" alt="" class="size-14 shrink-0 rounded-md object-cover" />
+        <div v-else class="flex size-14 shrink-0 items-center justify-center rounded-md bg-elevated font-mono text-lg text-muted">{{ monogram(stash.name) }}</div>
         <div class="min-w-0">
           <h1 class="truncate font-mono text-2xl leading-tight text-highlighted">{{ stash.name }}</h1>
           <div class="mt-2 flex items-center gap-1.5">
@@ -620,6 +659,12 @@ onBeforeUnmount(() => {
       <div class="flex flex-col gap-2 sm:flex-row">
         <UInput v-model="itemSearch" placeholder="Search items" icon="i-lucide-search" class="sm:max-w-sm sm:flex-1" />
         <USelect v-model="itemStatusFilter" :items="itemStatusFilterOptions" value-key="value" class="sm:w-40" />
+        <UButton v-if="failedItemCount" :label="`Retry failed (${failedItemCount})`" icon="i-lucide-refresh-cw" variant="soft" color="error" size="sm" :loading="retrying" @click="retryFailed" />
+      </div>
+
+      <div v-if="activeJobs.length" class="space-y-2 rounded-md bg-muted p-3">
+        <p class="text-xs font-medium text-highlighted">Download activity</p>
+        <OperationProgress v-for="job in activeJobs" :key="job.id" :label="job.progress_label || 'Downloading'" :percent="job.progress_percent ?? null" :count="job.progress_current !== null && job.progress_total !== null ? `${job.progress_current} / ${job.progress_total}` : undefined" status="active" />
       </div>
 
       <UAlert v-if="itemsError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not load Items" :description="itemsError" />
@@ -629,14 +674,13 @@ onBeforeUnmount(() => {
       </div>
       <template v-else-if="items.items.length">
         <div class="hidden overflow-hidden rounded-md border border-default bg-muted md:block">
-          <UTable :data="items.items" :columns="itemColumns" :ui="itemTableUi" class="text-sm" />
+          <UTable :data="sortedItems(items.items)" :columns="itemColumns" :ui="itemTableUi" class="text-sm" />
         </div>
 
         <div class="space-y-2 md:hidden">
           <div v-for="item in items.items" :key="item.id" class="flex items-center gap-3 rounded-md bg-muted p-3">
-            <div class="flex aspect-video w-14 shrink-0 items-center justify-center rounded-md bg-elevated">
-              <UIcon name="i-lucide-play" class="size-3.5 text-dimmed" />
-            </div>
+            <img v-if="item.media_item?.thumbnail_uri" :src="item.media_item.thumbnail_uri" alt="" class="aspect-video w-14 shrink-0 rounded-md object-cover" />
+            <div v-else class="flex aspect-video w-14 shrink-0 items-center justify-center rounded-md bg-elevated"><UIcon name="i-lucide-play" class="size-3.5 text-dimmed" /></div>
             <div class="min-w-0 flex-1 space-y-1">
               <p class="truncate font-mono text-sm text-highlighted">{{ itemTitle(item) }}</p>
               <div class="flex items-center gap-1.5">

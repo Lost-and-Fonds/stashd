@@ -3,6 +3,8 @@ domains:
 secured: true
 services:
   - postgres
+workers:
+  - vite
 custom_workers:
   schedule:
     label: Task Scheduler

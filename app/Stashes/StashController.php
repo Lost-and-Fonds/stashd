@@ -57,7 +57,16 @@ final readonly class StashController
     {
         return new Json([
             'stashes' => array_map(
-                static fn($stash): array => StashResource::fromRecord($stash)->toArray(),
+                function ($stash): array {
+                    $items = $this->stashItems->listForStash(StashId::fromPrimaryKey($stash->id));
+                    $sizes = $this->assets->totalSizeBytesByMediaItem(array_map(static fn($item): string => (string) $item->mediaItemId, $items));
+
+                    return StashResource::fromRecord($stash, [
+                        'itemCount' => count($items),
+                        'storageBytes' => array_sum($sizes),
+                        'inputSummary' => array_values(array_unique(array_map(fn($input): string => $input->providerKey, $this->stashInputs->listForStash(StashId::fromPrimaryKey($stash->id))))),
+                    ])->toArray();
+                },
                 $this->stashes->list(),
             ),
         ]);

@@ -86,7 +86,14 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     }
     public function isStrategyAvailable(ProviderStrategy $strategy): bool
     {
-        return $strategy->key !== 'plugin.complete' || $this->definition->httpGrants($this->secrets, 'complete') !== [];
+        if ($strategy->key !== 'plugin.complete') {
+            return true;
+        }
+
+        return array_filter(
+            $this->definition->httpGrants($this->secrets, 'complete'),
+            static fn(PluginHttpGrant $grant): bool => $grant->credential !== null,
+        ) !== [];
     }
     public function inputOptions(ResolvedInput $input): array
     {

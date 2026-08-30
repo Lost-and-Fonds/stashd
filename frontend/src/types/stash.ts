@@ -28,6 +28,10 @@ export interface StashApiResource {
   download_policy?: string
   organization_mode?: string
   state: string
+  icon_uri?: string | null
+  item_count?: number
+  storage_bytes?: number
+  input_summary?: string[]
   created_at?: string
   updated_at?: string
 }

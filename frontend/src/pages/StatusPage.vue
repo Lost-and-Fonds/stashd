@@ -3,10 +3,23 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import OperationProgress from '../components/OperationProgress.vue'
 import { fetchActivity, fetchHealth, fetchJobs, type ActivityApiResource, type HealthApiResponse, type JobApiResource } from '../api/status'
 import { subscribeLiveUpdates, type LiveEvent } from '../live/mercure'
+import { fetchStashItems, fetchStashes, retryFailedStash } from '../api/stashes'
+import { fetchStashBroadcasts } from '../api/broadcasts'
+import { fetchStashInputs } from '../api/inputs'
+import { formatRelativeDate } from '../utils/formatDate'
+import type { StashApiResource } from '../types/stash'
+import type { StashItemApiResource } from '../types/item'
+import type { BroadcastApiResource } from '../types/broadcast-plugin'
+import type { StashInputApiResource } from '../types/input'
 
 const health = ref<HealthApiResponse>()
 const jobs = ref<JobApiResource[]>([])
 const activity = ref<ActivityApiResource[]>([])
+const stashes = ref<StashApiResource[]>([])
+const itemsById = ref<Record<string, StashItemApiResource>>({})
+const broadcastsById = ref<Record<string, BroadcastApiResource>>({})
+const inputsById = ref<Record<string, StashInputApiResource>>({})
+const retryingStash = ref<string>()
 const healthLoading = ref(true)
 const jobsLoading = ref(true)
 const activityLoading = ref(true)
@@ -24,8 +37,15 @@ const attention = computed(() => {
     .sort((left, right) => Date.parse(right.finished_at ?? right.updated_at ?? right.created_at ?? '') - Date.parse(left.finished_at ?? left.updated_at ?? left.created_at ?? ''))
   const visibleFailedJobs = [] as JobApiResource[]
   const failureKeys = new Set<string>()
+  const downloadFailures = failedJobs.filter(job => job.intent === 'download')
+  const failuresByStash = new Map<string, JobApiResource[]>()
+  for (const job of downloadFailures) {
+    const stashId = job.entity_id ? itemsById.value[job.entity_id]?.stash_id : undefined
+    if (stashId) failuresByStash.set(stashId, [...(failuresByStash.get(stashId) ?? []), job])
+  }
 
   for (const job of failedJobs) {
+    if (job.intent === 'item_download') continue
     const key = `${job.intent}:${job.entity_type ?? ''}:${job.entity_id ?? ''}`
     if (failureKeys.has(key)) continue
     failureKeys.add(key)
@@ -35,14 +55,16 @@ const attention = computed(() => {
   const failedJobIds = new Set(visibleFailedJobs.map(job => job.id))
 
   return [
-    ...(health.value && health.value.status !== 'ok' ? [{ id: 'health', label: 'System health is degraded', context: health.value.storage.message ?? 'One or more health checks are not ready.' }] : []),
-    ...(health.value && !health.value.database.writable ? [{ id: 'database', label: 'Database is not writable', context: 'System health' }] : []),
-    ...(health.value && !health.value.storage.ready ? [{ id: 'storage', label: 'Storage is not ready', context: health.value.storage.message ?? 'System health' }] : []),
-    ...visibleFailedJobs.map(job => ({ id: `job-${job.id}`, label: `${intentLabel(job.intent)} failed`, context: job.last_error ?? entityLabel(job) })),
+    ...(health.value && health.value.status !== 'ok' ? [{ id: 'health', label: 'System health is degraded', context: health.value.storage.message ?? 'One or more health checks are not ready.', stashId: undefined }] : []),
+    ...(health.value && !health.value.database.writable ? [{ id: 'database', label: 'Database is not writable', context: 'System health', stashId: undefined }] : []),
+    ...(health.value && !health.value.storage.ready ? [{ id: 'storage', label: 'Storage is not ready', context: health.value.storage.message ?? 'System health', stashId: undefined }] : []),
+    ...[...failuresByStash.entries()].map(([stashId, failures]) => ({ id: `download-failures-${stashId}`, label: `${failures.length} downloads failed`, context: `${stashLabel(stashId)} · ${formatRelativeDate(failures[0].finished_at ?? failures[0].updated_at)}`, stashId, detail: failures[0].last_error ?? undefined })),
+    ...(downloadFailures.length && failuresByStash.size === 0 ? [{ id: 'download-failures', label: `${downloadFailures.length} downloads failed`, context: formatRelativeDate(downloadFailures[0].finished_at ?? downloadFailures[0].updated_at), stashId: undefined, detail: downloadFailures[0].last_error ?? undefined }] : []),
+    ...visibleFailedJobs.map(job => ({ id: `job-${job.id}`, label: `${intentLabel(job.intent)} failed`, context: `${entityLabel(job)} · ${formatRelativeDate(job.finished_at ?? job.updated_at)}`, stashId: undefined })),
     ...activity.value
       .filter(event => event.level === 'error' && Date.parse(event.created_at) >= recentCutoff && (!event.job_id || !failedJobIds.has(event.job_id)))
       .slice(0, 8)
-      .map(event => ({ id: `activity-${event.id}`, label: event.message, context: activityContext(event) }))
+      .map(event => ({ id: `activity-${event.id}`, label: event.message, context: activityContext(event), stashId: undefined }))
   ]
 })
 
@@ -51,15 +73,38 @@ function intentLabel(intent: string) {
 }
 
 function entityLabel(job: JobApiResource) {
+  if (job.entity_type === 'stash') return stashes.value.find(stash => stash.id === job.entity_id)?.name ?? 'Stash'
+  if (job.entity_type === 'media_item') return itemsById.value[job.entity_id ?? '']?.media_item?.title ?? 'Media item'
+  if (job.entity_type === 'broadcast') return broadcastsById.value[job.entity_id ?? '']?.name ?? 'Broadcast'
+  if (job.entity_type === 'stash_input') return inputsById.value[job.entity_id ?? '']?.title ?? 'Input'
   return [job.entity_type, job.entity_id].filter(Boolean).join(' · ') || 'Recent job'
 }
 
+function stashLabel(stashId: string) {
+  return stashes.value.find(stash => stash.id === stashId)?.name ?? 'Stash'
+}
+
 function activityContext(event: ActivityApiResource) {
+  if (event.media_item_id) return itemsById.value[event.media_item_id]?.media_item?.title ?? 'Media item'
+  if (event.broadcast_id) return broadcastsById.value[event.broadcast_id]?.name ?? 'Broadcast'
+  if (event.entity_type === 'stash_input') return inputsById.value[event.entity_id ?? '']?.title ?? 'Input'
+  if (event.stash_id) return stashLabel(event.stash_id)
   return [event.entity_type, event.entity_id].filter(Boolean).join(' · ') || event.type
 }
 
+async function retryStash(stashId: string) {
+  if (retryingStash.value) return
+  retryingStash.value = stashId
+  try {
+    await retryFailedStash(stashId)
+    await loadJobs()
+  } finally {
+    retryingStash.value = undefined
+  }
+}
+
 function formatDate(value?: string | null) {
-  return value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
+  return formatRelativeDate(value)
 }
 
 function formatBytes(bytes?: number | null) {
@@ -124,6 +169,20 @@ async function loadActivity() {
   }
 }
 
+async function loadContext() {
+  const resources = await Promise.all(stashes.value.map(async stash => {
+    const [items, inputs, broadcasts] = await Promise.all([
+      fetchStashItems(stash.id, { limit: 200, offset: 0 }),
+      fetchStashInputs(stash.id),
+      fetchStashBroadcasts(stash.id)
+    ])
+    return { items: items.items, inputs, broadcasts }
+  }))
+  itemsById.value = Object.fromEntries(resources.flatMap(resource => resource.items.map(item => [item.media_item_id, item])))
+  inputsById.value = Object.fromEntries(resources.flatMap(resource => resource.inputs.map(input => [input.id, input])))
+  broadcastsById.value = Object.fromEntries(resources.flatMap(resource => resource.broadcasts.map(broadcast => [broadcast.id, broadcast])))
+}
+
 function refreshJobsSoon() {
   if (jobsRefreshTimer) return
   jobsRefreshTimer = setTimeout(() => {
@@ -158,6 +217,7 @@ onMounted(() => {
   void loadHealth()
   void loadJobs()
   void loadActivity()
+  void fetchStashes().then(async value => { stashes.value = value; await loadContext() }).catch(() => undefined)
 })
 
 onBeforeUnmount(() => {
@@ -170,18 +230,22 @@ onBeforeUnmount(() => {
   <main class="mx-auto max-w-2xl space-y-8 px-4 py-8 sm:px-8">
     <header class="space-y-1">
       <h1 class="text-2xl font-semibold text-highlighted">Status</h1>
-      <p class="text-sm text-muted">Is Stashd okay, what it's doing, and what it's using.</p>
-      <p v-if="health" class="font-mono text-xs text-dimmed">Stashd {{ health.version }} · {{ health.status }}</p>
+      <p class="text-sm text-muted">A quick view of Stashd health, active work, and recent problems.</p>
+      <p v-if="health" class="font-mono text-xs" :class="health.status === 'ok' ? 'text-success' : 'text-warning'">Stashd {{ health.version }} · {{ health.status === 'ok' ? 'System healthy' : 'Degraded' }}</p>
     </header>
 
     <section class="space-y-3">
       <h2 class="text-base font-medium text-highlighted">Needs attention</h2>
       <UAlert v-if="healthError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not load system health" :description="healthError" />
       <div v-else-if="attention.length" class="divide-y divide-default/60 overflow-hidden rounded-md border border-default bg-muted">
-        <div v-for="issue in attention" :key="issue.id" class="space-y-1 p-3">
-          <div class="flex items-center gap-2"><span class="size-1.5 rounded-full bg-error" /><span class="text-sm text-highlighted">{{ issue.label }}</span></div>
-          <p class="pl-3.5 text-xs text-dimmed">{{ issue.context }}</p>
-        </div>
+          <div v-for="issue in attention" :key="issue.id" class="space-y-1 p-3">
+            <div class="flex items-center gap-2"><span class="size-1.5 rounded-full bg-error" /><span class="text-sm text-highlighted">{{ issue.label }}</span></div>
+            <p class="pl-3.5 text-xs text-dimmed">{{ issue.context }}</p>
+            <div v-if="issue.stashId || issue.detail" class="flex items-center gap-3 pl-3.5 pt-1">
+              <UButton v-if="issue.stashId" label="Retry failed" icon="i-lucide-refresh-cw" size="xs" variant="soft" color="error" :loading="retryingStash === issue.stashId" @click="retryStash(issue.stashId)" />
+              <details v-if="issue.detail" class="text-xs text-dimmed"><summary class="cursor-pointer">Details</summary><p class="mt-1 max-w-xl whitespace-pre-wrap">{{ issue.detail }}</p></details>
+            </div>
+          </div>
       </div>
       <p v-else-if="!healthLoading && !jobsLoading && !activityLoading" class="flex items-center gap-2 text-sm text-muted">
         <span class="size-1.5 rounded-full bg-success" />
