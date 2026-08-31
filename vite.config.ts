@@ -4,6 +4,11 @@ import ui from '@nuxt/ui/vite'
 
 export default defineConfig({
   root: '.',
+  publicDir: false,
+  build: {
+    outDir: 'public',
+    emptyOutDir: false
+  },
   server: {
     host: true,
     port: 5174,

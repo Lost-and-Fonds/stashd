@@ -4,6 +4,7 @@ secured: true
 services:
   - postgres
 workers:
+  - schedule
   - vite
 custom_workers:
   schedule:

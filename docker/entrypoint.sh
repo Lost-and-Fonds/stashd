@@ -150,7 +150,11 @@ prepare_runtime_env() {
     git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
     export STASHD_DATA_PATH="$DATA_DIR"
     export STASHD_MEDIA_PATH="$MEDIA_DIR"
-    export STASHD_PLUGIN_PACKAGE_ROOT="${DATA_DIR}/plugins"
+    if [ "$APP_DIR" = "/var/www/html" ]; then
+        export STASHD_PLUGIN_PACKAGE_ROOT="${DATA_DIR}/plugins"
+    else
+        export STASHD_PLUGIN_PACKAGE_ROOT="${STASHD_PLUGIN_PACKAGE_ROOT:-$APP_DIR/.stashd/plugin-packages}"
+    fi
     export TEMPEST_INTERNAL_STORAGE="${DATA_DIR}/.tempest"
     ensure_writable
     ensure_signing_key
@@ -162,6 +166,15 @@ prepare_runtime() {
     run_app php tempest stashd:boot
 }
 
+ensure_frontend() {
+    if [ -f "$APP_DIR/public/index.html" ] || [ ! -f "$APP_DIR/package.json" ]; then
+        return 0
+    fi
+
+    log "building frontend"
+    run_app npx vite build --outDir public --emptyOutDir false
+}
+
 ROLE="${1:-all}"
 
 cd "$APP_DIR"
@@ -169,13 +182,18 @@ cd "$APP_DIR"
 export_runtime_env() {
     export STASHD_DATA_PATH="$DATA_DIR"
     export STASHD_MEDIA_PATH="$MEDIA_DIR"
-    export STASHD_PLUGIN_PACKAGE_ROOT="${DATA_DIR}/plugins"
+    if [ "$APP_DIR" = "/var/www/html" ]; then
+        export STASHD_PLUGIN_PACKAGE_ROOT="${DATA_DIR}/plugins"
+    else
+        export STASHD_PLUGIN_PACKAGE_ROOT="${STASHD_PLUGIN_PACKAGE_ROOT:-$APP_DIR/.stashd/plugin-packages}"
+    fi
     export TEMPEST_INTERNAL_STORAGE="${DATA_DIR}/.tempest"
 }
 
 case "$ROLE" in
     all)
         prepare_runtime
+        ensure_frontend
         # $APP_DIR is only known at runtime (see the comment near its
         # declaration above), so the per-program `directory=` lines are
         # rendered into place here rather than baked into the image.
@@ -184,7 +202,8 @@ case "$ROLE" in
         exec /usr/bin/supervisord -n -c /etc/supervisor/supervisord.conf
         ;;
     serve)
-        export_runtime_env
+        prepare_runtime_env
+        ensure_frontend
         # Caddy (inside frankenphp) wants a writable config/data dir for its
         # own state; the gosu'd PUID may have no usable $HOME, so point it at
         # DATA_DIR, which is chowned to PUID:PGID by ensure_writable() (run as
@@ -204,6 +223,7 @@ case "$ROLE" in
         run_app php tempest stashd scheduler
         ;;
     boot)
+        ensure_frontend
         prepare_runtime
         ;;
     *)

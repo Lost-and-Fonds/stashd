@@ -30,6 +30,7 @@
 	# share one secret -- Stashd only ever publishes to itself, so splitting
 	# them would add two env vars for a distinction nothing uses.
 	mercure {
+		transport local
 		publisher_jwt {$MERCURE_JWT_SECRET}
 		subscriber_jwt {$MERCURE_JWT_SECRET}
 	}

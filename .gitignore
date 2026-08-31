@@ -5,6 +5,8 @@
 /components.d.ts
 /.tempest/
 /public/vite-tempest
+/public/assets/
+/public/index.html
 /.env
 /data/
 /media/
