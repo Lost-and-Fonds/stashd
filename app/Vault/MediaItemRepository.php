@@ -11,11 +11,10 @@ use Tempest\Database\Database;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Query;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class MediaItemRepository
 {
@@ -71,10 +70,13 @@ final class MediaItemRepository
 
     public function findByProviderIdentity(string $providerKey, string $providerItemId): ?MediaItemRecord
     {
-        return MediaItemRecord::select()
+        /** @var MediaItemRecord|null $item */
+        $item = MediaItemRecord::select()
             ->where('providerKey', $providerKey)
             ->where('providerItemId', $providerItemId)
             ->first();
+
+        return $item;
     }
 
     public function save(MediaItemRecord $record): MediaItemRecord
@@ -99,7 +101,10 @@ final class MediaItemRepository
             $query->offset($offset);
         }
 
-        return $query->all();
+        /** @var list<MediaItemRecord> $items */
+        $items = $query->all();
+
+        return $items;
     }
 
     public function count(): int
@@ -210,7 +215,10 @@ final class MediaItemRepository
 
         $byId = [];
 
-        foreach (MediaItemRecord::select()->whereIn('id', $ids)->all() as $item) {
+        /** @var list<MediaItemRecord> $items */
+        $items = array_values(MediaItemRecord::select()->whereIn('id', $ids)->all());
+
+        foreach ($items as $item) {
             $byId[(string) $item->id] = $item;
         }
 

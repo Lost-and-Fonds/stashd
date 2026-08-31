@@ -10,12 +10,11 @@ use App\Support\PrefixedUlidGenerator;
 use Tempest\Database\Connection\Connection;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\FormatPattern;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class JobRepository
 {
@@ -180,11 +179,14 @@ final class JobRepository
     /** @return list<JobRecord> */
     public function listProcessingStale(DateTime $staleBefore): array
     {
-        return JobRecord::select()
+        /** @var list<JobRecord> $jobs */
+        $jobs = array_values(JobRecord::select()
             ->where('state', JobState::Processing)
             ->whereNotNull('heartbeatAt')
             ->where('heartbeatAt', $staleBefore, '<')
-            ->all();
+            ->all());
+
+        return $jobs;
     }
 
     /**
@@ -199,15 +201,17 @@ final class JobRepository
      */
     public function listRecent(int $limit = 50): array
     {
-        $processing = JobRecord::select()
+        /** @var list<JobRecord> $processing */
+        $processing = array_values(JobRecord::select()
             ->where('state', JobState::Processing)
             ->orderBy('createdAt', Direction::ASC)
-            ->all();
+            ->all());
 
-        $recent = JobRecord::select()
+        /** @var list<JobRecord> $recent */
+        $recent = array_values(JobRecord::select()
             ->orderBy('createdAt', Direction::DESC)
             ->limit($limit)
-            ->all();
+            ->all());
 
         $seen = [];
         $jobs = [];
@@ -233,10 +237,13 @@ final class JobRepository
     /** @return list<JobRecord> */
     public function listForCommand(CommandId $commandId): array
     {
-        return JobRecord::select()
+        /** @var list<JobRecord> $jobs */
+        $jobs = array_values(JobRecord::select()
             ->where('commandId', $commandId->toString())
             ->orderBy('createdAt', Direction::ASC)
-            ->all();
+            ->all());
+
+        return $jobs;
     }
 
     /**
@@ -258,13 +265,14 @@ final class JobRepository
         // createdAt is second-precision, so a retry issued within the same
         // second as the failure it's replacing would tie -- id (a ULID) is
         // monotonic and breaks the tie in actual creation order.
-        $jobs = JobRecord::select()
+        /** @var list<JobRecord> $jobs */
+        $jobs = array_values(JobRecord::select()
             ->where('entityType', 'media_item')
             ->where('intent', JobIntent::Download)
             ->whereIn('entityId', $mediaItemIds)
             ->orderBy('createdAt', Direction::DESC)
             ->orderBy('id', Direction::DESC)
-            ->all();
+            ->all());
 
         $latestByMediaItem = [];
 

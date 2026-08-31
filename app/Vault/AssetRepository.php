@@ -10,11 +10,10 @@ use App\Support\DurationSeconds;
 use App\Support\PrefixedUlidGenerator;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class AssetRepository
 {
@@ -78,10 +77,13 @@ final class AssetRepository
 
     public function findByMediaItemAndRole(MediaItemId $mediaItemId, AssetRole $role): ?AssetRecord
     {
-        return AssetRecord::select()
+        /** @var AssetRecord|null $asset */
+        $asset = AssetRecord::select()
             ->where('mediaItemId', $mediaItemId->toString())
             ->where('role', $role)
             ->first();
+
+        return $asset;
     }
 
     public function findByBroadcastItemAndRole(BroadcastItemId $broadcastItemId, AssetRole $role): ?AssetRecord
@@ -137,9 +139,12 @@ final class AssetRepository
     /** @return list<AssetRecord> */
     public function listForMediaItem(MediaItemId $mediaItemId): array
     {
-        return AssetRecord::select()
+        /** @var list<AssetRecord> $assets */
+        $assets = AssetRecord::select()
             ->where('mediaItemId', $mediaItemId->toString())
             ->all();
+
+        return $assets;
     }
 
     /** @return list<AssetRecord> */
@@ -165,10 +170,13 @@ final class AssetRepository
     /** @return list<AssetRecord> */
     public function listByBroadcastAndRole(BroadcastId $broadcastId, AssetRole $role): array
     {
-        return AssetRecord::select()
+        /** @var list<AssetRecord> $assets */
+        $assets = AssetRecord::select()
             ->where('broadcastId', $broadcastId->toString())
             ->where('role', $role)
             ->all();
+
+        return $assets;
     }
 
     public function countReadyVaultAssets(): int

@@ -95,9 +95,11 @@ final readonly class StorageCapabilityChecker
             targetRoot: $this->config->broadcastsPath(),
         );
 
+        /** @var StorageLocationRecord|null $vault */
         $vault = StorageLocationRecord::select()
             ->where('key', StorageLocationKey::Vault)
             ->first();
+        /** @var StorageLocationRecord|null $broadcasts */
         $broadcasts = StorageLocationRecord::select()
             ->where('key', StorageLocationKey::Broadcasts)
             ->first();
@@ -189,6 +191,6 @@ final readonly class StorageCapabilityChecker
 
         $stat = stat($root);
 
-        return $stat === false ? null : (string) ($stat['dev'] ?? '');
+        return $stat === false ? null : (string) $stat['dev'];
     }
 }

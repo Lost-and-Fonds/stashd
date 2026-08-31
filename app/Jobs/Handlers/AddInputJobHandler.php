@@ -8,6 +8,7 @@ use App\Commands\CommandId;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
+use App\Http\Api\ApiJson;
 use App\Jobs\JobHandler;
 use App\Jobs\JobHandlerContext;
 use App\Jobs\JobIntent;
@@ -15,6 +16,7 @@ use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
+use App\Stashes\CreateStashWithInitialInput;
 use App\Stashes\CreateStashFromDiscovery;
 use App\Stashes\StashId;
 use App\Stashes\StashRepository;
@@ -28,7 +30,8 @@ use Tempest\DateTime\Timezone;
 final readonly class AddInputJobHandler implements JobHandler
 {
     public function __construct(
-        private CreateStashFromDiscovery $stashFromPreflight,
+        private CreateStashWithInitialInput $stashFromPreflight,
+        private CreateStashFromDiscovery $stashFromDiscovery,
         private StashRepository $stashes,
         private CommandRepository $commands,
         private JobRepository $jobs,
@@ -49,20 +52,26 @@ final readonly class AddInputJobHandler implements JobHandler
         $context->heartbeat($job);
         $context->progress($job, JobProgressUpdate::ofSteps(0, 1, 'Adding input to stash'));
 
+        /** @var array<string, mixed> $payload */
         $payload = $job->payload ?? [];
 
-        $stashId = StashId::parse((string) ($payload['stash_id'] ?? ''));
+        $stashId = StashId::parse(ApiJson::string($payload['stash_id'] ?? null));
         $stash = $this->stashes->find($stashId)
             ?? throw new RuntimeException('Add-input job targets a stash that no longer exists.');
 
+        /** @var array<string, mixed> $options */
         $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
-        if (is_string($payload['plugin'] ?? null) && is_array($payload['source'] ?? null)) {
-            $result = $this->stashFromPreflight->addToExisting($stash, $payload['plugin'], $payload['source'], $options);
+        $plugin = $payload['plugin'] ?? null;
+        $source = $payload['source'] ?? null;
+
+        if (is_string($plugin) && is_array($source)) {
+            /** @var array<string, mixed> $source */
+            $result = $this->stashFromPreflight->addToExisting($stash, $plugin, $source, $options);
         } else {
-            $preflightCommandId = (string) ($payload['preflight_command_id'] ?? '');
+            $preflightCommandId = is_string($payload['preflight_command_id'] ?? null) ? $payload['preflight_command_id'] : '';
             $preflightCommand = $this->commands->find(CommandId::parse($preflightCommandId))
                 ?? throw new RuntimeException('Preflight command not found.');
-            $result = $this->stashFromPreflight->commitInput($stash, $preflightCommand, $options);
+            $result = $this->stashFromDiscovery->commitInput($stash, $preflightCommand, $options);
         }
 
         $command->result = $result->toArray();

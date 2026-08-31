@@ -43,7 +43,7 @@ final readonly class StashdRuntimeCommand
     private function runAll(): ExitCode
     {
         $this->console->info('Starting Stashd all-in-one runtime (supervisord expected in Docker).');
-        $this->console->warn('Local dev: run `stashd serve`, `stashd worker`, and `stashd scheduler` in separate terminals.');
+        $this->console->info('Local dev: run `stashd serve`, `stashd worker`, and `stashd scheduler` in separate terminals.');
 
         return $this->frankenPhp->serve();
     }
@@ -61,7 +61,7 @@ final readonly class StashdRuntimeCommand
 
         $tick = 'php tempest stashd:worker-tick' . ($lane !== null ? " {$lane}" : '');
 
-        while (true) {
+        for (;;) {
             $result = $this->processes->run($tick);
 
             // Idle queues poll gently: with one loop per lane, a 2s cadence
@@ -74,7 +74,7 @@ final readonly class StashdRuntimeCommand
     {
         $this->console->info('Scheduler started.');
 
-        while (true) {
+        for (;;) {
             $this->processes->run('php tempest schedule:run');
             sleep(60);
         }

@@ -101,7 +101,7 @@ final readonly class BroadcastController
         }
 
         $body = ApiJson::normalizeRequest($request->body);
-        $typeRaw = trim((string) ($body['type'] ?? ''));
+        $typeRaw = trim(ApiJson::string($body['type'] ?? null));
 
         if (! in_array($typeRaw, BroadcastPluginRegistry::broadcastKeys(), true)) {
             return new Json([
@@ -112,7 +112,7 @@ final readonly class BroadcastController
             ], Status::BAD_REQUEST);
         }
 
-        $mediaKind = isset($body['mediaKind']) ? trim((string) $body['mediaKind']) : null;
+        $mediaKind = isset($body['mediaKind']) ? ApiJson::string($body['mediaKind']) : null;
         $preview = $this->lifecycle->preview(
             StashId::parse($stashId),
             $typeRaw,
@@ -134,9 +134,9 @@ final readonly class BroadcastController
         $typedStashId = StashId::parse($stashId);
 
         $body = ApiJson::normalizeRequest($request->body);
-        $typeRaw = trim((string) ($body['type'] ?? ''));
-        $name = trim((string) ($body['name'] ?? ''));
-        $slugRaw = trim((string) ($body['slug'] ?? ''));
+        $typeRaw = trim(ApiJson::string($body['type'] ?? null));
+        $name = trim(ApiJson::string($body['name'] ?? null));
+        $slugRaw = trim(ApiJson::string($body['slug'] ?? null));
 
         if ($typeRaw === '') {
             return new Json([
@@ -579,6 +579,7 @@ final readonly class BroadcastController
         );
     }
 
+    /** @return array<string, mixed> */
     private function mapPlugin(string $key, DiscoveredPlugin $discovered): array
     {
         return ApiJson::encode([

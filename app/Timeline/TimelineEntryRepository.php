@@ -8,11 +8,10 @@ use App\Support\PrefixedUlidGenerator;
 use App\Vault\MediaItemId;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class TimelineEntryRepository
 {

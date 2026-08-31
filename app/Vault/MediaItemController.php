@@ -20,6 +20,7 @@ use App\Vault\Api\MediaItemDetailResource;
 use App\Vault\Api\MediaItemResource;
 use App\Vault\Api\VaultItemSummaryResource;
 use App\Config\StashdConfig;
+use App\Http\Api\ApiJson;
 use Tempest\Http\ContentType;
 use Tempest\Http\Response;
 use Tempest\Http\Responses\NotFound;
@@ -98,9 +99,10 @@ final readonly class MediaItemController
 
         $metadataAsset = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::MetadataJson);
         $pluginMetadata = null;
+
         if ($metadataAsset?->state === AssetState::Ready && $metadataAsset->path !== null && is_file($metadataAsset->path)) {
             $decoded = json_decode((string) file_get_contents($metadataAsset->path), true);
-            $pluginMetadata = is_array($decoded) ? $decoded : null;
+            $pluginMetadata = is_array($decoded) ? ApiJson::normalizeRequest($decoded) : null;
         }
 
         return new Json([
@@ -120,14 +122,21 @@ final readonly class MediaItemController
     {
         $item = $this->findMediaItem($id);
 
-        if ($item === null) return new NotFound();
+        if ($item === null) {
+            return new NotFound();
+        }
 
         $asset = $this->assets->findByMediaItemAndRole(MediaItemId::fromPrimaryKey($item->id), AssetRole::VaultOriginal);
 
-        if ($asset === null || $asset->state !== AssetState::Ready || $asset->path === null || ! is_file($asset->path)) return new NotFound();
+        if ($asset === null || $asset->state !== AssetState::Ready || $asset->path === null || ! is_file($asset->path)) {
+            return new NotFound();
+        }
 
         $size = $asset->sizeBytes ?? filesize($asset->path);
-        if ($size === false || $size === null) return new NotFound();
+
+        if ($size === false) {
+            return new NotFound();
+        }
 
         $mediaType = $asset->mimeType ?? match ($asset->kind) {
             AssetKind::Video => 'video/mp4',

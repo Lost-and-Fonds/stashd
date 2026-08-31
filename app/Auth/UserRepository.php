@@ -7,11 +7,10 @@ namespace App\Auth;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class UserRepository
 {
@@ -21,7 +20,10 @@ final class UserRepository
 
     public function findByUsername(string $username): ?UserRecord
     {
-        return UserRecord::select()->where('username', $username)->include('passwordHash')->first();
+        /** @var UserRecord|null $record */
+        $record = UserRecord::select()->where('username', $username)->include('passwordHash')->first();
+
+        return $record;
     }
 
     public function findById(UserId $id): ?UserRecord

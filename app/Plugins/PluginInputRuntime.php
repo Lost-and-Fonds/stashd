@@ -185,6 +185,10 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     }
 
     /** @return array<string, mixed> */
+    /** @param array<string, mixed> $params
+     * @param callable(string): void|null $onActivity
+     * @return array<string, mixed>
+     */
     private function invokeUncached(string $method, array $params, string $operation, ?string $staging = null, ?PluginHelperGrant $helper = null, ?callable $onActivity = null): array
     {
         $package = $this->packages->activePath($this->definition->id) ?? throw new RuntimeException('YouTube plugin is not active');
@@ -228,7 +232,9 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         $process = $this->runner->start($this->definition->id, $stage);
 
         try {
-            $capabilityHandler = /** @param array<string, mixed> $message */ function (array $message) use ($invocation, $onActivity): array {
+            $capabilityHandler = /** @param array<string, mixed> $message
+                @return array<string, mixed>
+             */ function (array $message) use ($invocation, $onActivity): array {
                 $p = self::stringKeyed($message['params'] ?? null);
 
                 return match ($message['method'] ?? '') {
@@ -259,7 +265,9 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         }
     }
 
-    /** @param array<string, mixed> $p */
+    /** @param array<string, mixed> $p
+     * @return array<string, mixed>
+     */
     private function capabilityProgress(?callable $onActivity, array $p): array
     {
         if ($onActivity !== null && is_string($p['stage'] ?? null)) {

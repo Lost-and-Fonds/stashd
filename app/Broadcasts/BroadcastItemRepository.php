@@ -10,11 +10,10 @@ use App\Vault\MediaItemId;
 use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class BroadcastItemRepository
 {
@@ -63,28 +62,37 @@ final class BroadcastItemRepository
     /** @return list<BroadcastItemRecord> */
     public function listForBroadcast(BroadcastId $broadcastId): array
     {
-        return BroadcastItemRecord::select()
+        /** @var list<BroadcastItemRecord> $records */
+        $records = BroadcastItemRecord::select()
             ->where('broadcastId', $broadcastId->toString())
             ->orderBy('createdAt', Direction::ASC)
             ->all();
+
+        return $records;
     }
 
     public function findByBroadcastAndStashItem(
         BroadcastId $broadcastId,
         StashItemId $stashItemId,
     ): ?BroadcastItemRecord {
-        return BroadcastItemRecord::select()
+        /** @var BroadcastItemRecord|null $record */
+        $record = BroadcastItemRecord::select()
             ->where('broadcastId', $broadcastId->toString())
             ->where('stashItemId', $stashItemId->toString())
             ->first();
+
+        return $record;
     }
 
     /** @return list<BroadcastItemRecord> */
     public function listForMediaItem(MediaItemId $mediaItemId): array
     {
-        return BroadcastItemRecord::select()
+        /** @var list<BroadcastItemRecord> $records */
+        $records = BroadcastItemRecord::select()
             ->with('broadcast')
             ->where('mediaItemId', $mediaItemId->toString())
             ->all();
+
+        return $records;
     }
 }

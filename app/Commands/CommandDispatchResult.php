@@ -8,7 +8,10 @@ use App\Jobs\JobRecord;
 
 final readonly class CommandDispatchResult
 {
-    /** @param list<JobRecord> $jobs */
+    /**
+     * @param list<JobRecord> $jobs
+     * @param array<string, mixed> $extras
+     */
     public function __construct(
         public CommandRecord $command,
         public array $jobs,

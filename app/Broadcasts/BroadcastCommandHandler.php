@@ -10,6 +10,7 @@ use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
 use App\Commands\InvalidCommandPayload;
+use App\Http\Api\ApiJson;
 use App\Jobs\JobIntent;
 use App\Jobs\JobRepository;
 use App\Support\PrefixedUlid;
@@ -63,9 +64,9 @@ final readonly class BroadcastCommandHandler implements CommandHandler
     {
         $commandId = CommandId::fromPrimaryKey($command->id);
         $payload = $this->normalizedPayload($options);
-        $broadcast = $this->broadcasts->find(BroadcastId::parse((string) $payload['broadcast_id']))
+        $broadcast = $this->broadcasts->find(BroadcastId::parse(ApiJson::string($payload['broadcast_id'] ?? null)))
             ?? throw InvalidCommandPayload::withErrors(['Broadcast not found.']);
-        $payload['stash_id'] = (string) $broadcast->stashId;
+        $payload['stash_id'] = $broadcast->stashId;
         $targetId = $payload['broadcast_item_id'] ?? $payload['broadcast_id'];
 
         if (! is_string($targetId)) {

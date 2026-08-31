@@ -10,6 +10,6 @@ interface MetadataStrategyHandler
 {
     public function strategyKey(): string;
 
-    /** @return list<DiscoveredItem> */
+    /** @return DiscoveredItem */
     public function enrich(ResolvedInput $input, DiscoveredItem $item): DiscoveredItem;
 }

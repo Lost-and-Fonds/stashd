@@ -10,11 +10,10 @@ use App\Vault\MediaItemSourceRepository;
 use Tempest\Database\Database;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class StashRepository
 {
@@ -85,9 +84,12 @@ final class StashRepository
     /** @return list<StashRecord> */
     public function list(): array
     {
-        return StashRecord::select()
+        /** @var list<StashRecord> $records */
+        $records = StashRecord::select()
             ->orderBy('createdAt', Direction::ASC)
             ->all();
+
+        return $records;
     }
 
     public function update(

@@ -13,11 +13,10 @@ use Tempest\Database\Database;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Query;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class StashItemRepository
 {
@@ -62,10 +61,13 @@ final class StashItemRepository
 
     public function findByStashAndMediaItem(StashId $stashId, MediaItemId $mediaItemId): ?StashItemRecord
     {
-        return StashItemRecord::select()
+        /** @var StashItemRecord|null $record */
+        $record = StashItemRecord::select()
             ->where('stashId', $stashId->toString())
             ->where('mediaItemId', $mediaItemId->toString())
             ->first();
+
+        return $record;
     }
 
     /** @return list<StashItemRecord> */
@@ -205,9 +207,12 @@ final class StashItemRepository
     /** @return list<StashItemRecord> */
     public function listForMediaItem(MediaItemId $mediaItemId): array
     {
-        return StashItemRecord::select()
+        /** @var list<StashItemRecord> $records */
+        $records = StashItemRecord::select()
             ->where('mediaItemId', $mediaItemId->toString())
             ->all();
+
+        return $records;
     }
 
     /**
@@ -220,9 +225,12 @@ final class StashItemRepository
             return [];
         }
 
-        return StashItemRecord::select()
+        /** @var list<StashItemRecord> $records */
+        $records = StashItemRecord::select()
             ->whereIn('mediaItemId', $mediaItemIds)
             ->whereNot('stashId', $excludingStashId->toString())
             ->all();
+
+        return $records;
     }
 }

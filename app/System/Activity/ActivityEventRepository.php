@@ -7,11 +7,10 @@ namespace App\System\Activity;
 use App\Support\PrefixedUlidGenerator;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class ActivityEventRepository
 {
@@ -60,10 +59,13 @@ final class ActivityEventRepository
     /** @return list<ActivityEventRecord> */
     public function listRecent(int $limit = 50): array
     {
-        return ActivityEventRecord::select()
+        /** @var list<ActivityEventRecord> $records */
+        $records = ActivityEventRecord::select()
             ->orderBy('createdAt', Direction::DESC)
             ->orderBy('id', Direction::DESC)
             ->limit($limit)
             ->all();
+
+        return $records;
     }
 }

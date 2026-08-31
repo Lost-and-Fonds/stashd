@@ -33,7 +33,7 @@ final readonly class CommandController
     public function create(Request $request): Json
     {
         $body = ApiJson::normalizeRequest($request->body);
-        $typeRaw = trim((string) ($body['type'] ?? ''));
+        $typeRaw = trim(ApiJson::string($body['type'] ?? null));
 
         if ($typeRaw === '') {
             return new Json([
@@ -55,6 +55,7 @@ final readonly class CommandController
             ], Status::BAD_REQUEST);
         }
 
+        /** @var array<string, mixed> $options */
         $options = is_array($body['options'] ?? null) ? $body['options'] : [];
 
         try {

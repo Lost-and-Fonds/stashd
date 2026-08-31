@@ -10,6 +10,7 @@ use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
 use App\Commands\InvalidCommandPayload;
+use App\Http\Api\ApiJson;
 use App\Config\StashdConfig;
 use App\Jobs\JobIntent;
 use App\Jobs\JobRepository;
@@ -30,7 +31,7 @@ final readonly class StashPreflightCommandHandler implements CommandHandler
 
     public function validate(array $options): void
     {
-        $sourceUri = trim((string) ($options['sourceUri'] ?? $options['source_uri'] ?? ''));
+        $sourceUri = trim(ApiJson::string($options['sourceUri'] ?? $options['source_uri'] ?? null));
 
         if ($sourceUri === '') {
             throw InvalidCommandPayload::withErrors(['source_uri is required.']);
@@ -65,10 +66,12 @@ final readonly class StashPreflightCommandHandler implements CommandHandler
         ];
     }
 
-    /** @return array<string, mixed> */
+    /** @param array<string, mixed> $options
+     * @return array<string, mixed>
+     */
     private function normalizedPayload(CommandRecord $command, array $options): array
     {
-        $sourceUri = trim((string) ($options['sourceUri'] ?? $options['source_uri'] ?? ''));
+        $sourceUri = trim(ApiJson::string($options['sourceUri'] ?? $options['source_uri'] ?? null));
         $sourceTitle = $options['sourceTitle'] ?? $options['source_title'] ?? null;
         $sourceTitle = is_string($sourceTitle) && $sourceTitle !== '' ? $sourceTitle : null;
         $originRaw = $options['origin'] ?? null;

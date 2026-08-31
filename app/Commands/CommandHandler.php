@@ -19,6 +19,9 @@ interface CommandHandler
      */
     public function createJobs(CommandRecord $command, array $options): array;
 
-    /** @return array<string, mixed> */
+    /**
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>
+     */
     public function extras(CommandRecord $command, array $options): array;
 }

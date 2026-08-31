@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Stashes;
 
 use App\Jobs\JobIntent;
+use App\Http\Api\ApiJson;
 use App\Providers\Core\DiscoveredItem;
 use App\Providers\ProviderRegistry;
 use App\Providers\ProviderStrategySelector;
@@ -25,11 +26,11 @@ final readonly class DiscoverStashInput
     /** @param array<string, mixed> $payload */
     public function execute(array $payload, JobIntent $intent = JobIntent::Preflight): PreflightExecutionResult
     {
-        $sourceUri = str((string) ($payload['source_uri'] ?? ''))->trim()->toString();
+        $sourceUri = str(ApiJson::string($payload['source_uri'] ?? null))->trim()->toString();
         $sourceTitle = isset($payload['source_title']) && is_string($payload['source_title']) && str($payload['source_title'])->trim()->isNotEmpty()
             ? str($payload['source_title'])->trim()->toString()
             : null;
-        $origin = PreflightOrigin::tryFrom((string) ($payload['origin'] ?? '')) ?? PreflightOrigin::Api;
+        $origin = PreflightOrigin::tryFrom(ApiJson::string($payload['origin'] ?? null)) ?? PreflightOrigin::Api;
 
         $uri = StashdUri::parse($sourceUri);
         $provider = $this->providers->resolveForUri($uri);

@@ -67,7 +67,7 @@ final class VaultSidecarBuilder
         return encode($this->redactPayload($payload), pretty: true);
     }
 
-    /** @param array<string, mixed> $payload
+    /** @param array<mixed, mixed> $payload
      * @return array<string, mixed>
      */
     private function redactPayload(array $payload): array
@@ -75,6 +75,8 @@ final class VaultSidecarBuilder
         $redacted = [];
 
         foreach ($payload as $key => $value) {
+            $key = is_string($key) ? $key : (string) $key;
+
             if (is_array($value)) {
                 $redacted[$key] = $this->redactPayload($value);
 

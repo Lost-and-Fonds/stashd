@@ -172,7 +172,9 @@ final readonly class AuthService
         return $factory->create(subscribe: [MercurePublisher::TOPIC]);
     }
 
-    /** @return array{id: string, token: string, token_preview: string, name: string} */
+    /** @param list<string>|null $scopes
+     * @return array{id: string, token: string, token_preview: string, name: string}
+     */
     public function createApiToken(UserRecord $user, string $name, ?array $scopes = null, ?DateTime $expiresAt = null): array
     {
         $scopes = $scopes === null ? null : ApiTokenScopes::fromArray($scopes)->toArray();
@@ -230,10 +232,6 @@ final readonly class AuthService
     private function hashPassword(#[SensitiveParameter] string $password): string
     {
         $hash = password_hash($password, PASSWORD_DEFAULT);
-
-        if ($hash === false) {
-            throw new RuntimeException('Failed to hash password.');
-        }
 
         return $hash;
     }

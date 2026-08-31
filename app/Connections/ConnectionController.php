@@ -194,9 +194,7 @@ final readonly class ConnectionController
         $result = [];
 
         foreach ($normalized as $key => $value) {
-            if (is_string($key)) {
-                $result[$key] = $value;
-            }
+            $result[$key] = $value;
         }
 
         return $result;

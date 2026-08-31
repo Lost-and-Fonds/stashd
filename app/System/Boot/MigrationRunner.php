@@ -42,9 +42,12 @@ final readonly class MigrationRunner
     private function appliedMigrationNames(): array
     {
         try {
+            /** @var list<Migration> $migrations */
+            $migrations = array_values(Migration::all());
+
             return array_map(
                 static fn(Migration $migration): string => $migration->name,
-                Migration::all(),
+                $migrations,
             );
         } catch (QueryWasInvalid $exception) {
             if ($this->database->dialect->isTableNotFoundError($exception)) {

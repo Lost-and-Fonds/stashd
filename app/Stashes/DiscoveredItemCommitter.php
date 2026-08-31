@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
+use App\Http\Api\ApiJson;
 use App\Providers\InputOption;
 use App\Providers\ProviderDates;
 use App\Providers\ResolvedInput;
@@ -53,14 +54,11 @@ final readonly class DiscoveredItemCommitter
         /** @var list<string> $downloadableMediaItemIds */
         $downloadableMediaItemIds = [];
 
-        foreach (array_values($discoveredItems) as $index => $item) {
-            if (! is_array($item)) {
-                continue;
-            }
+        foreach ($discoveredItems as $index => $item) {
 
-            $providerItemId = str((string) ($item['provider_item_id'] ?? ''))->trim()->toString();
-            $canonicalUriRaw = str((string) ($item['canonical_uri'] ?? ''))->trim()->toString();
-            $title = str((string) ($item['title'] ?? 'Untitled'))->trim()->toString();
+            $providerItemId = str(ApiJson::string($item['provider_item_id'] ?? null))->trim()->toString();
+            $canonicalUriRaw = str(ApiJson::string($item['canonical_uri'] ?? null))->trim()->toString();
+            $title = str(ApiJson::string($item['title'] ?? null, 'Untitled'))->trim()->toString();
             $description = is_string($item['description'] ?? null) && str($item['description'])->trim()->isNotEmpty()
                 ? str($item['description'])->trim()->toString()
                 : null;
@@ -80,13 +78,13 @@ final readonly class DiscoveredItemCommitter
                     canonicalUri: $canonicalUri,
                     title: $title,
                     description: $description,
-                    durationSeconds: isset($item['duration_seconds']) ? (int) $item['duration_seconds'] : null,
+                    durationSeconds: ApiJson::integer($item['duration_seconds'] ?? null),
                     publishedAt: ProviderDates::tryParse(is_string($item['published_at'] ?? null) ? $item['published_at'] : null),
                     thumbnailUri: is_string($item['thumbnail_uri'] ?? null) && str($item['thumbnail_uri'])->trim()->isNotEmpty()
                     ? StashdUri::parse(str($item['thumbnail_uri'])->trim()->toString())
                     : null,
                     contentType: is_string($item['content_type'] ?? null) ? $item['content_type'] : null,
-                    sizeBytes: isset($item['size_bytes']) ? (int) $item['size_bytes'] : null,
+                    sizeBytes: ApiJson::integer($item['size_bytes'] ?? null),
                     sizeEstimated: (bool) ($item['size_estimated'] ?? false),
                 );
                 $mediaItemsCreated++;
@@ -95,7 +93,7 @@ final readonly class DiscoveredItemCommitter
                 $mediaItemsReused++;
 
                 if ($mediaItem->sizeBytes === null && isset($item['size_bytes'])) {
-                    $mediaItem->sizeBytes = (int) $item['size_bytes'];
+                    $mediaItem->sizeBytes = ApiJson::integer($item['size_bytes']);
                     $mediaItem->sizeEstimated = (bool) ($item['size_estimated'] ?? false);
                     $this->mediaItems->save($mediaItem);
                 }

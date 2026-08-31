@@ -9,11 +9,10 @@ use Tempest\Database\Builder\QueryBuilders\WhereGroupBuilder;
 use Tempest\Database\Builder\WhereOperator;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class StashInputRepository
 {
@@ -87,7 +86,8 @@ final class StashInputRepository
     /** @return list<StashInputRecord> */
     public function listDueForAutomaticSync(DateTime $now): array
     {
-        return StashInputRecord::select()
+        /** @var list<StashInputRecord> $records */
+        $records = StashInputRecord::select()
             ->where('state', StashInputState::Ready)
             ->where('syncMode', SyncMode::Automatic)
             ->andWhereGroup(fn(WhereGroupBuilder $group) => $group
@@ -95,14 +95,19 @@ final class StashInputRepository
                 ->orWhere('nextCheckAt', $now, WhereOperator::LESS_THAN_OR_EQUAL))
             ->orderBy('nextCheckAt', Direction::ASC)
             ->all();
+
+        return $records;
     }
 
     /** @return list<StashInputRecord> */
     public function listForStash(StashId $stashId): array
     {
-        return StashInputRecord::select()
+        /** @var list<StashInputRecord> $records */
+        $records = StashInputRecord::select()
             ->where('stashId', $stashId->toString())
             ->orderBy('createdAt', Direction::ASC)
             ->all();
+
+        return $records;
     }
 }

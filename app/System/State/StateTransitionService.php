@@ -102,12 +102,11 @@ final readonly class StateTransitionService
     }
 
     /**
-     * @template TState of object
-     * @template TRecord of object{state: TState, updatedAt?: ?DateTime, save(): void}
+     * @template TRecord of object
      *
      * @param  TRecord  $record
-     * @param  TState  $current
-     * @param  TState  $next
+     * @param  object  $current
+     * @param  object  $next
      * @return TRecord
      */
     private function apply(object $record, object $current, object $next, string $entity): object
@@ -120,10 +119,18 @@ final readonly class StateTransitionService
             );
         }
 
-        $record->state = $next;
+        /** @var object{state: object, updatedAt?: ?DateTime} $mutable */
+        $mutable = $record;
+        /** @phpstan-ignore-next-line */
+        $mutable->state = $next;
 
-        if (property_exists($record, 'updatedAt')) {
-            $record->updatedAt = DateTime::now(Timezone::UTC);
+        if (property_exists($mutable, 'updatedAt')) {
+            /** @phpstan-ignore-next-line */
+            $mutable->updatedAt = DateTime::now(Timezone::UTC);
+        }
+
+        if (! method_exists($record, 'save')) {
+            throw new \LogicException('Stateful record must provide save().');
         }
 
         $record->save();
@@ -133,6 +140,6 @@ final readonly class StateTransitionService
 
     private function stringifyState(object $state): string
     {
-        return $state instanceof \BackedEnum ? $state->value : (string) $state;
+        return $state instanceof \BackedEnum ? (string) $state->value : $state::class;
     }
 }

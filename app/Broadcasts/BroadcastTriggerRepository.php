@@ -6,11 +6,10 @@ namespace App\Broadcasts;
 
 use App\Support\PrefixedUlidGenerator;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class BroadcastTriggerRepository
 {
@@ -18,12 +17,12 @@ final class BroadcastTriggerRepository
         private PrefixedUlidGenerator $ids,
     ) {}
 
+    /** @param array<string, scalar|null>|null $settings */
     public function create(
         BroadcastId $broadcastId,
         string $type,
         bool $enabled = true,
         BroadcastTriggerState $state = BroadcastTriggerState::Ready,
-        /** @var array<string, scalar|null>|null $settings */
         ?array $settings = null,
     ): BroadcastTriggerRecord {
         $id = $this->ids->generate('btrigger')->toString();
@@ -56,9 +55,12 @@ final class BroadcastTriggerRepository
     /** @return list<BroadcastTriggerRecord> */
     public function listForBroadcast(BroadcastId $broadcastId): array
     {
-        return BroadcastTriggerRecord::select()
+        /** @var list<BroadcastTriggerRecord> $records */
+        $records = BroadcastTriggerRecord::select()
             ->where('broadcastId', $broadcastId->toString())
             ->all();
+
+        return $records;
     }
 
     public function findEnabled(BroadcastId $broadcastId, string $type): ?BroadcastTriggerRecord

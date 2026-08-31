@@ -15,13 +15,19 @@ $resolvePath = static function (string $path): string {
     return root_path($path);
 };
 
+$envString = static function (string $key, string $default): string {
+    $value = env($key, $default);
+
+    return is_string($value) ? $value : $default;
+};
+
 return new StashdConfig(
-    dataPath: $resolvePath(env('STASHD_DATA_PATH', env('DATA_PATH', 'data'))),
-    mediaPath: $resolvePath(env('STASHD_MEDIA_PATH', env('MEDIA_PATH', 'media'))),
-    publicUrl: env('STASHD_PUBLIC_URL', env('BASE_URI', 'http://localhost:8474')),
-    logFormat: env('STASHD_LOG_FORMAT', 'text'),
-    puid: (int) env('PUID', '1000'),
-    pgid: (int) env('PGID', '1000'),
-    umask: env('UMASK', '0022'),
-    httpPort: env('STASHD_HTTP_PORT', '8474'),
+    dataPath: $resolvePath($envString('STASHD_DATA_PATH', $envString('DATA_PATH', 'data'))),
+    mediaPath: $resolvePath($envString('STASHD_MEDIA_PATH', $envString('MEDIA_PATH', 'media'))),
+    publicUrl: $envString('STASHD_PUBLIC_URL', $envString('BASE_URI', 'http://localhost:8474')),
+    logFormat: $envString('STASHD_LOG_FORMAT', 'text'),
+    puid: (int) $envString('PUID', '1000'),
+    pgid: (int) $envString('PGID', '1000'),
+    umask: $envString('UMASK', '0022'),
+    httpPort: $envString('STASHD_HTTP_PORT', '8474'),
 );

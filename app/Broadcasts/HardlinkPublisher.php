@@ -43,7 +43,6 @@ final readonly class HardlinkPublisher
         if (
             is_array($statA)
             && is_array($statB)
-            && isset($statA['dev'], $statB['dev'])
             && $statA['dev'] !== $statB['dev']
         ) {
             return false;

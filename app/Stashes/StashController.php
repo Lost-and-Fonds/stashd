@@ -77,7 +77,7 @@ final readonly class StashController
     {
         $body = ApiJson::normalizeRequest($request->body);
 
-        $name = trim((string) ($body['name'] ?? ''));
+        $name = trim(ApiJson::string($body['name'] ?? null));
 
         if ($name === '') {
             $name = 'New Stash';
@@ -86,7 +86,7 @@ final readonly class StashController
         $syncMode = SyncMode::Automatic;
 
         if (isset($body['syncMode'])) {
-            $syncMode = SyncMode::tryFrom((string) $body['syncMode']);
+            $syncMode = SyncMode::tryFrom(ApiJson::string($body['syncMode']));
 
             if ($syncMode === null) {
                 return $this->validationError('Unsupported sync_mode.');
@@ -96,7 +96,7 @@ final readonly class StashController
         $downloadPolicy = DownloadPolicy::Video;
 
         if (isset($body['downloadPolicy'])) {
-            $downloadPolicy = DownloadPolicy::tryFrom((string) $body['downloadPolicy']);
+            $downloadPolicy = DownloadPolicy::tryFrom(ApiJson::string($body['downloadPolicy']));
 
             if ($downloadPolicy === null) {
                 return $this->validationError('Unsupported download_policy.');
@@ -106,7 +106,7 @@ final readonly class StashController
         $organizationMode = OrganizationMode::Flat;
 
         if (isset($body['organizationMode'])) {
-            $organizationMode = OrganizationMode::tryFrom((string) $body['organizationMode']);
+            $organizationMode = OrganizationMode::tryFrom(ApiJson::string($body['organizationMode']));
 
             if ($organizationMode === null) {
                 return $this->validationError('Unsupported organization_mode.');
@@ -118,7 +118,7 @@ final readonly class StashController
             syncMode: $syncMode,
             downloadPolicy: $downloadPolicy,
             organizationMode: $organizationMode,
-            description: isset($body['description']) ? trim((string) $body['description']) : null,
+            description: isset($body['description']) ? trim(ApiJson::string($body['description'])) : null,
         );
 
         $this->activity->stashCreated($stash);
@@ -316,7 +316,7 @@ final readonly class StashController
 
         $options = [
             'stash_id' => $id,
-            'preflight_command_id' => trim((string) ($body['preflightCommandId'] ?? '')),
+            'preflight_command_id' => trim(ApiJson::string($body['preflightCommandId'] ?? null)),
             // Sourced from the raw, un-normalized body: provider-option keys (e.g.
             // provider-declared keys are opaque identifiers, not DTO field names, so
             // ApiJson's snake/camel key transform must not touch them.
@@ -460,7 +460,7 @@ final readonly class StashController
         $name = null;
 
         if (isset($body['name'])) {
-            $name = trim((string) $body['name']);
+            $name = trim(ApiJson::string($body['name']));
 
             if ($name === '') {
                 return $this->validationError('name cannot be blank.');
@@ -470,7 +470,7 @@ final readonly class StashController
         $syncMode = null;
 
         if (isset($body['syncMode'])) {
-            $syncMode = SyncMode::tryFrom((string) $body['syncMode']);
+            $syncMode = SyncMode::tryFrom(ApiJson::string($body['syncMode']));
 
             if ($syncMode === null) {
                 return $this->validationError('Unsupported sync_mode.');
@@ -480,7 +480,7 @@ final readonly class StashController
         $downloadPolicy = null;
 
         if (isset($body['downloadPolicy'])) {
-            $downloadPolicy = DownloadPolicy::tryFrom((string) $body['downloadPolicy']);
+            $downloadPolicy = DownloadPolicy::tryFrom(ApiJson::string($body['downloadPolicy']));
 
             if ($downloadPolicy === null) {
                 return $this->validationError('Unsupported download_policy.');
@@ -490,7 +490,7 @@ final readonly class StashController
         $organizationMode = null;
 
         if (isset($body['organizationMode'])) {
-            $organizationMode = OrganizationMode::tryFrom((string) $body['organizationMode']);
+            $organizationMode = OrganizationMode::tryFrom(ApiJson::string($body['organizationMode']));
 
             if ($organizationMode === null) {
                 return $this->validationError('Unsupported organization_mode.');
@@ -500,7 +500,7 @@ final readonly class StashController
         $stash = $this->stashes->update(
             $stash,
             name: $name,
-            description: isset($body['description']) ? trim((string) $body['description']) : null,
+            description: isset($body['description']) ? trim(ApiJson::string($body['description'])) : null,
             syncMode: $syncMode,
             downloadPolicy: $downloadPolicy,
             organizationMode: $organizationMode,

@@ -9,11 +9,10 @@ use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class CommandRepository
 {
@@ -77,9 +76,12 @@ final class CommandRepository
     /** @return list<CommandRecord> */
     public function listRecent(int $limit = 50): array
     {
-        return CommandRecord::select()
+        /** @var list<CommandRecord> $records */
+        $records = CommandRecord::select()
             ->orderBy('createdAt', Direction::DESC)
             ->limit($limit)
             ->all();
+
+        return $records;
     }
 }

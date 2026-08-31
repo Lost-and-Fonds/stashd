@@ -10,11 +10,10 @@ use InvalidArgumentException;
 use Tempest\Database\Builder\QueryBuilders\WhereGroupBuilder;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class BroadcastRepository
 {
@@ -95,18 +94,24 @@ final class BroadcastRepository
     /** @return list<BroadcastRecord> */
     public function listForStash(StashId $stashId): array
     {
-        return BroadcastRecord::select()
+        /** @var list<BroadcastRecord> $records */
+        $records = BroadcastRecord::select()
             ->where('stashId', $stashId->toString())
             ->orderBy('createdAt', Direction::ASC)
             ->all();
+
+        return $records;
     }
 
     public function findByStashAndSlug(StashId $stashId, string $slug): ?BroadcastRecord
     {
-        return BroadcastRecord::select()
+        /** @var BroadcastRecord|null $record */
+        $record = BroadcastRecord::select()
             ->where('stashId', $stashId->toString())
             ->where('slug', $slug)
             ->first();
+
+        return $record;
     }
 
     /**
@@ -116,14 +121,17 @@ final class BroadcastRepository
      */
     public function nextAvailableSlug(StashId $stashId, string $base): string
     {
+        /** @var list<BroadcastRecord> $records */
+        $records = array_values(BroadcastRecord::select()
+            ->where('stashId', $stashId->toString())
+            ->andWhereGroup(fn(WhereGroupBuilder $group) => $group
+                ->where('slug', $base)
+                ->orWhereLike('slug', $base . '-%'))
+            ->all());
+
         $taken = array_map(
             static fn(BroadcastRecord $broadcast): string => $broadcast->slug,
-            BroadcastRecord::select()
-                ->where('stashId', $stashId->toString())
-                ->andWhereGroup(fn(WhereGroupBuilder $group) => $group
-                    ->where('slug', $base)
-                    ->orWhereLike('slug', $base . '-%'))
-                ->all(),
+            $records,
         );
 
         if (! in_array($base, $taken, true)) {

@@ -34,6 +34,7 @@ final class PackageManager
                 throw new RuntimeException('package directory could not be created');
             }
         }
+
         try {
             Filesystem\create_directory($this->staging, 0700);
         } catch (\Throwable $exception) {

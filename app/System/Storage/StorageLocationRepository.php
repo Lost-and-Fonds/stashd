@@ -6,11 +6,10 @@ namespace App\System\Storage;
 
 use App\Support\PrefixedUlidGenerator;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class StorageLocationRepository
 {
@@ -39,6 +38,7 @@ final class StorageLocationRepository
             ->first();
 
         if ($existing !== null) {
+            /** @var StorageLocationRecord $existing */
             $existing->role = $role;
             $existing->label = $label;
             $existing->path = $path;
@@ -86,13 +86,19 @@ final class StorageLocationRepository
     /** @return list<StorageLocationRecord> */
     public function all(): array
     {
-        return StorageLocationRecord::all();
+        /** @var list<StorageLocationRecord> $records */
+        $records = array_values(StorageLocationRecord::all());
+
+        return $records;
     }
 
     public function findByKey(StorageLocationKey $key): ?StorageLocationRecord
     {
-        return StorageLocationRecord::select()
+        /** @var StorageLocationRecord|null $record */
+        $record = StorageLocationRecord::select()
             ->where('key', $key)
             ->first();
+
+        return $record;
     }
 }

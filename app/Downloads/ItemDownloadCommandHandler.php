@@ -10,6 +10,7 @@ use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
 use App\Commands\InvalidCommandPayload;
+use App\Http\Api\ApiJson;
 use App\Jobs\JobIntent;
 use App\Jobs\JobRepository;
 use App\Stashes\StashId;
@@ -40,8 +41,8 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
 
     public function validate(array $options): void
     {
-        $mediaItemId = trim((string) ($options['mediaItemId'] ?? $options['media_item_id'] ?? ''));
-        $stashId = trim((string) ($options['stashId'] ?? $options['stash_id'] ?? ''));
+        $mediaItemId = trim(ApiJson::string($options['mediaItemId'] ?? $options['media_item_id'] ?? null));
+        $stashId = trim(ApiJson::string($options['stashId'] ?? $options['stash_id'] ?? null));
 
         if ($mediaItemId === '' || $stashId === '') {
             throw InvalidCommandPayload::withErrors(['media_item_id and stash_id are required.']);
@@ -79,6 +80,7 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
     public function createJobs(CommandRecord $command, array $options): array
     {
         $commandId = CommandId::fromPrimaryKey($command->id);
+        /** @var array{media_item_id: string, stash_id: string, force: bool} $payload */
         $payload = $this->normalizedPayload($options);
         $command->options = $payload;
         $command->targetType = 'media_item';
@@ -108,12 +110,14 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
         return [];
     }
 
-    /** @return array{media_item_id: string, stash_id: string, force: bool} */
+    /** @param array<string, mixed> $options
+     * @return array{media_item_id: string, stash_id: string, force: bool}
+     */
     private function normalizedPayload(array $options): array
     {
         return [
-            'media_item_id' => trim((string) ($options['mediaItemId'] ?? $options['media_item_id'] ?? '')),
-            'stash_id' => trim((string) ($options['stashId'] ?? $options['stash_id'] ?? '')),
+            'media_item_id' => trim(ApiJson::string($options['mediaItemId'] ?? $options['media_item_id'] ?? null)),
+            'stash_id' => trim(ApiJson::string($options['stashId'] ?? $options['stash_id'] ?? null)),
             'force' => (bool) ($options['force'] ?? false),
         ];
     }

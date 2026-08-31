@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\System\Activity;
 
+use App\Http\Api\ApiJson;
 use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastRecord;
 use App\Commands\CommandRecord;
@@ -338,13 +339,13 @@ final readonly class ActivityEventService
         return $this->emit(
             level: ActivityLevel::Info,
             type: 'broadcast.planned',
-            message: sprintf('Broadcast planned with %d files.', (int) ($plan['file_count'] ?? 0)),
+            message: sprintf('Broadcast planned with %d files.', ApiJson::integer($plan['file_count'] ?? null) ?? 0),
             entityType: 'broadcast',
             entityId: $broadcastId->toString(),
             jobId: (string) $job->id,
             commandId: (string) $command->id,
             groupKey: 'command:' . (string) $command->id,
-            metadata: ['file_count' => (int) ($plan['file_count'] ?? 0)],
+            metadata: ['file_count' => ApiJson::integer($plan['file_count'] ?? null) ?? 0],
         );
     }
 
@@ -375,13 +376,13 @@ final readonly class ActivityEventService
         return $this->emit(
             level: ActivityLevel::Success,
             type: 'broadcast.published',
-            message: sprintf('Broadcast published %d files.', (int) ($publish['published_count'] ?? 0)),
+            message: sprintf('Broadcast published %d files.', ApiJson::integer($publish['published_count'] ?? null) ?? 0),
             entityType: 'broadcast',
             entityId: $broadcastId->toString(),
             jobId: (string) $job->id,
             commandId: (string) $command->id,
             groupKey: 'command:' . (string) $command->id,
-            metadata: ['published_count' => (int) ($publish['published_count'] ?? 0)],
+            metadata: ['published_count' => ApiJson::integer($publish['published_count'] ?? null) ?? 0],
         );
     }
 
@@ -404,8 +405,8 @@ final readonly class ActivityEventService
             commandId: (string) $command->id,
             groupKey: 'command:' . (string) $command->id,
             metadata: [
-                'valid_count' => (int) ($verify['valid_count'] ?? 0),
-                'stale_count' => (int) ($verify['stale_count'] ?? 0),
+                'valid_count' => ApiJson::integer($verify['valid_count'] ?? null) ?? 0,
+                'stale_count' => ApiJson::integer($verify['stale_count'] ?? null) ?? 0,
             ],
         );
     }
@@ -427,7 +428,7 @@ final readonly class ActivityEventService
             commandId: (string) $command->id,
             groupKey: 'command:' . (string) $command->id,
             metadata: [
-                'stale_count' => (int) ($verify['stale_count'] ?? 0),
+                'stale_count' => ApiJson::integer($verify['stale_count'] ?? null) ?? 0,
             ],
         );
     }
@@ -483,13 +484,13 @@ final readonly class ActivityEventService
         return $this->emit(
             level: ActivityLevel::Info,
             type: 'broadcast.pruned',
-            message: sprintf('Broadcast pruned %d stale files.', (int) ($prune['removed_count'] ?? 0)),
+            message: sprintf('Broadcast pruned %d stale files.', ApiJson::integer($prune['removed_count'] ?? null) ?? 0),
             entityType: 'broadcast',
             entityId: $broadcastId->toString(),
             jobId: (string) $job->id,
             commandId: (string) $command->id,
             groupKey: 'command:' . (string) $command->id,
-            metadata: ['removed_count' => (int) ($prune['removed_count'] ?? 0)],
+            metadata: ['removed_count' => ApiJson::integer($prune['removed_count'] ?? null) ?? 0],
         );
     }
 
@@ -510,7 +511,7 @@ final readonly class ActivityEventService
             commandId: (string) $command->id,
             groupKey: 'command:' . (string) $command->id,
             metadata: [
-                'success_count' => (int) ($trigger['success_count'] ?? 0),
+                'success_count' => ApiJson::integer($trigger['success_count'] ?? null) ?? 0,
             ],
         );
     }
@@ -532,7 +533,7 @@ final readonly class ActivityEventService
             commandId: (string) $command->id,
             groupKey: 'command:' . (string) $command->id,
             metadata: [
-                'failure_count' => (int) ($trigger['failure_count'] ?? 0),
+                'failure_count' => ApiJson::integer($trigger['failure_count'] ?? null) ?? 0,
             ],
         );
     }

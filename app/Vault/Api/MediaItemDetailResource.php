@@ -34,6 +34,7 @@ final readonly class MediaItemDetailResource
      * @param list<AssetRecord> $assets
      * @param list<StashRecord> $stashes
      * @param list<BroadcastRecord> $broadcasts
+     * @param array<string, mixed>|null $pluginMetadata
      */
     public static function fromRecord(
         MediaItemRecord $item,

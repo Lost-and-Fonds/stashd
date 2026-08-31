@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth;
 
 use App\Http\ClientAddressResolver;
+use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use Tempest\DateTime\DateTime;
@@ -42,8 +43,8 @@ final readonly class AuthController
         }
 
         $body = $request->body;
-        $username = trim((string) ($body['username'] ?? ''));
-        $password = (string) ($body['password'] ?? '');
+        $username = trim(ApiJson::string($body['username'] ?? null));
+        $password = ApiJson::string($body['password'] ?? null);
 
         if ($username === '' || $password === '') {
             return new Json([
@@ -77,8 +78,8 @@ final readonly class AuthController
     public function login(Request $request): Json
     {
         $body = $request->body;
-        $username = trim((string) ($body['username'] ?? ''));
-        $password = (string) ($body['password'] ?? '');
+        $username = trim(ApiJson::string($body['username'] ?? null));
+        $password = ApiJson::string($body['password'] ?? null);
 
         if ($username === '' || $password === '') {
             return new Json([
@@ -135,7 +136,7 @@ final readonly class AuthController
     {
         $user = $this->context->requireUser();
         $body = $request->body;
-        $name = trim((string) ($body['name'] ?? ''));
+        $name = trim(ApiJson::string($body['name'] ?? null));
 
         if ($name === '') {
             return new Json([

@@ -7,6 +7,7 @@ namespace App\Jobs\Handlers;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
+use App\Http\Api\ApiJson;
 use App\Downloads\DownloadException;
 use App\Downloads\DownloadMediaItem;
 use App\Jobs\JobHandler;
@@ -51,8 +52,8 @@ final readonly class DownloadJobHandler implements JobHandler
 
         $payload = $job->payload ?? [];
 
-        $mediaItemId = MediaItemId::parse((string) ($payload['media_item_id'] ?? ''));
-        $stashId = StashId::parse((string) ($payload['stash_id'] ?? ''));
+        $mediaItemId = MediaItemId::parse(ApiJson::string($payload['media_item_id'] ?? null));
+        $stashId = StashId::parse(ApiJson::string($payload['stash_id'] ?? null));
         $force = (bool) ($payload['force'] ?? false);
 
         try {

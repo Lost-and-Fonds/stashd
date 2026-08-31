@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-$runningInLerd = getenv('LERD_SITE') === 'stashd' && getenv('container') === 'podman';
+$runningInLerd = getenv('LERD_SITE') === 'stashd'
+    || (getenv('container') === 'podman' && is_file('/usr/local/libexec/stashd/umoci'));
 $runningInCi = in_array(getenv('CI'), ['1', 'true'], true) || getenv('GITHUB_ACTIONS') === 'true';
 
 if (! $runningInLerd && ! $runningInCi) {
@@ -14,12 +15,12 @@ Direct host-side test execution is intentionally blocked.
 
 Use:
 
-    ./bin/test
+    composer test
 
 For focused tests:
 
-    ./bin/test tests/Feature/FooTest.php
-    ./bin/test --filter some_test_name
+    composer test -- tests/Feature/FooTest.php
+    composer test -- --flags=filter=some_test_name
 MESSAGE,
     );
     fwrite(STDERR, PHP_EOL);
@@ -140,10 +141,10 @@ if (getenv('STASHD_SKIP_DATABASE_BOOT') !== '1' && ! $unitOnly) {
     $workerName = trim((string) $workerName, '_') ?: 'default';
     $databaseName = substr($databaseBase, 0, 40) . '_test_' . substr($workerName, 0, 16);
 
-    $host = (string) (getenv('DB_HOST') ?: '127.0.0.1');
+    $host = (string) (getenv('DB_HOST') ?: ($runningInLerd ? 'lerd-postgres' : '127.0.0.1'));
     $port = (string) (getenv('DB_PORT') ?: '5432');
     $username = (string) (getenv('DB_USERNAME') ?: 'postgres');
-    $password = (string) (getenv('DB_PASSWORD') ?: '');
+    $password = (string) (getenv('DB_PASSWORD') ?: ($runningInLerd ? 'lerd' : ''));
     $adminDatabase = (string) (getenv('DB_ADMIN_DATABASE') ?: 'postgres');
     $pdo = new PDO(
         "pgsql:host={$host};port={$port};dbname={$adminDatabase}",

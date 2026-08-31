@@ -6,10 +6,9 @@ namespace App\Providers;
 
 use InvalidArgumentException;
 use Stringable;
+use Tempest\Support\Uri\Uri;
 
 use function Tempest\Support\str;
-
-use Tempest\Support\Uri\Uri;
 
 /** Stashd-owned URI value object wrapping Tempest's {@see Uri}. */
 final readonly class StashdUri implements Stringable
@@ -71,13 +70,19 @@ final readonly class StashdUri implements Stringable
     /** @return list<string> */
     public function segments(): array
     {
-        return $this->uri->segments;
+        /** @var list<string> $segments */
+        $segments = $this->uri->segments;
+
+        return $segments;
     }
 
     /** @return array<string, mixed> */
     public function query(): array
     {
-        return $this->uri->query;
+        /** @var array<string, mixed> $query */
+        $query = $this->uri->query;
+
+        return $query;
     }
 
     public function queryParam(string $key, mixed $default = null): mixed

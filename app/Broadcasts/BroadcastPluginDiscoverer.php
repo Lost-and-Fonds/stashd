@@ -33,6 +33,7 @@ final class BroadcastPluginDiscoverer implements Discovery
         $this->discoveryItems = new DiscoveryItems();
     }
 
+    /** @param ClassReflector<object> $class */
     public function discover(DiscoveryLocation $location, ClassReflector $class): void
     {
         $attribute = $class->getAttribute(StashdBroadcast::class);
@@ -122,6 +123,13 @@ final class BroadcastPluginDiscoverer implements Discovery
         }
 
         foreach ($this->discoveryItems as $meta) {
+            if (! is_array($meta)
+                || ! is_string($meta['className'] ?? null)
+                || ! is_string($meta['name'] ?? null)
+                || ! is_string($meta['description'] ?? null)) {
+                continue;
+            }
+
             try {
                 $instance = $this->container->get($meta['className']);
             } catch (\Throwable $e) {

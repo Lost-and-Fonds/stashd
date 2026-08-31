@@ -7,11 +7,10 @@ namespace App\Auth;
 use App\Support\PrefixedUlidGenerator;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class ApiTokenRepository
 {
@@ -19,6 +18,7 @@ final class ApiTokenRepository
         private PrefixedUlidGenerator $ids,
     ) {}
 
+    /** @param list<string>|null $scopes */
     public function create(
         UserId $userId,
         string $name,
@@ -47,20 +47,26 @@ final class ApiTokenRepository
 
     public function findByHash(string $tokenHash): ?ApiTokenRecord
     {
-        return ApiTokenRecord::select()
+        /** @var ApiTokenRecord|null $record */
+        $record = ApiTokenRecord::select()
             ->where('tokenHash', $tokenHash)
             ->whereNull('revokedAt')
             ->first();
+
+        return $record;
     }
 
     /** @return list<ApiTokenRecord> */
     public function listForUser(UserId $userId): array
     {
-        return ApiTokenRecord::select()
+        /** @var list<ApiTokenRecord> $records */
+        $records = ApiTokenRecord::select()
             ->where('userId', $userId->toString())
             ->whereNull('revokedAt')
             ->orderBy('createdAt', Direction::DESC)
             ->all();
+
+        return $records;
     }
 
     public function revoke(ApiTokenId $tokenId): void

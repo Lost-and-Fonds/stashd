@@ -7,10 +7,9 @@ namespace App\System\Event;
 use Symfony\Component\Mercure\HubInterface;
 use Symfony\Component\Mercure\Update;
 use Tempest\Log\Logger;
+use Throwable;
 
 use function Tempest\Support\Json\encode;
-
-use Throwable;
 
 /**
  * Publishes to the single topic every Stashd client subscribes to (a

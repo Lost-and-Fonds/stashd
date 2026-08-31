@@ -12,6 +12,7 @@ namespace App\Broadcasts;
  */
 final readonly class DiscoveredPlugin
 {
+    /** @param list<string> $broadcastKeys */
     public function __construct(
         public string $className,
         public string $name,

@@ -38,7 +38,7 @@ final readonly class FakeDownloader implements DownloaderInterface
         return self::IMPLEMENTATION;
     }
 
-    public function implementationVersion(): ?string
+    public function implementationVersion(): string
     {
         return '4a.0';
     }

@@ -7,11 +7,10 @@ namespace App\Vault;
 use App\Stashes\StashInputId;
 use App\Support\PrefixedUlidGenerator;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class MediaItemSourceRepository
 {
@@ -48,10 +47,13 @@ final class MediaItemSourceRepository
         MediaItemId $mediaItemId,
         StashInputId $stashInputId,
     ): ?MediaItemSourceRecord {
-        return MediaItemSourceRecord::select()
+        /** @var MediaItemSourceRecord|null $source */
+        $source = MediaItemSourceRecord::select()
             ->where('mediaItemId', $mediaItemId->toString())
             ->where('stashInputId', $stashInputId->toString())
             ->first();
+
+        return $source;
     }
 
     public function deleteForStashInput(StashInputId $stashInputId): void

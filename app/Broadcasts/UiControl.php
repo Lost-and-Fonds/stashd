@@ -9,6 +9,7 @@ namespace App\Broadcasts;
  */
 final readonly class UiControl
 {
+    /** @param array<string, mixed>|list<string> $options */
     public function __construct(
         /** Control name (unique within the plugin). */
         public string $name,

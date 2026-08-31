@@ -10,6 +10,7 @@ use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
 use App\Commands\InvalidCommandPayload;
+use App\Http\Api\ApiJson;
 use App\Jobs\JobIntent;
 use App\Jobs\JobRepository;
 use App\Support\PrefixedUlid;
@@ -29,7 +30,7 @@ final readonly class AssetVerifyCommandHandler implements CommandHandler
 
     public function validate(array $options): void
     {
-        $assetId = trim((string) ($options['assetId'] ?? $options['asset_id'] ?? ''));
+        $assetId = trim(ApiJson::string($options['assetId'] ?? $options['asset_id'] ?? null));
 
         if ($assetId === '') {
             throw InvalidCommandPayload::withErrors(['asset_id is required.']);
@@ -44,7 +45,7 @@ final readonly class AssetVerifyCommandHandler implements CommandHandler
     {
         $commandId = CommandId::fromPrimaryKey($command->id);
         $payload = [
-            'asset_id' => trim((string) ($options['assetId'] ?? $options['asset_id'] ?? '')),
+            'asset_id' => trim(ApiJson::string($options['assetId'] ?? $options['asset_id'] ?? null)),
         ];
         $command->options = $payload;
         $command->targetType = 'asset';

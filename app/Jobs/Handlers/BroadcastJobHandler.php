@@ -93,7 +93,10 @@ final readonly class BroadcastJobHandler implements JobHandler
 
             $this->transitions->transitionJob($job, JobState::Ready);
             $this->transitions->transitionCommand($command, CommandState::Completed);
-            if ($action === 'delete' && $broadcast !== null) $this->activity->broadcastDeleted($broadcast);
+
+            if ($action === 'delete' && $broadcast !== null) {
+                $this->activity->broadcastDeleted($broadcast);
+            }
             $this->activity->commandCompleted($command);
             $this->publisher->jobCompleted($job);
         } catch (BroadcastException $exception) {

@@ -35,7 +35,7 @@ final readonly class StashPreflightController
     {
         $body = ApiJson::normalizeRequest($request->body);
         $options = [
-            'source_uri' => trim((string) ($body['sourceUri'] ?? '')),
+            'source_uri' => trim(ApiJson::string($body['sourceUri'] ?? null)),
             'source_title' => $body['sourceTitle'] ?? null,
             'origin' => is_string($body['origin'] ?? null)
                 ? $body['origin']

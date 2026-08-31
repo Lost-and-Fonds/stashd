@@ -8,7 +8,19 @@ use Tempest\DateTime\DateTimeInterface;
 
 final class ApiJson
 {
-    /** @param array<string, mixed> $body */
+    public static function string(mixed $value, string $default = ''): string
+    {
+        return is_string($value) ? $value : $default;
+    }
+
+    public static function integer(mixed $value): ?int
+    {
+        return is_int($value) ? $value : null;
+    }
+
+    /** @param array<mixed, mixed> $body
+     * @return array<string, mixed>
+     */
     public static function normalizeRequest(array $body): array
     {
         return self::snakeToCamel($body);
@@ -25,7 +37,7 @@ final class ApiJson
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<mixed, mixed>  $data
      * @return array<string, mixed>
      */
     private static function snakeToCamel(array $data): array
@@ -33,7 +45,7 @@ final class ApiJson
         $normalized = [];
 
         foreach ($data as $key => $value) {
-            $normalizedKey = is_string($key) ? self::snakeToCamelKey($key) : $key;
+            $normalizedKey = is_string($key) ? self::snakeToCamelKey($key) : (string) $key;
             $normalized[$normalizedKey] = is_array($value) ? self::snakeToCamel($value) : $value;
         }
 
@@ -41,7 +53,7 @@ final class ApiJson
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<mixed, mixed>  $data
      * @return array<string, mixed>
      */
     private static function camelToSnake(array $data): array
@@ -49,7 +61,7 @@ final class ApiJson
         $encoded = [];
 
         foreach ($data as $key => $value) {
-            $encodedKey = is_string($key) ? self::camelToSnakeKey($key) : $key;
+            $encodedKey = is_string($key) ? self::camelToSnakeKey($key) : (string) $key;
 
             if (is_array($value)) {
                 $encoded[$encodedKey] = array_is_list($value)

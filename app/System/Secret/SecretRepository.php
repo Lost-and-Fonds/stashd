@@ -7,11 +7,10 @@ namespace App\System\Secret;
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use Tempest\Database\PrimaryKey;
-
-use function Tempest\Database\query;
-
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+
+use function Tempest\Database\query;
 
 final class SecretRepository
 {
@@ -21,11 +20,14 @@ final class SecretRepository
 
     public function findByKey(string $key): ?SecretRecord
     {
-        return SecretRecord::select()
+        /** @var SecretRecord|null $secret */
+        $secret = SecretRecord::select()
             ->where('key', $key)
             ->whereNull('revokedAt')
             ->include('encryptedValue', 'nonce', 'tokenDigest', 'metadata')
             ->first();
+
+        return $secret;
     }
 
     public function find(PrefixedUlid $id): ?SecretRecord

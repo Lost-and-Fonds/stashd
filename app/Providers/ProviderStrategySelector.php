@@ -61,7 +61,7 @@ final readonly class ProviderStrategySelector
                 StrategyCost::LastResort->value => 3,
             ];
 
-            $costCompare = ($costOrder[$a->cost->value] ?? 99) <=> ($costOrder[$b->cost->value] ?? 99);
+            $costCompare = $costOrder[$a->cost->value] <=> $costOrder[$b->cost->value];
 
             if ($options->preferHighestCapability) {
                 $costCompare = -$costCompare;

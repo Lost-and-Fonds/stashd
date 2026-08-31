@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Stashes;
 
 use App\Broadcasts\BroadcastRepository;
+use App\Http\Api\ApiJson;
 use App\Commands\CommandDispatchService;
 use App\Commands\CommandId;
 use App\Commands\CommandRecord;
@@ -50,7 +51,7 @@ final readonly class CreateStashFromDiscovery implements InitialInputPersistence
         $preflight = $this->requireCompletedPreflight($preflightCommand);
         $preflightResult = $this->decodePreflightResult($preflight);
 
-        $sourceUri = str((string) ($preflightResult['source_uri'] ?? ''))->trim()->toString();
+        $sourceUri = str(ApiJson::string($preflightResult['source_uri'] ?? null))->trim()->toString();
         $sourceTitle = is_string($preflightResult['source_title'] ?? null) ? $preflightResult['source_title'] : null;
         $origin = is_string($preflightResult['origin'] ?? null) ? $preflightResult['origin'] : PreflightOrigin::Api->value;
 
@@ -85,7 +86,7 @@ final readonly class CreateStashFromDiscovery implements InitialInputPersistence
         $stashId = StashId::fromPrimaryKey($stash->id);
         $inputType = StashInputTypeMapper::fromProviderInputType($resolved->inputType);
 
-        $syncMode = SyncMode::tryFrom((string) ($options['sync_mode'] ?? SyncMode::Automatic->value)) ?? SyncMode::Automatic;
+        $syncMode = SyncMode::tryFrom(ApiJson::string($options['sync_mode'] ?? null, SyncMode::Automatic->value)) ?? SyncMode::Automatic;
 
         $stashInput = null;
         $counts = new DiscoveredItemCommitCounts();
