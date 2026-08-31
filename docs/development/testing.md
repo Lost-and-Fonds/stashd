@@ -15,7 +15,7 @@ For PHP/application work:
 ```text
 1. Relevant focused test(s)
 2. composer lint
-3. composer test:static
+3. composer analyse
 4. Broader affected test suite, if the change crosses that boundary
 5. git diff --check
 ```
@@ -50,7 +50,7 @@ Then:
 
 ```bash
 composer lint
-composer test:static
+composer analyse
 git diff --check
 ```
 
@@ -69,7 +69,7 @@ Then:
 
 ```bash
 composer lint
-composer test:static
+composer analyse
 ```
 
 Run broader PostgreSQL-backed application coverage when the changed behavior
@@ -105,7 +105,7 @@ Then run:
 ```bash
 composer test:plugin-runtime
 composer lint
-composer test:static
+composer analyse
 ```
 
 If Rust runtime code changed, also run the existing workspace checks:

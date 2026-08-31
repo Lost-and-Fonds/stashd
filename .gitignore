@@ -21,3 +21,6 @@ __pycache__/
 /.env.lerd_override
 /.pi-lens/
 /.stashd/
+
+# Alchemy
+.alchemy

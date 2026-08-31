@@ -11,7 +11,7 @@ Common project checks are:
 
 ```bash
 composer lint
-composer test:static
+composer analyse
 composer test
 composer test:docker-smoke
 ```

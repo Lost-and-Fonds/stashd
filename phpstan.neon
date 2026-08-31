@@ -1,9 +1,0 @@
-includes:
-    - phpstan-baseline.neon
-
-parameters:
-    level: max
-    reportUnmatchedIgnoredErrors: false
-    paths:
-        - app
-    tmpDir: .tempest/cache/phpstan
