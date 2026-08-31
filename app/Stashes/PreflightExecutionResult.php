@@ -34,6 +34,12 @@ final readonly class PreflightExecutionResult
     /** @return array<string, mixed> */
     public function toResultArray(string $reviewUrl): array
     {
+        $sizes = array_column($this->discoveredItems, 'size_bytes');
+        $knownSizes = array_filter($sizes, static fn(mixed $size): bool => is_int($size) || is_float($size));
+        $totalSize = $knownSizes !== [] ? array_sum($knownSizes) : null;
+        $unknownSizeCount = count($sizes) - count($knownSizes);
+        $sizeEstimated = $totalSize !== null && ($unknownSizeCount > 0 || array_filter($this->discoveredItems, static fn(array $item): bool => ($item['size_estimated'] ?? false) === true) !== []);
+
         return [
             'source_uri' => $this->sourceUri,
             'source_title' => $this->sourceTitle,
@@ -48,11 +54,17 @@ final readonly class PreflightExecutionResult
                 'source_title' => $this->resolvedInput->sourceTitle,
                 'source_avatar_uri' => $this->resolvedInput->sourceAvatarUri?->toString(),
                 'estimated_item_count' => $this->resolvedInput->estimatedItemCount,
+                'size_bytes' => $this->resolvedInput->sizeBytes,
+                'size_estimated' => $this->resolvedInput->sizeEstimated,
             ],
             'discovery' => [
                 'strategy_key' => $this->strategyKey,
                 'estimated_item_count' => $this->estimatedItemCount,
                 'estimated_total_duration_seconds' => $this->estimatedTotalDurationSeconds,
+                'estimated_total_size_bytes' => $totalSize,
+                'estimated_total_size_estimated' => $sizeEstimated,
+                'estimated_total_size_known_items' => count($knownSizes),
+                'estimated_total_size_item_count' => count($sizes),
                 'discovered_items' => $this->discoveredItems,
                 'sample_items' => $this->sampleItems(),
             ],

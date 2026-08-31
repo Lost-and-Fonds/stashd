@@ -35,6 +35,8 @@ final class MediaItemRepository
         ?DateTime $publishedAt = null,
         StashdUri|string|null $thumbnailUri = null,
         ?string $contentType = null,
+        ?int $sizeBytes = null,
+        bool $sizeEstimated = false,
     ): MediaItemRecord {
         $id = $this->ids->generate('media')->toString();
         $record = new MediaItemRecord(
@@ -49,6 +51,8 @@ final class MediaItemRepository
             publishedAt: $publishedAt,
             thumbnailUri: $thumbnailUri instanceof StashdUri ? $thumbnailUri->toString() : $thumbnailUri,
             contentType: $contentType,
+            sizeBytes: $sizeBytes,
+            sizeEstimated: $sizeEstimated,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);

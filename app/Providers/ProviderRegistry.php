@@ -14,14 +14,16 @@ final class ProviderRegistry
 {
     /** @var array<string, Provider> */
     private array $providers = [];
+    private ExternalInputPluginRegistry $externalPlugins;
 
     public function __construct(
         FakeProvider $fakeProvider,
-        ?ExternalInputPluginRegistry $externalPlugins = null,
+        ExternalInputPluginRegistry $externalPlugins,
     ) {
+        $this->externalPlugins = $externalPlugins;
         $this->register($fakeProvider);
 
-        foreach ($externalPlugins?->providers() ?? [] as $plugin) {
+        foreach ($externalPlugins->providers() as $plugin) {
             $this->register($plugin);
         }
     }
@@ -45,7 +47,7 @@ final class ProviderRegistry
 
     public function resolveForUri(StashdUri $uri): Provider
     {
-        foreach ($this->providers as $provider) {
+        foreach ([...$this->providers, ...$this->externalPlugins->providers()] as $provider) {
             if ($provider->supportsUri($uri)) {
                 return $provider;
             }

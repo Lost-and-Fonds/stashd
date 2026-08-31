@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\System\Activity;
 
 use App\Broadcasts\BroadcastId;
+use App\Broadcasts\BroadcastRecord;
 use App\Commands\CommandRecord;
 use App\Downloads\DownloadExecutionResult;
 use App\Jobs\JobRecord;
@@ -46,6 +47,81 @@ final readonly class ActivityEventService
             entityType: 'stash',
             entityId: (string) $stash->id,
             stashId: (string) $stash->id,
+        );
+    }
+
+    public function stashUpdated(StashRecord $stash): ActivityEventRecord
+    {
+        return $this->emit(
+            level: ActivityLevel::Info,
+            type: 'stash.updated',
+            message: sprintf('Stash "%s" updated.', $stash->name),
+            entityType: 'stash',
+            entityId: (string) $stash->id,
+            stashId: (string) $stash->id,
+        );
+    }
+
+    public function inputUpdated(StashInputRecord $input): ActivityEventRecord
+    {
+        return $this->emit(
+            level: ActivityLevel::Info,
+            type: 'stash.input_updated',
+            message: sprintf('Input "%s" updated.', $input->title ?? $input->sourceUri),
+            entityType: 'stash_input',
+            entityId: (string) $input->id,
+            stashId: (string) $input->stashId,
+        );
+    }
+
+    public function broadcastUpdated(BroadcastRecord $broadcast): ActivityEventRecord
+    {
+        return $this->emit(
+            level: ActivityLevel::Info,
+            type: 'broadcast.updated',
+            message: sprintf('Broadcast "%s" updated.', $broadcast->name),
+            entityType: 'broadcast',
+            entityId: (string) $broadcast->id,
+            stashId: (string) $broadcast->stashId,
+            broadcastId: (string) $broadcast->id,
+        );
+    }
+
+    public function broadcastCreated(BroadcastRecord $broadcast): ActivityEventRecord
+    {
+        return $this->emit(
+            level: ActivityLevel::Info,
+            type: 'broadcast.created',
+            message: sprintf('Broadcast "%s" created.', $broadcast->name),
+            entityType: 'broadcast',
+            entityId: (string) $broadcast->id,
+            stashId: (string) $broadcast->stashId,
+            broadcastId: (string) $broadcast->id,
+        );
+    }
+
+    public function broadcastDeleted(BroadcastRecord $broadcast): ActivityEventRecord
+    {
+        return $this->emit(
+            level: ActivityLevel::Info,
+            type: 'broadcast.deleted',
+            message: sprintf('Broadcast "%s" deleted.', $broadcast->name),
+            entityType: 'broadcast',
+            entityId: (string) $broadcast->id,
+            stashId: (string) $broadcast->stashId,
+            broadcastId: (string) $broadcast->id,
+        );
+    }
+
+    public function stashDeleted(string $stashId): ActivityEventRecord
+    {
+        return $this->emit(
+            level: ActivityLevel::Info,
+            type: 'stash.deleted',
+            message: 'Stash deleted.',
+            entityType: 'stash',
+            entityId: $stashId,
+            stashId: $stashId,
         );
     }
 
@@ -210,6 +286,8 @@ final readonly class ActivityEventService
                 : sprintf('Download completed with %d ready assets.', $result->assetsReady),
             entityType: 'media_item',
             entityId: $result->mediaItemId,
+            stashId: is_string($job->payload['stash_id'] ?? null) ? $job->payload['stash_id'] : null,
+            mediaItemId: $result->mediaItemId,
             jobId: (string) $job->id,
             commandId: (string) $command->id,
             groupKey: 'command:' . (string) $command->id,
@@ -225,6 +303,8 @@ final readonly class ActivityEventService
             message: $this->secrets->redact($error),
             entityType: 'job',
             entityId: (string) $job->id,
+            stashId: is_string($job->payload['stash_id'] ?? null) ? $job->payload['stash_id'] : null,
+            mediaItemId: is_string($job->payload['media_item_id'] ?? null) ? $job->payload['media_item_id'] : null,
             jobId: (string) $job->id,
             commandId: $job->commandId?->toString(),
             groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,

@@ -63,6 +63,9 @@ final readonly class BroadcastCommandHandler implements CommandHandler
     {
         $commandId = CommandId::fromPrimaryKey($command->id);
         $payload = $this->normalizedPayload($options);
+        $broadcast = $this->broadcasts->find(BroadcastId::parse((string) $payload['broadcast_id']))
+            ?? throw InvalidCommandPayload::withErrors(['Broadcast not found.']);
+        $payload['stash_id'] = (string) $broadcast->stashId;
         $targetId = $payload['broadcast_item_id'] ?? $payload['broadcast_id'];
 
         if (! is_string($targetId)) {

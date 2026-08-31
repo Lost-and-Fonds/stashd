@@ -19,6 +19,11 @@ use App\Vault\Api\AssetResource;
 use App\Vault\Api\MediaItemDetailResource;
 use App\Vault\Api\MediaItemResource;
 use App\Vault\Api\VaultItemSummaryResource;
+use App\Config\StashdConfig;
+use Tempest\Http\ContentType;
+use Tempest\Http\Response;
+use Tempest\Http\Responses\NotFound;
+use Tempest\Http\Responses\Ok;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
@@ -36,6 +41,7 @@ final readonly class MediaItemController
         private StashRepository $stashes,
         private BroadcastItemRepository $broadcastItems,
         private BroadcastRepository $broadcasts,
+        private StashdConfig $config,
     ) {}
 
     #[Get('/api/v1/items')]
@@ -90,6 +96,13 @@ final readonly class MediaItemController
             $broadcastIds,
         )));
 
+        $metadataAsset = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::MetadataJson);
+        $pluginMetadata = null;
+        if ($metadataAsset?->state === AssetState::Ready && $metadataAsset->path !== null && is_file($metadataAsset->path)) {
+            $decoded = json_decode((string) file_get_contents($metadataAsset->path), true);
+            $pluginMetadata = is_array($decoded) ? $decoded : null;
+        }
+
         return new Json([
             ...MediaItemDetailResource::fromRecord(
                 item: $item,
@@ -97,8 +110,38 @@ final readonly class MediaItemController
                 stashes: $stashes,
                 broadcasts: $broadcasts,
                 preservedSizeBytes: $this->assets->preservedSizeBytesForMediaItem($mediaItemId),
+                pluginMetadata: $pluginMetadata,
             )->toArray(),
         ]);
+    }
+
+    #[Get('/api/v1/items/{id}/playback')]
+    public function playback(string $id): Response
+    {
+        $item = $this->findMediaItem($id);
+
+        if ($item === null) return new NotFound();
+
+        $asset = $this->assets->findByMediaItemAndRole(MediaItemId::fromPrimaryKey($item->id), AssetRole::VaultOriginal);
+
+        if ($asset === null || $asset->state !== AssetState::Ready || $asset->path === null || ! is_file($asset->path)) return new NotFound();
+
+        $size = $asset->sizeBytes ?? filesize($asset->path);
+        if ($size === false || $size === null) return new NotFound();
+
+        $mediaType = $asset->mimeType ?? match ($asset->kind) {
+            AssetKind::Video => 'video/mp4',
+            AssetKind::Audio => 'audio/mpeg',
+            AssetKind::Image => 'image/jpeg',
+            default => 'application/octet-stream',
+        };
+
+        return (new Ok())
+            ->addHeader(ContentType::HEADER, $mediaType)
+            ->addHeader('Content-Length', (string) $size)
+            ->addHeader('Accept-Ranges', 'bytes')
+            ->addHeader('Content-Disposition', 'inline')
+            ->addHeader('X-Accel-Redirect', $this->accelPath($asset->path));
     }
 
     #[Get('/api/v1/items/{id}/assets')]
@@ -217,5 +260,13 @@ final readonly class MediaItemController
                 'message' => 'Media item not found.',
             ],
         ], Status::NOT_FOUND);
+    }
+
+    private function accelPath(string $path): string
+    {
+        $root = rtrim($this->config->mediaPath, '/') . '/';
+        $relative = str_starts_with($path, $root) ? substr($path, strlen($root)) : basename($path);
+
+        return '/' . implode('/', array_map(rawurlencode(...), explode('/', $relative)));
     }
 }

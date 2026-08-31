@@ -26,12 +26,18 @@ final class PackageManager
         $this->links = $root . '/links';
         $this->staging = $root . '/staging';
 
-        foreach ([$this->packages, $this->active, $this->links, $this->staging] as $directory) {
+        foreach ([$this->root, $this->packages, $this->active, $this->links] as $directory) {
             try {
-                Filesystem\create_directory($directory, 0700);
+                Filesystem\create_directory($directory, 0755);
+                chmod($directory, 0755);
             } catch (\Throwable $exception) {
                 throw new RuntimeException('package directory could not be created');
             }
+        }
+        try {
+            Filesystem\create_directory($this->staging, 0700);
+        } catch (\Throwable $exception) {
+            throw new RuntimeException('package staging directory could not be created');
         }
         $this->umoci = $umoci ?? new Umoci();
     }
@@ -83,7 +89,8 @@ final class PackageManager
 
                 throw new PackageStateError('a different plugin artifact already uses this version');
             }
-            Filesystem\create_directory(dirname($destination), 0700);
+            Filesystem\create_directory(dirname($destination), 0755);
+            chmod(dirname($destination), 0755);
 
             if (! rename($rootfs, $destination)) {
                 throw new PackageStateError('package version could not be committed');

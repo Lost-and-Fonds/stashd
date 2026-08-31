@@ -150,20 +150,24 @@ final readonly class StashController
             return $this->validationError('Invalid stash or input settings.');
         }
 
+        // Discovery duration depends on the source and must not be cut off by
+        // PHP's default 30-second request limit.
         try {
-            $stash = $this->initialInput->execute(
-                $name,
-                $syncMode,
-                $downloadPolicy,
-                $organizationMode,
-                is_string($body['description'] ?? null) ? trim($body['description']) : null,
-                $plugin,
-                $source,
-                $options,
+            $stash = $this->stashes->create(
+                name: $name,
+                syncMode: $syncMode,
+                downloadPolicy: $downloadPolicy,
+                organizationMode: $organizationMode,
+                description: is_string($body['description'] ?? null) ? trim($body['description']) : null,
             );
-        } catch (\InvalidArgumentException $exception) {
-            return $this->validationError($exception->getMessage());
-        } catch (\RuntimeException $exception) {
+            $this->activity->stashCreated($stash);
+            $this->dispatch->dispatch(CommandType::StashAddInput, [
+                'stash_id' => (string) $stash->id,
+                'plugin' => $plugin,
+                'source' => $source,
+                'options' => $options,
+            ], $this->context->user());
+        } catch (\InvalidArgumentException|\RuntimeException|InvalidCommandPayload $exception) {
             return $this->validationError($exception->getMessage());
         }
 
@@ -435,6 +439,7 @@ final readonly class StashController
         }
 
         $input = $this->inputOptions->execute($stash, $input, $inputOptions);
+        $this->activity->inputUpdated($input);
 
         return new Json([
             'input' => StashInputResource::fromRecord($input, $this->inputOptions->declaredOptions($input))->toArray(),
@@ -500,6 +505,7 @@ final readonly class StashController
             downloadPolicy: $downloadPolicy,
             organizationMode: $organizationMode,
         );
+        $this->activity->stashUpdated($stash);
 
         return new Json([
             'stash' => StashResource::fromRecord($stash)->toArray(),
@@ -525,6 +531,7 @@ final readonly class StashController
                 ],
             ], Status::CONFLICT);
         }
+        $this->activity->stashDeleted((string) $stash->id);
 
         return new Json(['deleted' => true]);
     }

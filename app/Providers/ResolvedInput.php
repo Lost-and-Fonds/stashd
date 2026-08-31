@@ -15,5 +15,7 @@ final readonly class ResolvedInput
         public ?string $sourceTitle = null,
         public ?StashdUri $sourceAvatarUri = null,
         public ?int $estimatedItemCount = null,
+        public ?int $sizeBytes = null,
+        public bool $sizeEstimated = false,
     ) {}
 }

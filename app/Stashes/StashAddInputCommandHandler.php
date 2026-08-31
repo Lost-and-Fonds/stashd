@@ -40,6 +40,20 @@ final readonly class StashAddInputCommandHandler implements CommandHandler
             throw InvalidCommandPayload::withErrors(['Stash not found.']);
         }
 
+        $plugin = trim((string) ($options['plugin'] ?? ''));
+        $source = $options['source'] ?? null;
+
+        if ($plugin !== '' && is_array($source)) {
+            $inputOptions = StashInputOptions::fromArray(is_array($options['options'] ?? null) ? $options['options'] : []);
+            foreach ([$inputOptions?->titleRegexInclude, $inputOptions?->titleRegexExclude] as $pattern) {
+                if ($pattern !== null && ! StashInputOptions::isValidTitleRegex($pattern)) {
+                    throw InvalidCommandPayload::withErrors(["Invalid title filter pattern: {$pattern}"]);
+                }
+            }
+
+            return;
+        }
+
         $preflightCommandId = trim((string) ($options['preflightCommandId'] ?? $options['preflight_command_id'] ?? ''));
 
         if ($preflightCommandId === '') {
@@ -87,6 +101,11 @@ final readonly class StashAddInputCommandHandler implements CommandHandler
             'preflight_command_id' => $preflightCommandId,
             'options' => is_array($options['options'] ?? null) ? $options['options'] : [],
         ];
+
+        if (is_string($options['plugin'] ?? null) && is_array($options['source'] ?? null)) {
+            $payload['plugin'] = $options['plugin'];
+            $payload['source'] = $options['source'];
+        }
 
         $command->options = $payload;
         $command->targetType = 'stash';

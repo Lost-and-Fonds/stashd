@@ -15,7 +15,7 @@ final class ExternalInputPluginRegistry
     /** @param list<Provider> $plugins
      * @param list<PluginInputDefinition> $definitions
      */
-    public function __construct(private array $plugins = [], private array $definitions = []) {}
+    public function __construct(private array $plugins, private array $definitions) {}
 
     public function get(string $id): Provider
     {

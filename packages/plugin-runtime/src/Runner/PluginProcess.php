@@ -72,8 +72,14 @@ final class PluginProcess
                     FrameCodec::write($this->pipes[0], ['protocol' => 1, 'id' => $responseId, 'kind' => 'response', 'error' => ['code' => 'capability-denied', 'message' => $exception->getMessage()]]);
                 }
 
+                // This is an idle timeout, not a maximum operation duration. A
+                // capability can legitimately run for hours (yt-dlp downloads).
+                $deadline = microtime(true) + $timeout;
+
                 continue;
             }
+
+            $deadline = microtime(true) + $timeout;
 
             if (($message['id'] ?? null) !== $id) {
                 throw new FrameProtocolError('plugin response ID mismatch');

@@ -64,7 +64,7 @@ final readonly class DiscoverStashInput
         // configured), so this is a no-op when only the cheap one exists.
         $selectionOptions = match ($intent) {
             JobIntent::Preflight, JobIntent::InitialBackfill => new StrategySelectionOptions(preferHighestCapability: true),
-            JobIntent::SyncInput => new StrategySelectionOptions(preferHighestCapability: true, preferIncremental: true),
+            JobIntent::SyncInput => new StrategySelectionOptions(preferHighestCapability: true),
             default => null,
         };
         $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);
@@ -84,6 +84,8 @@ final readonly class DiscoverStashInput
                     sourceTitle: $resolved->sourceTitle,
                     sourceAvatarUri: $resolved->sourceAvatarUri,
                     estimatedItemCount: $resolved->estimatedItemCount,
+                    sizeBytes: $resolved->sizeBytes,
+                    sizeEstimated: $resolved->sizeEstimated,
                 );
             }
         }

@@ -10,6 +10,7 @@ use App\Plugins\PluginInputDefinition;
 use App\Plugins\PluginInputRuntime;
 use Stashd\PluginRuntime\Package\PackageManager;
 use Stashd\PluginRuntime\Runner\PluginRunner;
+use Tempest\Cache\Cache;
 use Tempest\Container\Container;
 use Tempest\Container\Initializer;
 
@@ -34,7 +35,7 @@ final class ExternalInputPluginRegistryInitializer implements Initializer
             $definitions[] = $definition;
         }
         $runner = new PluginRunner($packages);
-        $providers = array_map(static fn(PluginInputDefinition $definition): PluginInputRuntime => new PluginInputRuntime($definition, $runner, $packages, $container->get(\App\System\Secret\SecretsService::class)), $definitions);
+        $providers = array_map(static fn(PluginInputDefinition $definition): PluginInputRuntime => new PluginInputRuntime($definition, $runner, $packages, $container->get(\App\System\Secret\SecretsService::class), $container->get(Cache::class)), $definitions);
 
         return new ExternalInputPluginRegistry($providers, $definitions);
     }

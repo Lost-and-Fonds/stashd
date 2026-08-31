@@ -86,11 +86,19 @@ final readonly class DiscoveredItemCommitter
                     ? StashdUri::parse(str($item['thumbnail_uri'])->trim()->toString())
                     : null,
                     contentType: is_string($item['content_type'] ?? null) ? $item['content_type'] : null,
+                    sizeBytes: isset($item['size_bytes']) ? (int) $item['size_bytes'] : null,
+                    sizeEstimated: (bool) ($item['size_estimated'] ?? false),
                 );
                 $mediaItemsCreated++;
             } else {
                 $mediaItem = $existingMedia;
                 $mediaItemsReused++;
+
+                if ($mediaItem->sizeBytes === null && isset($item['size_bytes'])) {
+                    $mediaItem->sizeBytes = (int) $item['size_bytes'];
+                    $mediaItem->sizeEstimated = (bool) ($item['size_estimated'] ?? false);
+                    $this->mediaItems->save($mediaItem);
+                }
             }
 
             $mediaItemId = MediaItemId::fromPrimaryKey($mediaItem->id);

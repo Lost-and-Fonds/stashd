@@ -22,6 +22,8 @@ final readonly class DiscoveredItem
         public ?StashdUri $thumbnailUri = null,
         public ?array $rawMetadata = null,
         public ?string $contentType = null,
+        public ?int $sizeBytes = null,
+        public bool $sizeEstimated = false,
     ) {}
 
     /** @return array<string, mixed> */
@@ -36,6 +38,8 @@ final readonly class DiscoveredItem
             'published_at' => $item->publishedAt?->toRfc3339(useZ: true),
             'thumbnail_uri' => $item->thumbnailUri?->toString(),
             'content_type' => $item->contentType,
+            'size_bytes' => $item->sizeBytes,
+            'size_estimated' => $item->sizeEstimated,
         ];
 
         if ($item->rawMetadata !== null) {

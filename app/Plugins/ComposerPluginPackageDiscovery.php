@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
-use Composer\InstalledVersions;
 use RuntimeException;
 use Stashd\PluginRuntime\Package\PackageManifest;
 use Tempest\Support\Filesystem;
@@ -15,30 +14,6 @@ final class ComposerPluginPackageDiscovery
     public function all(?string $activeRoot = null): array
     {
         $packages = [];
-
-        foreach (InstalledVersions::getInstalledPackagesByType('stashd-plugin') as $name) {
-            $root = realpath(InstalledVersions::getInstallPath($name) ?? '');
-
-            if ($root === false || trim($root) === '') {
-                continue;
-            }
-            $composerPath = rtrim($root, '/') . '/composer.json';
-            $composer = $this->readJson($composerPath);
-            $payload = $this->pluginPayload($composer);
-            $relative = is_string($payload['manifest'] ?? null) ? trim($payload['manifest']) : '';
-
-            if ($relative === '' || str_starts_with($relative, '/') || str_contains($relative, '..')) {
-                throw new RuntimeException("Invalid Stashd plugin manifest declaration in {$name}.");
-            }
-            $manifestPath = $root . '/' . $relative;
-            $manifest = $this->readJson($manifestPath);
-
-            if (! is_array($manifest)) {
-                throw new RuntimeException("Invalid Stashd plugin manifest: {$manifestPath}");
-            }
-            PackageManifest::validateData($manifest);
-            $packages[] = ['name' => $name, 'root' => $root, 'manifest' => $manifest, 'manifest_path' => $manifestPath];
-        }
 
         if ($activeRoot !== null && Filesystem\is_directory($activeRoot)) {
             foreach (Filesystem\list_directory($activeRoot) as $root) {

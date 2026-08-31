@@ -61,7 +61,15 @@ final readonly class DownloadJobHandler implements JobHandler
                 stashId: $stashId,
                 jobId: PrefixedUlid::parse((string) $job->id),
                 force: $force,
-                onProgress: fn() => $context->heartbeat($job),
+                onProgress: function (?string $stage = null) use ($context, $job): void {
+                    if ($stage === null || $stage === '') {
+                        $context->heartbeat($job);
+
+                        return;
+                    }
+
+                    $context->progress($job, JobProgressUpdate::indeterminate($stage));
+                },
             );
 
             $command->result = $result->toArray();

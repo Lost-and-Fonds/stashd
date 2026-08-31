@@ -64,6 +64,8 @@ final readonly class InputPluginController
                 'provider_input_id' => $resolved->providerInputId,
                 'kind' => $resolved->inputType,
                 'display_name' => $resolved->title,
+                'size_bytes' => $resolved->sizeBytes,
+                'size_estimated' => $resolved->sizeEstimated,
             ],
         ]));
     }

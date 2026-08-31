@@ -54,6 +54,8 @@ final readonly class StashItemResource
                 'contentType' => $this->mediaItem->contentType,
                 'publishedAt' => $this->mediaItem->publishedAt,
                 'failureReason' => $this->downloadFailureReason,
+                'sizeBytes' => $this->mediaItem->sizeBytes,
+                'sizeEstimated' => $this->mediaItem->sizeEstimated,
             ],
             'totalAssetSizeBytes' => $this->totalAssetSizeBytes,
         ]);

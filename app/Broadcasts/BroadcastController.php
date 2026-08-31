@@ -25,6 +25,7 @@ use App\Stashes\StashRecord;
 use App\Stashes\StashRepository;
 use App\Support\PrefixedUlid;
 use App\System\Storage\PathSanitizer;
+use App\System\Activity\ActivityEventService;
 use App\Vault\MediaItemRepository;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
@@ -53,6 +54,7 @@ final readonly class BroadcastController
         private CommandDispatchService $commands,
         private CommandRepository $commandRecords,
         private JobRepository $jobs,
+        private ActivityEventService $activity,
     ) {}
 
     #[Get('/api/v1/broadcast-plugins')]
@@ -212,6 +214,7 @@ final readonly class BroadcastController
             slug: $slug,
             settings: $settings,
         );
+        $this->activity->broadcastCreated($broadcast);
 
         $build = $this->commands->dispatch(CommandType::BroadcastRebuild, [
             'broadcast_id' => (string) $broadcast->id,
@@ -356,6 +359,7 @@ final readonly class BroadcastController
         $settings['source_settings'] = $sourceSettings;
         $broadcast->settings = $settings;
         $this->broadcasts->save($broadcast);
+        $this->activity->broadcastUpdated($broadcast);
 
         return new Json(['broadcast' => $this->mapBroadcast($broadcast)]);
     }
@@ -391,6 +395,7 @@ final readonly class BroadcastController
 
         $broadcast->settings = $settings === [] ? null : $settings;
         $this->broadcasts->save($broadcast);
+        $this->activity->broadcastUpdated($broadcast);
 
         return new Json([
             'broadcast' => $this->mapBroadcast($broadcast),

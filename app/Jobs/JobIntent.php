@@ -26,7 +26,7 @@ enum JobIntent: string
     {
         return match ($this) {
             self::Download, self::Broadcast, self::DownloadCaptions => JobLane::Bulk,
-            self::InitialBackfill, self::SyncInput => JobLane::Discovery,
+            self::InitialBackfill, self::AddInput, self::SyncInput => JobLane::Discovery,
             default => JobLane::Interactive,
         };
     }

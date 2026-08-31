@@ -19,6 +19,7 @@ final readonly class MediaItemDetailResource
      * @param list<AssetRecord> $assets
      * @param list<StashRecord> $stashes
      * @param list<BroadcastRecord> $broadcasts
+     * @param array<string, mixed>|null $pluginMetadata
      */
     public function __construct(
         private MediaItemRecord $item,
@@ -26,6 +27,7 @@ final readonly class MediaItemDetailResource
         private array $stashes,
         private array $broadcasts,
         private int $preservedSizeBytes,
+        private ?array $pluginMetadata = null,
     ) {}
 
     /**
@@ -39,8 +41,9 @@ final readonly class MediaItemDetailResource
         array $stashes,
         array $broadcasts,
         int $preservedSizeBytes,
+        ?array $pluginMetadata = null,
     ): self {
-        return new self($item, $assets, $stashes, $broadcasts, $preservedSizeBytes);
+        return new self($item, $assets, $stashes, $broadcasts, $preservedSizeBytes, $pluginMetadata);
     }
 
     /** @return array<string, mixed> */
@@ -52,6 +55,7 @@ final readonly class MediaItemDetailResource
             'stashes' => array_map(static fn(StashRecord $stash): array => StashResource::fromRecord($stash)->toArray(), $this->stashes),
             'broadcasts' => array_map(static fn(BroadcastRecord $broadcast): array => BroadcastResource::fromRecord($broadcast)->toArray(), $this->broadcasts),
             'preservedSizeBytes' => $this->preservedSizeBytes,
+            'pluginMetadata' => $this->pluginMetadata,
         ]);
     }
 

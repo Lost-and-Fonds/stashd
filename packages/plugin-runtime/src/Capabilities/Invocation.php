@@ -9,6 +9,7 @@ use GuzzleHttp\Psr7\Uri;
 use GuzzleHttp\Psr7\UriResolver;
 use RuntimeException;
 use Stashd\PluginRuntime\Sandbox\SandboxPolicy;
+use Tempest\DateTime\Duration;
 use Tempest\Process\GenericProcessExecutor;
 use Tempest\Process\OutputChannel;
 use Tempest\Process\PendingProcess;
@@ -225,7 +226,9 @@ final class Invocation
         }
         $command = array_values($command);
         array_push($command, ...$arguments);
-        $process = (new GenericProcessExecutor())->start(new PendingProcess($command));
+        // No maximum runtime: long media is valid. Abort only when yt-dlp has
+        // stopped producing output for a sustained period.
+        $process = (new GenericProcessExecutor())->start(new PendingProcess($command, idleTimeout: Duration::seconds(60)));
         $result = $process->wait($onOutput === null ? null : static function (OutputChannel $channel, string $buffer) use ($onOutput): void {
             if ($buffer !== '') {
                 $onOutput();
