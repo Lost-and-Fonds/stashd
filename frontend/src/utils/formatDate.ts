@@ -1,5 +1,14 @@
+import { ref } from 'vue'
+
+const relativeTimeTick = ref(Date.now())
+
+if (typeof window !== 'undefined') {
+  window.setInterval(() => { relativeTimeTick.value = Date.now() }, 30_000)
+}
+
 export function formatRelativeDate(value?: string | null): string {
   if (!value) return '—'
+  relativeTimeTick.value
 
   const date = new Date(value)
   const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000))

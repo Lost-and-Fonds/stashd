@@ -1,21 +1,22 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, ref, resolveComponent, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 
 import { fetchVaultItems, type VaultItemApiResource } from '../api/vault'
 import { subscribeLiveUpdates, type LiveEvent } from '../live/mercure'
 
 const router = useRouter()
+const route = useRoute()
 const items = ref<VaultItemApiResource[]>([])
 const total = ref(0)
 const vaultTotal = ref(0)
 const preservedSizeBytes = ref<number | null>(null)
 const loading = ref(true)
 const error = ref<string>()
-const search = ref('')
-const kind = ref('all')
-const page = ref(1)
+const search = ref(typeof route.query.search === 'string' ? route.query.search : '')
+const kind = ref(typeof route.query.kind === 'string' ? route.query.kind : 'all')
+const page = ref(Math.max(1, Number(route.query.page) || 1))
 const pageSize = 50
 
 const kindMeta: Record<string, { label: string, icon: string }> = {
@@ -141,8 +142,25 @@ function handleLiveEvent(event: LiveEvent) {
   if ((event.event === 'job.completed' || event.event === 'job.failed') && (event.payload.intent?.startsWith('download') || event.payload.entityType === 'media_item')) scheduleLiveRefresh()
 }
 
-watch([search, kind], () => { page.value = 1; void load() })
-watch(page, () => { void load() })
+function syncQuery() {
+  const query = { ...route.query }
+  const value = search.value.trim()
+  if (value) query.search = value
+  else delete query.search
+  if (kind.value !== 'all') query.kind = kind.value
+  else delete query.kind
+  if (page.value > 1) query.page = String(page.value)
+  else delete query.page
+  void router.replace({ query })
+}
+
+watch([search, kind], () => { page.value = 1 })
+watch([search, kind, page], () => { syncQuery(); void load() })
+watch(() => [route.query.search, route.query.kind, route.query.page], ([querySearch, queryKind, queryPage]) => {
+  search.value = typeof querySearch === 'string' ? querySearch : ''
+  kind.value = typeof queryKind === 'string' ? queryKind : 'all'
+  page.value = Math.max(1, Number(queryPage) || 1)
+})
 onMounted(() => {
   void load()
   unsubscribe = subscribeLiveUpdates(handleLiveEvent)

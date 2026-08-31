@@ -68,7 +68,7 @@ onMounted(async () => { try { [stash.value, plugins.value] = await Promise.all([
             <UAlert color="success" variant="subtle" icon="i-lucide-circle-check" title="Source ready" :description="resolved.display_name ?? undefined" />
             <UAlert v-if="options.diagnostics.length" color="warning" variant="subtle" title="Unsupported Input options" :description="options.diagnostics.map(diagnostic => diagnostic.message).join(' ')" />
             <div v-else class="space-y-5"><PluginField v-for="field in options.fields" :key="field.key" v-model="optionValues[field.key]" :field="field" /></div>
-            <div class="flex items-center gap-2"><UButton label="Add Input" type="submit" size="lg" :loading="saving" :disabled="options.diagnostics.length > 0" /><UButton :to="`/stashes/${stashId}`" label="Cancel" variant="ghost" color="neutral" size="lg" /></div>
+            <div class="flex items-center gap-2"><UButton label="Add Input" type="submit" size="lg" :loading="saving" :disabled="options.diagnostics.length > 0" /><UButton label="Cancel" variant="ghost" color="neutral" size="lg" @click="router.push(`/stashes/${stashId}`)" /></div>
           </template>
         </template>
       </UForm>

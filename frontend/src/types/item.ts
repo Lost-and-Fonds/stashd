@@ -28,6 +28,8 @@ export interface StashItemApiResource {
     duration_seconds?: number | null
     published_at?: string | null
     failure_reason?: string | null
+    size_bytes?: number | null
+    size_estimated?: boolean
   } | null
   total_asset_size_bytes?: number | null
 }
@@ -38,5 +40,6 @@ export interface StashItemsApiResponse {
   limit: number
   offset: number
   stash_item_count: number
+  ignored_count?: number
   status_counts?: Record<string, number>
 }

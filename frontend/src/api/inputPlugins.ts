@@ -3,7 +3,7 @@ import type { InputOptionDeclaration } from '../types/input'
 import type { StashApiResource } from '../types/stash'
 
 export interface InputPluginApiResource { key: string, label: string, source_fields: SourceFieldDeclaration[], input_options: InputOptionDeclaration[] }
-export interface ResolvedSource { plugin_key: string, canonical_reference: string, provider_input_id: string, kind: string, display_name: string | null }
+export interface ResolvedSource { plugin_key: string, canonical_reference: string, provider_input_id: string, kind: string, display_name: string | null, size_bytes?: number | null, size_estimated?: boolean }
 
 async function body<T>(response: Response): Promise<T> {
   const value = await response.json().catch(() => null) as { error?: { message?: unknown } } | null
@@ -20,7 +20,7 @@ export async function preflightInputPlugin(plugin: string, source: Record<string
   return (await body<{ resolved_source: ResolvedSource }>(response)).resolved_source
 }
 
-export async function createStashWithInput(name: string, plugin: string, source: Record<string, boolean | number | string>, options: Record<string, boolean | string>): Promise<StashApiResource> {
-  const response = await fetch('/api/v1/stashes/with-input', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, input: { plugin, source, options: { provider: options } } }) })
+export async function createStashWithInput(name: string, plugin: string, source: Record<string, boolean | number | string>, options: { title_regex_include: string | null, title_regex_exclude: string | null, provider: Record<string, boolean | string> }): Promise<StashApiResource> {
+  const response = await fetch('/api/v1/stashes/with-input', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, input: { plugin, source, options } }) })
   return (await body<{ stash: StashApiResource }>(response)).stash
 }

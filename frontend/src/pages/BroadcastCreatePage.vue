@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { FormError } from '@nuxt/ui'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { normalizeBroadcastPreview } from '../adapters/normalizeCreationPreflight'
 import { broadcastOptionValues, normalizeBroadcastOptions } from '../adapters/normalizeBroadcastOptions'
 import { createStashBroadcast, fetchBroadcastPlugins, fetchConnectionLibraries, previewBroadcast } from '../api/broadcasts'
@@ -16,8 +16,10 @@ import type { ConnectionApiResource } from '../types/connection'
 import type { PreflightState } from '../types/preflight'
 
 const route = useRoute()
+const router = useRouter()
 const stashId = String(route.params.stashId)
 const stash = ref<StashApiResource>()
+const broadcastName = ref('')
 const plugins = ref<BroadcastPluginApiResource[]>([])
 const connections = ref<ConnectionApiResource[]>([])
 const libraries = ref<{ value: string, label: string, kind?: string }[]>([])
@@ -102,6 +104,7 @@ async function load() {
   try {
     const [stashResource, pluginResources, connectionResources] = await Promise.all([fetchStash(stashId), fetchBroadcastPlugins(), fetchConnections()])
     stash.value = stashResource
+    broadcastName.value = stashResource.name
     plugins.value = pluginResources
     connections.value = connectionResources
   } catch (exception) {
@@ -116,6 +119,8 @@ function validate(state: Record<string, PluginFieldValue | undefined>): FormErro
   const errors = fields
     .filter(field => field.required && (state[field.key] === undefined || state[field.key] === ''))
     .map(field => ({ name: field.key, message: `${field.label} is required.` }))
+
+  if (broadcastName.value.trim() === '') errors.push({ name: 'name', message: 'Title is required.' })
 
   if (libraryKey.value !== null && connectionKey.value !== null && typeof state[connectionKey.value] === 'string' && state[connectionKey.value] !== '' && (state[libraryKey.value] === undefined || state[libraryKey.value] === '')) {
     errors.push({ name: libraryKey.value, message: 'Choose a discovered library.' })
@@ -164,7 +169,8 @@ async function create() {
   created.value = undefined
 
   try {
-    created.value = await createStashBroadcast(stash.value.id, selectedPlugin.value.key, settings())
+    created.value = await createStashBroadcast(stash.value.id, selectedPlugin.value.key, settings(), broadcastName.value.trim())
+    await router.push(`/stashes/${stash.value.id}`)
   } catch (exception) {
     error.value = exception instanceof Error ? exception.message : 'Could not create broadcast.'
   } finally {
@@ -197,6 +203,9 @@ onBeforeUnmount(() => { if (previewTimer) clearTimeout(previewTimer); previewGen
       <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not create broadcast" :description="error" />
 
       <UForm v-if="stash" :state="values" :validate="validate" class="space-y-6" @submit="create">
+        <UFormField name="name" label="Title" required>
+          <UInput v-model="broadcastName" placeholder="Broadcast title" class="w-full" />
+        </UFormField>
         <UFormField name="type">
           <URadioGroup v-model="typeKey" :items="typeItems" variant="card" size="lg" />
         </UFormField>
@@ -251,7 +260,7 @@ onBeforeUnmount(() => { if (previewTimer) clearTimeout(previewTimer); previewGen
 
         <div class="flex gap-2">
           <UButton label="Create broadcast" type="submit" size="lg" :loading="saving" :disabled="!selectedPlugin || normalized.diagnostics.length > 0" />
-          <UButton label="Cancel" :to="`/stashes/${stash.id}`" variant="ghost" color="neutral" size="lg" :disabled="saving" />
+          <UButton label="Cancel" variant="ghost" color="neutral" size="lg" :disabled="saving" @click="router.push(`/stashes/${stash.id}`)" />
         </div>
       </UForm>
     </template>

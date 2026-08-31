@@ -48,6 +48,7 @@ export interface VaultItemDetailResponse {
   stashes: Array<{ id: string, name: string }>
   broadcasts: Array<{ id: string, stash_id: string, type: string, name: string, slug: string }>
   preserved_size_bytes: number
+  plugin_metadata?: Record<string, unknown> | null
 }
 
 export async function fetchVaultItems(query: { limit: number, offset: number, search?: string, kind?: string }): Promise<VaultItemsResponse> {

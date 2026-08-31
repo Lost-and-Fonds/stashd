@@ -38,6 +38,7 @@ export interface JobApiResource {
   started_at?: string | null
   finished_at?: string | null
   updated_at?: string | null
+  payload?: { stash_id?: string | null, media_item_id?: string | null } | null
 }
 
 export interface ActivityApiResource {

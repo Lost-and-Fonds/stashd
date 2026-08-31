@@ -13,6 +13,8 @@ export interface JobLiveEvent {
   commandId?: string | null
   entityType?: string | null
   entityId?: string | null
+  stashId?: string | null
+  mediaItemId?: string | null
   progressCurrent?: number | null
   progressTotal?: number | null
   progressPercent?: number | null
@@ -58,6 +60,7 @@ export interface ActivityLiveEvent {
 export type LiveEvent =
   | { event: `job.${'created' | 'progress' | 'completed' | 'failed'}`, payload: JobLiveEvent }
   | { event: 'activity.created', payload: ActivityLiveEvent }
+  | { event: 'connection.restored', payload: Record<string, never> }
 
 type Listener = (event: LiveEvent) => void
 
@@ -69,6 +72,7 @@ let reconnectDelay = 1000
 let generation = 0
 let started = false
 let stopping = false
+let connected = false
 
 export function parseLiveEvent(data: string): LiveEvent | undefined {
   let value: Record<string, unknown>
@@ -118,7 +122,12 @@ async function connect(): Promise<void> {
 
   const next = new EventSource(`/.well-known/mercure?topic=${encodeURIComponent(topic)}`, { withCredentials: true })
   source = next
-  next.onopen = () => { reconnectDelay = 1000 }
+  next.onopen = () => {
+    const wasConnected = connected
+    connected = true
+    reconnectDelay = 1000
+    if (wasConnected) listeners.forEach(listener => listener({ event: 'connection.restored', payload: {} }))
+  }
   next.onmessage = (message) => {
     const event = parseLiveEvent(message.data)
     if (!event) return
@@ -151,6 +160,7 @@ export function stopLiveUpdates(): void {
   generation += 1
   source?.close()
   source = undefined
+  connected = false
   if (reconnectTimer) clearTimeout(reconnectTimer)
   reconnectTimer = undefined
 }

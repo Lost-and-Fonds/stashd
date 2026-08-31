@@ -77,7 +77,10 @@ onBeforeUnmount(() => {
         <h1 class="text-2xl font-semibold text-highlighted">Stashes</h1>
         <p class="mt-1 text-sm text-muted">Everything you're preserving, at a glance.</p>
       </div>
-      <UButton label="New stash" icon="i-lucide-plus" to="/stashes/new" />
+      <RouterLink to="/stashes/new" class="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-2 font-mono text-sm font-medium text-inverted transition-colors hover:bg-primary/90">
+        <UIcon name="i-lucide-plus" class="size-4" />
+        New stash
+      </RouterLink>
     </header>
 
     <div v-if="loading" class="flex items-center gap-2 text-sm text-muted">
@@ -91,7 +94,7 @@ onBeforeUnmount(() => {
     </div>
     <div v-else class="divide-y divide-default rounded-md border border-default">
       <div v-for="stash in stashes" :key="stash.id" class="p-4 transition-colors hover:bg-elevated/40 sm:p-5">
-        <RouterLink :to="`/stashes/${stash.id}`" class="flex items-start gap-3">
+        <RouterLink :to="{ name: 'stash-detail', params: { id: stash.id } }" class="flex items-start gap-3">
           <img v-if="stash.icon_uri" :src="stash.icon_uri" alt="" class="size-11 shrink-0 rounded-md object-cover" />
           <div v-else class="flex size-11 shrink-0 items-center justify-center rounded-md bg-elevated font-mono text-sm text-muted">{{ monogram(stash.name) }}</div>
           <div class="min-w-0 flex-1">

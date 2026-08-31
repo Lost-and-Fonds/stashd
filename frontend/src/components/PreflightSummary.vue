@@ -16,7 +16,7 @@ const storageText = computed(() => {
   const storage = props.state.plan.storage
   switch (storage.kind) {
     case 'none': return 'No additional storage'
-    case 'estimate': return `~${storage.label} additional`
+    case 'estimate': return `${storage.estimated === false ? '' : '~'}${storage.label} additional`
     case 'range': return `~${storage.lowLabel}–${storage.highLabel} additional`
     case 'calculating': return 'Calculating estimate…'
     case 'unavailable': return 'Unable to estimate additional storage'

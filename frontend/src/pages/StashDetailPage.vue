@@ -34,6 +34,7 @@ const broadcastsError = ref<string>()
 const itemsError = ref<string>()
 const copiedId = ref<string>()
 const actionError = ref<string>()
+const refreshError = ref<string>()
 const actionNotice = ref<string>()
 const editOpen = ref(false)
 const editSaving = ref(false)
@@ -49,6 +50,8 @@ const inputOperations = ref<Record<string, CommandOperation | undefined>>({})
 const broadcastOperations = ref<Record<string, CommandOperation | undefined>>({})
 let unsubscribe: (() => void) | undefined
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
+let loadGeneration = 0
+let itemsLoadGeneration = 0
 
 const syncModeOptions = [
   { label: 'Automatic', value: 'automatic' },
@@ -126,8 +129,28 @@ function operationText(operation: CommandOperation | undefined, verb: string) {
 }
 
 const failedItemCount = computed(() => items.value.status_counts?.failed ?? 0)
-const activeJobs = computed(() => jobs.value.filter(job => job.entity_type === 'media_item' && (job.state === 'processing' || job.state === 'pending')))
-const itemSort = ref({ key: 'published', direction: 'desc' as 'asc' | 'desc' })
+const activeJobs = computed(() => jobs.value.filter(job => job.entity_type === 'media_item' && job.payload?.stash_id === stash.value?.id && (job.state === 'processing' || job.state === 'pending')))
+const downloadOperation = computed(() => {
+  const ignored = items.value.ignored_count ?? 0
+  const total = Math.max(0, items.value.stash_item_count - ignored)
+  const ready = items.value.status_counts?.ready ?? 0
+  const pending = (items.value.status_counts?.download_pending ?? 0) + (items.value.status_counts?.downloading ?? 0)
+  if (activeJobs.value.length === 0 && pending === 0) return undefined
+
+  const current = activeJobs.value.find(job => job.state === 'processing') ?? activeJobs.value[0]
+  const item = current ? items.value.items.find(candidate => candidate.media_item_id === current.entity_id) : undefined
+  const stage = current
+    ? [...new Set([current.progress_label, item ? itemTitle(item) : undefined].filter((value): value is string => Boolean(value)))].join(' · ') || undefined
+    : undefined
+  const percent = total === 0 ? 100 : Math.round((ready / total) * 100)
+  const count = `${ready} of ${total} items`
+
+  return { percent, stage, count }
+})
+const itemSort = ref({
+  key: typeof route.query.sort === 'string' ? route.query.sort : 'published',
+  direction: route.query.dir === 'asc' ? 'asc' as const : 'desc' as const
+})
 
 function openEdit() {
   if (!stash.value) return
@@ -234,8 +257,15 @@ function scheduleRefresh() {
 }
 
 function handleLiveEvent(event: LiveEvent) {
+  if (event.event === 'connection.restored') {
+    scheduleRefresh()
+    return
+  }
+
   if (event.event === 'activity.created') {
-    if ((event.payload.stashId ?? event.payload.stash_id) === stash.value?.id) scheduleRefresh()
+    const mediaItemId = event.payload.mediaItemId ?? event.payload.media_item_id
+    const matchesItem = mediaItemId !== undefined && items.value.items.some(item => item.media_item_id === mediaItemId)
+    if ((event.payload.stashId ?? event.payload.stash_id) === stash.value?.id || matchesItem) scheduleRefresh()
     return
   }
 
@@ -245,9 +275,37 @@ function handleLiveEvent(event: LiveEvent) {
   const commandId = event.payload.commandId ?? event.payload.command_id
   const entityType = event.payload.entityType ?? event.payload.entity_type
   const entityId = event.payload.entityId ?? event.payload.entity_id
-  if (entityType === 'stash' && entityId === stash.value?.id) {
+  const eventStashId = event.payload.stashId ?? event.payload.stash_id
+  const eventMediaItemId = event.payload.mediaItemId ?? event.payload.media_item_id
+  const matchesStash = entityType === 'stash' && entityId === stash.value?.id || eventStashId === stash.value?.id
+  const matchesItem = eventMediaItemId !== undefined && items.value.items.some(item => item.media_item_id === eventMediaItemId)
+
+  if (event.event.startsWith('job.')) {
+    const nextJob: JobApiResource = {
+      id: event.payload.id,
+      command_id: commandId,
+      intent: event.payload.intent ?? '',
+      entity_type: entityType,
+      entity_id: entityId,
+      state: event.event === 'job.created' ? 'pending' : event.event === 'job.progress' ? 'processing' : event.event === 'job.completed' ? 'ready' : 'failed',
+      progress_current: event.payload.progressCurrent ?? event.payload.progress_current,
+      progress_total: event.payload.progressTotal ?? event.payload.progress_total,
+      progress_percent: event.payload.progressPercent ?? event.payload.progress_percent,
+      progress_label: event.payload.progressLabel ?? event.payload.progress_label,
+      last_error: event.payload.lastError ?? event.payload.last_error,
+      payload: typeof eventMediaItemId === 'string' || typeof eventStashId === 'string'
+        ? {
+            media_item_id: typeof eventMediaItemId === 'string' ? eventMediaItemId : null,
+            stash_id: typeof eventStashId === 'string' ? eventStashId : null
+          }
+        : null
+    }
+    if (matchesStash || matchesItem) jobs.value = [nextJob, ...jobs.value.filter(job => job.id !== nextJob.id)]
+  }
+
+  if (matchesStash) {
     stashOperation.value = operation
-    if (event.event === 'job.completed' || event.event === 'job.failed') scheduleRefresh()
+    if (entityType !== 'media_item' || event.event === 'job.completed' || event.event === 'job.failed') scheduleRefresh()
     return
   }
   const input = inputs.value.find(candidate => candidate.id === entityId)
@@ -258,7 +316,7 @@ function handleLiveEvent(event: LiveEvent) {
   if (inputId) inputOperations.value = { ...inputOperations.value, [inputId]: operation }
   if (broadcastId) broadcastOperations.value = { ...broadcastOperations.value, [broadcastId]: operation }
 
-  if ((event.event === 'job.completed' || event.event === 'job.failed') && (inputId || broadcastId)) scheduleRefresh()
+  if ((event.event === 'job.completed' || event.event === 'job.failed') && (inputId || broadcastId || matchesItem)) scheduleRefresh()
 }
 
 async function syncInput(input: StashInputApiResource) {
@@ -309,7 +367,13 @@ function itemDuration(item: StashItemApiResource) {
 
 function itemSize(item: StashItemApiResource) {
   const bytes = item.total_asset_size_bytes
-  if (bytes === null || bytes === undefined) return '—'
+  if (bytes === null || bytes === undefined || bytes <= 0) {
+    const estimate = item.media_item?.size_bytes
+    if (estimate === null || estimate === undefined || estimate <= 0) return '—'
+    if (estimate < 1024 * 1024) return `${item.media_item?.size_estimated ? '~' : ''}${Math.round(estimate / 1024)} KB`
+    if (estimate < 1024 * 1024 * 1024) return `${item.media_item?.size_estimated ? '~' : ''}${(estimate / (1024 * 1024)).toFixed(1)} MB`
+    return `${item.media_item?.size_estimated ? '~' : ''}${(estimate / (1024 * 1024 * 1024)).toFixed(1)} GB`
+  }
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
@@ -326,25 +390,8 @@ function activeJobFor(item: StashItemApiResource) {
   return jobs.value.find(job => job.entity_type === 'media_item' && job.entity_id === item.media_item_id && (job.state === 'processing' || job.state === 'pending'))
 }
 
-function itemSortValue(item: StashItemApiResource, key: string): string | number {
-  if (key === 'title') return itemTitle(item).toLowerCase()
-  if (key === 'published') return item.media_item?.published_at ? Date.parse(item.media_item.published_at) : 0
-  if (key === 'duration') return item.media_item?.duration_seconds ?? -1
-  if (key === 'size') return item.total_asset_size_bytes ?? -1
-  return itemState(item)
-}
-
 function sortItems(key: string) {
   itemSort.value = itemSort.value.key === key ? { key, direction: itemSort.value.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: key === 'published' ? 'desc' : 'asc' }
-}
-
-function sortedItems(itemsToSort: StashItemApiResource[]) {
-  const direction = itemSort.value.direction === 'asc' ? 1 : -1
-  return [...itemsToSort].sort((left, right) => {
-    const a = itemSortValue(left, itemSort.value.key)
-    const b = itemSortValue(right, itemSort.value.key)
-    return a < b ? -direction : a > b ? direction : 0
-  })
 }
 
 function sortHeader(label: string, key: string) {
@@ -366,7 +413,7 @@ const itemColumns: TableColumn<StashItemApiResource>[] = [
     header: () => sortHeader('Title', 'title'),
     cell: ({ row }) => h('div', { class: 'flex items-center gap-2.5' }, [
       itemThumbnail(row.original),
-      h('span', { class: 'block whitespace-normal font-mono text-sm text-highlighted' }, itemTitle(row.original))
+      h(resolveComponent('RouterLink'), { to: `/vault/${row.original.media_item_id}`, class: 'block whitespace-normal font-mono text-sm text-highlighted hover:text-primary' }, () => itemTitle(row.original))
     ])
   },
   {
@@ -389,8 +436,8 @@ const itemTableUi = {
   tbody: 'divide-y divide-default/60'
 }
 
-const itemSearch = ref('')
-const itemStatusFilter = ref('all')
+const itemSearch = ref(typeof route.query.search === 'string' ? route.query.search : '')
+const itemStatusFilter = ref(typeof route.query.status === 'string' ? route.query.status : 'all')
 const itemStatusFilterOptions = [
   { label: 'All statuses', value: 'all' },
   { label: 'Ready', value: 'ready' },
@@ -400,7 +447,7 @@ const itemStatusFilterOptions = [
   { label: 'Ignored', value: 'ignored' }
 ]
 const itemsPageSize = 20
-const itemsPage = ref(1)
+const itemsPage = ref(Math.max(1, Number(route.query.page) || 1))
 const itemsTotalPages = computed(() => Math.max(1, Math.ceil(items.value.total / itemsPageSize)))
 const itemsRangeLabel = computed(() => {
   if (items.value.total === 0) return ''
@@ -417,21 +464,25 @@ function clearItemFilters() {
 async function loadItems() {
   const stashId = String(route.params.id)
   if (!stash.value || !stashId) return
+  const generation = ++itemsLoadGeneration
 
   itemsLoading.value = true
   itemsError.value = undefined
 
   try {
-    items.value = await fetchStashItems(stashId, {
+    const nextItems = await fetchStashItems(stashId, {
       limit: itemsPageSize,
       offset: (itemsPage.value - 1) * itemsPageSize,
       search: itemSearch.value.trim() || undefined,
-      status: itemStatusFilter.value === 'all' ? undefined : itemStatusFilter.value
+      status: itemStatusFilter.value === 'all' ? undefined : itemStatusFilter.value,
+      sort: itemSort.value.key,
+      direction: itemSort.value.direction
     })
+    if (generation === itemsLoadGeneration) items.value = nextItems
   } catch (exception) {
-    itemsError.value = exception instanceof Error ? exception.message : 'Could not load Stash items.'
+    if (generation === itemsLoadGeneration) itemsError.value = exception instanceof Error ? exception.message : 'Could not load Stash items.'
   } finally {
-    itemsLoading.value = false
+    if (generation === itemsLoadGeneration) itemsLoading.value = false
   }
 }
 
@@ -441,22 +492,33 @@ async function loadJobs() {
 
 async function load() {
   const stashId = String(route.params.id)
-  loading.value = true
-  error.value = undefined
+  const generation = ++loadGeneration
+  const replacingPage = stash.value?.id !== stashId
+  if (replacingPage) loading.value = true
+  error.value = replacingPage ? undefined : error.value
+  refreshError.value = undefined
   inputsError.value = undefined
   broadcastsError.value = undefined
   itemsError.value = undefined
-  stash.value = undefined
-  inputs.value = []
-  broadcasts.value = []
-  items.value = { items: [], total: 0, limit: itemsPageSize, offset: 0, stash_item_count: 0 }
-  itemsPage.value = 1
+  if (replacingPage) {
+    stash.value = undefined
+    inputs.value = []
+    broadcasts.value = []
+    items.value = { items: [], total: 0, limit: itemsPageSize, offset: 0, stash_item_count: 0 }
+  }
 
   try {
-    stash.value = await fetchStash(stashId)
+    const nextStash = await fetchStash(stashId)
+    if (generation !== loadGeneration) return
+    stash.value = nextStash
   } catch (exception) {
-    error.value = exception instanceof Error ? exception.message : 'Could not load this Stash.'
-    loading.value = false
+    if (generation !== loadGeneration) return
+    if (replacingPage) {
+      error.value = exception instanceof Error ? exception.message : 'Could not load this Stash.'
+      loading.value = false
+    } else {
+      refreshError.value = exception instanceof Error ? exception.message : 'Could not refresh this Stash.'
+    }
     return
   }
 
@@ -464,6 +526,7 @@ async function load() {
     fetchStashInputs(stashId),
     fetchStashBroadcasts(stashId)
   ])
+  if (generation !== loadGeneration) return
 
   if (inputResult.status === 'fulfilled') inputs.value = inputResult.value
   else inputsError.value = inputResult.reason instanceof Error ? inputResult.reason.message : 'Could not load Inputs.'
@@ -478,12 +541,34 @@ async function load() {
     if (broadcast.rebuild_operation && !isTerminal(broadcast.rebuild_operation)) broadcastOperations.value = { ...broadcastOperations.value, [broadcast.id]: broadcast.rebuild_operation }
   }
 
-  loading.value = false
+  if (replacingPage) loading.value = false
   await Promise.all([loadItems(), loadJobs()])
 }
 
+function syncItemQuery() {
+  const query = { ...route.query }
+  const search = itemSearch.value.trim()
+  if (search) query.search = search
+  else delete query.search
+  if (itemStatusFilter.value !== 'all') query.status = itemStatusFilter.value
+  else delete query.status
+  if (itemsPage.value > 1) query.page = String(itemsPage.value)
+  else delete query.page
+  if (itemSort.value.key !== 'published') query.sort = itemSort.value.key
+  else delete query.sort
+  if (itemSort.value.direction !== 'desc') query.dir = itemSort.value.direction
+  else delete query.dir
+  void router.replace({ query })
+}
+
 watch([itemSearch, itemStatusFilter], () => { itemsPage.value = 1 })
-watch([itemSearch, itemStatusFilter, itemsPage], () => { void loadItems() })
+watch([itemSearch, itemStatusFilter, itemsPage, itemSort], () => { syncItemQuery(); void loadItems() })
+watch(() => [route.query.search, route.query.status, route.query.page, route.query.sort, route.query.dir], ([search, status, page, sort, dir]) => {
+  itemSearch.value = typeof search === 'string' ? search : ''
+  itemStatusFilter.value = typeof status === 'string' ? status : 'all'
+  itemsPage.value = Math.max(1, Number(page) || 1)
+  itemSort.value = { key: typeof sort === 'string' ? sort : 'published', direction: dir === 'asc' ? 'asc' : 'desc' }
+})
 watch(() => route.params.id, () => { void load() })
 onMounted(load)
 onMounted(() => { unsubscribe = subscribeLiveUpdates(handleLiveEvent) })
@@ -516,10 +601,10 @@ onBeforeUnmount(() => {
     </RouterLink>
 
     <header class="flex items-start justify-between gap-4">
-      <div class="flex items-start gap-4">
+      <div class="flex min-w-0 flex-1 items-start gap-4">
         <img v-if="stash.icon_uri" :src="stash.icon_uri" alt="" class="size-14 shrink-0 rounded-md object-cover" />
         <div v-else class="flex size-14 shrink-0 items-center justify-center rounded-md bg-elevated font-mono text-lg text-muted">{{ monogram(stash.name) }}</div>
-        <div class="min-w-0">
+        <div class="min-w-0 flex-1">
           <h1 class="truncate font-mono text-2xl leading-tight text-highlighted">{{ stash.name }}</h1>
           <div class="mt-2 flex items-center gap-1.5">
             <span class="size-1.5 rounded-full" :class="statePresentation(stash.state).dot" />
@@ -530,19 +615,20 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <UDropdownMenu
-        :items="[
-          { label: 'Edit Stash', icon: 'i-lucide-pencil', onSelect: openEdit },
-          ...(failedItemCount > 0 ? [{ label: `Retry failed downloads (${failedItemCount})`, icon: 'i-lucide-refresh-cw', onSelect: retryFailed, disabled: retrying }] : []),
-          { type: 'separator' },
-          { label: 'Delete Stash', icon: 'i-lucide-trash-2', color: 'error', onSelect: openDelete }
-        ]"
-        :content="{ align: 'end' }"
+          :items="[
+            { label: 'Edit Stash', icon: 'i-lucide-pencil', onSelect: openEdit },
+            ...(failedItemCount > 0 ? [{ label: `Retry failed downloads (${failedItemCount})`, icon: 'i-lucide-refresh-cw', onSelect: retryFailed, disabled: retrying }] : []),
+            { type: 'separator' },
+            { label: 'Delete Stash', icon: 'i-lucide-trash-2', color: 'error', onSelect: openDelete }
+          ]"
+          :content="{ align: 'end' }"
       >
         <UButton icon="i-lucide-ellipsis" aria-label="Stash actions" title="Stash actions" variant="ghost" color="neutral" />
       </UDropdownMenu>
     </header>
 
     <UAlert v-if="actionError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Stash action failed" :description="actionError" />
+    <UAlert v-if="refreshError" color="warning" variant="subtle" icon="i-lucide-refresh-cw" title="Live update unavailable" :description="refreshError" />
     <UAlert v-if="actionNotice" color="success" variant="subtle" icon="i-lucide-check" :description="actionNotice" />
     <p v-if="operationText(stashOperation, 'Retry')" class="text-xs text-dimmed">{{ operationText(stashOperation, 'Retry') }}</p>
 
@@ -554,7 +640,7 @@ onBeforeUnmount(() => {
           <h2 class="text-base font-medium text-highlighted">Inputs</h2>
           <span class="font-mono text-xs text-dimmed">{{ inputs.length }}</span>
         </div>
-        <UButton label="Add Input" icon="i-lucide-plus" variant="ghost" color="neutral" size="sm" :to="`/stashes/${stash.id}/inputs/new`" />
+        <UButton label="New input" icon="i-lucide-plus" variant="ghost" color="neutral" size="sm" @click="router.push(`/stashes/${stash.id}/inputs/new`)" />
       </div>
 
       <UAlert v-if="inputsError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not load Inputs" :description="inputsError" />
@@ -579,7 +665,7 @@ onBeforeUnmount(() => {
               {{ operationText(inputOperations[input.id], 'Sync') }}
             </p>
             <UButton :label="inputOperations[input.id] && !isTerminal(inputOperations[input.id]) ? 'Syncing…' : 'Sync now'" icon="i-lucide-refresh-cw" :loading="inputOperations[input.id]?.state === 'running'" :disabled="Boolean(inputOperations[input.id] && !isTerminal(inputOperations[input.id]))" variant="ghost" color="neutral" size="sm" @click="syncInput(input)" />
-            <UButton label="Configure" icon="i-lucide-settings" :to="`/stashes/${stash.id}/inputs/${input.id}/configure`" variant="ghost" color="neutral" size="sm" />
+            <UButton label="Configure" icon="i-lucide-settings" variant="ghost" color="neutral" size="sm" @click="router.push(`/stashes/${stash.id}/inputs/${input.id}/configure`)" />
           </div>
         </div>
       </template>
@@ -597,7 +683,7 @@ onBeforeUnmount(() => {
           <h2 class="text-base font-medium text-highlighted">Broadcasts</h2>
           <span class="font-mono text-xs text-dimmed">{{ broadcasts.length }}</span>
         </div>
-        <UButton label="New broadcast" icon="i-lucide-plus" variant="ghost" color="neutral" size="sm" :to="`/stashes/${stash.id}/broadcasts/new`" />
+        <UButton label="New broadcast" icon="i-lucide-plus" variant="ghost" color="neutral" size="sm" @click="router.push(`/stashes/${stash.id}/broadcasts/new`)" />
       </div>
 
       <UAlert v-if="broadcastsError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not load Broadcasts" :description="broadcastsError" />
@@ -644,7 +730,7 @@ onBeforeUnmount(() => {
 
       <div v-else class="rounded-md bg-muted p-4 text-center">
         <p class="text-sm text-muted">No Broadcasts configured for this Stash.</p>
-        <UButton label="New broadcast" :to="`/stashes/${stash.id}/broadcasts/new`" variant="ghost" color="neutral" size="sm" class="mt-2" />
+        <UButton label="New broadcast" variant="ghost" color="neutral" size="sm" class="mt-2" @click="router.push(`/stashes/${stash.id}/broadcasts/new`)" />
       </div>
     </section>
 
@@ -662,23 +748,27 @@ onBeforeUnmount(() => {
         <UButton v-if="failedItemCount" :label="`Retry failed (${failedItemCount})`" icon="i-lucide-refresh-cw" variant="soft" color="error" size="sm" :loading="retrying" @click="retryFailed" />
       </div>
 
-      <div v-if="activeJobs.length" class="space-y-2 rounded-md bg-muted p-3">
-        <p class="text-xs font-medium text-highlighted">Download activity</p>
-        <OperationProgress v-for="job in activeJobs" :key="job.id" :label="job.progress_label || 'Downloading'" :percent="job.progress_percent ?? null" :count="job.progress_current !== null && job.progress_total !== null ? `${job.progress_current} / ${job.progress_total}` : undefined" status="active" />
-      </div>
-
       <UAlert v-if="itemsError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not load Items" :description="itemsError" />
-      <div v-else-if="itemsLoading" class="flex items-center gap-2 rounded-md bg-muted p-4 text-sm text-muted">
+      <div v-else-if="itemsLoading && !items.items.length" class="flex items-center gap-2 rounded-md bg-muted p-4 text-sm text-muted">
         <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" />
         Loading items…
       </div>
       <template v-else-if="items.items.length">
+        <div v-if="downloadOperation" class="w-full">
+          <OperationProgress
+            label="Downloading"
+            :percent="downloadOperation.percent"
+            :stage="downloadOperation.stage"
+            :count="downloadOperation.count"
+            status="active"
+          />
+        </div>
         <div class="hidden overflow-hidden rounded-md border border-default bg-muted md:block">
-          <UTable :data="sortedItems(items.items)" :columns="itemColumns" :ui="itemTableUi" class="text-sm" />
+        <UTable :data="items.items" :columns="itemColumns" :ui="itemTableUi" class="text-sm" />
         </div>
 
         <div class="space-y-2 md:hidden">
-          <div v-for="item in items.items" :key="item.id" class="flex items-center gap-3 rounded-md bg-muted p-3">
+          <RouterLink v-for="item in items.items" :key="item.id" :to="`/vault/${item.media_item_id}`" class="flex items-center gap-3 rounded-md bg-muted p-3 hover:bg-elevated">
             <img v-if="item.media_item?.thumbnail_uri" :src="item.media_item.thumbnail_uri" alt="" class="aspect-video w-14 shrink-0 rounded-md object-cover" />
             <div v-else class="flex aspect-video w-14 shrink-0 items-center justify-center rounded-md bg-elevated"><UIcon name="i-lucide-play" class="size-3.5 text-dimmed" /></div>
             <div class="min-w-0 flex-1 space-y-1">
@@ -693,7 +783,7 @@ onBeforeUnmount(() => {
                 · {{ itemDuration(item) }} · {{ itemSize(item) }}
               </p>
             </div>
-          </div>
+          </RouterLink>
         </div>
 
         <div class="hidden items-center justify-between gap-3 sm:flex">

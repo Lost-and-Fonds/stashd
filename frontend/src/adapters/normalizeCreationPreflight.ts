@@ -12,16 +12,20 @@ export function normalizeStashPreflight(review: StashPreflightReview): Preflight
   const discovery = review.preflight?.discovery
   const resolved = review.preflight?.resolved_input
   const count = discovery?.estimated_item_count ?? resolved?.estimated_item_count ?? 0
+  const sizeBytes = discovery?.estimated_total_size_bytes
+  const sizeEstimated = discovery?.estimated_total_size_estimated
+  const knownSizeItems = discovery?.estimated_total_size_known_items
+  const sizeItems = discovery?.estimated_total_size_item_count
 
   return {
     status: 'ready',
     plan: {
-      itemCountLabel: `${count.toLocaleString()} items found`,
       operations: count > 0 ? [{ key: 'discovery', label: 'Items discovered', itemCount: count, storageLabel: '—', icon: 'i-lucide-list-video' }] : [],
-      storage: { kind: 'unavailable' },
+      storage: typeof sizeBytes === 'number' && sizeBytes > 0 ? { kind: 'estimate', label: bytesLabel(sizeBytes), estimated: sizeEstimated !== false } : { kind: 'unavailable' },
       notes: [
         ...(resolved?.provider_key ? [`Provider: ${resolved.provider_key}`] : []),
-        'Storage estimate is not available until preservation work begins.'
+        ...(typeof sizeBytes === 'number' && sizeBytes > 0 && typeof knownSizeItems === 'number' && typeof sizeItems === 'number' && knownSizeItems < sizeItems ? [`Size estimate covers ${knownSizeItems.toLocaleString()} of ${sizeItems.toLocaleString()} items.`] : []),
+        ...(typeof sizeBytes !== 'number' || sizeBytes <= 0 ? ['Storage estimate is unavailable for discovered items.'] : [])
       ]
     }
   }

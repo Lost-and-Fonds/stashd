@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { fetchVaultItem, type VaultItemDetailResponse } from '../api/vault'
 import { subscribeLiveUpdates, type LiveEvent } from '../live/mercure'
 
 const route = useRoute()
+const router = useRouter()
 const detail = ref<VaultItemDetailResponse>()
 const loading = ref(true)
 const error = ref<string>()
@@ -25,6 +26,8 @@ const itemKind = computed(() => {
   const assets = detail.value?.assets ?? []
   return assets.find(asset => asset.role === 'vault_original')?.kind ?? assets[0]?.kind ?? null
 })
+const playableAsset = computed(() => detail.value?.assets.find(asset => asset.role === 'vault_original' && ['video', 'audio', 'image'].includes(asset.kind)))
+const playbackUrl = computed(() => playableAsset.value && detail.value ? `/api/v1/items/${encodeURIComponent(detail.value.item.id)}/playback` : undefined)
 
 function formatBytes(bytes: number | null) {
   if (bytes === null) return '—'
@@ -39,6 +42,11 @@ function formatDate(value: string | null | undefined) {
 
 function roleLabel(role: string) {
   return roleLabels[role] ?? role
+}
+
+function goBack() {
+  if (typeof router.options.history.state.back === 'string') router.back()
+  else void router.push('/vault')
 }
 
 async function load() {
@@ -91,10 +99,10 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="mx-auto max-w-2xl space-y-8 px-4 py-8 sm:px-8">
-    <RouterLink to="/vault" class="inline-flex items-center gap-1 font-mono text-xs text-dimmed transition-colors hover:text-muted">
+    <button type="button" class="inline-flex items-center gap-1 font-mono text-xs text-dimmed transition-colors hover:text-muted" @click="goBack">
       <UIcon name="i-lucide-arrow-left" class="size-3.5" />
-      Vault
-    </RouterLink>
+      Back
+    </button>
 
     <div v-if="loading" class="flex items-center gap-2 rounded-md bg-muted p-4 text-sm text-muted">
       <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" />
@@ -108,6 +116,21 @@ onBeforeUnmount(() => {
           {{ itemKind ?? 'Unknown kind' }} · {{ detail.item.provider_key }} · {{ formatBytes(detail.preserved_size_bytes) }} preserved
         </p>
       </header>
+
+      <section v-if="playableAsset && playbackUrl" class="space-y-3">
+        <h2 class="text-base font-medium text-highlighted">Preview</h2>
+        <video v-if="playableAsset.kind === 'video'" :src="playbackUrl" controls playsinline class="max-h-[70vh] w-full rounded-md bg-black" />
+        <audio v-else-if="playableAsset.kind === 'audio'" :src="playbackUrl" controls class="w-full" />
+        <img v-else :src="playbackUrl" :alt="detail.item.title" class="max-h-[70vh] w-full rounded-md object-contain" />
+      </section>
+
+      <section v-if="detail.plugin_metadata && Object.keys(detail.plugin_metadata).length" class="space-y-3">
+        <h2 class="text-base font-medium text-highlighted">Plugin metadata</h2>
+        <details open class="rounded-md bg-muted p-3">
+          <summary class="cursor-pointer text-sm text-toned">Show metadata</summary>
+          <pre class="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-muted">{{ JSON.stringify(detail.plugin_metadata, null, 2) }}</pre>
+        </details>
+      </section>
 
       <section class="space-y-3">
         <div class="flex items-baseline gap-2">

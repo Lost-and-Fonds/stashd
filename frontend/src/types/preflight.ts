@@ -7,7 +7,7 @@
 
 export type StorageEstimate =
   | { kind: 'none' }
-  | { kind: 'estimate', label: string }
+  | { kind: 'estimate', label: string, estimated?: boolean }
   | { kind: 'range', lowLabel: string, highLabel: string }
   | { kind: 'calculating' }
   | { kind: 'unavailable' }

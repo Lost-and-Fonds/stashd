@@ -16,11 +16,17 @@ export interface StashPreflightReview {
       provider_key?: string | null
       title?: string | null
       estimated_item_count?: number | null
+      size_bytes?: number | null
+      size_estimated?: boolean
     }
     discovery?: {
       strategy_key?: string | null
       estimated_item_count?: number | null
       estimated_total_duration_seconds?: number | null
+      estimated_total_size_bytes?: number | null
+      estimated_total_size_estimated?: boolean
+      estimated_total_size_known_items?: number
+      estimated_total_size_item_count?: number
     }
   } | null
 }
@@ -97,12 +103,16 @@ export interface StashItemsQuery {
   offset: number
   search?: string
   status?: string
+  sort?: string
+  direction?: 'asc' | 'desc'
 }
 
 export async function fetchStashItems(stashId: string, query: StashItemsQuery): Promise<StashItemsApiResponse> {
   const parameters = new URLSearchParams({ limit: String(query.limit), offset: String(query.offset) })
   if (query.search) parameters.set('search', query.search)
   if (query.status) parameters.set('status', query.status)
+  if (query.sort) parameters.set('sort', query.sort)
+  if (query.direction) parameters.set('dir', query.direction)
 
   const response = await apiFetch(`/api/v1/stashes/${encodeURIComponent(stashId)}/items?${parameters}`)
   const body = await responseBody<Partial<StashItemsApiResponse> & { items?: StashItemApiResource[] }>(response)
@@ -113,6 +123,7 @@ export async function fetchStashItems(stashId: string, query: StashItemsQuery): 
     limit: body.limit ?? query.limit,
     offset: body.offset ?? 0,
     stash_item_count: body.stash_item_count ?? body.total ?? 0,
+    ignored_count: body.ignored_count ?? 0,
     status_counts: body.status_counts ?? {}
   }
 }

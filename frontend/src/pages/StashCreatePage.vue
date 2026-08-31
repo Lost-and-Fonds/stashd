@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import type { FormError } from '@nuxt/ui'
 import { inputOptionValues, normalizeInputOptions } from '../adapters/normalizeInputOptions'
 import { normalizeSourceFields } from '../adapters/normalizeSourceFields'
 import { normalizeStashPreflight } from '../adapters/normalizeCreationPreflight'
@@ -17,6 +18,7 @@ const plugins = ref<InputPluginApiResource[]>([])
 const pluginKey = ref('')
 const sourceValues = reactive<Record<string, PluginFieldValue | undefined>>({})
 const optionValues = reactive<Record<string, PluginFieldValue | undefined>>({})
+const filters = reactive({ include: '', exclude: '' })
 const stashName = ref('')
 const nameTouched = ref(false)
 const resolved = ref<ResolvedSource>()
@@ -30,6 +32,11 @@ const selected = computed(() => plugins.value.find(plugin => plugin.key === plug
 const source = computed(() => normalizeSourceFields(selected.value?.source_fields ?? []))
 const inputOptions = computed(() => normalizeInputOptions(selected.value?.input_options ?? []))
 const canResolve = computed(() => selected.value && source.value.diagnostics.length === 0 && source.value.fields.every(field => !field.required || (sourceValues[field.key] !== undefined && sourceValues[field.key] !== '')))
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+}
 let preflightGeneration = 0
 let preflightCommandId: string | undefined
 let unsubscribeLive: (() => void) | undefined
@@ -54,6 +61,12 @@ function sourcePayload(): Record<string, boolean | number | string> {
 }
 function optionPayload(): Record<string, boolean | string> {
   return Object.fromEntries(Object.entries(optionValues).filter((entry): entry is [string, boolean | string] => typeof entry[1] === 'boolean' || typeof entry[1] === 'string'))
+}
+function validate(): FormError[] {
+  return (['include', 'exclude'] as const).flatMap(key => {
+    if (!filters[key]) return []
+    try { new RegExp(filters[key]); return [] } catch { return [{ name: `title_regex_${key}`, message: 'That does not look like a valid regular expression.' }] }
+  })
 }
 async function resolve() {
   if (!selected.value || !canResolve.value) return
@@ -110,7 +123,7 @@ function handleLiveEvent(event: LiveEvent) {
 async function create() {
   if (!selected.value || !resolved.value || !stashName.value.trim()) return
   saving.value = true; error.value = undefined
-  try { const stash = await createStashWithInput(stashName.value.trim(), selected.value.key, sourcePayload(), optionPayload()); await router.push(`/stashes/${stash.id}`) }
+  try { const stash = await createStashWithInput(stashName.value.trim(), selected.value.key, sourcePayload(), { title_regex_include: filters.include.trim() || null, title_regex_exclude: filters.exclude.trim() || null, provider: optionPayload() }); await router.push(`/stashes/${stash.id}`) }
   catch (exception) { error.value = exception instanceof Error ? exception.message : 'Could not create this stash.' }
   finally { saving.value = false }
 }
@@ -125,7 +138,7 @@ onBeforeUnmount(() => { unsubscribeLive?.(); preflightGeneration++ })
     <div v-if="loading" class="text-sm text-muted">Loading input types…</div>
     <template v-else>
       <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not create stash" :description="error" />
-      <UForm class="space-y-6" @submit.prevent="create">
+      <UForm :validate="validate" class="space-y-6" @submit.prevent="create">
         <UFormField label="Input type" required><URadioGroup v-model="pluginKey" :items="plugins.map(plugin => ({ label: plugin.label, description: '', value: plugin.key }))" variant="card" size="lg" /></UFormField>
         <template v-if="selected">
           <UAlert v-if="source.diagnostics.length" color="warning" variant="subtle" title="Unsupported source fields" :description="source.diagnostics.join(' ')" />
@@ -133,9 +146,14 @@ onBeforeUnmount(() => { unsubscribeLive?.(); preflightGeneration++ })
           <UButton label="Validate source" type="button" :loading="resolving" :disabled="!canResolve || Boolean(resolved)" @click="resolve" />
           <template v-if="resolved">
             <UAlert color="success" variant="subtle" icon="i-lucide-circle-check" title="Source ready" :description="resolved.display_name ?? undefined" />
+            <p v-if="resolved.size_bytes" class="font-mono text-xs text-dimmed">Estimated download: {{ resolved.size_estimated ? '~' : '' }}{{ formatBytes(resolved.size_bytes) }}</p>
             <PreflightSummary v-if="preflight" :state="preflight" />
-            <UAlert v-if="preflightError" color="warning" variant="subtle" icon="i-lucide-info" title="Planning unavailable" :description="`${preflightError} You can still create this Stash.`" />
+            <UAlert v-if="preflightError" color="warning" variant="subtle" icon="i-lucide-info" title="Planning unavailable" :description="`${preflightError} The stash can still be created; planning will continue in the background.`" />
             <UFormField label="Stash name" required><UInput v-model="stashName" class="w-full" @update:model-value="nameTouched = true" /></UFormField>
+            <div class="space-y-5">
+              <UFormField name="title_regex_include" label="Include title regex" description="Only matching titles are preserved."><UInput v-model="filters.include" placeholder="e.g. season 2|s02" /></UFormField>
+              <UFormField name="title_regex_exclude" label="Exclude title regex" description="Matching titles are ignored."><UInput v-model="filters.exclude" placeholder="e.g. trailer|shorts" /></UFormField>
+            </div>
             <UAlert v-if="inputOptions.diagnostics.length" color="warning" variant="subtle" title="Unsupported input options" :description="inputOptions.diagnostics.map(diagnostic => diagnostic.message).join(' ')" />
             <div v-else class="space-y-5"><PluginField v-for="field in inputOptions.fields" :key="field.key" v-model="optionValues[field.key]" :field="field" /></div>
             <div class="flex items-center gap-2"><UButton label="Create stash" type="submit" size="lg" :loading="saving" :disabled="!stashName.trim()" /><UButton label="Cancel" to="/stashes" variant="ghost" color="neutral" size="lg" /></div>

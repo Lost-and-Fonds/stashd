@@ -22,11 +22,11 @@ export async function fetchStashBroadcasts(stashId: string): Promise<BroadcastAp
   return body.broadcasts ?? []
 }
 
-export async function createStashBroadcast(stashId: string, type: string, settings: Record<string, BroadcastOptionValue>): Promise<CreatedBroadcastApiResource> {
+export async function createStashBroadcast(stashId: string, type: string, settings: Record<string, BroadcastOptionValue>, name?: string): Promise<CreatedBroadcastApiResource> {
   const response = await fetch(`/api/v1/stashes/${encodeURIComponent(stashId)}/broadcasts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type, settings })
+    body: JSON.stringify({ type, settings, ...(name ? { name } : {}) })
   })
   const body = await responseBody<{ broadcast: CreatedBroadcastApiResource }>(response)
 
