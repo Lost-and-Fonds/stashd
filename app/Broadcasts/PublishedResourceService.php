@@ -265,7 +265,7 @@ final readonly class PublishedResourceService
 
         $secret = $this->secretRecords->find(PrefixedUlid::parse($resource->credentialSecretId));
 
-        return $secret === null || $secret->revokedAt !== null ? null : $this->secrets->get($secret->key);
+        return $secret === null || $secret->revokedAt !== null ? null : $this->secrets->read($secret->key);
     }
 
     private function ensureCredential(PublishedResourceRecord $resource): void

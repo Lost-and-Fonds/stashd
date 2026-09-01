@@ -52,17 +52,33 @@ final readonly class SecretsService
 
     public function get(string $key): ?string
     {
+        $value = $this->read($key);
+
+        if ($value === null) {
+            return null;
+        }
+
+        $record = $this->secrets->findByKey($key);
+
+        if ($record === null) {
+            return $value;
+        }
+
+        $record->lastUsedAt = DateTime::now(Timezone::UTC);
+        $this->secrets->save($record);
+
+        return $value;
+    }
+
+    public function read(string $key): ?string
+    {
         $record = $this->secrets->findByKey($key);
 
         if ($record === null) {
             return null;
         }
 
-        $plaintext = $this->decrypt($record->encryptedValue);
-        $record->lastUsedAt = DateTime::now(Timezone::UTC);
-        $this->secrets->save($record);
-
-        return $plaintext;
+        return $this->decrypt($record->encryptedValue);
     }
 
     public function has(string $key): bool
