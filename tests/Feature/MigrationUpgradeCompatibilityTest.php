@@ -104,6 +104,8 @@ function prepareLegacyBaseline(Database $database): void
 {
     $database->execute(new Query('DROP TABLE published_resources'));
     $database->execute(new Query('DROP INDEX assets_derived_identity'));
+    $database->execute(new Query('ALTER TABLE media_items DROP COLUMN IF EXISTS "sizeEstimated"'));
+    $database->execute(new Query('ALTER TABLE media_items DROP COLUMN IF EXISTS "sizeBytes"'));
     $database->execute(new Query('ALTER TABLE assets DROP COLUMN "derivationKey"'));
     $database->execute(new Query('ALTER TABLE broadcasts ADD COLUMN "tokenSecretId" VARCHAR(40) NULL'));
     $database->execute(new Query('ALTER TABLE broadcasts ADD COLUMN "tokenPreview" VARCHAR(255) NULL'));

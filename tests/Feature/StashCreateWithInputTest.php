@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Commands\CommandRecord;
+use App\Commands\CommandState;
+use App\Commands\CommandType;
 use App\Plugins\ExternalInputPluginRegistry;
 use App\Plugins\PluginInputDefinition;
 use App\Providers\Fake\FakeProvider;
@@ -45,15 +48,20 @@ test('a declared Input source creates a stash and initial input atomically', fun
         ->and(StashInputRecord::select()->first()?->options?->provider)->toBe(['include_archived' => false]);
 });
 
-test('an unknown Input plugin cannot leave a stash behind', function (): void {
+test('an unknown Input plugin is reported by the queued add-input command', function (): void {
     $response = $this->http->post('/api/v1/stashes/with-input', [
         'name' => 'Must Not Exist',
         'input' => ['plugin' => 'missing', 'source' => ['anything' => 'value']],
     ], headers: $this->authHeaders());
 
-    $response->assertStatus(Status::BAD_REQUEST);
-    expect(StashRecord::count()->execute())->toBe(0)
-        ->and(StashInputRecord::count()->execute())->toBe(0);
+    $response->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $command = CommandRecord::select()->where('type', CommandType::StashAddInput)->first();
+
+    expect(StashRecord::count()->execute())->toBe(1)
+        ->and(StashInputRecord::count()->execute())->toBe(0)
+        ->and($command?->state)->toBe(CommandState::Failed);
 });
 
 test('initial Input failure after Stash insert rolls the whole transaction back', function (): void {

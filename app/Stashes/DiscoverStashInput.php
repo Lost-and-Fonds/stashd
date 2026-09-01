@@ -56,16 +56,17 @@ final readonly class DiscoverStashInput
             );
         }
 
-        // Preflight must prefer the same strategy as the later commit
+        // Preflight must prefer the same strategy as the later initial commit
         // (InitialBackfill) -- otherwise the items previewed here can differ
         // from what actually gets persisted once a stronger plugin capability
-        // is available. SyncInput belongs here for the same reason: falling
-        // back to a cheap strategy could shrink a source on every sync.
+        // is available. A later sync is deliberately incremental: providers
+        // use their cheap feed/check strategy and retain the complete backfill
+        // as the initial discovery path.
         // Strategies still gate their own availability (e.g. no key
         // configured), so this is a no-op when only the cheap one exists.
         $selectionOptions = match ($intent) {
             JobIntent::Preflight, JobIntent::InitialBackfill => new StrategySelectionOptions(preferHighestCapability: true),
-            JobIntent::SyncInput => new StrategySelectionOptions(preferHighestCapability: true),
+            JobIntent::SyncInput => new StrategySelectionOptions(preferIncremental: true),
             default => null,
         };
         $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);

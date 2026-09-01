@@ -992,6 +992,23 @@ paths:
                   item: { $ref: "#/components/schemas/MediaItem" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/items/{id}/playback:
+    get:
+      operationId: playbackItem
+      tags: [Items]
+      summary: Stream a preserved media item for playback
+      parameters:
+        - $ref: "#/components/parameters/MediaItemId"
+      responses:
+        "200":
+          description: Preserved media asset
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/v1/items/{id}/assets:
     get:
       operationId: listItemAssets

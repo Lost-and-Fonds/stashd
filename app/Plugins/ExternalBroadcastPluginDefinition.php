@@ -86,7 +86,9 @@ final readonly class ExternalBroadcastPluginDefinition
             ? array_values(array_filter($raw['supported_file_kinds'], 'is_string'))
             : ['audio', 'video'];
 
-        $packageRoot = $manifestDirectory !== null ? rtrim($manifestDirectory, '/') : rtrim($root, '/') . '/plugins/' . $required('id');
+        // Composer discovery passes the installed package root, not a parent
+        // plugin directory. Keep helper grants relative to that package.
+        $packageRoot = $manifestDirectory !== null ? rtrim($manifestDirectory, '/') : rtrim($root, '/');
         $runtimePackageRoot = $packageRoot;
         $componentPath = str_starts_with($component, '/') ? $component : rtrim($root, '/') . '/' . ltrim($component, '/');
         $helpers = [];

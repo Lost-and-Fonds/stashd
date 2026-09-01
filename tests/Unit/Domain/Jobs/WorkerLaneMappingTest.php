@@ -26,7 +26,7 @@ test('bulk work and interactive work are in separate lanes', function (): void {
         ->and(JobIntent::Broadcast->lane())->toBe(JobLane::Bulk)
         ->and(JobIntent::InitialBackfill->lane())->toBe(JobLane::Discovery)
         ->and(JobIntent::Preflight->lane())->toBe(JobLane::Interactive)
-        ->and(JobIntent::AddInput->lane())->toBe(JobLane::Interactive);
+        ->and(JobIntent::AddInput->lane())->toBe(JobLane::Discovery);
 });
 
 test('probe sees its own process as alive', function (): void {
