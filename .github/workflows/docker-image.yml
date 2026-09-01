@@ -21,53 +21,53 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Optional provider packages are path repositories for local development.
       # Keep them outside the core image/runtime dependency set while making
       # the packaged acceptance job reproducible in this monorepo checkout.
       - name: Checkout optional packages
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Lost-and-Fonds/plugin-api
           ref: v0.1.0
           path: plugin-api
       - name: Checkout plugin SDK
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Lost-and-Fonds/stashd-php-sdk
           ref: v0.2.4
           path: stashd-php-sdk
       - name: Checkout provider packages
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Lost-and-Fonds/podcast
           ref: v0.2.4
           path: plugins/podcast
       - name: Checkout YouTube package
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Lost-and-Fonds/youtube
           ref: v0.3.18
           path: plugins/youtube
       - name: Checkout Jellyfin package
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Lost-and-Fonds/jellyfin
           ref: v0.2.2
           path: plugins/jellyfin
       - name: Checkout Plex package
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Lost-and-Fonds/plex
           ref: v0.2.2
           path: plugins/plex
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build Lerd development image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: dev
@@ -77,7 +77,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=dev
 
       - name: Cache Composer and npm downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/composer
@@ -146,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Run plugin runtime conformance
         run: packages/plugin-runtime/tests/run.sh
@@ -156,13 +156,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build smoke image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: prod
@@ -180,13 +180,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build E2E image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: prod
@@ -196,7 +196,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=prod
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -212,19 +212,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Skipped on pull_request: forked PRs don't have package-write access,
       # and this job only validates the build there (push: false below).
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -232,7 +232,7 @@ jobs:
 
       - name: Compute image tags/labels
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/lost-and-fonds/stashd
           flavor: |
@@ -248,7 +248,7 @@ jobs:
       # check that would have caught the Docker build being broken for
       # anyone but the original dev machine (see docs/TODO.md).
       - name: Build (and push on main/tags)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: prod
