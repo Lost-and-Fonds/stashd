@@ -33,6 +33,7 @@ test('GET /api/v1/stashes lists stashes', function (): void {
             'state',
             'created_at',
             'updated_at',
+            'last_discovery_at',
         ]);
 });
 

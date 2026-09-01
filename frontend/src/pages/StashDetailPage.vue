@@ -129,7 +129,10 @@ function operationText(operation: CommandOperation | undefined, verb: string) {
 }
 
 const failedItemCount = computed(() => items.value.status_counts?.failed ?? 0)
-const activeJobs = computed(() => jobs.value.filter(job => job.entity_type === 'media_item' && job.payload?.stash_id === stash.value?.id && (job.state === 'processing' || job.state === 'pending')))
+const activeJobs = computed(() => jobs.value.filter(job => {
+  if (job.entity_type !== 'media_item' || !['processing', 'pending'].includes(job.state)) return false
+  return job.payload?.stash_id === stash.value?.id || items.value.items.some(item => item.media_item_id === job.entity_id)
+}))
 const downloadOperation = computed(() => {
   const ignored = items.value.ignored_count ?? 0
   const total = Math.max(0, items.value.stash_item_count - ignored)
@@ -142,7 +145,8 @@ const downloadOperation = computed(() => {
   const stage = current
     ? [...new Set([current.progress_label, item ? itemTitle(item) : undefined].filter((value): value is string => Boolean(value)))].join(' · ') || undefined
     : undefined
-  const percent = total === 0 ? 100 : Math.round((ready / total) * 100)
+  const activeProgress = activeJobs.value.reduce((sum, job) => sum + (job.progress_percent ?? 0) / 100, 0)
+  const percent = total === 0 ? 100 : Math.min(99, Math.round(((ready + activeProgress) / total) * 100))
   const count = `${ready} of ${total} items`
 
   return { percent, stage, count }
@@ -277,6 +281,7 @@ function handleLiveEvent(event: LiveEvent) {
   const entityId = event.payload.entityId ?? event.payload.entity_id
   const eventStashId = event.payload.stashId ?? event.payload.stash_id
   const eventMediaItemId = event.payload.mediaItemId ?? event.payload.media_item_id
+    ?? (entityType === 'media_item' ? entityId : undefined)
   const matchesStash = entityType === 'stash' && entityId === stash.value?.id || eventStashId === stash.value?.id
   const matchesItem = eventMediaItemId !== undefined && items.value.items.some(item => item.media_item_id === eventMediaItemId)
 
@@ -511,6 +516,12 @@ async function load() {
     const nextStash = await fetchStash(stashId)
     if (generation !== loadGeneration) return
     stash.value = nextStash
+    if (route.query.edit === '1') {
+      openEdit()
+      const query = { ...route.query }
+      delete query.edit
+      void router.replace({ query })
+    }
   } catch (exception) {
     if (generation !== loadGeneration) return
     if (replacingPage) {
@@ -610,7 +621,7 @@ onBeforeUnmount(() => {
             <span class="size-1.5 rounded-full" :class="statePresentation(stash.state).dot" />
             <span class="text-xs" :class="statePresentation(stash.state).text">{{ statePresentation(stash.state).label }}</span>
           </div>
-          <p class="mt-1 text-sm text-muted">{{ items.stash_item_count.toLocaleString() }} items<span v-if="stash.updated_at"> · updated {{ relativeDate(stash.updated_at) }}</span></p>
+          <p class="mt-1 text-sm text-muted">{{ items.stash_item_count.toLocaleString() }} items<span v-if="stash.last_discovery_at"> · updated {{ relativeDate(stash.last_discovery_at) }}</span></p>
           <p v-if="stash.description" class="mt-2 max-w-md text-sm text-muted">{{ stash.description }}</p>
         </div>
       </div>

@@ -34,6 +34,7 @@ export interface StashApiResource {
   input_summary?: string[]
   created_at?: string
   updated_at?: string
+  last_discovery_at?: string
 }
 
 export interface StashDeleteImpact {

@@ -16,9 +16,9 @@ async function signOut(): Promise<void> {
 }
 
 const primaryLinks = [
-  { label: 'Status', icon: 'i-lucide-activity', to: '/status' },
   { label: 'Stashes', icon: 'i-lucide-inbox', to: '/stashes' },
-  { label: 'Vault', icon: 'i-lucide-archive', to: '/vault' }
+  { label: 'Vault', icon: 'i-lucide-archive', to: '/vault' },
+  { label: 'Status', icon: 'i-lucide-activity', to: '/status' }
 ]
 
 const mobileItems = [primaryLinks, [{ label: 'Configure', icon: 'i-lucide-sliders-horizontal', to: '/settings' }]]

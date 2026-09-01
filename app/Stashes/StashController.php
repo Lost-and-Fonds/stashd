@@ -25,6 +25,7 @@ use App\System\Activity\ActivityEventService;
 use App\Vault\AssetRepository;
 use App\Vault\MediaItemState;
 use Tempest\Database\Direction;
+use Tempest\DateTime\DateTime;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
@@ -65,6 +66,7 @@ final readonly class StashController
                         'itemCount' => count($items),
                         'storageBytes' => array_sum($sizes),
                         'inputSummary' => array_values(array_unique(array_map(fn($input): string => $input->providerKey, $this->stashInputs->listForStash(StashId::fromPrimaryKey($stash->id))))),
+                        'lastDiscoveryAt' => $this->latestDiscoveryAt(StashId::fromPrimaryKey($stash->id)),
                     ])->toArray();
                 },
                 $this->stashes->list(),
@@ -184,8 +186,25 @@ final readonly class StashController
         }
 
         return new Json([
-            'stash' => StashResource::fromRecord($stash)->toArray(),
+            'stash' => StashResource::fromRecord($stash, [
+                'lastDiscoveryAt' => $this->latestDiscoveryAt(StashId::fromPrimaryKey($stash->id)),
+            ])->toArray(),
         ]);
+    }
+
+    private function latestDiscoveryAt(StashId $stashId): ?DateTime
+    {
+        $latest = null;
+
+        foreach ($this->stashInputs->listForStash($stashId) as $input) {
+            $candidate = $input->lastSuccessAt ?? $input->createdAt;
+
+            if ($candidate !== null && ($latest === null || $candidate->toNativeDateTime() > $latest->toNativeDateTime())) {
+                $latest = $candidate;
+            }
+        }
+
+        return $latest;
     }
 
     #[Get('/api/v1/stashes/{id}/items')]

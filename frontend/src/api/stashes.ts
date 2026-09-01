@@ -37,6 +37,13 @@ export async function fetchStashes(): Promise<StashApiResource[]> {
   return body.stashes ?? []
 }
 
+export async function syncStash(stashId: string): Promise<string[]> {
+  const response = await apiFetch(`/api/v1/stashes/${encodeURIComponent(stashId)}/sync`, { method: 'POST' })
+  const body = await responseBody<{ command_ids?: string[] }>(response)
+
+  return body.command_ids ?? []
+}
+
 export async function fetchStash(stashId: string): Promise<StashApiResource> {
   const response = await apiFetch(`/api/v1/stashes/${encodeURIComponent(stashId)}`)
   const body = await responseBody<{ stash: StashApiResource }>(response)

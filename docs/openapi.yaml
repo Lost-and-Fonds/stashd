@@ -1614,6 +1614,11 @@ components:
           description: Resolved channel/owner avatar, if the provider exposed one.
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+        last_discovery_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Most recent successful item discovery across the stash inputs.
 
     StashInput:
       type: object
