@@ -28,6 +28,7 @@ export interface StashItemApiResource {
     duration_seconds?: number | null
     published_at?: string | null
     failure_reason?: string | null
+    upstream_state?: string | null
     size_bytes?: number | null
     size_estimated?: boolean
   } | null

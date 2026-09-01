@@ -82,7 +82,8 @@ const stateMeta: Record<string, { label: string, dot: string, text: string }> = 
   download_pending: { label: 'download pending', dot: 'bg-neutral-400', text: 'text-dimmed' },
   downloading: { label: 'downloading', dot: 'bg-primary', text: 'text-primary' },
   ignored: { label: 'ignored', dot: 'bg-neutral-400', text: 'text-dimmed' },
-  missing: { label: 'missing', dot: 'bg-error', text: 'text-error' }
+  missing: { label: 'missing', dot: 'bg-error', text: 'text-error' },
+  region_blocked: { label: 'region blocked', dot: 'bg-warning', text: 'text-warning' }
 }
 
 function statePresentation(state: string) {
@@ -405,7 +406,9 @@ function sortHeader(label: string, key: string) {
 }
 
 function itemStatusCell(item: StashItemApiResource) {
-  const meta = statePresentation(itemState(item))
+  const meta = item.media_item?.upstream_state && item.media_item.upstream_state !== 'available'
+    ? statePresentation(item.media_item.upstream_state)
+    : statePresentation(itemState(item))
   return h('span', { class: 'inline-flex items-center gap-1.5' }, [
     h('span', { class: ['size-1.5 rounded-full', meta.dot] }),
     h('span', { class: ['text-xs', meta.text] }, meta.label)

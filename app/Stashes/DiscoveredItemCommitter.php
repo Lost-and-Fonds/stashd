@@ -12,6 +12,7 @@ use App\Providers\StashdUri;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemSourceRepository;
+use App\Vault\UpstreamState;
 
 use function Tempest\Support\str;
 
@@ -86,11 +87,19 @@ final readonly class DiscoveredItemCommitter
                     contentType: is_string($item['content_type'] ?? null) ? $item['content_type'] : null,
                     sizeBytes: ApiJson::integer($item['size_bytes'] ?? null),
                     sizeEstimated: (bool) ($item['size_estimated'] ?? false),
+                    upstreamState: UpstreamState::tryFrom(ApiJson::string($item['upstream_state'] ?? null)) ?? UpstreamState::Available,
                 );
                 $mediaItemsCreated++;
             } else {
                 $mediaItem = $existingMedia;
                 $mediaItemsReused++;
+
+                $upstreamState = UpstreamState::tryFrom(ApiJson::string($item['upstream_state'] ?? null));
+
+                if ($upstreamState !== null && $mediaItem->upstreamState !== $upstreamState) {
+                    $mediaItem->upstreamState = $upstreamState;
+                    $this->mediaItems->save($mediaItem);
+                }
 
                 if ($mediaItem->sizeBytes === null && isset($item['size_bytes'])) {
                     $mediaItem->sizeBytes = ApiJson::integer($item['size_bytes']);
@@ -126,7 +135,7 @@ final readonly class DiscoveredItemCommitter
                 );
                 $stashItemsCreated++;
 
-                if ($stashItem->state !== StashItemState::Ignored) {
+                if ($stashItem->state !== StashItemState::Ignored && $mediaItem->upstreamState === UpstreamState::Available) {
                     $downloadableMediaItemIds[] = $mediaItemId->toString();
                 }
             } else {

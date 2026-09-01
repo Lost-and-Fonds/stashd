@@ -36,6 +36,7 @@ final class MediaItemRepository
         ?string $contentType = null,
         ?int $sizeBytes = null,
         bool $sizeEstimated = false,
+        UpstreamState $upstreamState = UpstreamState::Available,
     ): MediaItemRecord {
         $id = $this->ids->generate('media')->toString();
         $record = new MediaItemRecord(
@@ -44,7 +45,7 @@ final class MediaItemRepository
             canonicalUri: $canonicalUri instanceof StashdUri ? $canonicalUri->toString() : $canonicalUri,
             title: $title,
             state: $state,
-            upstreamState: UpstreamState::Available,
+            upstreamState: $upstreamState,
             description: $description,
             durationSeconds: DurationSeconds::toDuration($durationSeconds),
             publishedAt: $publishedAt,

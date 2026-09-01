@@ -109,7 +109,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         return array_map(static function (array $item): DiscoveredItem {
             $artwork = self::nullableString($item['artwork-reference'] ?? null);
 
-            return new DiscoveredItem(self::string($item['id'] ?? null), StashdUri::parse(self::string($item['reference'] ?? null)), self::string($item['title'] ?? null), self::nullableString($item['description'] ?? null), self::nullableInt($item['duration-seconds'] ?? null), ProviderDates::tryParse(self::nullableString($item['published-at'] ?? null)), $artwork === null ? null : StashdUri::parse($artwork), null, self::nullableString($item['kind'] ?? null), self::nullableInt($item['size-bytes'] ?? null), (bool) ($item['size-estimated'] ?? false));
+            return new DiscoveredItem(self::string($item['id'] ?? null), StashdUri::parse(self::string($item['reference'] ?? null)), self::string($item['title'] ?? null), self::nullableString($item['description'] ?? null), self::nullableInt($item['duration-seconds'] ?? null), ProviderDates::tryParse(self::nullableString($item['published-at'] ?? null)), $artwork === null ? null : StashdUri::parse($artwork), null, self::nullableString($item['kind'] ?? null), self::nullableInt($item['size-bytes'] ?? null), (bool) ($item['size-estimated'] ?? false), self::nullableString($item['upstream-state'] ?? null));
         }, self::arrayOfArrays($raw));
     }
     public function implementationName(): string

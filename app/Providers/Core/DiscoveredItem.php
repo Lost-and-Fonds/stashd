@@ -24,6 +24,7 @@ final readonly class DiscoveredItem
         public ?string $contentType = null,
         public ?int $sizeBytes = null,
         public bool $sizeEstimated = false,
+        public ?string $upstreamState = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -40,6 +41,7 @@ final readonly class DiscoveredItem
             'content_type' => $item->contentType,
             'size_bytes' => $item->sizeBytes,
             'size_estimated' => $item->sizeEstimated,
+            'upstream_state' => $item->upstreamState,
         ];
 
         if ($item->rawMetadata !== null) {
