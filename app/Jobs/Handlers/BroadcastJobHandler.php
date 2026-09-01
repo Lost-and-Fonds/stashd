@@ -25,6 +25,7 @@ use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+use Throwable;
 
 final readonly class BroadcastJobHandler implements JobHandler
 {
@@ -99,9 +100,11 @@ final readonly class BroadcastJobHandler implements JobHandler
             }
             $this->activity->commandCompleted($command);
             $this->publisher->jobCompleted($job);
-        } catch (BroadcastException $exception) {
+        } catch (Throwable $exception) {
+            $errorCode = $exception instanceof BroadcastException ? $exception->errorCode : 'broadcast_failed';
+
             if ($broadcast !== null && $broadcast->state === BroadcastState::Processing) {
-                $broadcast->lastError = $exception->errorCode;
+                $broadcast->lastError = $errorCode;
                 $this->broadcasts->save($broadcast);
 
                 if ($broadcast->state->canTransitionTo(BroadcastState::Failed)) {
@@ -109,7 +112,7 @@ final readonly class BroadcastJobHandler implements JobHandler
                 }
             }
 
-            $this->activity->broadcastFailed($command, $job, $broadcastId, $exception->errorCode, $exception->getMessage());
+            $this->activity->broadcastFailed($command, $job, $broadcastId, $errorCode, $exception->getMessage());
 
             throw $exception;
         }

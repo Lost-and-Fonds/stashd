@@ -44,6 +44,8 @@ final readonly class PublishedResourceService
             $existing->access = $access;
             $existing->state = 'ready';
 
+            $this->ensureCredential($existing);
+
             return $this->resources->save($existing);
         }
 
@@ -66,6 +68,8 @@ final readonly class PublishedResourceService
             $existing->downloadName = $downloadName;
             $existing->access = $access;
             $existing->state = 'ready';
+
+            $this->ensureCredential($existing);
 
             return $this->resources->save($existing);
         }
@@ -262,5 +266,12 @@ final readonly class PublishedResourceService
         $secret = $this->secretRecords->find(PrefixedUlid::parse($resource->credentialSecretId));
 
         return $secret === null || $secret->revokedAt !== null ? null : $this->secrets->get($secret->key);
+    }
+
+    private function ensureCredential(PublishedResourceRecord $resource): void
+    {
+        if ($resource->access === 'credential' && $this->credentialFor($resource) === null) {
+            $this->createCredential($resource);
+        }
     }
 }
