@@ -104,7 +104,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = []): array
     {
         $operation = $strategy->key === 'plugin.complete' ? 'complete' : 'refresh';
-        $raw = $this->invoke('input.discover', ['input_id' => $input->providerInputId, 'intent' => $operation, 'options' => $this->wireOptions($options)], $operation, helper: $operation === 'complete' ? $this->definition->helper : null);
+        $raw = $this->invoke('input.discover', ['input_id' => $input->providerInputId, 'intent' => $operation, 'options' => $this->wireOptions($options)], $operation, helper: $this->definition->helper);
 
         return array_map(static function (array $item): DiscoveredItem {
             $artwork = self::nullableString($item['artwork-reference'] ?? null);
