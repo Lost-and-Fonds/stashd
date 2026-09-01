@@ -2,12 +2,8 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-PACKAGE_ROOT=${STASHD_PLUGIN_PACKAGE_ROOT:-$(mktemp -d)}
-CREATED_ROOT=0
-
-if [ "${STASHD_PLUGIN_PACKAGE_ROOT:-}" = "" ]; then
-    CREATED_ROOT=1
-fi
+PACKAGE_ROOT=$(mktemp -d)
+CREATED_ROOT=1
 
 cleanup() {
     if [ "$CREATED_ROOT" -eq 1 ]; then
