@@ -13,7 +13,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ startsWith(github.ref, 'refs/tags/v') && 'release' || github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -208,6 +208,7 @@ jobs:
         run: STASHD_E2E_SKIP_BUILD=1 tests/e2e/run.sh
 
   build:
+    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')
     needs: [quality, smoke, e2e, plugin-runtime]
     runs-on: ubuntu-latest
     steps:
@@ -223,7 +224,7 @@ jobs:
       # Skipped on pull_request: forked PRs don't have package-write access,
       # and this job only validates the build there (push: false below).
       - name: Log in to GHCR
-        if: github.event_name != 'pull_request'
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -244,16 +245,15 @@ jobs:
             type=semver,pattern=v{{major}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
-      # PRs build both platforms but don't push -- this is the regression
-      # check that would have caught the Docker build being broken for
-      # anyone but the original dev machine (see docs/TODO.md).
-      - name: Build (and push on main/tags)
+      # PRs build both platforms without pushing. Release tags are the only
+      # push path; main validation does not compete with release publishing.
+      - name: Build (and push on release tags)
         uses: docker/build-push-action@v7
         with:
           context: .
           target: prod
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=prod
