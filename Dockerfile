@@ -100,7 +100,7 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
 
 COPY . .
-COPY --from=frontend-assets /app/dist ./public
+COPY --from=frontend-assets /app/public ./public
 RUN git config --global --add safe.directory /var/www/html \
     && composer dump-autoload --optimize \
     && php vendor/bin/tempest discovery:generate --no-interaction \
