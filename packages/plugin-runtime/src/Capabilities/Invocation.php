@@ -226,9 +226,11 @@ final class Invocation
         }
         $command = array_values($command);
         array_push($command, ...$arguments);
-        // No maximum runtime: long media is valid. Abort only when yt-dlp has
-        // stopped producing output for a sustained period.
-        $process = (new GenericProcessExecutor())->start(new PendingProcess($command, idleTimeout: Duration::seconds(60)));
+        // No maximum runtime: long media is valid. Progress-reporting work
+        // uses a short stall detector; silent inspection commands get a longer
+        // window because they emit one result only after metadata is ready.
+        $idleTimeout = $onOutput === null ? Duration::seconds(600) : Duration::seconds(60);
+        $process = (new GenericProcessExecutor())->start(new PendingProcess($command, idleTimeout: $idleTimeout));
         $result = $process->wait($onOutput === null ? null : static function (OutputChannel $channel, string $buffer) use ($onOutput): void {
             if ($buffer !== '') {
                 $onOutput();
