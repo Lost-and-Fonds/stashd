@@ -44,10 +44,10 @@
             "@php ./tempest discovery:generate --no-interaction"
         ],
         "test": "@php vendor/bin/alchemy test",
-        "test:parallel": "@php vendor/bin/alchemy test --flags=parallel",
+        "test:parallel": "@php vendor/bin/alchemy test --flags=parallel,processes=4",
         "test:unit": "@php vendor/bin/alchemy test --flags=testsuite=Unit",
         "test:feature": "@php vendor/bin/alchemy test --flags=testsuite=Feature",
-        "test:feature:parallel": "@php vendor/bin/alchemy test --flags=testsuite=Feature,parallel",
+        "test:feature:parallel": "@php vendor/bin/alchemy test --flags=testsuite=Feature,parallel,processes=4",
         "test:postgres": "@php vendor/bin/alchemy test",
         "test:docker-smoke": "tests/docker/smoke.sh",
         "test:docker-smoke:no-build": "STASHD_SMOKE_SKIP_BUILD=1 tests/docker/smoke.sh",

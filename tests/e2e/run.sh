@@ -11,6 +11,7 @@ PG_DB=stashd
 PG_USER=stashd
 PG_PASSWORD=stashd-e2e
 TIMEOUT="${STASHD_E2E_TIMEOUT:-180}"
+SKIP_BUILD="${STASHD_E2E_SKIP_BUILD:-0}"
 TMP="$(mktemp -d)"
 PUID="$(id -u)"
 PGID="$(id -g)"
@@ -24,7 +25,9 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 mkdir -p "$TMP/data" "$TMP/media"
-docker build -t "$IMAGE" "$ROOT"
+if [ "$SKIP_BUILD" != "1" ]; then
+    docker build -t "$IMAGE" "$ROOT"
+fi
 
 # PostgreSQL is the default runtime, so the app cannot boot without one.
 docker network create "$NETWORK" >/dev/null 2>&1 || true

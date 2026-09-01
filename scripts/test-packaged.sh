@@ -19,7 +19,9 @@ trap cleanup EXIT INT TERM
 mkdir -p "$PACKAGE_ROOT"
 export STASHD_PLUGIN_PACKAGE_ROOT="$PACKAGE_ROOT"
 
-php "$ROOT/scripts/build-installed-plugins.php"
+if [ "${STASHD_PLUGIN_PACKAGES_READY:-0}" != "1" ]; then
+    php "$ROOT/scripts/build-installed-plugins.php"
+fi
 "$ROOT/scripts/test-postgres.sh" \
     "$ROOT/tests/Feature/PodcastPluginLifecycleTest.php" \
     "$ROOT/tests/Feature/ExternalInputPluginLifecycleTest.php"
