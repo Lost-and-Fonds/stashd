@@ -9,6 +9,7 @@ const route = useRoute()
 const router = useRouter()
 const detail = ref<VaultItemDetailResponse>()
 const loading = ref(true)
+const refreshing = ref(false)
 const error = ref<string>()
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let unsubscribe: (() => void) | undefined
@@ -50,16 +51,20 @@ function goBack() {
 }
 
 async function load() {
-  loading.value = true
+  const hadDetail = detail.value !== undefined
+
+  if (detail.value === undefined) loading.value = true
+  else refreshing.value = true
   error.value = undefined
 
   try {
     detail.value = await fetchVaultItem(String(route.params.itemId))
   } catch (exception) {
-    detail.value = undefined
+    if (!hadDetail) detail.value = undefined
     error.value = exception instanceof Error ? exception.message : 'Could not load this Vault item.'
   } finally {
     loading.value = false
+    refreshing.value = false
   }
 }
 
@@ -108,14 +113,19 @@ onBeforeUnmount(() => {
       <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" />
       Loading item…
     </div>
-    <UAlert v-else-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not load item" :description="error" />
+    <UAlert v-else-if="error && !detail" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not load item" :description="error" />
     <template v-else-if="detail">
-      <header class="space-y-1">
-        <h1 class="font-mono text-2xl leading-tight text-highlighted">{{ detail.item.title || 'Untitled item' }}</h1>
+      <header class="space-y-2">
+        <div class="flex items-start justify-between gap-4">
+          <h1 class="font-mono text-2xl leading-tight text-highlighted">{{ detail.item.title || 'Untitled item' }}</h1>
+          <UButton label="Refetch" icon="i-lucide-refresh-cw" variant="soft" color="neutral" size="sm" :loading="refreshing" @click="load" />
+        </div>
         <p class="text-sm text-muted">
           {{ itemKind ?? 'Unknown kind' }} · {{ detail.item.provider_key }} · {{ formatBytes(detail.preserved_size_bytes) }} preserved
         </p>
       </header>
+
+      <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not refetch item" :description="error" />
 
       <section v-if="playableAsset && playbackUrl" class="space-y-3">
         <h2 class="text-base font-medium text-highlighted">Preview</h2>
