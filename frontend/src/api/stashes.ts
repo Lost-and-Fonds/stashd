@@ -131,6 +131,7 @@ export async function fetchStashItems(stashId: string, query: StashItemsQuery): 
     offset: body.offset ?? 0,
     stash_item_count: body.stash_item_count ?? body.total ?? 0,
     ignored_count: body.ignored_count ?? 0,
+    downloadable_count: body.downloadable_count ?? 0,
     status_counts: body.status_counts ?? {}
   }
 }

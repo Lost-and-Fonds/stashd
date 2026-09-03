@@ -62,14 +62,14 @@ final readonly class DownloadJobHandler implements JobHandler
                 stashId: $stashId,
                 jobId: PrefixedUlid::parse((string) $job->id),
                 force: $force,
-                onProgress: function (?string $stage = null) use ($context, $job): void {
+                onProgress: function (?string $stage = null, ?float $fraction = null) use ($context, $job): void {
                     if ($stage === null || $stage === '') {
                         $context->heartbeat($job);
 
                         return;
                     }
 
-                    $context->progress($job, JobProgressUpdate::indeterminate($stage));
+                    $context->progress($job, $fraction === null ? JobProgressUpdate::indeterminate($stage) : JobProgressUpdate::ofPercent($fraction * 100, $stage));
                 },
             );
 

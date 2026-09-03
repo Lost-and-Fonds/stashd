@@ -64,6 +64,8 @@ final readonly class InputPluginController
                 'provider_input_id' => $resolved->providerInputId,
                 'kind' => $resolved->inputType,
                 'display_name' => $resolved->title,
+                'source_title' => $resolved->sourceTitle,
+                'source_avatar_uri' => $resolved->sourceAvatarUri?->toString(),
                 'size_bytes' => $resolved->sizeBytes,
                 'size_estimated' => $resolved->sizeEstimated,
             ],

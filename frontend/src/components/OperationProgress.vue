@@ -64,7 +64,7 @@ const color = {
 
     <div v-if="stage || count" class="flex items-center justify-between gap-3">
       <p v-if="stage" class="truncate font-mono text-xs text-muted">{{ stage }}</p>
-      <p v-if="count" class="shrink-0 font-mono text-xs text-dimmed">{{ count }}</p>
+      <p v-if="count" class="ml-auto shrink-0 font-mono text-xs text-dimmed">{{ count }}</p>
     </div>
   </div>
 </template>

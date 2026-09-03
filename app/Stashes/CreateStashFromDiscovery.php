@@ -14,6 +14,9 @@ use App\Commands\CommandState;
 use App\Commands\CommandType;
 use App\Downloads\DownloadPolicyEvaluator;
 use App\Jobs\JobIntent;
+use App\Jobs\JobHandlerContext;
+use App\Jobs\JobProgressUpdate;
+use App\Jobs\JobRecord;
 use InvalidArgumentException;
 use RuntimeException;
 use Tempest\Database\Database;
@@ -46,7 +49,7 @@ final readonly class CreateStashFromDiscovery implements InitialInputPersistence
     /**
      * @param  array<string, mixed>  $options
      */
-    public function commitInput(StashRecord $stash, CommandRecord $preflightCommand, array $options = []): StashInputCommitResult
+    public function commitInput(StashRecord $stash, CommandRecord $preflightCommand, array $options = [], ?JobHandlerContext $context = null, ?JobRecord $job = null): StashInputCommitResult
     {
         $preflight = $this->requireCompletedPreflight($preflightCommand);
         $preflightResult = $this->decodePreflightResult($preflight);
@@ -64,7 +67,9 @@ final readonly class CreateStashFromDiscovery implements InitialInputPersistence
             'source_title' => $sourceTitle,
             'origin' => $origin,
             'provider_options' => is_array($options['provider'] ?? null) ? $options['provider'] : [],
-        ], JobIntent::InitialBackfill);
+        ], JobIntent::InitialBackfill, $context === null || $job === null ? null : static function (string $stage, ?float $fraction) use ($context, $job): void {
+            $context->progress($job, $fraction === null ? JobProgressUpdate::indeterminate($stage) : JobProgressUpdate::ofPercent($fraction * 100, $stage));
+        });
 
         return $this->commitDiscoveredInput($stash, $discovered, $options, (string) $preflight->id);
     }
@@ -106,6 +111,13 @@ final readonly class CreateStashFromDiscovery implements InitialInputPersistence
             syncMode: $syncMode,
             options: $inputOptions,
         );
+
+        if ($stashInput->title !== $resolved->title || $stashInput->sourceUri !== $resolved->sourceUri->toString() || $stashInput->options?->toArray() !== $inputOptions?->toArray()) {
+            $stashInput->title = $resolved->title;
+            $stashInput->sourceUri = $resolved->sourceUri->toString();
+            $stashInput->options = $inputOptions;
+            $this->stashInputs->save($stashInput);
+        }
 
         if ($stash->iconUri === null && $resolved->sourceAvatarUri !== null) {
             $this->stashes->update($stash, iconUri: $resolved->sourceAvatarUri->toString());

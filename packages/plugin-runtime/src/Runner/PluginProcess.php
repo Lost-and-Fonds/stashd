@@ -124,6 +124,44 @@ final class PluginProcess
         }
     }
 
+    /** @param array<string, mixed> $params */
+    public function notify(string $method, array $params): void
+    {
+        if ($this->closed) {
+            return;
+        }
+
+        FrameCodec::write($this->pipes[0], ['protocol' => 1, 'kind' => 'notification', 'method' => $method, 'params' => $params]);
+    }
+
+    /** @param callable(array<string, mixed>): array<string, mixed> $capabilityHandler */
+    public function pump(callable $capabilityHandler, int $waitMicroseconds = 100_000): bool
+    {
+        $read = [$this->pipes[1]];
+        $write = null;
+        $except = null;
+
+        if (@stream_select($read, $write, $except, 0, $waitMicroseconds) !== 1) {
+            return false;
+        }
+
+        $message = FrameCodec::read($this->pipes[1], 0.01);
+
+        if ($message === null || ($message['kind'] ?? null) !== 'request' || ! is_string($message['id'] ?? null)) {
+            return false;
+        }
+
+        $id = $message['id'];
+
+        try {
+            FrameCodec::write($this->pipes[0], ['protocol' => 1, 'id' => $id, 'kind' => 'response', 'result' => $capabilityHandler($message)]);
+        } catch (Throwable $exception) {
+            FrameCodec::write($this->pipes[0], ['protocol' => 1, 'id' => $id, 'kind' => 'response', 'error' => ['code' => 'capability-denied', 'message' => $exception->getMessage()]]);
+        }
+
+        return true;
+    }
+
     public function stderr(): string
     {
         $value = stream_get_contents($this->pipes[2]);

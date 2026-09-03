@@ -48,7 +48,9 @@ final readonly class PreflightJobHandler implements JobHandler
 
         $payload = $job->payload ?? [];
 
-        $result = $this->executor->execute($payload);
+        $result = $this->executor->execute($payload, onProgress: function (string $stage, ?float $fraction) use ($job, $context): void {
+            $context->progress($job, $fraction === null ? JobProgressUpdate::indeterminate($stage) : JobProgressUpdate::ofPercent($fraction * 100, $stage));
+        });
         $reviewUrl = rtrim($this->config->publicUrl, '/') . '/api/v1/stashes/preflight/' . (string) $command->id . '/review';
         $resultArray = $result->toResultArray($reviewUrl);
 

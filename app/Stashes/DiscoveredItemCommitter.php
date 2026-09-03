@@ -9,6 +9,7 @@ use App\Providers\InputOption;
 use App\Providers\ProviderDates;
 use App\Providers\ResolvedInput;
 use App\Providers\StashdUri;
+use App\Support\DurationSeconds;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemSourceRepository;
@@ -93,17 +94,37 @@ final readonly class DiscoveredItemCommitter
             } else {
                 $mediaItem = $existingMedia;
                 $mediaItemsReused++;
+                $changed = false;
 
                 $upstreamState = UpstreamState::tryFrom(ApiJson::string($item['upstream_state'] ?? null));
 
                 if ($upstreamState !== null && $mediaItem->upstreamState !== $upstreamState) {
                     $mediaItem->upstreamState = $upstreamState;
-                    $this->mediaItems->save($mediaItem);
+                    $changed = true;
                 }
 
                 if ($mediaItem->sizeBytes === null && isset($item['size_bytes'])) {
                     $mediaItem->sizeBytes = ApiJson::integer($item['size_bytes']);
                     $mediaItem->sizeEstimated = (bool) ($item['size_estimated'] ?? false);
+                    $changed = true;
+                }
+
+                if ($mediaItem->publishedAt === null && is_string($item['published_at'] ?? null)) {
+                    $mediaItem->publishedAt = ProviderDates::tryParse($item['published_at']);
+                    $changed = $mediaItem->publishedAt !== null || $changed;
+                }
+
+                if ($mediaItem->durationSeconds === null && isset($item['duration_seconds'])) {
+                    $mediaItem->durationSeconds = DurationSeconds::toDuration(ApiJson::integer($item['duration_seconds']));
+                    $changed = true;
+                }
+
+                if ($mediaItem->thumbnailUri === null && is_string($item['thumbnail_uri'] ?? null)) {
+                    $mediaItem->thumbnailUri = $item['thumbnail_uri'];
+                    $changed = true;
+                }
+
+                if ($changed) {
                     $this->mediaItems->save($mediaItem);
                 }
             }

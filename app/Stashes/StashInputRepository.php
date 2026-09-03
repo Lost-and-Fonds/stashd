@@ -29,6 +29,7 @@ final class StashInputRepository
         ?string $title = null,
         ?SyncMode $syncMode = null,
         ?StashInputOptions $options = null,
+        StashInputState $state = StashInputState::Ready,
     ): StashInputRecord {
         $id = $this->ids->generate('input')->toString();
         $record = new StashInputRecord(
@@ -37,7 +38,7 @@ final class StashInputRepository
             inputType: $inputType,
             sourceUri: $sourceUri,
             providerInputId: $providerInputId,
-            state: StashInputState::Ready,
+            state: $state,
             title: $title,
             syncMode: $syncMode,
             options: $options,

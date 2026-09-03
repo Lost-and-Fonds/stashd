@@ -29,6 +29,7 @@ use Stashd\PluginRuntime\Capabilities\CredentialGrant;
 use Stashd\PluginRuntime\Capabilities\Invocation;
 use Stashd\PluginRuntime\Package\PackageManager;
 use Stashd\PluginRuntime\Runner\PluginRunner;
+use Stashd\PluginRuntime\Runner\PluginProcess;
 use Tempest\Cache\Cache;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Duration;
@@ -101,10 +102,10 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     {
         return $this->definition->options;
     }
-    public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = []): array
+    public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = [], ?callable $onProgress = null): array
     {
         $operation = $strategy->key === 'plugin.complete' ? 'complete' : 'refresh';
-        $raw = $this->invoke('input.discover', ['input_id' => $input->providerInputId, 'intent' => $operation, 'options' => $this->wireOptions($options)], $operation, helper: $this->definition->helper);
+        $raw = $this->invoke('input.discover', ['input_id' => $input->providerInputId, 'intent' => $operation, 'options' => $this->wireOptions($options)], $operation, helper: $this->definition->helper, onActivity: $onProgress);
 
         return array_map(static function (array $item): DiscoveredItem {
             $artwork = self::nullableString($item['artwork-reference'] ?? null);
@@ -174,7 +175,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
      */
     private function invoke(string $method, array $params, string $operation, ?string $staging = null, ?PluginHelperGrant $helper = null, ?callable $onActivity = null): array
     {
-        if ($staging === null && ($method === 'input.resolve' || $operation === 'complete')) {
+        if ($onActivity === null && $staging === null && ($method === 'input.resolve' || $operation === 'complete')) {
             $key = 'plugin-input.' . hash('sha256', json_encode([$this->definition->id, $this->definition->version, $method, $params], JSON_THROW_ON_ERROR));
 
             /** @var array<string, mixed> */
@@ -186,7 +187,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
 
     /** @return array<string, mixed> */
     /** @param array<string, mixed> $params
-     * @param callable(string): void|null $onActivity
+     * @param callable(string, ?float): void|null $onActivity
      * @return array<string, mixed>
      */
     private function invokeUncached(string $method, array $params, string $operation, ?string $staging = null, ?PluginHelperGrant $helper = null, ?callable $onActivity = null): array
@@ -232,13 +233,14 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         $process = $this->runner->start($this->definition->id, $stage);
 
         try {
+            $capabilityHandler = null;
             $capabilityHandler = /** @param array<string, mixed> $message
                 @return array<string, mixed>
-             */ function (array $message) use ($invocation, $onActivity): array {
+             */ function (array $message) use ($invocation, $onActivity, $process, &$capabilityHandler): array {
                 $p = self::stringKeyed($message['params'] ?? null);
 
                 return match ($message['method'] ?? '') {
-                    'http.request' => $this->capabilityHttp($invocation, $p), 'resource.read' => $this->capabilityResourceRead($invocation, $p), 'staging.stage' => $this->capabilityStage($invocation, $p), 'staging.write' => $this->capabilityWrite($invocation, $p), 'helper.run' => $this->capabilityHelper($invocation, $p, $onActivity), 'event.log' => ['accepted' => true], 'event.progress' => $this->capabilityProgress($onActivity, $p), default => throw new RuntimeException('unsupported plugin capability'),
+                    'http.request' => $this->capabilityHttp($invocation, $p), 'resource.read' => $this->capabilityResourceRead($invocation, $p), 'staging.stage' => $this->capabilityStage($invocation, $p), 'staging.write' => $this->capabilityWrite($invocation, $p), 'helper.run' => $this->capabilityHelper($invocation, $p, $onActivity, $process, $capabilityHandler), 'event.log' => ['accepted' => true], 'event.progress' => $this->capabilityProgress($onActivity, $p), default => throw new RuntimeException('unsupported plugin capability'),
                 };
             };
             // This is an inactivity window, not an operation duration limit.
@@ -271,7 +273,9 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     private function capabilityProgress(?callable $onActivity, array $p): array
     {
         if ($onActivity !== null && is_string($p['stage'] ?? null)) {
-            $onActivity($p['stage']);
+            $fraction = is_numeric($p['fraction'] ?? null) ? (float) $p['fraction'] : null;
+            $fraction = $fraction !== null && $fraction >= 0.0 && $fraction <= 1.0 ? $fraction : null;
+            $onActivity($p['stage'], $fraction);
         }
 
         return ['accepted' => true];
@@ -323,10 +327,23 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     /** @param array<string, mixed> $p
      * @return array<string, mixed>
      */
-    private function capabilityHelper(Invocation $i, array $p, ?callable $onActivity = null): array
+    private function capabilityHelper(Invocation $i, array $p, ?callable $onActivity = null, ?PluginProcess $process = null, ?callable $capabilityHandler = null): array
     {
         $arguments = is_array($p['arguments'] ?? null) ? array_values($p['arguments']) : [];
-        $r = $i->runHelper(self::string($p['name'] ?? null), $arguments, $onActivity);
+        $name = self::string($p['name'] ?? null);
+        $r = $i->runHelper($name, $arguments, $process === null ? null : function (string $channel, string $buffer) use ($process, $name, $capabilityHandler): void {
+            $process->notify('helper.output', ['name' => $name, 'channel' => $channel, 'buffer' => $buffer]);
+
+            if ($capabilityHandler !== null) {
+                $deadline = microtime(true) + 1.0;
+
+                do {
+                    if ($process->pump($capabilityHandler)) {
+                        break;
+                    }
+                } while (microtime(true) < $deadline);
+            }
+        });
 
         return ['exit_code' => $r->exitCode, 'stdout' => $r->stdout, 'stderr' => $r->stderr];
     }

@@ -24,7 +24,7 @@ final readonly class DiscoverStashInput
     ) {}
 
     /** @param array<string, mixed> $payload */
-    public function execute(array $payload, JobIntent $intent = JobIntent::Preflight): PreflightExecutionResult
+    public function execute(array $payload, JobIntent $intent = JobIntent::Preflight, ?callable $onProgress = null): PreflightExecutionResult
     {
         $sourceUri = str(ApiJson::string($payload['source_uri'] ?? null))->trim()->toString();
         $sourceTitle = isset($payload['source_title']) && is_string($payload['source_title']) && str($payload['source_title'])->trim()->isNotEmpty()
@@ -36,10 +36,10 @@ final readonly class DiscoverStashInput
         $provider = $this->providers->resolveForUri($uri);
         $resolved = $provider->resolveInput($uri);
 
-        return $this->executeResolved($resolved, $sourceUri, $sourceTitle, $origin, $payload['provider_options'] ?? null, $intent);
+        return $this->executeResolved($resolved, $sourceUri, $sourceTitle, $origin, $payload['provider_options'] ?? null, $intent, $onProgress);
     }
 
-    public function executeResolved(ResolvedInput $resolved, string $sourceUri, ?string $sourceTitle, PreflightOrigin $origin, mixed $providerOptions, JobIntent $intent = JobIntent::Preflight): PreflightExecutionResult
+    public function executeResolved(ResolvedInput $resolved, string $sourceUri, ?string $sourceTitle, PreflightOrigin $origin, mixed $providerOptions, JobIntent $intent = JobIntent::Preflight, ?callable $onProgress = null): PreflightExecutionResult
     {
         $provider = $this->providers->get($resolved->providerKey);
 
@@ -71,7 +71,7 @@ final readonly class DiscoverStashInput
         };
         $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);
         /** @var list<DiscoveredItem> $discovered */
-        $discovered = $provider->discover($resolved, $strategy, self::providerOptions($providerOptions));
+        $discovered = $provider->discover($resolved, $strategy, self::providerOptions($providerOptions), $onProgress);
 
         if ($sourceTitle === null && $resolved->inputType === 'playlist') {
             $inputTitle = $this->playlistTitle($discovered);

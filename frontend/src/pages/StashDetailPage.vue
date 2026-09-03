@@ -48,6 +48,7 @@ const retrying = ref(false)
 const stashOperation = ref<CommandOperation>()
 const inputOperations = ref<Record<string, CommandOperation | undefined>>({})
 const broadcastOperations = ref<Record<string, CommandOperation | undefined>>({})
+const downloadBatchTotal = ref(0)
 let unsubscribe: (() => void) | undefined
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let loadGeneration = 0
@@ -130,15 +131,27 @@ function operationText(operation: CommandOperation | undefined, verb: string) {
 }
 
 const failedItemCount = computed(() => items.value.status_counts?.failed ?? 0)
+const pendingDownloadCount = computed(() => (items.value.status_counts?.download_pending ?? 0) + (items.value.status_counts?.downloading ?? 0))
 const activeJobs = computed(() => jobs.value.filter(job => {
   if (job.entity_type !== 'media_item' || !['processing', 'pending'].includes(job.state)) return false
   return job.payload?.stash_id === stash.value?.id || items.value.items.some(item => item.media_item_id === job.entity_id)
 }))
+const activeDownloadJobs = computed(() => jobs.value.filter(job => {
+  if (job.intent !== 'download' || !['processing', 'pending'].includes(job.state)) return false
+  return job.payload?.stash_id === stash.value?.id || items.value.items.some(item => item.media_item_id === job.entity_id)
+}))
+const queuedDownloadCount = computed(() => Math.max(items.value.downloadable_count ?? 0, pendingDownloadCount.value, activeDownloadJobs.value.length))
+watch([queuedDownloadCount, () => activeJobs.value.length], ([pending, active]) => {
+  if (pending > 0) downloadBatchTotal.value = Math.max(downloadBatchTotal.value, pending)
+  else if (active === 0) downloadBatchTotal.value = 0
+}, { immediate: true })
+const discoveryJob = computed(() => jobs.value.find(job => {
+  if (!['processing', 'pending'].includes(job.state) || !['add_input', 'initial_backfill', 'sync_input'].includes(job.intent)) return false
+  return job.payload?.stash_id === stash.value?.id || (job.entity_type === 'stash' && job.entity_id === stash.value?.id)
+}))
 const downloadOperation = computed(() => {
-  const ignored = items.value.ignored_count ?? 0
-  const total = Math.max(0, items.value.stash_item_count - ignored)
-  const ready = items.value.status_counts?.ready ?? 0
-  const pending = (items.value.status_counts?.download_pending ?? 0) + (items.value.status_counts?.downloading ?? 0)
+  const pending = queuedDownloadCount.value
+  const total = downloadBatchTotal.value || pending
   if (activeJobs.value.length === 0 && pending === 0) return undefined
 
   const current = activeJobs.value.find(job => job.state === 'processing') ?? activeJobs.value[0]
@@ -147,8 +160,9 @@ const downloadOperation = computed(() => {
     ? [...new Set([current.progress_label, item ? itemTitle(item) : undefined].filter((value): value is string => Boolean(value)))].join(' · ') || undefined
     : undefined
   const activeProgress = activeJobs.value.reduce((sum, job) => sum + (job.progress_percent ?? 0) / 100, 0)
-  const percent = total === 0 ? 100 : Math.min(99, Math.round(((ready + activeProgress) / total) * 100))
-  const count = `${ready} of ${total} items`
+  const completed = Math.max(0, total - pending)
+  const percent = total === 0 ? null : Math.min(99, Math.round(((completed + activeProgress) / total) * 100))
+  const count = `${completed} of ${total} items`
 
   return { percent, stage, count }
 })
@@ -756,6 +770,8 @@ onBeforeUnmount(() => {
         <span class="font-mono text-xs text-dimmed">{{ items.stash_item_count }}</span>
       </div>
 
+      <UAlert v-if="discoveryJob" color="primary" variant="subtle" icon="i-lucide-scan-search" :title="discoveryJob.progress_label || 'Discovering items…'" :description="discoveryJob.progress_percent !== null && discoveryJob.progress_percent !== undefined ? `${Math.round(discoveryJob.progress_percent)}% complete — items will appear here as discovery finishes.` : 'Items will appear here as discovery finishes.'" />
+
       <div class="flex flex-col gap-2 sm:flex-row">
         <UInput v-model="itemSearch" placeholder="Search items" icon="i-lucide-search" class="sm:max-w-sm sm:flex-1" />
         <USelect v-model="itemStatusFilter" :items="itemStatusFilterOptions" value-key="value" class="sm:w-40" />
@@ -813,7 +829,8 @@ onBeforeUnmount(() => {
       </template>
 
       <div v-else class="rounded-md bg-muted p-4 text-center">
-        <p class="text-sm text-muted">{{ itemSearch || itemStatusFilter !== 'all' ? 'No items match these filters.' : 'No items in this Stash.' }}</p>
+        <UIcon v-if="discoveryJob" name="i-lucide-loader-circle" class="mb-2 size-5 animate-spin text-primary" />
+        <p class="text-sm text-muted">{{ discoveryJob ? 'Discovery is underway. Items will appear here shortly.' : itemSearch || itemStatusFilter !== 'all' ? 'No items match these filters.' : 'No items in this Stash.' }}</p>
         <UButton v-if="itemSearch || itemStatusFilter !== 'all'" label="Clear filters" variant="ghost" color="neutral" size="sm" class="mt-2" @click="clearItemFilters" />
       </div>
     </section>

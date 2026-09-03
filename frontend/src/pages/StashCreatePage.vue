@@ -123,7 +123,7 @@ function handleLiveEvent(event: LiveEvent) {
 async function create() {
   if (!selected.value || !resolved.value || !stashName.value.trim()) return
   saving.value = true; error.value = undefined
-  try { const stash = await createStashWithInput(stashName.value.trim(), selected.value.key, sourcePayload(), { title_regex_include: filters.include.trim() || null, title_regex_exclude: filters.exclude.trim() || null, provider: optionPayload() }); await router.push(`/stashes/${stash.id}`) }
+  try { const stash = await createStashWithInput(stashName.value.trim(), selected.value.key, sourcePayload(), { title_regex_include: filters.include.trim() || null, title_regex_exclude: filters.exclude.trim() || null, provider: optionPayload() }, resolved.value); await router.push(`/stashes/${stash.id}`) }
   catch (exception) { error.value = exception instanceof Error ? exception.message : 'Could not create this stash.' }
   finally { saving.value = false }
 }

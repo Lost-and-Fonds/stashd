@@ -10,6 +10,15 @@ set -eu
 APP_DIR="$(pwd)"
 DATA_DIR="${STASHD_DATA_PATH:-/data}"
 MEDIA_DIR="${STASHD_MEDIA_PATH:-/media}"
+# Lerd bind-mounts the checkout but does not inject .env values as container
+# environment. Let the local .env override the image default for its persistent
+# project-local media directory; production keeps the explicit /media mount.
+if [ "$APP_DIR" != "/var/www/html" ] && [ -f "$APP_DIR/.env" ]; then
+    configured_media_dir="$(sed -n 's/^STASHD_MEDIA_PATH=//p' "$APP_DIR/.env" | tail -n 1)"
+    if [ -n "$configured_media_dir" ]; then
+        MEDIA_DIR="$configured_media_dir"
+    fi
+fi
 PUID="${PUID:-1000}"
 PGID="${PGID:-1000}"
 
@@ -52,7 +61,7 @@ run_app() {
 ensure_writable() {
     for dir in "$DATA_DIR" "$MEDIA_DIR"; do
         mkdir -p "$dir"
-        if [ "$(id -u)" -eq 0 ]; then
+        if [ "$(id -u)" -eq 0 ] && [ "$APP_DIR" = "/var/www/html" ]; then
             chown -R "${PUID}:${PGID}" "$dir" || true
         fi
     done

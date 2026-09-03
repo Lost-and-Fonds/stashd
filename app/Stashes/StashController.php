@@ -147,9 +147,20 @@ final readonly class StashController
         $plugin = is_string($input['plugin'] ?? null) ? $input['plugin'] : '';
         $source = is_array($input['source'] ?? null) ? self::object($input['source']) : null;
         $options = is_array($input['options'] ?? null) ? self::object($input['options']) : [];
+        $resolvedInput = is_array($input['resolved_input'] ?? null) ? self::object($input['resolved_input']) : null;
 
         if ($syncMode === null || $downloadPolicy === null || $organizationMode === null || $plugin === '' || $source === null) {
             return $this->validationError('Invalid stash or input settings.');
+        }
+
+        if ($resolvedInput !== null) {
+            $providerInputId = trim(ApiJson::string($resolvedInput['provider_input_id'] ?? null));
+            $sourceUri = trim(ApiJson::string($resolvedInput['canonical_reference'] ?? null));
+            $resolvedPlugin = trim(ApiJson::string($resolvedInput['plugin_key'] ?? null));
+
+            if ($providerInputId === '' || $sourceUri === '' || $resolvedPlugin !== $plugin) {
+                return $this->validationError('Invalid resolved input metadata.');
+            }
         }
 
         // Discovery duration depends on the source and must not be cut off by
@@ -162,6 +173,24 @@ final readonly class StashController
                 organizationMode: $organizationMode,
                 description: is_string($body['description'] ?? null) ? trim($body['description']) : null,
             );
+
+            if ($resolvedInput !== null) {
+                $this->stashInputs->create(
+                    stashId: StashId::fromPrimaryKey($stash->id),
+                    providerKey: $plugin,
+                    inputType: StashInputTypeMapper::fromProviderInputType(ApiJson::string($resolvedInput['kind'] ?? null)),
+                    sourceUri: $sourceUri,
+                    providerInputId: $providerInputId,
+                    title: ApiJson::string($resolvedInput['display_name'] ?? null) ?: ApiJson::string($resolvedInput['source_title'] ?? null) ?: null,
+                    syncMode: $syncMode,
+                    options: StashInputOptions::fromArray($options),
+                );
+                $sourceAvatar = ApiJson::string($resolvedInput['source_avatar_uri'] ?? null);
+
+                if ($sourceAvatar !== '') {
+                    $this->stashes->update($stash, iconUri: $sourceAvatar);
+                }
+            }
             $this->activity->stashCreated($stash);
             $this->dispatch->dispatch(CommandType::StashAddInput, [
                 'stash_id' => (string) $stash->id,
@@ -278,6 +307,7 @@ final readonly class StashController
             'limit' => $limit,
             'offset' => $offset,
             'status_counts' => $this->stashItems->statusCountsForStash($stashId),
+            'downloadable_count' => $this->stashItems->downloadableCountForStash($stashId),
             'ignored_count' => $this->stashItems->countIgnoredForStash($stashId),
             // Unfiltered, whole-stash count -- distinct from `total` (which
             // reflects the current search/status/includeIgnored filters) so

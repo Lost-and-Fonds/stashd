@@ -102,9 +102,10 @@ async function load() {
   error.value = undefined
 
   try {
-    const [stashResource, pluginResources, connectionResources] = await Promise.all([fetchStash(stashId), fetchBroadcastPlugins(), fetchConnections()])
+    const stashResource = await fetchStash(stashId)
     stash.value = stashResource
     broadcastName.value = stashResource.name
+    const [pluginResources, connectionResources] = await Promise.all([fetchBroadcastPlugins(), fetchConnections()])
     plugins.value = pluginResources
     connections.value = connectionResources
   } catch (exception) {

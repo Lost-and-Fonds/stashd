@@ -7,6 +7,9 @@ namespace Tests\Feature;
 use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastPathBuilder;
 use App\Broadcasts\BroadcastRepository;
+use App\Broadcasts\PublishedResourceRepository;
+use App\Broadcasts\PublishedResourceService;
+use App\Config\StashdConfig;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
@@ -78,6 +81,36 @@ test('Podcast plugin is discovered and publishes an audio feed from PostgreSQL l
 
     $record = $this->container->get(BroadcastRepository::class)->find(BroadcastId::parse($broadcast->body['broadcast']['id']));
     $feedPath = $this->container->get(BroadcastPathBuilder::class)->broadcastFile($record, 'feed.xml');
+    $feedXml = simplexml_load_file($feedPath);
+    $enclosureUrl = (string) $feedXml->channel->item->enclosure['url'];
     expect(is_file($feedPath))->toBeTrue()
-        ->and((string) simplexml_load_file($feedPath)->channel->title)->toBe('Lifecycle Podcast');
+        ->and((string) $feedXml->channel->title)->toBe('Lifecycle Podcast')
+        ->and($enclosureUrl)->toContain('/published/');
+
+    $publications = $this->container->get(PublishedResourceRepository::class)->listForBroadcast(BroadcastId::parse($broadcast->body['broadcast']['id']));
+    $publicationService = $this->container->get(PublishedResourceService::class);
+    $feed = array_values(array_filter($publications, static fn($resource): bool => $resource->relativePath === 'feed.xml'))[0] ?? null;
+    $enclosurePath = (string) parse_url($enclosureUrl, PHP_URL_PATH);
+    $pathParts = explode('/', trim($enclosurePath, '/'));
+    $publishedIndex = array_search('published', $pathParts, true);
+    $enclosureId = is_int($publishedIndex) ? ($pathParts[$publishedIndex + 1] ?? null) : null;
+    $audio = array_values(array_filter(
+        $publications,
+        static fn($resource): bool => (string) $resource->id === $enclosureId,
+    ))[0] ?? null;
+    expect($feed)->not->toBeNull()
+        ->and($audio)->not->toBeNull();
+
+    $feedCredential = $publicationService->credential($feed);
+    $audioCredential = $publicationService->credential($audio);
+    $this->http->get('/published/' . $feed->id . '/access/' . rawurlencode((string) $feedCredential))
+        ->assertStatus(Status::OK)
+        ->assertHeaderContains('Content-Type', 'application/rss+xml');
+    $audioSource = $publicationService->source($audio);
+    $mediaRoot = rtrim($this->container->get(StashdConfig::class)->mediaPath, '/') . '/';
+    $this->http->get('/published/' . $audio->id . '/access/' . rawurlencode((string) $audioCredential))
+        ->assertStatus(Status::OK)
+        ->assertHeaderContains('Content-Length', (string) $audioSource['size'])
+        ->assertHeaderContains('Accept-Ranges', 'bytes')
+        ->assertHeaderContains('X-Accel-Redirect', '/' . ltrim(substr($audioSource['path'], strlen($mediaRoot)), '/'));
 });

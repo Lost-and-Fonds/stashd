@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Stashes;
 
 use App\Jobs\JobIntent;
+use App\Jobs\JobHandlerContext;
+use App\Jobs\JobProgressUpdate;
+use App\Jobs\JobRecord;
 use App\Plugins\ExternalInputPluginRegistry;
 use App\System\Activity\ActivityEventService;
 use RuntimeException;
@@ -49,9 +52,9 @@ final readonly class CreateStashWithInitialInput
     /** @param array<string, mixed> $source
      *  @param array<string, mixed> $options
      */
-    public function addToExisting(StashRecord $stash, string $pluginId, array $source, array $options): StashInputCommitResult
+    public function addToExisting(StashRecord $stash, string $pluginId, array $source, array $options, ?JobHandlerContext $context = null, ?JobRecord $job = null): StashInputCommitResult
     {
-        $discovered = $this->discover($pluginId, $source, $options);
+        $discovered = $this->discover($pluginId, $source, $options, $context, $job);
         $result = null;
         $committed = $this->database->withinTransaction(function () use ($stash, $discovered, $options, &$result): void {
             $result = $this->inputs->persistDiscoveredInput($stash, $discovered, $options);
@@ -69,7 +72,7 @@ final readonly class CreateStashWithInitialInput
     /** @param array<string, mixed> $source
      *  @param array<string, mixed> $options
      */
-    private function discover(string $pluginId, array $source, array $options): PreflightExecutionResult
+    private function discover(string $pluginId, array $source, array $options, ?JobHandlerContext $context = null, ?JobRecord $job = null): PreflightExecutionResult
     {
         $plugin = $this->plugins->definition($pluginId)
             ?? throw new \InvalidArgumentException('Input plugin not found.');
@@ -82,6 +85,9 @@ final readonly class CreateStashWithInitialInput
             PreflightOrigin::Api,
             $options['provider'] ?? [],
             JobIntent::InitialBackfill,
+            $context === null || $job === null ? null : static function (string $stage, ?float $fraction) use ($context, $job): void {
+                $context->progress($job, $fraction === null ? JobProgressUpdate::indeterminate($stage) : JobProgressUpdate::ofPercent($fraction * 100, $stage));
+            },
         );
     }
 }

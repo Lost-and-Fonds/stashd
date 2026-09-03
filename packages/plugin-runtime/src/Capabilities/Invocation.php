@@ -226,14 +226,13 @@ final class Invocation
         }
         $command = array_values($command);
         array_push($command, ...$arguments);
-        // No maximum runtime: long media is valid. Progress-reporting work
-        // uses a short stall detector; silent inspection commands get a longer
-        // window because they emit one result only after metadata is ready.
-        $idleTimeout = $onOutput === null ? Duration::seconds(600) : Duration::seconds(60);
-        $process = (new GenericProcessExecutor())->start(new PendingProcess($command, idleTimeout: $idleTimeout));
+        // No maximum runtime: long media is valid. The job worker's stale-job
+        // recovery is the stall detector; yt-dlp can legitimately be silent
+        // while resolving formats or starting a large transfer.
+        $process = (new GenericProcessExecutor())->start(new PendingProcess($command));
         $result = $process->wait($onOutput === null ? null : static function (OutputChannel $channel, string $buffer) use ($onOutput): void {
             if ($buffer !== '') {
-                $onOutput();
+                $onOutput($channel->value, $buffer);
             }
         });
 

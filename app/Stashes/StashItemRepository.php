@@ -172,6 +172,22 @@ final class StashItemRepository
         return $counts;
     }
 
+    public function downloadableCountForStash(StashId $stashId): int
+    {
+        /** @var list<array{count: int|string}> $rows */
+        $rows = $this->database->fetch(new Query(
+            'SELECT COUNT(*) AS count
+             FROM "stash_items"
+             JOIN "media_items" ON "media_items"."id" = "stash_items"."mediaItemId"
+             WHERE "stash_items"."stashId" = ?
+               AND "stash_items"."state" <> ?
+               AND "media_items"."state" IN (?, ?, ?, ?)',
+            [$stashId->toString(), StashItemState::Ignored->value, 'discovered', 'metadata_ready', 'download_pending', 'downloading'],
+        ));
+
+        return (int) ($rows[0]['count'] ?? 0);
+    }
+
     /** @return SelectQueryBuilder<StashItemRecord> */
     private function filteredQuery(
         StashId $stashId,

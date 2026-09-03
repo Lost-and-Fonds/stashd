@@ -42,5 +42,6 @@ export interface StashItemsApiResponse {
   offset: number
   stash_item_count: number
   ignored_count?: number
+  downloadable_count?: number
   status_counts?: Record<string, number>
 }

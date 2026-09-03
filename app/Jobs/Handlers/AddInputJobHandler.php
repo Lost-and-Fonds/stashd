@@ -66,12 +66,12 @@ final readonly class AddInputJobHandler implements JobHandler
 
         if (is_string($plugin) && is_array($source)) {
             /** @var array<string, mixed> $source */
-            $result = $this->stashFromPreflight->addToExisting($stash, $plugin, $source, $options);
+            $result = $this->stashFromPreflight->addToExisting($stash, $plugin, $source, $options, $context, $job);
         } else {
             $preflightCommandId = is_string($payload['preflight_command_id'] ?? null) ? $payload['preflight_command_id'] : '';
             $preflightCommand = $this->commands->find(CommandId::parse($preflightCommandId))
                 ?? throw new RuntimeException('Preflight command not found.');
-            $result = $this->stashFromDiscovery->commitInput($stash, $preflightCommand, $options);
+            $result = $this->stashFromDiscovery->commitInput($stash, $preflightCommand, $options, $context, $job);
         }
 
         $command->result = $result->toArray();
