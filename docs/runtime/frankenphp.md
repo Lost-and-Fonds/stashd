@@ -30,10 +30,8 @@ frankenphp run --config docker/Caddyfile
 The container entrypoint runs `stashd:boot`, then supervisord starts:
 
 - FrankenPHP (`stashd serve`)
-- Job poll loops, one per lane (`stashd worker interactive|discovery|bulk`) —
-  interactive jobs (preflight/add-input) never queue behind downloads or
-  channel backfills; `stashd worker` with no lane processes everything
-  (local dev)
+- Symfony Messenger consumers for the two core workloads
+  (`stashd worker interactive|background`)
 - Scheduler loop (`stashd scheduler`)
 
 See `docker/supervisord.conf.template` and `docker/entrypoint.sh`.

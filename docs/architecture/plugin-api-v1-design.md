@@ -111,7 +111,7 @@ Preflight runs asynchronously, resolves the same strongest available discovery s
 
 #### Acquisition
 
-Discovery does not download bytes. A separate `DownloadStrategyHandler`/`DownloaderInterface` boundary handles acquisition. For YouTube, `YtdlpDownloader` calls only `YtdlpGateway`, which wraps `hazel/ytdlphp` and `yt-dlp`.
+Discovery does not download bytes. A separate downloader boundary handles acquisition. Provider plugins own the provider-specific acquisition implementation.
 
 The download path is:
 

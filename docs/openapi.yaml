@@ -21,7 +21,6 @@ tags:
   - name: StashItems
   - name: Items
   - name: Broadcasts
-  - name: Commands
   - name: Jobs
   - name: Activity
   - name: Events
@@ -388,7 +387,7 @@ paths:
                       - broadcast:write
                       - media-server:read
                       - media-server:write
-                      - commands:create
+                      - jobs:read
                       - tokens:manage
                   nullable: true
                 expires_at: { type: string, format: date-time, nullable: true }
@@ -577,10 +576,8 @@ paths:
       operationId: addStashInput
       tags: [StashInputs]
       summary: >
-        Commit a previously-run preflight (POST /stashes/preflight) onto
-        this stash, discovering and downloading-eligible items. This is
-        the create flow's second step -- preflight resolves and previews
-        a source without committing anything; this endpoint commits it.
+        Add a source to this stash. The source is independently resolved and
+        validated by the queued job; any preview data is advisory only.
       parameters:
         - $ref: "#/components/parameters/StashId"
       requestBody:
@@ -589,11 +586,19 @@ paths:
           application/json:
             schema:
               type: object
-              required: [preflight_command_id]
+              required: [source_uri]
               properties:
-                preflight_command_id:
+                source_uri:
                   type: string
-                  description: command_id returned by POST /stashes/preflight
+                  description: Source URI to resolve authoritatively during ingestion.
+                source_title:
+                  type: string
+                  nullable: true
+                  description: Optional display hint; never trusted as source metadata.
+                plugin:
+                  type: string
+                  nullable: true
+                  description: Optional input plugin hint.
                 options:
                   type: object
                   description: >
@@ -605,10 +610,10 @@ paths:
                   additionalProperties: true
       responses:
         "201":
-          description: Command accepted (asynchronous; poll GET /commands/{id})
+          description: Job accepted; poll GET /jobs/{id}.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/CommandDispatchResult" }
+              schema: { $ref: "#/components/schemas/Job" }
         "400": { $ref: "#/components/responses/ValidationError" }
         "404": { $ref: "#/components/responses/NotFound" }
 
@@ -619,23 +624,46 @@ paths:
       summary: >
         Check every input of this stash for new items now, rather than
         waiting for the hourly scheduled check. Dispatches one
-        stash.sync_input command per input. Items already held are left
+        one sync job per input. Items already held are left
         untouched; anything new is committed and then downloaded according
         to the stash's download policy.
       parameters:
         - $ref: "#/components/parameters/StashId"
       responses:
         "202":
-          description: Checks accepted (asynchronous; poll GET /commands/{id})
+          description: Sync jobs accepted; poll GET /jobs/{id}.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  command_ids:
+                  job_ids:
                     type: array
                     items: { type: string }
         "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/stashes/{id}/retry-failed:
+    post:
+      operationId: retryFailedDownloads
+      tags: [Jobs]
+      summary: Create one fresh download job for each failed item in a stash.
+      parameters:
+        - $ref: "#/components/parameters/StashId"
+      responses:
+        "202":
+          description: Download jobs accepted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created_count, jobs]
+                properties:
+                  created_count:
+                    type: integer
+                  jobs:
+                    type: array
+                    items: { $ref: "#/components/schemas/Job" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /api/v1/stashes/{id}/inputs/{inputId}:
@@ -701,11 +729,15 @@ paths:
                   enum: [create_stash, manual_paste, api, browser_extension, scheduler]
                   default: api
       responses:
-        "201":
-          description: Command accepted (asynchronous; poll the review endpoint below)
+        "200":
+          description: Disposable preview; it is not persisted or required by a later job.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/CommandDispatchResult" }
+              schema:
+                type: object
+                required: [preflight]
+                properties:
+                  preflight: { $ref: "#/components/schemas/InputPreflight" }
         "400":
           description: Validation error, or the source URI's provider/URL shape isn't supported
           content:
@@ -717,24 +749,6 @@ paths:
                     error:
                       code: unsupported_provider_url
                       message: "YouTube handle URL is missing a handle. (https://www.youtube.com/@)"
-
-  /api/v1/stashes/preflight/{commandId}/review:
-    get:
-      operationId: reviewPreflight
-      tags: [StashInputs]
-      summary: Poll a preflight command for its review payload (resolved source, sample items, filter declarations)
-      parameters:
-        - name: commandId
-          in: path
-          required: true
-          schema: { type: string }
-      responses:
-        "200":
-          description: Review payload (preflight may still be running; check state)
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/PreflightReview" }
-        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/v1/broadcast-plugins:
     get:
@@ -1067,55 +1081,6 @@ paths:
                   broadcasts:
                     type: array
                     items: { $ref: "#/components/schemas/Broadcast" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /api/v1/commands:
-    post:
-      operationId: dispatchCommand
-      tags: [Commands]
-      summary: Dispatch a command (the generic entry point behind most async operations)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [type]
-              properties:
-                type: { $ref: "#/components/schemas/CommandType" }
-                options:
-                  type: object
-                  additionalProperties: true
-      responses:
-        "201":
-          description: Command accepted
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/CommandDispatchResult" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-
-  /api/v1/commands/{id}:
-    get:
-      operationId: showCommand
-      tags: [Commands]
-      summary: Command detail, with its jobs
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-      responses:
-        "200":
-          description: Command and jobs
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  command: { $ref: "#/components/schemas/Command" }
-                  jobs:
-                    type: array
-                    items: { $ref: "#/components/schemas/Job" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /api/v1/jobs:
@@ -1527,7 +1492,7 @@ components:
               - broadcast:write
               - media-server:read
               - media-server:write
-              - commands:create
+              - jobs:read
               - tokens:manage
         last_used_at: { type: string, format: date-time, nullable: true }
         expires_at: { type: string, format: date-time, nullable: true }
@@ -1557,46 +1522,14 @@ components:
     PodcastMediaKind: { type: string, enum: [audio, video], description: "Preferred episode enclosure media for a `podcast` broadcast (settings.media_kind); defaults to audio." }
     BroadcastState: { type: string, enum: [pending, processing, ready, stale, failed, disabled] }
     BroadcastItemState: { type: string, enum: [pending, processing, ready, stale, failed, disabled] }
-    JobState: { type: string, enum: [pending, processing, ready, failed, cancelled] }
-    CommandState: { type: string, enum: [accepted, rejected, running, completed, failed] }
+    JobState: { type: string, enum: [pending, processing, retrying, ready, failed, cancelled] }
     MediaServerType: { type: string, enum: [jellyfin, plex] }
     MediaServerState: { type: string, enum: [ready, failed, disabled] }
     ActivityLevel: { type: string, enum: [info, success, warning, error] }
-    CommandType:
-      type: string
-      description: One of the dispatchable command types.
-      enum:
-        - stash.preflight
-        - stash.add_input
-        - item.download
-        - asset.verify
-        - broadcast.plan
-        - broadcast.rebuild
-        - broadcast.rebuild_item
-        - broadcast.verify
-        - broadcast.prune
-        - broadcast.trigger
-        - broadcast.rotate_token
-        - media_server.test_connection
-        - media_server.list_libraries
-        - asset.transcode_podcast_audio
-        - system.boot
-        - system.storage_check
-        - system.verify_vault
-    JobIntent:
-      type: string
-      enum:
-        - preflight
-        - add_input
-        - initial_backfill
-        - download
-        - enrich
-        - broadcast
-        - storage_check
-        - boot
-        - verify_vault
-        - media_server
-        - transcode_podcast_audio
+    InputPreflight:
+      type: object
+      description: Disposable advisory input preview; it is not execution state.
+      additionalProperties: true
 
     Stash:
       type: object
@@ -1868,64 +1801,20 @@ components:
               media_item_id: { type: string }
               title: { type: string }
 
-    Command:
-      type: object
-      properties:
-        id: { type: string }
-        type: { $ref: "#/components/schemas/CommandType" }
-        state: { $ref: "#/components/schemas/CommandState" }
-        target_type: { type: string, nullable: true }
-        target_id: { type: string, nullable: true }
-        options:
-          type: object
-          additionalProperties: true
-          nullable: true
-        result:
-          type: object
-          additionalProperties: true
-          nullable: true
-        created_by_user_id: { type: string, nullable: true }
-        created_at: { type: string, format: date-time }
-        updated_at: { type: string, format: date-time }
-
-    CommandDispatchResult:
-      type: object
-      description: Returned by every command-dispatching endpoint (POST .../commands, .../preflight, .../inputs).
-      properties:
-        command_id: { type: string }
-        command_state: { $ref: "#/components/schemas/CommandState" }
-        command_type: { $ref: "#/components/schemas/CommandType" }
-        job_ids:
-          type: array
-          items: { type: string }
-        jobs:
-          type: array
-          items:
-            type: object
-            properties:
-              id: { type: string }
-              intent: { $ref: "#/components/schemas/JobIntent" }
-              state: { $ref: "#/components/schemas/JobState" }
-
     Job:
       type: object
       properties:
         id: { type: string }
-        command_id: { type: string, nullable: true }
-        intent: { $ref: "#/components/schemas/JobIntent" }
+        type: { type: string, description: Namespaced plugin or core job type. }
         entity_type:
           type: string
           nullable: true
           description: e.g. media_item -- set by item.download jobs, paired with entity_id for matching live progress to a specific item.
         entity_id: { type: string, nullable: true }
         state: { $ref: "#/components/schemas/JobState" }
-        priority: { type: integer }
         attempts: { type: integer }
-        max_attempts: { type: integer }
-        scheduled_at: { type: string, format: date-time, nullable: true }
         started_at: { type: string, format: date-time, nullable: true }
         finished_at: { type: string, format: date-time, nullable: true }
-        heartbeat_at: { type: string, format: date-time, nullable: true }
         progress_current: { type: integer, nullable: true }
         progress_total: { type: integer, nullable: true }
         progress_percent: { type: integer, nullable: true }
@@ -1959,7 +1848,6 @@ components:
         media_item_id: { type: string, nullable: true }
         broadcast_id: { type: string, nullable: true }
         job_id: { type: string, nullable: true }
-        command_id: { type: string, nullable: true }
         created_at: { type: string, format: date-time }
 
     MediaServerConnection:
@@ -2008,69 +1896,3 @@ components:
                   last_error: { type: string, nullable: true }
                   free_bytes: { type: integer, nullable: true }
                   total_bytes: { type: integer, nullable: true }
-
-    PreflightReview:
-      type: object
-      properties:
-        command_id: { type: string }
-        state: { $ref: "#/components/schemas/CommandState" }
-        review_url: { type: string, nullable: true }
-        ui_note: { type: string }
-        preflight:
-          type: object
-          nullable: true
-          description: Null until the preflight job finishes; poll until state is completed.
-          properties:
-            source_uri: { type: string }
-            source_title: { type: string, nullable: true }
-            origin: { type: string }
-            review_url: { type: string }
-            resolved_input:
-              type: object
-              properties:
-                provider_key: { type: string }
-                input_type: { type: string }
-                source_uri: { type: string }
-                provider_input_id: { type: string }
-                title: { type: string, nullable: true }
-                source_title: { type: string, nullable: true }
-                source_avatar_uri: { type: string, nullable: true }
-                estimated_item_count: { type: integer, nullable: true }
-            discovery:
-              type: object
-              properties:
-                strategy_key: { type: string }
-                estimated_item_count: { type: integer }
-                estimated_total_duration_seconds: { type: integer }
-                discovered_items:
-                  type: array
-                  items: { type: object, additionalProperties: true }
-                sample_items:
-                  type: array
-                  items: { type: object, additionalProperties: true }
-            universal_filters:
-              type: array
-              description: Always present, regardless of provider.
-              items:
-                type: object
-                properties:
-                  key: { type: string, enum: [title_regex_include, title_regex_exclude] }
-                  label: { type: string }
-                  type: { type: string, enum: [string] }
-            input_options:
-              type: array
-              description: Provider-declared toggles for this specific resolved input (e.g. YouTube channel-only include_shorts/include_live).
-              items:
-                type: object
-                properties:
-                  key: { type: string, example: include_shorts }
-                  label: { type: string }
-                  type: { type: string, enum: [bool, enum] }
-                  default: {}
-                  choices:
-                    type: array
-                    nullable: true
-                    items: { type: string }
-                  applicable_input_types:
-                    type: array
-                    items: { type: string }
