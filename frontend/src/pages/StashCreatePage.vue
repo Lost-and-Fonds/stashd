@@ -6,10 +6,9 @@ import { inputOptionValues, normalizeInputOptions } from '../adapters/normalizeI
 import { normalizeSourceFields } from '../adapters/normalizeSourceFields'
 import { normalizeStashPreflight } from '../adapters/normalizeCreationPreflight'
 import { createStashWithInput, fetchInputPlugins, preflightInputPlugin, type InputPluginApiResource, type ResolvedSource } from '../api/inputPlugins'
-import { fetchStashPreflightReview, preflightStash } from '../api/stashes'
+import { preflightStash } from '../api/stashes'
 import PluginField from '../components/plugin/PluginField.vue'
 import PreflightSummary from '../components/PreflightSummary.vue'
-import { subscribeLiveUpdates, type LiveEvent } from '../live/mercure'
 import type { PluginFieldValue } from '../types/plugin-ui'
 import type { PreflightState } from '../types/preflight'
 
@@ -38,15 +37,12 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
 }
 let preflightGeneration = 0
-let preflightCommandId: string | undefined
-let unsubscribeLive: (() => void) | undefined
 
 function clear(values: Record<string, PluginFieldValue | undefined>) { for (const key of Object.keys(values)) delete values[key] }
 function invalidate() {
   resolved.value = undefined
   preflight.value = undefined
   preflightError.value = undefined
-  preflightCommandId = undefined
   preflightGeneration++
   error.value = undefined
 }
@@ -71,7 +67,7 @@ function validate(): FormError[] {
 async function resolve() {
   if (!selected.value || !canResolve.value) return
   const generation = ++preflightGeneration
-  resolving.value = true; error.value = undefined; preflight.value = undefined; preflightError.value = undefined; preflightCommandId = undefined
+  resolving.value = true; error.value = undefined; preflight.value = undefined; preflightError.value = undefined
   try {
     const nextResolved = await preflightInputPlugin(selected.value.key, sourcePayload())
     if (generation !== preflightGeneration) return
@@ -89,8 +85,7 @@ async function requestStashPreflight(generation: number) {
   try {
     const accepted = await preflightStash(resolved.value.canonical_reference, resolved.value.display_name)
     if (generation !== preflightGeneration) return
-    preflightCommandId = accepted.command_id
-    await receiveStashPreflight(generation, accepted.command_id)
+    if (accepted.preflight) preflight.value = normalizeStashPreflight({ preflight: accepted.preflight })
   } catch (exception) {
     if (generation === preflightGeneration) {
       preflight.value = undefined
@@ -99,27 +94,6 @@ async function requestStashPreflight(generation: number) {
   }
 }
 
-async function receiveStashPreflight(generation: number, commandId: string) {
-  try {
-    const review = await fetchStashPreflightReview(commandId)
-    if (generation !== preflightGeneration) return
-    if (review.state === 'completed' && review.preflight) preflight.value = normalizeStashPreflight(review)
-    else if (review.state === 'failed') preflightError.value = 'Authoritative planning could not be completed.'
-  } catch (exception) {
-    if (generation === preflightGeneration) preflightError.value = exception instanceof Error ? exception.message : 'Authoritative planning is unavailable.'
-  }
-}
-
-function handleLiveEvent(event: LiveEvent) {
-  if (!preflightCommandId || !event.event.startsWith('job.')) return
-  const commandId = event.payload.commandId ?? event.payload.command_id
-  if (commandId !== preflightCommandId) return
-  if (event.event === 'job.completed') void receiveStashPreflight(preflightGeneration, preflightCommandId)
-  if (event.event === 'job.failed') {
-    preflightError.value = 'Authoritative planning could not be completed.'
-    preflight.value = undefined
-  }
-}
 async function create() {
   if (!selected.value || !resolved.value || !stashName.value.trim()) return
   saving.value = true; error.value = undefined
@@ -127,8 +101,8 @@ async function create() {
   catch (exception) { error.value = exception instanceof Error ? exception.message : 'Could not create this stash.' }
   finally { saving.value = false }
 }
-onMounted(async () => { unsubscribeLive = subscribeLiveUpdates(handleLiveEvent); try { plugins.value = await fetchInputPlugins() } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Could not load input types.' } finally { loading.value = false } })
-onBeforeUnmount(() => { unsubscribeLive?.(); preflightGeneration++ })
+onMounted(async () => { try { plugins.value = await fetchInputPlugins() } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Could not load input types.' } finally { loading.value = false } })
+onBeforeUnmount(() => { preflightGeneration++ })
 </script>
 
 <template>

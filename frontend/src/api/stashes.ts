@@ -3,14 +3,10 @@ import type { StashApiResource, StashDeleteImpact } from '../types/stash'
 import { apiFetch } from './auth'
 
 export interface StashPreflightResponse {
-  command_id: string
-  command_state: string
-  review_url?: string
+  preflight: InputPreflight['preflight']
 }
 
-export interface StashPreflightReview {
-  command_id: string
-  state: string
+export interface InputPreflight {
   preflight?: {
     resolved_input?: {
       provider_key?: string | null
@@ -39,9 +35,9 @@ export async function fetchStashes(): Promise<StashApiResource[]> {
 
 export async function syncStash(stashId: string): Promise<string[]> {
   const response = await apiFetch(`/api/v1/stashes/${encodeURIComponent(stashId)}/sync`, { method: 'POST' })
-  const body = await responseBody<{ command_ids?: string[] }>(response)
+  const body = await responseBody<{ job_ids?: string[] }>(response)
 
-  return body.command_ids ?? []
+  return body.job_ids ?? []
 }
 
 export async function fetchStash(stashId: string): Promise<StashApiResource> {
@@ -55,16 +51,10 @@ export async function preflightStash(sourceUri: string, sourceTitle?: string | n
   const response = await apiFetch('/api/v1/stashes/preflight', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ source_uri: sourceUri, source_title: sourceTitle ?? null, origin: 'create_stash' })
+    body: JSON.stringify({ source_uri: sourceUri, source_title: sourceTitle ?? null })
   })
 
   return responseBody<StashPreflightResponse>(response)
-}
-
-export async function fetchStashPreflightReview(commandId: string): Promise<StashPreflightReview> {
-  const response = await apiFetch(`/api/v1/stashes/preflight/${encodeURIComponent(commandId)}/review`)
-
-  return responseBody<StashPreflightReview>(response)
 }
 
 export interface UpdateStashInput {
@@ -96,13 +86,11 @@ export async function deleteStash(stashId: string): Promise<void> {
 }
 
 export async function retryFailedStash(stashId: string): Promise<string> {
-  const response = await apiFetch('/api/v1/commands', {
+  const response = await apiFetch(`/api/v1/stashes/${encodeURIComponent(stashId)}/retry-failed`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'stash.retry_failed', options: { stash_id: stashId } })
   })
-  const body = await responseBody<{ command_id: string }>(response)
-  return body.command_id
+  const body = await responseBody<{ jobs?: Array<{ id: string }> }>(response)
+  return body.jobs?.[0]?.id ?? ''
 }
 
 export interface StashItemsQuery {

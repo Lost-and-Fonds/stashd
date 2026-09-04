@@ -30,7 +30,7 @@ const destinationSaving = ref(false)
 const destinationError = ref<string>()
 const deleteOpen = ref(false)
 const deleteSubmitting = ref(false)
-const deleteCommandId = ref<string>()
+const deleteJobId = ref<string>()
 const deleteError = ref<string>()
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let unsubscribe: (() => void) | undefined
@@ -72,9 +72,9 @@ function eventEntityId(event: LiveEvent): string | null {
   return event.payload.entityId ?? event.payload.entity_id ?? null
 }
 
-function eventCommandId(event: LiveEvent): string | null {
+function eventJobId(event: LiveEvent): string | null {
   if (!event.event.startsWith('job.')) return null
-  return event.payload.commandId ?? event.payload.command_id ?? null
+  return event.payload.id ?? null
 }
 
 function handleLiveEvent(event: LiveEvent) {
@@ -88,9 +88,9 @@ function handleLiveEvent(event: LiveEvent) {
     return
   }
 
-  const commandId = eventCommandId(event)
+  const jobId = eventJobId(event)
   const matches = eventEntityId(event) === id
-  const deleting = deleteCommandId.value !== undefined && commandId === deleteCommandId.value
+  const deleting = deleteJobId.value !== undefined && jobId === deleteJobId.value
   if (!matches && !deleting) return
 
   if (event.event === 'job.completed' && deleting) {
@@ -101,7 +101,7 @@ function handleLiveEvent(event: LiveEvent) {
   if (event.event === 'job.failed' && deleting) {
     deleteError.value = event.payload.lastError ?? event.payload.last_error ?? 'Broadcast deletion failed.'
     deleteSubmitting.value = false
-    deleteCommandId.value = undefined
+    deleteJobId.value = undefined
     return
   }
 
@@ -140,8 +140,9 @@ async function runAction(action: PluginAction) {
   completedActionLabel.value = undefined
 
   try {
-    broadcast.value = await invokeBroadcastAction(broadcast.value.id, action.intent)
-    completedActionLabel.value = action.label
+    const result = await invokeBroadcastAction(broadcast.value.id, action.intent)
+    broadcast.value = result.broadcast
+    completedActionLabel.value = `${action.label} queued`
     confirmationOpen.value = false
     confirmingAction.value = undefined
   } catch (exception) {
@@ -174,7 +175,7 @@ async function saveDestination() {
 
 function openDelete() {
   deleteError.value = undefined
-  deleteCommandId.value = undefined
+  deleteJobId.value = undefined
   deleteOpen.value = true
 }
 
@@ -184,7 +185,7 @@ async function confirmDelete() {
   deleteError.value = undefined
 
   try {
-    deleteCommandId.value = await deleteBroadcast(broadcast.value.id)
+    deleteJobId.value = await deleteBroadcast(broadcast.value.id)
   } catch (exception) {
     deleteSubmitting.value = false
     deleteError.value = exception instanceof Error ? exception.message : 'Could not delete this Broadcast.'
@@ -298,7 +299,7 @@ async function confirmDelete() {
     <UModal v-model:open="deleteOpen" title="Delete Broadcast" :description="broadcast ? `Remove “${broadcast.name}” and its generated output? The owning Stash and preserved Vault data are retained.` : undefined" :ui="{ content: 'max-w-lg' }">
       <template #body>
         <UAlert v-if="deleteError" class="mb-4" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not delete Broadcast" :description="deleteError" />
-        <p v-if="deleteCommandId" class="text-sm text-muted">Deletion queued. Waiting for completion…</p>
+        <p v-if="deleteJobId" class="text-sm text-muted">Deletion queued. Waiting for completion…</p>
         <div v-else class="flex justify-end gap-2">
           <UButton label="Cancel" variant="ghost" color="neutral" :disabled="deleteSubmitting" @click="deleteOpen = false" />
           <UButton label="Delete Broadcast" color="error" :loading="deleteSubmitting" @click="confirmDelete" />

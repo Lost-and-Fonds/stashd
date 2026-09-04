@@ -1,5 +1,5 @@
 import type { BroadcastPreview } from '../api/broadcasts'
-import type { StashPreflightReview } from '../api/stashes'
+import type { InputPreflight } from '../api/stashes'
 import type { PreflightState } from '../types/preflight'
 
 function bytesLabel(bytes: number): string {
@@ -8,7 +8,7 @@ function bytesLabel(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
 }
 
-export function normalizeStashPreflight(review: StashPreflightReview): PreflightState {
+export function normalizeStashPreflight(review: InputPreflight): PreflightState {
   const discovery = review.preflight?.discovery
   const resolved = review.preflight?.resolved_input
   const count = discovery?.estimated_item_count ?? resolved?.estimated_item_count ?? 0

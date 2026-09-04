@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, ref, resolveComponent, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useClipboard } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
 
 import { fetchStashBroadcasts, rebuildBroadcast } from '../api/broadcasts'
@@ -9,8 +8,7 @@ import { fetchStashInputs, syncStashInput } from '../api/inputs'
 import { deleteStash, fetchStash, fetchStashDeleteImpact, fetchStashItems, retryFailedStash, updateStash, type UpdateStashInput } from '../api/stashes'
 import { subscribeLiveUpdates, type JobLiveEvent, type LiveEvent } from '../live/mercure'
 import type { BroadcastApiResource } from '../types/broadcast-plugin'
-import type { CommandOperation } from '../api/commands'
-import type { StashInputApiResource } from '../types/input'
+import type { LifecycleOperation, StashInputApiResource } from '../types/input'
 import type { StashItemApiResource, StashItemsApiResponse } from '../types/item'
 import type { StashApiResource, StashDeleteImpact } from '../types/stash'
 import OperationProgress from '../components/OperationProgress.vue'
@@ -19,7 +17,6 @@ import { formatExactDate, formatRelativeDate } from '../utils/formatDate'
 
 const route = useRoute()
 const router = useRouter()
-const { copy } = useClipboard()
 
 const stash = ref<StashApiResource>()
 const inputs = ref<StashInputApiResource[]>([])
@@ -45,9 +42,9 @@ const deleteImpactLoading = ref(false)
 const deleteImpact = ref<StashDeleteImpact>()
 const deleteConfirming = ref(false)
 const retrying = ref(false)
-const stashOperation = ref<CommandOperation>()
-const inputOperations = ref<Record<string, CommandOperation | undefined>>({})
-const broadcastOperations = ref<Record<string, CommandOperation | undefined>>({})
+const stashOperation = ref<LifecycleOperation>()
+const inputOperations = ref<Record<string, LifecycleOperation | undefined>>({})
+const broadcastOperations = ref<Record<string, LifecycleOperation | undefined>>({})
 const downloadBatchTotal = ref(0)
 let unsubscribe: (() => void) | undefined
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
@@ -75,6 +72,7 @@ const stateMeta: Record<string, { label: string, dot: string, text: string }> = 
   ready: { label: 'ready', dot: 'bg-success', text: 'text-success' },
   processing: { label: 'processing', dot: 'bg-primary', text: 'text-primary' },
   pending: { label: 'pending', dot: 'bg-neutral-400', text: 'text-dimmed' },
+  retrying: { label: 'retrying', dot: 'bg-warning', text: 'text-warning' },
   stale: { label: 'stale', dot: 'bg-warning', text: 'text-warning' },
   failed: { label: 'failed', dot: 'bg-error', text: 'text-error' },
   disabled: { label: 'disabled', dot: 'bg-neutral-400', text: 'text-dimmed' },
@@ -118,11 +116,11 @@ function broadcastFacts(broadcast: BroadcastApiResource) {
   ]
 }
 
-function isTerminal(operation: CommandOperation | undefined) {
+function isTerminal(operation: LifecycleOperation | undefined) {
   return operation?.state === 'completed' || operation?.state === 'failed' || operation?.state === 'rejected'
 }
 
-function operationText(operation: CommandOperation | undefined, verb: string) {
+function operationText(operation: LifecycleOperation | undefined, verb: string) {
   if (!operation) return undefined
   if (operation.state === 'accepted') return `${verb} queued…`
   if (operation.state === 'running') return operation.label || `${verb}…`
@@ -133,11 +131,11 @@ function operationText(operation: CommandOperation | undefined, verb: string) {
 const failedItemCount = computed(() => items.value.status_counts?.failed ?? 0)
 const pendingDownloadCount = computed(() => (items.value.status_counts?.download_pending ?? 0) + (items.value.status_counts?.downloading ?? 0))
 const activeJobs = computed(() => jobs.value.filter(job => {
-  if (job.entity_type !== 'media_item' || !['processing', 'pending'].includes(job.state)) return false
+  if (job.entity_type !== 'media_item' || !['processing', 'pending', 'retrying'].includes(job.state)) return false
   return job.payload?.stash_id === stash.value?.id || items.value.items.some(item => item.media_item_id === job.entity_id)
 }))
 const activeDownloadJobs = computed(() => jobs.value.filter(job => {
-  if (job.intent !== 'download' || !['processing', 'pending'].includes(job.state)) return false
+  if (job.type !== 'core.download' || !['processing', 'pending', 'retrying'].includes(job.state)) return false
   return job.payload?.stash_id === stash.value?.id || items.value.items.some(item => item.media_item_id === job.entity_id)
 }))
 const queuedDownloadCount = computed(() => Math.max(items.value.downloadable_count ?? 0, pendingDownloadCount.value, activeDownloadJobs.value.length))
@@ -146,7 +144,7 @@ watch([queuedDownloadCount, () => activeJobs.value.length], ([pending, active]) 
   else if (active === 0) downloadBatchTotal.value = 0
 }, { immediate: true })
 const discoveryJob = computed(() => jobs.value.find(job => {
-  if (!['processing', 'pending'].includes(job.state) || !['add_input', 'initial_backfill', 'sync_input'].includes(job.intent)) return false
+  if (!['processing', 'pending', 'retrying'].includes(job.state) || !['core.add_input', 'core.initial_backfill', 'core.sync_input'].includes(job.type)) return false
   return job.payload?.stash_id === stash.value?.id || (job.entity_type === 'stash' && job.entity_id === stash.value?.id)
 }))
 const downloadOperation = computed(() => {
@@ -238,8 +236,8 @@ async function retryFailed() {
   actionNotice.value = undefined
 
   try {
-    const commandId = await retryFailedStash(stash.value.id)
-    stashOperation.value = { id: commandId, state: 'accepted' }
+    const jobId = await retryFailedStash(stash.value.id)
+    stashOperation.value = { id: jobId, state: 'accepted' }
     actionNotice.value = 'Retry queued.'
     await loadItems()
   } catch (exception) {
@@ -249,7 +247,7 @@ async function retryFailed() {
   }
 }
 
-function operationFromEvent(event: LiveEvent): CommandOperation | undefined {
+function operationFromEvent(event: LiveEvent): LifecycleOperation | undefined {
   if (!event.event.startsWith('job.')) return undefined
   const payload = event.payload as JobLiveEvent
 
@@ -260,7 +258,7 @@ function operationFromEvent(event: LiveEvent): CommandOperation | undefined {
       : event.event === 'job.completed' ? 'completed' : 'failed'
 
   return {
-    id: payload.commandId ?? payload.command_id ?? payload.id,
+    id: payload.id,
     state,
     label: payload.progressLabel ?? payload.progress_label ?? undefined,
     percent: payload.progressPercent ?? payload.progress_percent ?? null
@@ -291,7 +289,7 @@ function handleLiveEvent(event: LiveEvent) {
   const operation = operationFromEvent(event)
   if (!operation) return
 
-  const commandId = event.payload.commandId ?? event.payload.command_id
+  const jobId = event.payload.id
   const entityType = event.payload.entityType ?? event.payload.entity_type
   const entityId = event.payload.entityId ?? event.payload.entity_id
   const eventStashId = event.payload.stashId ?? event.payload.stash_id
@@ -303,8 +301,7 @@ function handleLiveEvent(event: LiveEvent) {
   if (event.event.startsWith('job.')) {
     const nextJob: JobApiResource = {
       id: event.payload.id,
-      command_id: commandId,
-      intent: event.payload.intent ?? '',
+      type: event.payload.type ?? '',
       entity_type: entityType,
       entity_id: entityId,
       state: event.event === 'job.created' ? 'pending' : event.event === 'job.progress' ? 'processing' : event.event === 'job.completed' ? 'ready' : 'failed',
@@ -330,8 +327,8 @@ function handleLiveEvent(event: LiveEvent) {
   }
   const input = inputs.value.find(candidate => candidate.id === entityId)
   const broadcast = broadcasts.value.find(candidate => candidate.id === entityId)
-  const inputId = input?.id ?? Object.entries(inputOperations.value).find(([, candidate]) => candidate?.id === commandId)?.[0]
-  const broadcastId = broadcast?.id ?? Object.entries(broadcastOperations.value).find(([, candidate]) => candidate?.id === commandId)?.[0]
+  const inputId = input?.id ?? Object.entries(inputOperations.value).find(([, candidate]) => candidate?.id === jobId)?.[0]
+  const broadcastId = broadcast?.id ?? Object.entries(broadcastOperations.value).find(([, candidate]) => candidate?.id === jobId)?.[0]
 
   if (inputId) inputOperations.value = { ...inputOperations.value, [inputId]: operation }
   if (broadcastId) broadcastOperations.value = { ...broadcastOperations.value, [broadcastId]: operation }
@@ -361,9 +358,9 @@ async function rebuild(broadcast: BroadcastApiResource) {
   }
 }
 
-function copyPublishedUrl(broadcast: BroadcastApiResource) {
+async function copyPublishedUrl(broadcast: BroadcastApiResource) {
   if (!broadcast.published_url) return
-  copy(broadcast.published_url)
+  await navigator.clipboard.writeText(broadcast.published_url)
   copiedId.value = broadcast.id
   setTimeout(() => {
     if (copiedId.value === broadcast.id) copiedId.value = undefined
@@ -407,7 +404,7 @@ function itemThumbnail(item: StashItemApiResource) {
 }
 
 function activeJobFor(item: StashItemApiResource) {
-  return jobs.value.find(job => job.entity_type === 'media_item' && job.entity_id === item.media_item_id && (job.state === 'processing' || job.state === 'pending'))
+  return jobs.value.find(job => job.entity_type === 'media_item' && job.entity_id === item.media_item_id && ['processing', 'pending', 'retrying'].includes(job.state))
 }
 
 function sortItems(key: string) {

@@ -44,6 +44,8 @@ export interface StashInputApiResource extends InputOptionsApiResource {
 export interface LifecycleOperation {
   id: string
   state: 'accepted' | 'running' | 'completed' | 'failed' | 'rejected'
+  label?: string
+  percent?: number | null
 }
 
 /**

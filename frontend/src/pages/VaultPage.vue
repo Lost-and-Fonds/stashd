@@ -139,7 +139,7 @@ function handleLiveEvent(event: LiveEvent) {
     return
   }
 
-  if ((event.event === 'job.completed' || event.event === 'job.failed') && (event.payload.intent?.startsWith('download') || event.payload.entityType === 'media_item')) scheduleLiveRefresh()
+  if ((event.event === 'job.completed' || event.event === 'job.failed') && (event.payload.type?.startsWith('core.download') || event.payload.entityType === 'media_item')) scheduleLiveRefresh()
 }
 
 function syncQuery() {

@@ -58,9 +58,9 @@ export async function fetchBroadcast(broadcastId: string): Promise<BroadcastApiR
 
 export async function deleteBroadcast(broadcastId: string): Promise<string> {
   const response = await fetch(`/api/v1/broadcasts/${encodeURIComponent(broadcastId)}`, { method: 'DELETE' })
-  const body = await responseBody<{ command_id: string }>(response)
+  const body = await responseBody<{ job_id: string }>(response)
 
-  return body.command_id
+  return body.job_id
 }
 
 export async function updateBroadcastDestination(broadcastId: string, destinationPath: string): Promise<BroadcastApiResource> {
@@ -85,15 +85,15 @@ export async function updateBroadcastSourceSettings(broadcastId: string, sourceR
   return body.broadcast
 }
 
-export async function invokeBroadcastAction(broadcastId: string, intent: string): Promise<BroadcastApiResource> {
+export async function invokeBroadcastAction(broadcastId: string, intent: string): Promise<{ broadcast: BroadcastApiResource, operation: LifecycleOperation }> {
   const response = await fetch(`/api/v1/broadcasts/${encodeURIComponent(broadcastId)}/actions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ intent })
   })
-  const body = await responseBody<{ completed: true, broadcast: BroadcastApiResource }>(response)
+  const body = await responseBody<{ broadcast: BroadcastApiResource, operation: LifecycleOperation }>(response)
 
-  return body.broadcast
+  return body
 }
 
 export async function rebuildBroadcast(broadcastId: string): Promise<LifecycleOperation> {

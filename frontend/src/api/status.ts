@@ -24,10 +24,10 @@ export interface HealthApiResponse {
 
 export interface JobApiResource {
   id: string
-  command_id?: string | null
-  intent: string
+  type: string
   entity_type?: string | null
   entity_id?: string | null
+  stash_id?: string | null
   state: string
   progress_current?: number | null
   progress_total?: number | null
@@ -52,7 +52,6 @@ export interface ActivityApiResource {
   media_item_id?: string | null
   broadcast_id?: string | null
   job_id?: string | null
-  command_id?: string | null
   created_at: string
 }
 

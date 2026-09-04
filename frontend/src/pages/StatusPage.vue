@@ -29,7 +29,7 @@ const activityError = ref<string>()
 let unsubscribe: (() => void) | undefined
 let jobsRefreshTimer: ReturnType<typeof setTimeout> | undefined
 
-const activeJobs = computed(() => jobs.value.filter(job => job.state === 'pending' || job.state === 'processing'))
+const activeJobs = computed(() => jobs.value.filter(job => ['pending', 'processing', 'retrying'].includes(job.state)))
 const attention = computed(() => {
   const recentCutoff = Date.now() - 24 * 60 * 60 * 1000
   const failedJobs = jobs.value
@@ -37,7 +37,7 @@ const attention = computed(() => {
     .sort((left, right) => Date.parse(right.finished_at ?? right.updated_at ?? right.created_at ?? '') - Date.parse(left.finished_at ?? left.updated_at ?? left.created_at ?? ''))
   const visibleFailedJobs = [] as JobApiResource[]
   const failureKeys = new Set<string>()
-  const downloadFailures = failedJobs.filter(job => job.intent === 'download')
+  const downloadFailures = failedJobs.filter(job => job.type === 'core.download')
   const failuresByStash = new Map<string, JobApiResource[]>()
   for (const job of downloadFailures) {
     const stashId = job.entity_id ? itemsById.value[job.entity_id]?.stash_id : undefined
@@ -45,8 +45,7 @@ const attention = computed(() => {
   }
 
   for (const job of failedJobs) {
-    if (job.intent === 'item_download') continue
-    const key = `${job.intent}:${job.entity_type ?? ''}:${job.entity_id ?? ''}`
+    const key = `${job.type}:${job.entity_type ?? ''}:${job.entity_id ?? ''}`
     if (failureKeys.has(key)) continue
     failureKeys.add(key)
     visibleFailedJobs.push(job)
@@ -60,7 +59,7 @@ const attention = computed(() => {
     ...(health.value && !health.value.storage.ready ? [{ id: 'storage', label: 'Storage is not ready', context: health.value.storage.message ?? 'System health', stashId: undefined }] : []),
     ...[...failuresByStash.entries()].map(([stashId, failures]) => ({ id: `download-failures-${stashId}`, label: `${failures.length} downloads failed`, context: `${stashLabel(stashId)} · ${formatRelativeDate(failures[0].finished_at ?? failures[0].updated_at)}`, stashId, detail: failures[0].last_error ?? undefined })),
     ...(downloadFailures.length && failuresByStash.size === 0 ? [{ id: 'download-failures', label: `${downloadFailures.length} downloads failed`, context: formatRelativeDate(downloadFailures[0].finished_at ?? downloadFailures[0].updated_at), stashId: undefined, detail: downloadFailures[0].last_error ?? undefined }] : []),
-    ...visibleFailedJobs.map(job => ({ id: `job-${job.id}`, label: `${intentLabel(job.intent)} failed`, context: `${entityLabel(job)} · ${formatRelativeDate(job.finished_at ?? job.updated_at)}`, stashId: undefined })),
+    ...visibleFailedJobs.map(job => ({ id: `job-${job.id}`, label: `${jobTypeLabel(job.type)} failed`, context: `${entityLabel(job)} · ${formatRelativeDate(job.finished_at ?? job.updated_at)}`, stashId: undefined })),
     ...activity.value
       .filter(event => event.level === 'error' && Date.parse(event.created_at) >= recentCutoff && (!event.job_id || !failedJobIds.has(event.job_id)))
       .slice(0, 8)
@@ -68,8 +67,8 @@ const attention = computed(() => {
   ]
 })
 
-function intentLabel(intent: string) {
-  return intent.replaceAll('_', ' ')
+function jobTypeLabel(type: string) {
+  return type.replace(/^core\./, '').replaceAll('_', ' ')
 }
 
 function entityLabel(job: JobApiResource) {
@@ -260,11 +259,11 @@ onBeforeUnmount(() => {
       <div v-else-if="activeJobs.length" class="space-y-3">
         <div v-for="job in activeJobs" :key="job.id" class="rounded-md bg-muted p-3">
           <OperationProgress
-            :label="`${intentLabel(job.intent)} · ${entityLabel(job)}`"
+            :label="`${jobTypeLabel(job.type)} · ${entityLabel(job)}`"
             :percent="jobPercent(job)"
             :stage="job.progress_label ?? undefined"
             :count="jobCount(job)"
-            :status="job.state === 'pending' ? 'queued' : 'active'"
+            :status="job.state === 'pending' || job.state === 'retrying' ? 'queued' : 'active'"
           />
         </div>
       </div>

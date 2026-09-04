@@ -10,7 +10,6 @@ export type LiveEventName = typeof liveEventNames[number]
 
 export interface JobLiveEvent {
   id: string
-  commandId?: string | null
   entityType?: string | null
   entityId?: string | null
   stashId?: string | null
@@ -20,9 +19,7 @@ export interface JobLiveEvent {
   progressPercent?: number | null
   progressLabel?: string | null
   lastError?: string | null
-  // Compatibility aliases for the initial live-wiring slice.
-  command_id?: string | null
-  intent?: string
+  type?: string
   entity_type?: string | null
   entity_id?: string | null
   state?: string
@@ -45,15 +42,12 @@ export interface ActivityLiveEvent {
   mediaItemId?: string | null
   broadcastId?: string | null
   jobId?: string | null
-  commandId?: string | null
-  // Compatibility aliases for the initial live-wiring slice.
   entity_type?: string | null
   entity_id?: string | null
   stash_id?: string | null
   media_item_id?: string | null
   broadcast_id?: string | null
   job_id?: string | null
-  command_id?: string | null
   [key: string]: unknown
 }
 
