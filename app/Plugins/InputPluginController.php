@@ -7,6 +7,7 @@ namespace App\Plugins;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
+use App\Providers\InputOption;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
@@ -23,12 +24,18 @@ final readonly class InputPluginController
     #[Get('/api/v1/input-plugins')]
     public function index(): Json
     {
-        return new Json(['plugins' => array_map(static fn(PluginInputDefinition $plugin): array => [
-            'key' => $plugin->id,
-            'label' => $plugin->name,
-            'source_fields' => array_map(static fn(PluginSourceField $field): array => $field->toArray(), $plugin->sourceFields),
-            'input_options' => array_map(static fn($option): array => $option->toArray(), $plugin->options),
-        ], $this->plugins->definitions())]);
+        $plugins = [];
+
+        foreach ($this->plugins->definitions() as $plugin) {
+            $plugins[] = [
+                'key' => $plugin->id,
+                'label' => $plugin->name,
+                'source_fields' => array_map(static fn(PluginSourceField $field): array => $field->toArray(), $plugin->sourceFields),
+                'input_options' => array_map(static fn(InputOption $option): array => $option->toArray(), $plugin->options),
+            ];
+        }
+
+        return new Json(['plugins' => $plugins]);
     }
 
     #[Post('/api/v1/input-plugins/{id}/preflight')]

@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
-use App\Commands\CommandDispatchService;
-use App\Commands\CommandType;
 use App\Downloads\DownloadPolicyEvaluator;
+use App\Jobs\JobDispatcher;
 use App\Providers\InputOption;
 use App\Providers\ProviderRegistry;
 use App\Providers\ResolvedInput;
@@ -23,7 +22,7 @@ final readonly class UpdateStashInputOptions
         private ProviderRegistry $providers,
         private StashInputFilter $filter,
         private StateTransitionService $transitions,
-        private CommandDispatchService $commands,
+        private JobDispatcher $jobDispatcher,
         private DownloadPolicyEvaluator $downloadPolicy,
     ) {}
 
@@ -71,10 +70,10 @@ final readonly class UpdateStashInputOptions
 
         if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
             foreach ($downloadableMediaItemIds as $mediaItemId) {
-                $this->commands->dispatch(CommandType::ItemDownload, [
-                    'mediaItemId' => $mediaItemId,
-                    'stashId' => (string) $stash->id,
-                ]);
+                $this->jobDispatcher->dispatch('core.download', 'media_item', $mediaItemId, (string) $stash->id, [
+                    'media_item_id' => $mediaItemId,
+                    'stash_id' => (string) $stash->id,
+                ], 'background');
             }
         }
 

@@ -27,7 +27,6 @@ final class ActivityEventRecord
         public ?string $mediaItemId = null,
         public ?string $broadcastId = null,
         public ?string $jobId = null,
-        public ?string $commandId = null,
         public ?string $groupKey = null,
         public ?array $metadata = null,
         public ?DateTime $createdAt = null,

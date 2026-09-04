@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Console;
 
-use App\Jobs\JobLane;
-use App\System\FrankenPhp\FrankenPhpProcessLauncher;
+use App\Jobs\MessengerWorkerRunner;
+use App\Jobs\MessengerTransportRegistry;
+use App\Jobs\WorkerPoolManager;
 use Tempest\Console\ConsoleArgument;
 use Tempest\Console\ConsoleCommand;
 use Tempest\Console\ExitCode;
@@ -17,8 +18,10 @@ final readonly class StashdRuntimeCommand
     use HasConsole;
 
     public function __construct(
+        private MessengerWorkerRunner $workers,
+        private WorkerPoolManager $pools,
+        private MessengerTransportRegistry $transports,
         private ProcessExecutor $processes,
-        private FrankenPhpProcessLauncher $frankenPhp,
     ) {}
 
     #[ConsoleCommand(
@@ -28,13 +31,13 @@ final readonly class StashdRuntimeCommand
     public function __invoke(
         #[ConsoleArgument(description: 'Role to run', aliases: ['role'])]
         string $role = 'all',
-        #[ConsoleArgument(description: 'Worker lane (interactive, discovery, bulk); omit to process all lanes')]
-        ?string $lane = null,
+        #[ConsoleArgument(description: 'Worker workload (interactive or background)')]
+        ?string $workload = null,
     ): ExitCode {
         return match ($role) {
             'all' => $this->runAll(),
-            'serve' => $this->frankenPhp->serve(),
-            'worker' => $this->runWorker($lane),
+            'serve' => $this->serve(),
+            'worker' => $this->runWorker($workload),
             'scheduler' => $this->runScheduler(),
             default => $this->unknownRole($role),
         };
@@ -45,29 +48,30 @@ final readonly class StashdRuntimeCommand
         $this->console->info('Starting Stashd all-in-one runtime (supervisord expected in Docker).');
         $this->console->info('Local dev: run `stashd serve`, `stashd worker`, and `stashd scheduler` in separate terminals.');
 
-        return $this->frankenPhp->serve();
+        return $this->serve();
     }
 
-    private function runWorker(?string $lane): ExitCode
+    private function runWorker(?string $workload): ExitCode
     {
-        if ($lane !== null && JobLane::tryFrom($lane) === null) {
-            $this->console->error("Unknown worker lane: {$lane}");
-            $this->console->info('Valid lanes: interactive, discovery, bulk');
+        if ($workload !== null && ! in_array($workload, ['interactive', 'background'], true)) {
+            $this->console->error("Unknown worker workload: {$workload}");
+            $this->console->info('Valid workloads: interactive, background');
 
             return ExitCode::ERROR;
         }
 
-        $this->console->info('Job worker started' . ($lane !== null ? " (lane: {$lane})" : '') . '. Polling for pending jobs…');
+        $this->console->info('Messenger worker started' . ($workload !== null ? " ({$workload})" : '') . '.');
+        $this->pools->run($workload ?? 'background', $this->workers, $this->transports);
 
-        $tick = 'php tempest stashd:worker-tick' . ($lane !== null ? " {$lane}" : '');
+        return ExitCode::SUCCESS;
+    }
 
-        for (;;) {
-            $result = $this->processes->run($tick);
+    private function serve(): ExitCode
+    {
+        $root = dirname(__DIR__, 2);
+        $this->processes->run("frankenphp run --config {$root}/docker/Caddyfile");
 
-            // Idle queues poll gently: with one loop per lane, a 2s cadence
-            // per loop adds up to constant PHP boots on a small NAS.
-            sleep($result->exitCode === 0 ? 2 : 5);
-        }
+        return ExitCode::SUCCESS;
     }
 
     private function runScheduler(): ExitCode

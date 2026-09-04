@@ -27,8 +27,6 @@ final readonly class BootCommand
 
         $this->console->success('Stashd boot completed.');
         $this->console->keyValue('Directories created', (string) count($result['directories_created']));
-        $this->console->keyValue('Boot command', $result['command_id']);
-        $this->console->keyValue('Boot job', $result['job_id']);
 
         return ExitCode::SUCCESS;
     }

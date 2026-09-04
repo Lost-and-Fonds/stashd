@@ -29,7 +29,6 @@ final class ActivityEventRepository
         ?string $mediaItemId = null,
         ?string $broadcastId = null,
         ?string $jobId = null,
-        ?string $commandId = null,
         ?string $groupKey = null,
         ?array $metadata = null,
     ): ActivityEventRecord {
@@ -44,7 +43,6 @@ final class ActivityEventRepository
             mediaItemId: $mediaItemId,
             broadcastId: $broadcastId,
             jobId: $jobId,
-            commandId: $commandId,
             groupKey: $groupKey,
             metadata: $metadata,
         );

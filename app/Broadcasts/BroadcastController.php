@@ -6,15 +6,13 @@ namespace App\Broadcasts;
 
 use App\Broadcasts\Api\BroadcastItemResource;
 use App\Broadcasts\Api\BroadcastResource;
-use App\Commands\CommandDispatchService;
-use App\Commands\CommandRecord;
-use App\Commands\CommandRepository;
-use App\Commands\CommandType;
-use App\Commands\InvalidCommandPayload;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
-use App\Jobs\JobIntent;
+use App\Jobs\JobType;
+use App\Jobs\JobRecord;
+use App\Jobs\JobDispatcher;
+use App\Jobs\JobDefinitionRegistry;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
 use App\Plugins\ExternalBroadcastPlugin;
@@ -51,9 +49,9 @@ final readonly class BroadcastController
         private BroadcastContextFactory $contexts,
         private MediaItemRepository $mediaItems,
         private BroadcastPathBuilder $paths,
-        private CommandDispatchService $commands,
-        private CommandRepository $commandRecords,
         private JobRepository $jobs,
+        private JobDispatcher $jobDispatcher,
+        private JobDefinitionRegistry $jobDefinitions,
         private ActivityEventService $activity,
     ) {}
 
@@ -216,13 +214,18 @@ final readonly class BroadcastController
         );
         $this->activity->broadcastCreated($broadcast);
 
-        $build = $this->commands->dispatch(CommandType::BroadcastRebuild, [
-            'broadcast_id' => (string) $broadcast->id,
-        ]);
+        $build = $this->jobDispatcher->dispatch(
+            'core.broadcast',
+            entityType: 'broadcast',
+            entityId: (string) $broadcast->id,
+            stashId: (string) $stash->id,
+            payload: ['broadcast_id' => (string) $broadcast->id, 'action' => 'rebuild'],
+            workload: 'background',
+        );
 
         return new Json([
             'broadcast' => $this->mapBroadcast($broadcast),
-            'build_command_id' => (string) $build->command->id,
+            'build_job_id' => (string) $build->id,
             'policy_mismatch' => $this->policyMismatch($stash->downloadPolicy, $broadcast),
         ], Status::CREATED);
     }
@@ -264,29 +267,30 @@ final readonly class BroadcastController
             return $this->notFound('Broadcast not found.');
         }
 
-        $active = $this->jobs->pendingOrProcessing(JobIntent::Broadcast, PrefixedUlid::parse((string) $broadcast->id));
+        $active = $this->jobs->pendingOrProcessing(JobType::core('core.broadcast'), PrefixedUlid::parse((string) $broadcast->id));
 
-        if ($active?->commandId !== null) {
+        if ($active !== null) {
             return new Json([
                 'operation' => [
-                    'id' => (string) $active->commandId,
+                    'id' => (string) $active->id,
                     'state' => $active->state === JobState::Processing ? 'running' : 'accepted',
                 ],
             ], Status::ACCEPTED);
         }
 
-        try {
-            $result = $this->commands->dispatch(CommandType::BroadcastRebuild, [
-                'broadcast_id' => (string) $broadcast->id,
-            ]);
-        } catch (InvalidCommandPayload $exception) {
-            return $this->validationError($exception->getMessage());
-        }
+        $result = $this->jobDispatcher->dispatch(
+            'core.broadcast',
+            entityType: 'broadcast',
+            entityId: (string) $broadcast->id,
+            stashId: (string) $broadcast->stashId,
+            payload: ['broadcast_id' => (string) $broadcast->id, 'action' => 'rebuild'],
+            workload: 'background',
+        );
 
         return new Json(ApiJson::encode([
             'operation' => [
-                'id' => (string) $result->command->id,
-                'state' => $result->command->state->value,
+                'id' => (string) $result->id,
+                'state' => 'accepted',
             ],
         ]), Status::ACCEPTED);
     }
@@ -298,12 +302,16 @@ final readonly class BroadcastController
             return $this->notFound('Broadcast not found.');
         }
 
-        $command = $this->commands->dispatch(CommandType::BroadcastDelete, [
-            'broadcast_id' => $id,
-        ]);
+        $job = $this->jobDispatcher->dispatch(
+            'core.broadcast',
+            entityType: 'broadcast',
+            entityId: $id,
+            payload: ['broadcast_id' => $id, 'action' => 'delete'],
+            workload: 'background',
+        );
 
         return new Json([
-            'command_id' => (string) $command->command->id,
+            'job_id' => (string) $job->id,
         ], Status::ACCEPTED);
     }
 
@@ -418,21 +426,27 @@ final readonly class BroadcastController
             return $this->validationError('intent is required.');
         }
 
+        $type = $broadcast->type . '.broadcast.' . $intent;
+
         try {
-            $this->lifecycle->invokePluginAction(BroadcastId::fromPrimaryKey($broadcast->id), $intent);
-        } catch (BroadcastException $exception) {
-            return new Json([
-                'error' => [
-                    'code' => $exception->errorCode,
-                    'message' => $exception->getMessage(),
-                ],
-            ], Status::BAD_REQUEST);
+            $definition = $this->jobDefinitions->get($type);
+        } catch (\InvalidArgumentException) {
+            return new Json(['error' => ['code' => 'unsupported_broadcast_action', 'message' => 'This broadcast action is not queueable.']], Status::BAD_REQUEST);
         }
 
+        $job = $this->jobDispatcher->dispatch(
+            $type,
+            entityType: 'broadcast',
+            entityId: (string) $broadcast->id,
+            stashId: (string) $broadcast->stashId,
+            payload: ['broadcast_id' => (string) $broadcast->id, 'operation' => $intent],
+            workload: $definition->workload,
+        );
+
         return new Json([
-            'completed' => true,
             'broadcast' => $this->mapBroadcast($broadcast),
-        ]);
+            'operation' => ['id' => (string) $job->id, 'state' => 'accepted'],
+        ], Status::ACCEPTED);
     }
 
     /** @return array<string, mixed> */
@@ -534,28 +548,20 @@ final readonly class BroadcastController
             'plugin_actions' => $actions,
             'plugin_source_options' => $plugin instanceof BroadcastPluginSourceOptions
                 ? array_map(
-                    static fn(UiControl $control): array => [
-                        'name' => $control->name,
-                        'label' => $control->label,
-                        'type' => $control->type,
-                        'default' => $control->default,
-                        'options' => $control->options,
-                        'description' => $control->description,
-                        'required' => $control->required,
-                    ],
+                    $this->mapControl(...),
                     $plugin->sourceUiControls(),
                 )
                 : [],
-            'rebuild_operation' => $this->operation($this->commandRecords->latestForTarget(CommandType::BroadcastRebuild, 'broadcast', (string) $broadcast->id)),
+            'rebuild_operation' => $this->operation($this->jobs->latestForEntity(JobType::core('core.broadcast'), 'broadcast', (string) $broadcast->id)),
         ];
     }
 
     /** @return array{id: string, state: string}|null */
-    private function operation(?CommandRecord $command): ?array
+    private function operation(?JobRecord $job): ?array
     {
-        return $command === null ? null : [
-            'id' => (string) $command->id,
-            'state' => $command->state->value,
+        return $job === null ? null : [
+            'id' => (string) $job->id,
+            'state' => $job->state->value,
         ];
     }
 
@@ -591,33 +597,31 @@ final readonly class BroadcastController
                 $discovered->plugin->supportedFileKinds(),
             ),
             'uiControls' => array_map(
-                static fn(UiControl $control): array => [
-                    'name' => $control->name,
-                    'label' => $control->label,
-                    'type' => $control->type,
-                    'default' => $control->default,
-                    'options' => $control->options,
-                    'description' => $control->description,
-                    'required' => $control->required,
-                ],
+                $this->mapControl(...),
                 $discovered->plugin->uiControls(),
             ),
             'sourceOptions' => $discovered->plugin instanceof BroadcastPluginSourceOptions
                 ? array_map(
-                    static fn(UiControl $control): array => [
-                        'name' => $control->name,
-                        'label' => $control->label,
-                        'type' => $control->type,
-                        'default' => $control->default,
-                        'options' => $control->options,
-                        'description' => $control->description,
-                        'required' => $control->required,
-                    ],
+                    $this->mapControl(...),
                     $discovered->plugin->sourceUiControls(),
                 )
                 : [],
             'connectionSettingKey' => $discovered->plugin instanceof ExternalBroadcastPlugin ? $discovered->plugin->connectionSettingKey() : null,
             'librarySettingKey' => $discovered->plugin instanceof ExternalBroadcastPlugin ? $discovered->plugin->librarySettingKey() : null,
         ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function mapControl(UiControl $control): array
+    {
+        return [
+            'name' => $control->name,
+            'label' => $control->label,
+            'type' => $control->type,
+            'default' => $control->default,
+            'options' => $control->options,
+            'description' => $control->description,
+            'required' => $control->required,
+        ];
     }
 }

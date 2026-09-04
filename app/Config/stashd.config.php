@@ -30,4 +30,14 @@ return new StashdConfig(
     pgid: (int) $envString('PGID', '1000'),
     umask: $envString('UMASK', '0022'),
     httpPort: $envString('STASHD_HTTP_PORT', '8474'),
+    workers: [
+        'interactive' => [
+            'min_workers' => max(1, (int) $envString('STASHD_INTERACTIVE_MIN_WORKERS', '1')),
+            'max_workers' => max(1, (int) $envString('STASHD_INTERACTIVE_MAX_WORKERS', '2')),
+        ],
+        'background' => [
+            'min_workers' => max(1, (int) $envString('STASHD_BACKGROUND_MIN_WORKERS', '1')),
+            'max_workers' => max(1, (int) $envString('STASHD_BACKGROUND_MAX_WORKERS', '4')),
+        ],
+    ],
 );

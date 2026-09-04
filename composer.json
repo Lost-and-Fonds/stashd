@@ -12,8 +12,10 @@
         "opis/json-schema": "^2.6",
         "guzzlehttp/guzzle": "^7.9",
         "guzzlehttp/psr7": "^2.7",
-        "symfony/process": "^7.3",
         "symfony/uid": "^7.3",
+        "symfony/messenger": "^8.1",
+        "symfony/doctrine-messenger": "^8.1",
+        "doctrine/dbal": "^4.3",
         "symfony/mercure": "^0.7.2",
         "lcobucci/jwt": "^5.6"
     },

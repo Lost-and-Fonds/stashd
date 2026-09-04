@@ -15,6 +15,8 @@ final readonly class StashdConfig
         public int $pgid,
         public string $umask,
         public string $httpPort,
+        /** @var array<string, array{min_workers: int, max_workers: int}> */
+        public array $workers = [],
     ) {}
 
     public function vaultPath(): string

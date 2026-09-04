@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace App\System\Activity;
 
-use App\Http\Api\ApiJson;
-use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastRecord;
-use App\Commands\CommandRecord;
 use App\Downloads\DownloadExecutionResult;
 use App\Jobs\JobRecord;
 use App\Stashes\StashInputCommitResult;
@@ -19,559 +16,70 @@ use App\System\Secret\SecretsService;
 
 final readonly class ActivityEventService
 {
-    public function __construct(
-        private ActivityEventRepository $events,
-        private SecretsService $secrets,
-        private EventPublisher $publisher,
-    ) {}
-
-    public function commandAccepted(CommandRecord $command, bool $publish = true): ActivityEventRecord
-    {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'command.accepted',
-            message: sprintf('Command %s accepted.', $command->type->value),
-            entityType: 'command',
-            entityId: (string) $command->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            publish: $publish,
-        );
-    }
+    public function __construct(private ActivityEventRepository $events, private SecretsService $secrets, private EventPublisher $publisher) {}
 
     public function stashCreated(StashRecord $stash): ActivityEventRecord
     {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'stash.created',
-            message: sprintf('Stash "%s" created.', $stash->name),
-            entityType: 'stash',
-            entityId: (string) $stash->id,
-            stashId: (string) $stash->id,
-        );
+        return $this->emit(ActivityLevel::Info, 'stash.created', sprintf('Stash "%s" created.', $stash->name), 'stash', (string) $stash->id, stashId: (string) $stash->id);
     }
-
     public function stashUpdated(StashRecord $stash): ActivityEventRecord
     {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'stash.updated',
-            message: sprintf('Stash "%s" updated.', $stash->name),
-            entityType: 'stash',
-            entityId: (string) $stash->id,
-            stashId: (string) $stash->id,
-        );
+        return $this->emit(ActivityLevel::Info, 'stash.updated', sprintf('Stash "%s" updated.', $stash->name), 'stash', (string) $stash->id, stashId: (string) $stash->id);
     }
-
-    public function inputUpdated(StashInputRecord $input): ActivityEventRecord
-    {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'stash.input_updated',
-            message: sprintf('Input "%s" updated.', $input->title ?? $input->sourceUri),
-            entityType: 'stash_input',
-            entityId: (string) $input->id,
-            stashId: (string) $input->stashId,
-        );
-    }
-
-    public function broadcastUpdated(BroadcastRecord $broadcast): ActivityEventRecord
-    {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'broadcast.updated',
-            message: sprintf('Broadcast "%s" updated.', $broadcast->name),
-            entityType: 'broadcast',
-            entityId: (string) $broadcast->id,
-            stashId: (string) $broadcast->stashId,
-            broadcastId: (string) $broadcast->id,
-        );
-    }
-
-    public function broadcastCreated(BroadcastRecord $broadcast): ActivityEventRecord
-    {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'broadcast.created',
-            message: sprintf('Broadcast "%s" created.', $broadcast->name),
-            entityType: 'broadcast',
-            entityId: (string) $broadcast->id,
-            stashId: (string) $broadcast->stashId,
-            broadcastId: (string) $broadcast->id,
-        );
-    }
-
-    public function broadcastDeleted(BroadcastRecord $broadcast): ActivityEventRecord
-    {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'broadcast.deleted',
-            message: sprintf('Broadcast "%s" deleted.', $broadcast->name),
-            entityType: 'broadcast',
-            entityId: (string) $broadcast->id,
-            stashId: (string) $broadcast->stashId,
-            broadcastId: (string) $broadcast->id,
-        );
-    }
-
     public function stashDeleted(string $stashId): ActivityEventRecord
     {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'stash.deleted',
-            message: 'Stash deleted.',
-            entityType: 'stash',
-            entityId: $stashId,
-            stashId: $stashId,
-        );
+        return $this->emit(ActivityLevel::Info, 'stash.deleted', 'Stash deleted.', 'stash', $stashId, stashId: $stashId);
+    }
+    public function inputUpdated(StashInputRecord $input): ActivityEventRecord
+    {
+        return $this->emit(ActivityLevel::Info, 'stash.input_updated', sprintf('Input "%s" updated.', $input->title ?? $input->sourceUri), 'stash_input', (string) $input->id, stashId: (string) $input->stashId);
+    }
+    public function broadcastCreated(BroadcastRecord $broadcast): ActivityEventRecord
+    {
+        return $this->emit(ActivityLevel::Info, 'broadcast.created', sprintf('Broadcast "%s" created.', $broadcast->name), 'broadcast', (string) $broadcast->id, stashId: (string) $broadcast->stashId, broadcastId: (string) $broadcast->id);
+    }
+    public function broadcastUpdated(BroadcastRecord $broadcast): ActivityEventRecord
+    {
+        return $this->emit(ActivityLevel::Info, 'broadcast.updated', sprintf('Broadcast "%s" updated.', $broadcast->name), 'broadcast', (string) $broadcast->id, stashId: (string) $broadcast->stashId, broadcastId: (string) $broadcast->id);
+    }
+    public function broadcastDeleted(BroadcastRecord $broadcast): ActivityEventRecord
+    {
+        return $this->emit(ActivityLevel::Info, 'broadcast.deleted', sprintf('Broadcast "%s" deleted.', $broadcast->name), 'broadcast', (string) $broadcast->id, stashId: (string) $broadcast->stashId, broadcastId: (string) $broadcast->id);
     }
 
-    public function jobStarted(JobRecord $job): ActivityEventRecord
+    public function stashInputCommitted(?object $ignored, JobRecord $job, StashInputCommitResult $result): ActivityEventRecord
     {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'job.started',
-            message: sprintf('Job %s started.', $job->intent->value),
-            entityType: 'job',
-            entityId: (string) $job->id,
-            jobId: (string) $job->id,
-            commandId: $job->commandId?->toString(),
-            groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
-        );
+        return $this->emit(ActivityLevel::Success, 'stash.input_added', sprintf('Input added to stash with %d new media items.', $result->mediaItemsCreated), 'stash', $result->stashId, stashId: $result->stashId, jobId: (string) $job->id, groupKey: 'job:' . (string) $job->id, metadata: $result->toArray());
     }
 
-    public function preflightCompleted(CommandRecord $command, JobRecord $job, int $itemCount): ActivityEventRecord
+    public function stashInputSynced(?object $ignored, JobRecord $job, StashInputRecord $input, StashInputSyncResult $result): ActivityEventRecord
     {
-        return $this->emit(
-            level: ActivityLevel::Success,
-            type: 'preflight.completed',
-            message: sprintf('Preflight completed with %d estimated items.', $itemCount),
-            entityType: 'command',
-            entityId: (string) $command->id,
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: ['estimated_item_count' => $itemCount],
-        );
+        $label = $input->title ?? $input->sourceUri;
+        $message = $result->stashItemsCreated > 0 ? sprintf('Found %d new item(s) in %s.', $result->stashItemsCreated, $label) : sprintf('No new items in %s.', $label);
+
+        return $this->emit(ActivityLevel::Success, 'stash.input_synced', $message, 'stash', $result->stashId, stashId: $result->stashId, jobId: (string) $job->id, groupKey: 'job:' . (string) $job->id, metadata: $result->toArray());
     }
 
     public function storageCheckCompleted(JobRecord $job, bool $ok): ActivityEventRecord
     {
-        return $this->emit(
-            level: $ok ? ActivityLevel::Success : ActivityLevel::Warning,
-            type: 'storage_check.completed',
-            message: $ok ? 'Storage check completed successfully.' : 'Storage check completed with warnings.',
-            entityType: 'job',
-            entityId: (string) $job->id,
-            jobId: (string) $job->id,
-            commandId: $job->commandId?->toString(),
-            groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
-        );
+        return $this->emit($ok ? ActivityLevel::Success : ActivityLevel::Warning, 'storage_check.completed', $ok ? 'Storage check completed successfully.' : 'Storage check completed with warnings.', 'job', (string) $job->id, jobId: (string) $job->id, groupKey: 'job:' . (string) $job->id);
     }
 
-    public function jobFailed(JobRecord $job, string $error): ActivityEventRecord
+    public function downloadCompleted(?object $ignored, JobRecord $job, DownloadExecutionResult $result): ActivityEventRecord
     {
-        return $this->emit(
-            level: ActivityLevel::Error,
-            type: 'job.failed',
-            message: $this->secrets->redact($error),
-            entityType: 'job',
-            entityId: (string) $job->id,
-            jobId: (string) $job->id,
-            commandId: $job->commandId?->toString(),
-            groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
-        );
-    }
-
-    public function commandCompleted(CommandRecord $command): ActivityEventRecord
-    {
-        return $this->emit(
-            level: ActivityLevel::Success,
-            type: 'command.completed',
-            message: sprintf('Command %s completed.', $command->type->value),
-            entityType: 'command',
-            entityId: (string) $command->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-        );
-    }
-
-    public function commandFailed(CommandRecord $command, string $error): ActivityEventRecord
-    {
-        return $this->emit(
-            level: ActivityLevel::Error,
-            type: 'command.failed',
-            message: $this->secrets->redact($error),
-            entityType: 'command',
-            entityId: (string) $command->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-        );
-    }
-
-    public function stashInputCommitted(
-        CommandRecord $command,
-        JobRecord $job,
-        StashInputCommitResult $result,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ActivityLevel::Success,
-            type: 'stash.input_added',
-            message: sprintf(
-                'Input added to stash with %d new media items.',
-                $result->mediaItemsCreated,
-            ),
-            entityType: 'stash',
-            entityId: $result->stashId,
-            stashId: $result->stashId,
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: $result->toArray(),
-        );
-    }
-
-    public function stashInputSynced(
-        CommandRecord $command,
-        JobRecord $job,
-        StashInputRecord $input,
-        StashInputSyncResult $result,
-    ): ActivityEventRecord {
-        $label = $input->title ?? $input->sourceUri;
-
-        return $this->emit(
-            level: ActivityLevel::Success,
-            type: 'stash.input_synced',
-            message: $result->stashItemsCreated > 0
-                ? sprintf('Found %d new item(s) in %s.', $result->stashItemsCreated, $label)
-                : sprintf('No new items in %s.', $label),
-            entityType: 'stash',
-            entityId: $result->stashId,
-            stashId: $result->stashId,
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: $result->toArray(),
-        );
-    }
-
-    public function retriedFailedDownloads(
-        CommandRecord $command,
-        JobRecord $job,
-        string $stashId,
-        int $retriedCount,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'stash.retried_failed',
-            message: sprintf('Retried %d failed download(s).', $retriedCount),
-            entityType: 'stash',
-            entityId: $stashId,
-            stashId: $stashId,
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-        );
-    }
-
-    public function downloadCompleted(
-        CommandRecord $command,
-        JobRecord $job,
-        DownloadExecutionResult $result,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ActivityLevel::Success,
-            type: 'download.completed',
-            message: $result->skipped
-                ? 'Download skipped because Vault original already exists.'
-                : sprintf('Download completed with %d ready assets.', $result->assetsReady),
-            entityType: 'media_item',
-            entityId: $result->mediaItemId,
-            stashId: is_string($job->payload['stash_id'] ?? null) ? $job->payload['stash_id'] : null,
-            mediaItemId: $result->mediaItemId,
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: $result->toArray(),
-        );
+        return $this->emit(ActivityLevel::Success, 'download.completed', $result->skipped ? 'Download skipped because Vault original already exists.' : sprintf('Download completed with %d ready assets.', $result->assetsReady), 'media_item', $result->mediaItemId, stashId: is_string($job->payload['stash_id'] ?? null) ? $job->payload['stash_id'] : null, mediaItemId: $result->mediaItemId, jobId: (string) $job->id, groupKey: 'job:' . (string) $job->id, metadata: $result->toArray());
     }
 
     public function downloadFailed(JobRecord $job, string $code, string $error): ActivityEventRecord
     {
-        return $this->emit(
-            level: ActivityLevel::Error,
-            type: 'download.failed',
-            message: $this->secrets->redact($error),
-            entityType: 'job',
-            entityId: (string) $job->id,
-            stashId: is_string($job->payload['stash_id'] ?? null) ? $job->payload['stash_id'] : null,
-            mediaItemId: is_string($job->payload['media_item_id'] ?? null) ? $job->payload['media_item_id'] : null,
-            jobId: (string) $job->id,
-            commandId: $job->commandId?->toString(),
-            groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
-            metadata: ['code' => $code],
-        );
-    }
-
-    /** @param array<string, mixed> $result */
-    public function vaultVerifyCompleted(CommandRecord $command, JobRecord $job, array $result): ActivityEventRecord
-    {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'vault.verify_completed',
-            message: 'Vault verification completed.',
-            entityType: 'command',
-            entityId: (string) $command->id,
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: $result,
-        );
-    }
-
-    /** @param array<string, mixed> $plan */
-    public function broadcastPlanned(
-        CommandRecord $command,
-        JobRecord $job,
-        BroadcastId $broadcastId,
-        array $plan,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'broadcast.planned',
-            message: sprintf('Broadcast planned with %d files.', ApiJson::integer($plan['file_count'] ?? null) ?? 0),
-            entityType: 'broadcast',
-            entityId: $broadcastId->toString(),
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: ['file_count' => ApiJson::integer($plan['file_count'] ?? null) ?? 0],
-        );
-    }
-
-    public function broadcastRebuildStarted(
-        CommandRecord $command,
-        JobRecord $job,
-        BroadcastId $broadcastId,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'broadcast.rebuild_started',
-            message: 'Broadcast rebuild started.',
-            entityType: 'broadcast',
-            entityId: $broadcastId->toString(),
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-        );
-    }
-
-    /** @param array<string, mixed> $publish */
-    public function broadcastPublished(
-        CommandRecord $command,
-        JobRecord $job,
-        BroadcastId $broadcastId,
-        array $publish,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ActivityLevel::Success,
-            type: 'broadcast.published',
-            message: sprintf('Broadcast published %d files.', ApiJson::integer($publish['published_count'] ?? null) ?? 0),
-            entityType: 'broadcast',
-            entityId: $broadcastId->toString(),
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: ['published_count' => ApiJson::integer($publish['published_count'] ?? null) ?? 0],
-        );
-    }
-
-    /** @param array<string, mixed> $verify */
-    public function broadcastVerified(
-        CommandRecord $command,
-        JobRecord $job,
-        BroadcastId $broadcastId,
-        array $verify,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ($verify['ok'] ?? false) ? ActivityLevel::Success : ActivityLevel::Warning,
-            type: 'broadcast.verified',
-            message: ($verify['ok'] ?? false)
-                ? 'Broadcast verification succeeded.'
-                : 'Broadcast verification found stale or missing files.',
-            entityType: 'broadcast',
-            entityId: $broadcastId->toString(),
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: [
-                'valid_count' => ApiJson::integer($verify['valid_count'] ?? null) ?? 0,
-                'stale_count' => ApiJson::integer($verify['stale_count'] ?? null) ?? 0,
-            ],
-        );
-    }
-
-    /** @param array<string, mixed> $verify */
-    public function broadcastStale(
-        CommandRecord $command,
-        JobRecord $job,
-        BroadcastId $broadcastId,
-        array $verify,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ActivityLevel::Warning,
-            type: 'broadcast.stale',
-            message: 'Broadcast is stale and needs regeneration.',
-            entityType: 'broadcast',
-            entityId: $broadcastId->toString(),
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: [
-                'stale_count' => ApiJson::integer($verify['stale_count'] ?? null) ?? 0,
-            ],
-        );
-    }
-
-    public function broadcastFailed(
-        CommandRecord $command,
-        JobRecord $job,
-        BroadcastId $broadcastId,
-        string $code,
-        string $error,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ActivityLevel::Error,
-            type: 'broadcast.failed',
-            message: $this->secrets->redact($error),
-            entityType: 'broadcast',
-            entityId: $broadcastId->toString(),
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: ['code' => $code],
-        );
-    }
-
-    /** @param array<string, mixed> $result */
-    public function broadcastPluginActionCompleted(
-        CommandRecord $command,
-        JobRecord $job,
-        BroadcastId $broadcastId,
-        string $intent,
-        array $result,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'broadcast.plugin_action_completed',
-            message: 'Broadcast plugin action completed.',
-            entityType: 'broadcast',
-            entityId: $broadcastId->toString(),
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: ['intent' => $intent, 'result' => $result],
-        );
-    }
-
-    /** @param array<string, mixed> $prune */
-    public function broadcastPruned(
-        CommandRecord $command,
-        JobRecord $job,
-        BroadcastId $broadcastId,
-        array $prune,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ActivityLevel::Info,
-            type: 'broadcast.pruned',
-            message: sprintf('Broadcast pruned %d stale files.', ApiJson::integer($prune['removed_count'] ?? null) ?? 0),
-            entityType: 'broadcast',
-            entityId: $broadcastId->toString(),
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: ['removed_count' => ApiJson::integer($prune['removed_count'] ?? null) ?? 0],
-        );
-    }
-
-    /** @param array<string, mixed> $trigger */
-    public function broadcastOperationSucceeded(
-        CommandRecord $command,
-        JobRecord $job,
-        BroadcastId $broadcastId,
-        array $trigger,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ActivityLevel::Success,
-            type: 'broadcast.trigger_succeeded',
-            message: 'Broadcast operation succeeded.',
-            entityType: 'broadcast',
-            entityId: $broadcastId->toString(),
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: [
-                'success_count' => ApiJson::integer($trigger['success_count'] ?? null) ?? 0,
-            ],
-        );
-    }
-
-    /** @param array<string, mixed> $trigger */
-    public function broadcastOperationFailed(
-        CommandRecord $command,
-        JobRecord $job,
-        BroadcastId $broadcastId,
-        array $trigger,
-    ): ActivityEventRecord {
-        return $this->emit(
-            level: ActivityLevel::Warning,
-            type: 'broadcast.trigger_failed',
-            message: 'Broadcast operation failed; broadcast files remain valid.',
-            entityType: 'broadcast',
-            entityId: $broadcastId->toString(),
-            jobId: (string) $job->id,
-            commandId: (string) $command->id,
-            groupKey: 'command:' . (string) $command->id,
-            metadata: [
-                'failure_count' => ApiJson::integer($trigger['failure_count'] ?? null) ?? 0,
-            ],
-        );
+        return $this->emit(ActivityLevel::Error, 'download.failed', $this->secrets->redact($error), 'job', (string) $job->id, stashId: is_string($job->payload['stash_id'] ?? null) ? $job->payload['stash_id'] : null, mediaItemId: is_string($job->payload['media_item_id'] ?? null) ? $job->payload['media_item_id'] : null, jobId: (string) $job->id, groupKey: 'job:' . (string) $job->id, metadata: ['code' => $code]);
     }
 
     /** @param array<string, mixed>|null $metadata */
-    private function emit(
-        ActivityLevel $level,
-        string $type,
-        string $message,
-        ?string $entityType = null,
-        ?string $entityId = null,
-        ?string $stashId = null,
-        ?string $mediaItemId = null,
-        ?string $broadcastId = null,
-        ?string $jobId = null,
-        ?string $commandId = null,
-        ?string $groupKey = null,
-        ?array $metadata = null,
-        bool $publish = true,
-    ): ActivityEventRecord {
-        $record = $this->events->create(
-            level: $level,
-            type: $type,
-            message: $message,
-            entityType: $entityType,
-            entityId: $entityId,
-            stashId: $stashId,
-            mediaItemId: $mediaItemId,
-            broadcastId: $broadcastId,
-            jobId: $jobId,
-            commandId: $commandId,
-            groupKey: $groupKey,
-            metadata: $metadata,
-        );
-
-        if ($publish) {
-            $this->publisher->activityCreated($record);
-        }
+    private function emit(ActivityLevel $level, string $type, string $message, ?string $entityType = null, ?string $entityId = null, ?string $stashId = null, ?string $mediaItemId = null, ?string $broadcastId = null, ?string $jobId = null, ?string $groupKey = null, ?array $metadata = null): ActivityEventRecord
+    {
+        $record = $this->events->create(level: $level, type: $type, message: $message, entityType: $entityType, entityId: $entityId, stashId: $stashId, mediaItemId: $mediaItemId, broadcastId: $broadcastId, jobId: $jobId, groupKey: $groupKey, metadata: $metadata);
+        $this->publisher->activityCreated($record);
 
         return $record;
     }

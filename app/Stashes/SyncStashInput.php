@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace App\Stashes;
 
 use App\Broadcasts\BroadcastRepository;
-use App\Commands\CommandDispatchService;
-use App\Commands\CommandType;
 use App\Downloads\DownloadPolicyEvaluator;
-use App\Jobs\JobIntent;
+use App\Jobs\JobType;
+use App\Jobs\JobDispatcher;
 use RuntimeException;
 use Tempest\Database\Database;
 use Tempest\DateTime\DateTime;
@@ -33,7 +32,7 @@ final readonly class SyncStashInput
         private DiscoverStashInput $discovery,
         private DiscoveredItemCommitter $committer,
         private DownloadPolicyEvaluator $downloadPolicy,
-        private CommandDispatchService $commandDispatch,
+        private JobDispatcher $jobDispatcher,
         private BroadcastRepository $broadcasts,
         private Database $database,
     ) {}
@@ -50,7 +49,7 @@ final readonly class SyncStashInput
                 'source_uri' => $input->sourceUri,
                 'source_title' => $input->title,
                 'provider_options' => $input->options === null ? [] : $input->options->provider,
-            ], JobIntent::SyncInput);
+            ], JobType::core('core.sync_input'));
 
             $counts = new DiscoveredItemCommitCounts();
             $committed = $this->database->withinTransaction(function () use (
@@ -87,18 +86,19 @@ final readonly class SyncStashInput
             $this->realignPositions($stashId, $stashInputId, $discovered->discoveredItems);
 
             foreach ($this->broadcasts->listForStash($stashId) as $broadcast) {
-                $this->commandDispatch->dispatch(CommandType::BroadcastRebuild, [
+                $this->jobDispatcher->dispatch('core.broadcast', 'broadcast', (string) $broadcast->id, $stashId->toString(), [
                     'broadcast_id' => (string) $broadcast->id,
-                ]);
+                    'action' => 'rebuild',
+                ], 'background');
             }
         }
 
         if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
             foreach ($counts->downloadableMediaItemIds as $mediaItemId) {
-                $this->commandDispatch->dispatch(CommandType::ItemDownload, [
-                    'mediaItemId' => $mediaItemId,
-                    'stashId' => $stashId->toString(),
-                ]);
+                $this->jobDispatcher->dispatch('core.download', 'media_item', $mediaItemId, $stashId->toString(), [
+                    'media_item_id' => $mediaItemId,
+                    'stash_id' => $stashId->toString(),
+                ], 'background');
             }
         }
 

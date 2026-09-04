@@ -5,15 +5,13 @@ declare(strict_types=1);
 namespace App\Stashes;
 
 use App\Auth\AuthContext;
-use App\Commands\CommandDispatchService;
-use App\Commands\CommandRecord;
-use App\Commands\CommandRepository;
-use App\Commands\CommandType;
-use App\Commands\InvalidCommandPayload;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
-use App\Jobs\JobIntent;
+use App\Jobs\JobType;
+use App\Jobs\JobDispatcher;
+use App\Jobs\Api\JobResource;
+use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
 use App\Stashes\Api\StashInputResource;
@@ -24,6 +22,7 @@ use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventService;
 use App\Vault\AssetRepository;
 use App\Vault\MediaItemState;
+use App\Vault\MediaItemRepository;
 use Tempest\Database\Direction;
 use Tempest\DateTime\DateTime;
 use Tempest\Http\Request;
@@ -44,13 +43,11 @@ final readonly class StashController
         private StashItemRepository $stashItems,
         private StashInputRepository $stashInputs,
         private UpdateStashInputOptions $inputOptions,
-        private CommandDispatchService $dispatch,
-        private CommandRepository $commands,
-        private AuthContext $context,
         private ActivityEventService $activity,
         private AssetRepository $assets,
+        private MediaItemRepository $mediaItems,
         private JobRepository $jobs,
-        private CreateStashWithInitialInput $initialInput,
+        private JobDispatcher $jobDispatcher,
     ) {}
 
     #[Get('/api/v1/stashes')]
@@ -192,13 +189,20 @@ final readonly class StashController
                 }
             }
             $this->activity->stashCreated($stash);
-            $this->dispatch->dispatch(CommandType::StashAddInput, [
-                'stash_id' => (string) $stash->id,
-                'plugin' => $plugin,
-                'source' => $source,
-                'options' => $options,
-            ], $this->context->user());
-        } catch (\InvalidArgumentException|\RuntimeException|InvalidCommandPayload $exception) {
+            $this->jobDispatcher->dispatch(
+                'core.add_input',
+                entityType: 'stash',
+                entityId: (string) $stash->id,
+                stashId: (string) $stash->id,
+                payload: [
+                    'stash_id' => (string) $stash->id,
+                    'plugin' => $plugin,
+                    'source' => $source,
+                    'options' => $options,
+                ],
+                workload: 'interactive',
+            );
+        } catch (\InvalidArgumentException|\RuntimeException $exception) {
             return $this->validationError($exception->getMessage());
         }
 
@@ -330,7 +334,7 @@ final readonly class StashController
             'inputs' => array_map(
                 fn($input): array => [
                     ...StashInputResource::fromRecord($input, $this->inputOptions->declaredOptions($input))->toArray(),
-                    'sync_operation' => $this->operation($this->commands->latestForTarget(CommandType::StashSyncInput, 'stash_input', (string) $input->id)),
+                    'sync_operation' => $this->operation($this->jobs->latestForEntity(JobType::core('core.sync_input'), 'stash_input', (string) $input->id)),
                 ],
                 $this->stashInputs->listForStash(StashId::fromPrimaryKey($stash->id)),
             ),
@@ -349,40 +353,24 @@ final readonly class StashController
         $body = ApiJson::normalizeRequest($request->body);
 
         if (is_string($request->body['plugin'] ?? null) && is_array($request->body['source'] ?? null)) {
-            try {
-                $result = $this->initialInput->addToExisting(
-                    $existing,
-                    $request->body['plugin'],
-                    array_filter($request->body['source'], is_string(...), ARRAY_FILTER_USE_KEY),
-                    is_array($request->body['options'] ?? null) ? self::object($request->body['options']) : [],
-                );
-            } catch (\InvalidArgumentException|\RuntimeException $exception) {
-                return $this->validationError($exception->getMessage());
-            }
-
-            return new Json(ApiJson::encode($result->toArray()), Status::CREATED);
-        }
-
-        $options = [
-            'stash_id' => $id,
-            'preflight_command_id' => trim(ApiJson::string($body['preflightCommandId'] ?? null)),
-            // Sourced from the raw, un-normalized body: provider-option keys (e.g.
-            // provider-declared keys are opaque identifiers, not DTO field names, so
-            // ApiJson's snake/camel key transform must not touch them.
-            'options' => is_array($request->body['options'] ?? null) ? $request->body['options'] : [],
-        ];
-
-        try {
-            $result = $this->dispatch->dispatch(
-                CommandType::StashAddInput,
-                $options,
-                $this->context->user(),
+            $job = $this->jobDispatcher->dispatch(
+                type: 'core.add_input',
+                entityType: 'stash',
+                entityId: (string) $existing->id,
+                stashId: (string) $existing->id,
+                payload: [
+                    'stash_id' => (string) $existing->id,
+                    'plugin' => $request->body['plugin'],
+                    'source' => array_filter($request->body['source'], is_string(...), ARRAY_FILTER_USE_KEY),
+                    'options' => is_array($request->body['options'] ?? null) ? $request->body['options'] : [],
+                ],
+                workload: 'interactive',
             );
-        } catch (InvalidCommandPayload $exception) {
-            return $this->validationError($exception->getMessage());
+
+            return new Json(['job' => JobResource::fromRecord($job)->toArray()], Status::ACCEPTED);
         }
 
-        return new Json(ApiJson::encode($result->toArray()), Status::CREATED);
+        return $this->validationError('plugin and source are required.');
     }
 
     /** Checks every input of the stash for new items, on demand. */
@@ -395,25 +383,71 @@ final readonly class StashController
             return $this->notFound('Stash not found.');
         }
 
-        $commandIds = [];
+        $jobIds = [];
 
         foreach ($this->stashInputs->listForStash(StashId::fromPrimaryKey($stash->id)) as $input) {
-            try {
-                $result = $this->dispatch->dispatch(
-                    CommandType::StashSyncInput,
-                    ['stash_input_id' => (string) $input->id],
-                    $this->context->user(),
-                );
-            } catch (InvalidCommandPayload $exception) {
-                return $this->validationError($exception->getMessage());
+            $active = $this->jobs->pendingOrProcessing(JobType::core('core.sync_input'), PrefixedUlid::parse((string) $input->id));
+
+            if ($active !== null) {
+                $jobIds[] = (string) $active->id;
+
+                continue;
             }
 
-            $commandIds[] = $result->toArray()['command_id'] ?? null;
+            $jobIds[] = (string) $this->jobDispatcher->dispatch(
+                type: 'core.sync_input',
+                entityType: 'stash_input',
+                entityId: (string) $input->id,
+                stashId: (string) $stash->id,
+                payload: ['stash_input_id' => (string) $input->id],
+                workload: 'background',
+            )->id;
         }
 
         return new Json(ApiJson::encode([
-            'command_ids' => array_values(array_filter($commandIds, is_string(...))),
+            'job_ids' => $jobIds,
         ]), Status::ACCEPTED);
+    }
+
+    #[Post('/api/v1/stashes/{id}/retry-failed')]
+    public function retryFailed(string $id): Json
+    {
+        $stash = $this->findStash($id);
+
+        if ($stash === null) {
+            return $this->notFound('Stash not found.');
+        }
+
+        $stashId = StashId::fromPrimaryKey($stash->id);
+        $mediaItemIds = [];
+
+        foreach ($this->stashItems->listForStash($stashId) as $item) {
+            $mediaItem = $this->mediaItems->find($item->mediaItemId);
+
+            if ($mediaItem?->state === MediaItemState::Failed) {
+                $mediaItem->state = MediaItemState::DownloadPending;
+                $this->mediaItems->save($mediaItem);
+                $mediaItemIds[(string) $item->mediaItemId] = true;
+            }
+        }
+
+        $jobs = [];
+
+        foreach (array_keys($mediaItemIds) as $mediaItemId) {
+            $jobs[] = $this->jobDispatcher->dispatch(
+                type: 'core.download',
+                entityType: 'media_item',
+                entityId: $mediaItemId,
+                stashId: $stashId->toString(),
+                payload: ['media_item_id' => $mediaItemId, 'stash_id' => $stashId->toString(), 'force' => false],
+                workload: 'background',
+            );
+        }
+
+        return new Json([
+            'created_count' => count($jobs),
+            'jobs' => array_map(static fn($job): array => JobResource::fromRecord($job)->toArray(), $jobs),
+        ], Status::ACCEPTED);
     }
 
     #[Post('/api/v1/stashes/{id}/inputs/{inputId}/sync')]
@@ -431,31 +465,30 @@ final readonly class StashController
             return $this->notFound('Stash input not found.');
         }
 
-        $active = $this->jobs->pendingOrProcessing(JobIntent::SyncInput, PrefixedUlid::parse($inputId));
+        $active = $this->jobs->pendingOrProcessing(JobType::core('core.sync_input'), PrefixedUlid::parse($inputId));
 
-        if ($active?->commandId !== null) {
+        if ($active !== null) {
             return new Json([
                 'operation' => [
-                    'id' => (string) $active->commandId,
+                    'id' => (string) $active->id,
                     'state' => $active->state === JobState::Processing ? 'running' : 'accepted',
                 ],
             ], Status::ACCEPTED);
         }
 
-        try {
-            $result = $this->dispatch->dispatch(
-                CommandType::StashSyncInput,
-                ['stash_input_id' => (string) $input->id],
-                $this->context->user(),
-            );
-        } catch (InvalidCommandPayload $exception) {
-            return $this->validationError($exception->getMessage());
-        }
+        $job = $this->jobDispatcher->dispatch(
+            type: 'core.sync_input',
+            entityType: 'stash_input',
+            entityId: (string) $input->id,
+            stashId: (string) $stash->id,
+            payload: ['stash_input_id' => (string) $input->id],
+            workload: 'background',
+        );
 
         return new Json(ApiJson::encode([
             'operation' => [
-                'id' => (string) $result->command->id,
-                'state' => $result->command->state->value,
+                'id' => (string) $job->id,
+                'state' => 'accepted',
             ],
         ]), Status::ACCEPTED);
     }
@@ -640,11 +673,11 @@ final readonly class StashController
     }
 
     /** @return array{id: string, state: string}|null */
-    private function operation(?CommandRecord $command): ?array
+    private function operation(?JobRecord $job): ?array
     {
-        return $command === null ? null : [
-            'id' => (string) $command->id,
-            'state' => $command->state->value,
+        return $job === null ? null : [
+            'id' => (string) $job->id,
+            'state' => $job->state->value,
         ];
     }
 

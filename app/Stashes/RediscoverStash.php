@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
-use App\Jobs\JobIntent;
+use App\Jobs\JobType;
 use App\Providers\ProviderDates;
 use App\Support\DurationSeconds;
 use App\Vault\MediaItemRepository;
@@ -33,8 +33,7 @@ final readonly class RediscoverStash
             $discovered = $this->discovery->execute([
                 'source_uri' => $input->sourceUri,
                 'source_title' => $input->title,
-                'origin' => PreflightOrigin::Scheduler->value,
-            ], JobIntent::InitialBackfill);
+            ], JobType::core('core.initial_backfill'));
 
             foreach ($discovered->discoveredItems as $item) {
                 $result['discovered']++;

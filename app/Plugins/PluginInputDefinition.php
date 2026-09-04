@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
+use App\Jobs\JobDefinition;
 use App\Providers\InputOption;
 use App\Providers\InputOptionType;
 use App\System\Secret\SecretsService;
@@ -16,14 +17,17 @@ use Tempest\Validation\Validator;
 
 final readonly class PluginInputDefinition
 {
-    /** @param list<string> $prefixes
-     * @param list<mixed> $grants
+    /**
+     * @param list<string> $prefixes
+     * @param list<array<string, mixed>> $grants
      * @param list<InputOption> $options
      * @param list<PluginSourceField> $sourceFields
      * @param list<PluginCredentialDefinition> $credentials
+     * @param list<JobDefinition> $jobs
      */
-    public function __construct(public string $id, public string $providerKey, public string $name, public string $version, public string $root, public array $prefixes, public array $grants, public array $options, public array $sourceFields, public array $credentials, public ?PluginHelperGrant $helper) {}
+    public function __construct(public string $id, public string $providerKey, public string $name, public string $version, public string $root, public array $prefixes, public array $grants, public array $options, public array $sourceFields, public array $credentials, public ?PluginHelperGrant $helper, public array $jobs = []) {}
 
+    /** @param array<string, mixed> $manifest */
     /** @param array<string, mixed> $manifest */
     public static function from(array $manifest, string $root): ?self
     {
@@ -133,9 +137,15 @@ final readonly class PluginInputDefinition
         $version = is_string($manifest['version'] ?? null) ? $manifest['version'] : '0.0.0';
 
         $prefixes = is_array($manifest['source_prefixes'] ?? null) ? array_values(array_filter($manifest['source_prefixes'], static fn(mixed $value): bool => is_string($value))) : [];
-        $grants = is_array($manifest['http_grants'] ?? null) ? array_values(array_filter($manifest['http_grants'], 'is_array')) : [];
+        $grants = [];
 
-        return new self($id, $providerKey, $name, $version, $root, $prefixes, $grants, $options, $sourceFields, $credentials, $helper);
+        foreach (is_array($manifest['http_grants'] ?? null) ? $manifest['http_grants'] : [] as $grant) {
+            if (is_array($grant)) {
+                $grants[] = self::object($grant);
+            }
+        }
+
+        return new self($id, $providerKey, $name, $version, $root, $prefixes, $grants, $options, $sourceFields, $credentials, $helper, PluginJobDefinitions::fromManifest($manifest));
     }
 
     /** @param array<string, mixed> $source
@@ -193,9 +203,6 @@ final readonly class PluginInputDefinition
         $result = [];
 
         foreach ($this->grants as $raw) {
-            if (! is_array($raw)) {
-                continue;
-            }
             $ops = is_array($raw['operations'] ?? null) ? $raw['operations'] : [];
 
             if ($ops !== [] && ! in_array($operation, $ops, true)) {

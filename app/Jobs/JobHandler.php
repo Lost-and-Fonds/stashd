@@ -6,7 +6,5 @@ namespace App\Jobs;
 
 interface JobHandler
 {
-    public function handle(JobRecord $job, JobHandlerContext $context): void;
-
-    public function intent(): JobIntent;
+    public function handle(JobRecord $job, JobProgressReporter $progress): void;
 }

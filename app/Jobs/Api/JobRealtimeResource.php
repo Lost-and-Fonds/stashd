@@ -29,8 +29,7 @@ final readonly class JobRealtimeResource
 
         return ApiJson::encode([
             'id' => (string) $this->job->id,
-            'commandId' => $this->job->commandId === null ? null : (string) $this->job->commandId,
-            'intent' => $this->job->intent->value,
+            'type' => $this->job->type(),
             'entityType' => $this->job->entityType,
             'entityId' => $this->job->entityId,
             'stashId' => is_string($stashId) ? $stashId : null,
@@ -45,7 +44,6 @@ final readonly class JobRealtimeResource
             'lastError' => $this->job->lastError,
             'startedAt' => $this->job->startedAt,
             'finishedAt' => $this->job->finishedAt,
-            'heartbeatAt' => $this->job->heartbeatAt,
             'createdAt' => $this->job->createdAt,
             'updatedAt' => $this->job->updatedAt,
         ]);

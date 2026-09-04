@@ -20,7 +20,6 @@ final readonly class BroadcastLifecycleService
         private BroadcastItemRepository $broadcastItems,
         private BroadcastContextFactory $contextFactory,
         private BroadcastPluginRegistry $plugins,
-        private BroadcastTriggerService $triggers,
         private StateTransitionService $transitions,
         private BroadcastPathBuilder $paths,
         private PublishedResourceService $publications,
@@ -144,7 +143,6 @@ final readonly class BroadcastLifecycleService
             publish: $publish->toArray(),
             verify: $verify->toArray(),
             prune: $prune?->toArray(),
-            trigger: null,
         );
     }
 
@@ -197,7 +195,6 @@ final readonly class BroadcastLifecycleService
             plan: $itemPlan->toArray(),
             publish: $publish->toArray(),
             verify: $verify->toArray(),
-            trigger: null,
         );
     }
 
@@ -264,14 +261,6 @@ final readonly class BroadcastLifecycleService
         $this->broadcasts->delete($broadcast);
 
         return new BroadcastDeleteResult($removedCount);
-    }
-
-    public function trigger(BroadcastId $broadcastId): BroadcastTriggerResult
-    {
-        $broadcast = $this->broadcasts->find($broadcastId)
-            ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
-
-        return $this->triggers->execute($broadcast, 'manual');
     }
 
     /** @param array<string, mixed> $payload

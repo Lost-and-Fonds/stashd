@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
+use App\Jobs\JobDefinition;
 use RuntimeException;
 use Tempest\Support\Filesystem;
 use Tempest\Validation\Rules\IsString;
@@ -18,6 +19,7 @@ final readonly class ExternalBroadcastPluginDefinition
      * @param  array<string, string>  $helpers
      * @param  array<string, string>  $operations
      * @param  array<int, array<string, mixed>>  $sourceOptions
+     * @param  list<JobDefinition> $jobs
      */
     public function __construct(
         public string $id,
@@ -44,11 +46,19 @@ final readonly class ExternalBroadcastPluginDefinition
         public ?string $credentialParameter,
         public string $credentialPlacement,
         public array $sourceOptions,
+        public array $jobs = [],
     ) {}
 
     public static function fromManifest(mixed $raw, string $root, string $socketPath, ?string $manifestDirectory = null): ?self
     {
         if (! is_array($raw) || ! is_string($raw['broadcast_key'] ?? null)) {
+            return null;
+        }
+
+        /** @var array<string, mixed> $raw */
+        $broadcastKey = $raw['broadcast_key'];
+
+        if (! is_string($broadcastKey)) {
             return null;
         }
 
@@ -151,7 +161,7 @@ final readonly class ExternalBroadcastPluginDefinition
 
         return new self(
             id: $required('id'),
-            logicalKey: trim($raw['broadcast_key']),
+            logicalKey: trim($broadcastKey),
             runtime: $runtime,
             name: is_string($raw['name'] ?? null) && trim($raw['name']) !== '' ? trim($raw['name']) : $required('id'),
             version: is_string($raw['version'] ?? null) && trim($raw['version']) !== '' ? trim($raw['version']) : '0.0.0',
@@ -174,6 +184,7 @@ final readonly class ExternalBroadcastPluginDefinition
             credentialParameter: is_array($raw['credential'] ?? null) && is_string($raw['credential']['parameter'] ?? null) ? trim($raw['credential']['parameter']) : null,
             credentialPlacement: is_array($raw['credential'] ?? null) && in_array($raw['credential']['placement'] ?? null, ['query', 'header'], true) ? $raw['credential']['placement'] : 'query',
             sourceOptions: $sourceOptions,
+            jobs: PluginJobDefinitions::fromManifest($raw),
         );
     }
 

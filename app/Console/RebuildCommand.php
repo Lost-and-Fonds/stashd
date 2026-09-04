@@ -28,7 +28,7 @@ final readonly class RebuildCommand
     // as "supervisorctl unreachable" and skips the restart below -- even though
     // the names that DID match were, as a side effect of that same stop call,
     // genuinely stopped and then never restarted.
-    private const array SUPERVISED_ROLES = ['worker-interactive', 'worker-discovery', 'worker-bulk', 'scheduler', 'frankenphp'];
+    private const array SUPERVISED_ROLES = ['worker-interactive', 'worker-background', 'scheduler', 'frankenphp'];
 
     public function __construct(
         private StashdConfig $config,

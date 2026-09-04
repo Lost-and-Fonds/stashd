@@ -4,14 +4,11 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Commands\CommandId;
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use Tempest\Database\Connection\Connection;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 use Tempest\DateTime\DateTime;
-use Tempest\DateTime\FormatPattern;
 use Tempest\DateTime\Timezone;
 
 use function Tempest\Database\query;
@@ -20,26 +17,23 @@ final class JobRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
-        private Connection $connection,
     ) {}
 
     /** @param array<string, mixed>|null $payload */
     public function create(
-        JobIntent $intent,
-        ?CommandId $commandId = null,
+        JobType $intent,
         ?string $entityType = null,
         ?PrefixedUlid $entityId = null,
-        int $priority = 100,
+        ?string $stashId = null,
         ?array $payload = null,
     ): JobRecord {
         $id = $this->ids->generate('job')->toString();
         $record = new JobRecord(
-            commandId: $commandId,
-            intent: $intent,
+            intent: $intent->value,
             entityType: $entityType,
             entityId: $entityId?->toString(),
+            stashId: $stashId,
             state: JobState::Pending,
-            priority: $priority,
             payload: $payload,
         );
         $record->id = new PrimaryKey($id);
@@ -52,33 +46,63 @@ final class JobRepository
         return $record;
     }
 
+    /** @param array<string, mixed>|null $payload */
+    public function createType(
+        string $type,
+        ?string $entityType = null,
+        ?string $entityId = null,
+        ?string $stashId = null,
+        ?array $payload = null,
+    ): JobRecord {
+        $intent = new JobType($type);
+        $record = $this->create($intent, entityType: $entityType, entityId: $entityId === null ? null : PrefixedUlid::parse($entityId), stashId: $stashId, payload: $payload);
+
+        if ($stashId !== null) {
+            $record->payload = [...($record->payload ?? []), 'stash_id' => $stashId];
+        }
+
+        return $this->save($record);
+    }
+
     public function find(JobId $id): ?JobRecord
     {
         return JobRecord::findById($id->toPrimaryKey());
     }
 
-    public function hasPendingOrProcessing(JobIntent $intent, PrefixedUlid $entityId): bool
+    public function hasPendingOrProcessing(JobType $intent, PrefixedUlid $entityId): bool
     {
         return $this->pendingOrProcessing($intent, $entityId) !== null;
     }
 
-    public function pendingOrProcessing(JobIntent $intent, PrefixedUlid $entityId): ?JobRecord
+    public function pendingOrProcessing(JobType $intent, PrefixedUlid $entityId): ?JobRecord
     {
         $job = JobRecord::select()
-            ->where('intent', $intent)
+            ->where('intent', $intent->value)
             ->where('entityId', $entityId->toString())
-            ->whereIn('state', [JobState::Pending, JobState::Processing])
+            ->whereIn('state', [JobState::Pending, JobState::Processing, JobState::Retrying])
             ->first();
 
         return $job instanceof JobRecord ? $job : null;
     }
 
-    public function hasPendingOrProcessingIntent(JobIntent $intent): bool
+    public function hasPendingOrProcessingIntent(JobType $intent): bool
     {
         return JobRecord::select()
-            ->where('intent', $intent)
-            ->whereIn('state', [JobState::Pending, JobState::Processing])
+            ->where('intent', $intent->value)
+            ->whereIn('state', [JobState::Pending, JobState::Processing, JobState::Retrying])
             ->first() !== null;
+    }
+
+    public function latestForEntity(JobType $intent, string $entityType, string $entityId): ?JobRecord
+    {
+        $job = JobRecord::select()
+            ->where('intent', $intent->value)
+            ->where('entityType', $entityType)
+            ->where('entityId', $entityId)
+            ->orderBy('createdAt', Direction::DESC)
+            ->first();
+
+        return $job instanceof JobRecord ? $job : null;
     }
 
     public function save(JobRecord $record): JobRecord
@@ -90,109 +114,9 @@ final class JobRepository
     }
 
     /**
-     * PostgreSQL claims one locked candidate with SKIP LOCKED in a single
-     * statement. The owner token lets stale-job recovery verify the owning
-     * process is dead before re-queuing.
-     */
-    public function claimNextPending(?JobLane $lane = null, ?string $ownerToken = null): ?JobRecord
-    {
-        return $this->claimNextPendingPostgres($lane, $ownerToken);
-    }
-
-    private function claimNextPendingPostgres(?JobLane $lane, ?string $ownerToken): ?JobRecord
-    {
-        $bindings = [
-            'pending' => JobState::Pending->value,
-            'now' => DateTime::now(Timezone::UTC)->format(FormatPattern::SQL_DATE_TIME, Timezone::UTC),
-        ];
-        $where = [
-            '"state" = :pending',
-            '("scheduledAt" IS NULL OR "scheduledAt" <= :now)',
-        ];
-
-        if ($lane !== null) {
-            $placeholders = [];
-
-            foreach ($lane->intents() as $index => $intent) {
-                $key = "intent_{$index}";
-                $placeholders[] = ":{$key}";
-                $bindings[$key] = $intent->value;
-            }
-            $where[] = '"intent" IN (' . implode(', ', $placeholders) . ')';
-        }
-
-        $statement = $this->connection->prepare(
-            'UPDATE "jobs"
-             SET "state" = :processing, "attempts" = "attempts" + 1,
-                 "startedAt" = CURRENT_TIMESTAMP, "heartbeatAt" = CURRENT_TIMESTAMP,
-                 "updatedAt" = CURRENT_TIMESTAMP, "lastError" = NULL, "ownerToken" = :ownerToken
-             WHERE "id" = (
-                SELECT "id" FROM "jobs" WHERE ' . implode(' AND ', $where)
-                . ' ORDER BY "priority" ASC, "createdAt" ASC LIMIT 1 FOR UPDATE SKIP LOCKED
-             )
-             RETURNING "id"',
-        );
-        $statement->execute([
-            ...$bindings,
-            'processing' => JobState::Processing->value,
-            'ownerToken' => $ownerToken,
-        ]);
-        $id = $statement->fetchColumn();
-
-        return is_string($id) ? JobRecord::findById(new PrimaryKey($id)) : null;
-    }
-
-    public function parkForRetry(JobRecord $job, string $lastError, DateTime $scheduledAt): bool
-    {
-        $updatedAt = DateTime::now(Timezone::UTC);
-        $statement = $this->connection->prepare(
-            'UPDATE "jobs"
-             SET "state" = :pending, "startedAt" = NULL, "heartbeatAt" = NULL,
-                 "ownerToken" = NULL, "lastError" = :lastError,
-                 "scheduledAt" = :scheduledAt, "updatedAt" = :updatedAt
-             WHERE "id" = :id AND "state" = :processing',
-        );
-        $statement->execute([
-            'pending' => JobState::Pending->value,
-            'lastError' => $lastError,
-            'scheduledAt' => $scheduledAt->format(FormatPattern::SQL_DATE_TIME, Timezone::UTC),
-            'updatedAt' => $updatedAt->format(FormatPattern::SQL_DATE_TIME, Timezone::UTC),
-            'id' => (string) $job->id,
-            'processing' => JobState::Processing->value,
-        ]);
-
-        if ($statement->rowCount() !== 1) {
-            return false;
-        }
-
-        $job->state = JobState::Pending;
-        $job->startedAt = null;
-        $job->heartbeatAt = null;
-        $job->ownerToken = null;
-        $job->lastError = $lastError;
-        $job->scheduledAt = $scheduledAt;
-        $job->updatedAt = $updatedAt;
-
-        return true;
-    }
-
-    /** @return list<JobRecord> */
-    public function listProcessingStale(DateTime $staleBefore): array
-    {
-        /** @var list<JobRecord> $jobs */
-        $jobs = array_values(JobRecord::select()
-            ->where('state', JobState::Processing)
-            ->whereNotNull('heartbeatAt')
-            ->where('heartbeatAt', $staleBefore, '<')
-            ->all());
-
-        return $jobs;
-    }
-
-    /**
      * Processing jobs are always included, on top of the $limit most recent.
-     * They're claimed oldest-first (see claimNextPending), so a plain
-     * "ORDER BY createdAt DESC LIMIT $limit" reliably drops the one actively
+     * Active jobs are included, on top of the $limit most recent, so a plain
+     * "ORDER BY createdAt DESC LIMIT $limit" reliably drops an active job
      * processing job during a large batch (e.g. backfilling a channel with
      * hundreds of items) -- which hid live download progress from the stash
      * detail page.
@@ -234,18 +158,6 @@ final class JobRepository
         return $jobs;
     }
 
-    /** @return list<JobRecord> */
-    public function listForCommand(CommandId $commandId): array
-    {
-        /** @var list<JobRecord> $jobs */
-        $jobs = array_values(JobRecord::select()
-            ->where('commandId', $commandId->toString())
-            ->orderBy('createdAt', Direction::ASC)
-            ->all());
-
-        return $jobs;
-    }
-
     /**
      * The error message from each media item's most recent download job, but
      * only for items whose most recent attempt is the one that failed --
@@ -268,7 +180,7 @@ final class JobRepository
         /** @var list<JobRecord> $jobs */
         $jobs = array_values(JobRecord::select()
             ->where('entityType', 'media_item')
-            ->where('intent', JobIntent::Download)
+            ->where('intent', JobType::core('core.download')->value)
             ->whereIn('entityId', $mediaItemIds)
             ->orderBy('createdAt', Direction::DESC)
             ->orderBy('id', Direction::DESC)

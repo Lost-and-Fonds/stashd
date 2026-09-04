@@ -223,8 +223,8 @@ case "$ROLE" in
         ;;
     worker)
         export_runtime_env
-        # Optional second arg picks a worker lane (interactive, discovery,
-        # bulk); supervisord runs one program per lane. No arg = all lanes.
+        # Optional second arg picks a Messenger workload (interactive or
+        # background).
         run_app php tempest stashd worker ${2:+"$2"}
         ;;
     scheduler)

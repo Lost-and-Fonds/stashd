@@ -13,7 +13,6 @@ final readonly class StashInputCommitResult
         public int $mediaItemsReused,
         public int $stashItemsCreated,
         public int $stashItemsReused,
-        public string $preflightCommandId,
         /** @var list<string> */
         public array $downloadableMediaItemIds = [],
     ) {}
@@ -24,7 +23,6 @@ final readonly class StashInputCommitResult
         return [
             'stash_id' => $this->stashId,
             'stash_input_id' => $this->stashInputId,
-            'preflight_command_id' => $this->preflightCommandId,
             'media_items_created' => $this->mediaItemsCreated,
             'media_items_reused' => $this->mediaItemsReused,
             'stash_items_created' => $this->stashItemsCreated,

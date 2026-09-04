@@ -132,7 +132,7 @@ final class MediaItemRepository
                 (SELECT COUNT(DISTINCT bi."broadcastId") FROM "broadcast_items" bi WHERE bi."mediaItemId" = m."id") AS broadcast_count
              FROM "media_items" m'
                 . ($where === [] ? '' : ' WHERE ' . implode(' AND ', $where))
-                . ' ORDER BY m."createdAt" DESC LIMIT ? OFFSET ?',
+                . ' ORDER BY m."createdAt" DESC, m."id" DESC LIMIT ? OFFSET ?',
             [
                 AssetRole::VaultOriginal->value,
                 AssetState::Ready->value,

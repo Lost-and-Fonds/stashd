@@ -32,7 +32,6 @@ final readonly class ActivityEventResource
             'mediaItemId' => $this->event->mediaItemId,
             'broadcastId' => $this->event->broadcastId,
             'jobId' => $this->event->jobId,
-            'commandId' => $this->event->commandId,
             'createdAt' => $this->event->createdAt,
         ]);
     }

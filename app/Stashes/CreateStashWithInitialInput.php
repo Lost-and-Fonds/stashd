@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
-use App\Jobs\JobIntent;
-use App\Jobs\JobHandlerContext;
+use App\Jobs\JobType;
+use App\Jobs\JobProgressReporter;
 use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Plugins\ExternalInputPluginRegistry;
@@ -19,7 +19,7 @@ final readonly class CreateStashWithInitialInput
     public function __construct(
         private ExternalInputPluginRegistry $plugins,
         private DiscoverStashInput $discovery,
-        private InitialInputPersistence $inputs,
+        private CreateStashFromDiscovery $inputs,
         private StashRepository $stashes,
         private ActivityEventService $activity,
         private Database $database,
@@ -52,7 +52,7 @@ final readonly class CreateStashWithInitialInput
     /** @param array<string, mixed> $source
      *  @param array<string, mixed> $options
      */
-    public function addToExisting(StashRecord $stash, string $pluginId, array $source, array $options, ?JobHandlerContext $context = null, ?JobRecord $job = null): StashInputCommitResult
+    public function addToExisting(StashRecord $stash, string $pluginId, array $source, array $options, ?JobProgressReporter $context = null, ?JobRecord $job = null): StashInputCommitResult
     {
         $discovered = $this->discover($pluginId, $source, $options, $context, $job);
         $result = null;
@@ -72,7 +72,7 @@ final readonly class CreateStashWithInitialInput
     /** @param array<string, mixed> $source
      *  @param array<string, mixed> $options
      */
-    private function discover(string $pluginId, array $source, array $options, ?JobHandlerContext $context = null, ?JobRecord $job = null): PreflightExecutionResult
+    private function discover(string $pluginId, array $source, array $options, ?JobProgressReporter $context = null, ?JobRecord $job = null): InputPreflightResult
     {
         $plugin = $this->plugins->definition($pluginId)
             ?? throw new \InvalidArgumentException('Input plugin not found.');
@@ -82,9 +82,8 @@ final readonly class CreateStashWithInitialInput
             $resolved,
             $resolved->sourceUri->toString(),
             null,
-            PreflightOrigin::Api,
             $options['provider'] ?? [],
-            JobIntent::InitialBackfill,
+            JobType::core('core.initial_backfill'),
             $context === null || $job === null ? null : static function (string $stage, ?float $fraction) use ($context, $job): void {
                 $context->progress($job, $fraction === null ? JobProgressUpdate::indeterminate($stage) : JobProgressUpdate::ofPercent($fraction * 100, $stage));
             },

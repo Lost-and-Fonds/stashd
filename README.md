@@ -17,7 +17,7 @@ composer test
 composer test:docker-smoke
 ```
 
-See the [runtime](docs/runtime/frankenphp.md), [providers](docs/providers/README.md), [storage](docs/storage/README.md), [broadcasts](docs/broadcasts/README.md), and [architecture](docs/architecture/) documentation. For product and engineering detail, see the [engineering specification](docs/Stashd-Engineering-Specification.md).
+See the [runtime](docs/runtime/frankenphp.md), [providers](docs/providers/README.md), [storage](docs/storage/README.md), [broadcasts](docs/broadcasts/README.md), and [architecture](docs/architecture/) documentation. For product and engineering detail, see the [engineering specification](docs/engineering-spec.md).
 
 ## Ecosystem
 

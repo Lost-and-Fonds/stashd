@@ -22,13 +22,16 @@ final readonly class PluginCredentialService
             if ($plugin->credentials === []) {
                 continue;
             }
+            $credentials = [];
+
+            foreach ($plugin->credentials as $credential) {
+                $credentials[] = $credential->toArray($this->secrets->has($credential->secretKey));
+            }
+
             $plugins[] = [
                 'key' => $plugin->id,
                 'label' => $plugin->name,
-                'credentials' => array_map(
-                    fn(PluginCredentialDefinition $credential): array => $credential->toArray($this->secrets->has($credential->secretKey)),
-                    $plugin->credentials,
-                ),
+                'credentials' => $credentials,
             ];
         }
 

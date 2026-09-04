@@ -8,14 +8,6 @@ use App\Broadcasts\BroadcastItemRecord;
 use App\Broadcasts\BroadcastItemState;
 use App\Broadcasts\BroadcastRecord;
 use App\Broadcasts\BroadcastState;
-use App\Broadcasts\BroadcastTriggerRecord;
-use App\Broadcasts\BroadcastTriggerRunRecord;
-use App\Broadcasts\BroadcastTriggerRunState;
-use App\Broadcasts\BroadcastTriggerState;
-use App\Commands\CommandRecord;
-use App\Commands\CommandState;
-use App\Jobs\JobRecord;
-use App\Jobs\JobState;
 use App\Stashes\StashInputRecord;
 use App\Stashes\StashInputState;
 use App\Stashes\StashItemRecord;
@@ -31,27 +23,6 @@ use Tempest\DateTime\Timezone;
 
 final readonly class StateTransitionService
 {
-    public function transitionCommand(CommandRecord $record, CommandState $next): CommandRecord
-    {
-        // Re-asserting Running on an already-Running command is idempotent, not
-        // an illegal transition. Every job handler marks its command Running at
-        // the start of handle(); when a stalled job is re-queued by
-        // JobWorkerService::recoverStaleJobs() the command is left Running, so
-        // the retry runs that same line again. Without this guard that retry
-        // throws "Command cannot transition from running to running", which then
-        // fails the job for a bogus reason and masks the original failure.
-        if ($record->state === CommandState::Running && $next === CommandState::Running) {
-            return $record;
-        }
-
-        return $this->apply($record, $record->state, $next, 'Command');
-    }
-
-    public function transitionJob(JobRecord $record, JobState $next): JobRecord
-    {
-        return $this->apply($record, $record->state, $next, 'Job');
-    }
-
     public function transitionStash(StashRecord $record, StashState $next): StashRecord
     {
         return $this->apply($record, $record->state, $next, 'Stash');
@@ -85,20 +56,6 @@ final readonly class StateTransitionService
     public function transitionBroadcastItem(BroadcastItemRecord $record, BroadcastItemState $next): BroadcastItemRecord
     {
         return $this->apply($record, $record->state, $next, 'Broadcast item');
-    }
-
-    public function transitionBroadcastTrigger(
-        BroadcastTriggerRecord $record,
-        BroadcastTriggerState $next,
-    ): BroadcastTriggerRecord {
-        return $this->apply($record, $record->state, $next, 'Broadcast trigger');
-    }
-
-    public function transitionBroadcastTriggerRun(
-        BroadcastTriggerRunRecord $record,
-        BroadcastTriggerRunState $next,
-    ): BroadcastTriggerRunRecord {
-        return $this->apply($record, $record->state, $next, 'Broadcast trigger run');
     }
 
     /**

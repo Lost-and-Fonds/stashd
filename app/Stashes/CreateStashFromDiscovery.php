@@ -6,22 +6,10 @@ namespace App\Stashes;
 
 use App\Broadcasts\BroadcastRepository;
 use App\Http\Api\ApiJson;
-use App\Commands\CommandDispatchService;
-use App\Commands\CommandId;
-use App\Commands\CommandRecord;
-use App\Commands\CommandRepository;
-use App\Commands\CommandState;
-use App\Commands\CommandType;
 use App\Downloads\DownloadPolicyEvaluator;
-use App\Jobs\JobIntent;
-use App\Jobs\JobHandlerContext;
-use App\Jobs\JobProgressUpdate;
-use App\Jobs\JobRecord;
-use InvalidArgumentException;
+use App\Jobs\JobType;
+use App\Jobs\JobDispatcher;
 use RuntimeException;
-use Tempest\Database\Database;
-
-use function Tempest\Support\str;
 
 /**
  * Commits a completed preflight into a stash input on an existing stash.
@@ -32,47 +20,16 @@ use function Tempest\Support\str;
  * stash input, media items, sources, and stash items, deduplicating against
  * whatever the stash (and the wider Vault) already has.
  */
-final readonly class CreateStashFromDiscovery implements InitialInputPersistence
+final readonly class CreateStashFromDiscovery
 {
     public function __construct(
-        private CommandRepository $commands,
         private StashRepository $stashes,
         private StashInputRepository $stashInputs,
         private DiscoveredItemCommitter $committer,
-        private CommandDispatchService $commandDispatch,
+        private JobDispatcher $jobDispatcher,
         private DownloadPolicyEvaluator $downloadPolicy,
-        private DiscoverStashInput $discovery,
         private BroadcastRepository $broadcasts,
-        private Database $database,
     ) {}
-
-    /**
-     * @param  array<string, mixed>  $options
-     */
-    public function commitInput(StashRecord $stash, CommandRecord $preflightCommand, array $options = [], ?JobHandlerContext $context = null, ?JobRecord $job = null): StashInputCommitResult
-    {
-        $preflight = $this->requireCompletedPreflight($preflightCommand);
-        $preflightResult = $this->decodePreflightResult($preflight);
-
-        $sourceUri = str(ApiJson::string($preflightResult['source_uri'] ?? null))->trim()->toString();
-        $sourceTitle = is_string($preflightResult['source_title'] ?? null) ? $preflightResult['source_title'] : null;
-        $origin = is_string($preflightResult['origin'] ?? null) ? $preflightResult['origin'] : PreflightOrigin::Api->value;
-
-        if ($sourceUri === '') {
-            throw new InvalidArgumentException('Preflight result is missing its source_uri.');
-        }
-
-        $discovered = $this->discovery->execute([
-            'source_uri' => $sourceUri,
-            'source_title' => $sourceTitle,
-            'origin' => $origin,
-            'provider_options' => is_array($options['provider'] ?? null) ? $options['provider'] : [],
-        ], JobIntent::InitialBackfill, $context === null || $job === null ? null : static function (string $stage, ?float $fraction) use ($context, $job): void {
-            $context->progress($job, $fraction === null ? JobProgressUpdate::indeterminate($stage) : JobProgressUpdate::ofPercent($fraction * 100, $stage));
-        });
-
-        return $this->commitDiscoveredInput($stash, $discovered, $options, (string) $preflight->id);
-    }
 
     /**
      * Persists a resolved Input and its discovered items. The caller may wrap
@@ -80,7 +37,7 @@ final readonly class CreateStashFromDiscovery implements InitialInputPersistence
      *
      * @param array<string, mixed> $options
      */
-    public function persistDiscoveredInput(StashRecord $stash, PreflightExecutionResult $discovered, array $options = []): StashInputCommitResult
+    public function persistDiscoveredInput(StashRecord $stash, InputPreflightResult $discovered, array $options = []): StashInputCommitResult
     {
 
         $resolved = $discovered->resolvedInput;
@@ -143,37 +100,8 @@ final readonly class CreateStashFromDiscovery implements InitialInputPersistence
             mediaItemsReused: $counts->mediaItemsReused,
             stashItemsCreated: $counts->stashItemsCreated,
             stashItemsReused: $counts->stashItemsReused,
-            preflightCommandId: '',
             downloadableMediaItemIds: $counts->downloadableMediaItemIds,
         );
-    }
-
-    /** @param array<string, mixed> $options */
-    public function commitDiscoveredInput(StashRecord $stash, PreflightExecutionResult $discovered, array $options = [], string $preflightCommandId = ''): StashInputCommitResult
-    {
-        $result = null;
-        $committed = $this->database->withinTransaction(function () use ($stash, $discovered, $options, &$result): void {
-            $result = $this->persistDiscoveredInput($stash, $discovered, $options);
-        });
-
-        if (! $committed || ! $result instanceof StashInputCommitResult) {
-            throw new RuntimeException('Failed to commit stash input.');
-        }
-
-        $result = new StashInputCommitResult(
-            stashId: $result->stashId,
-            stashInputId: $result->stashInputId,
-            mediaItemsCreated: $result->mediaItemsCreated,
-            mediaItemsReused: $result->mediaItemsReused,
-            stashItemsCreated: $result->stashItemsCreated,
-            stashItemsReused: $result->stashItemsReused,
-            preflightCommandId: $preflightCommandId,
-            downloadableMediaItemIds: $result->downloadableMediaItemIds,
-        );
-
-        $this->dispatchFollowups($stash, $result);
-
-        return $result;
     }
 
     public function dispatchFollowups(StashRecord $stash, StashInputCommitResult $result): void
@@ -182,42 +110,19 @@ final readonly class CreateStashFromDiscovery implements InitialInputPersistence
 
         if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
             foreach ($result->downloadableMediaItemIds as $mediaItemId) {
-                $this->commandDispatch->dispatch(CommandType::ItemDownload, [
-                    'mediaItemId' => $mediaItemId,
-                    'stashId' => $stashId->toString(),
-                ]);
+                $this->jobDispatcher->dispatch('core.download', 'media_item', $mediaItemId, $stashId->toString(), [
+                    'media_item_id' => $mediaItemId,
+                    'stash_id' => $stashId->toString(),
+                ], 'background');
             }
         }
 
         foreach ($this->broadcasts->listForStash($stashId) as $broadcast) {
-            $this->commandDispatch->dispatch(CommandType::BroadcastRebuild, [
+            $this->jobDispatcher->dispatch('core.broadcast', 'broadcast', (string) $broadcast->id, $stashId->toString(), [
                 'broadcast_id' => (string) $broadcast->id,
-            ]);
+                'action' => 'rebuild',
+            ], 'background');
         }
     }
 
-    private function requireCompletedPreflight(CommandRecord $preflightCommand): CommandRecord
-    {
-        $command = $this->commands->find(CommandId::fromPrimaryKey($preflightCommand->id));
-
-        if ($command === null || $command->type !== CommandType::StashPreflight) {
-            throw new InvalidArgumentException('Preflight command not found.');
-        }
-
-        if ($command->state !== CommandState::Completed) {
-            throw new InvalidArgumentException('Preflight command must be completed before adding an input.');
-        }
-
-        if ($command->result === null) {
-            throw new InvalidArgumentException('Preflight command is missing stored results.');
-        }
-
-        return $command;
-    }
-
-    /** @return array<string, mixed> */
-    private function decodePreflightResult(CommandRecord $command): array
-    {
-        return $command->result ?? throw new InvalidArgumentException('Preflight result is missing.');
-    }
 }

@@ -29,7 +29,7 @@ final readonly class SchedulerTickCommand
         $count = $this->scheduler->runDueChecks();
 
         if ($count > 0) {
-            $this->console->info("Scheduled {$count} routine preflight job(s).");
+            $this->console->info("Scheduled {$count} routine sync job(s).");
         }
 
         return ExitCode::SUCCESS;

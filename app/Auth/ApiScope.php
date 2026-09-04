@@ -21,6 +21,5 @@ enum ApiScope: string
     case MediaServerRead = 'media-server:read';
     /** @deprecated Historical token scope retained for old credentials. */
     case MediaServerWrite = 'media-server:write';
-    case CommandsCreate = 'commands:create';
     case TokensManage = 'tokens:manage';
 }

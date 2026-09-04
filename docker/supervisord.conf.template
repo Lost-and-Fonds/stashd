@@ -22,11 +22,8 @@ stdout_logfile_maxbytes=0
 stderr_logfile=/dev/fd/2
 stderr_logfile_maxbytes=0
 
-; One worker program per lane: interactive jobs (preflights, add-input --
-; things a human is watching) never queue behind bulk work (downloads,
-; transcodes, broadcast rebuilds), and fresh-channel discovery doesn't wait
-; on either. Lanes stay in one container / PID namespace so stale-job
-; recovery can verify owner-process liveness across lanes.
+; Messenger consumers use the two core workloads. PostgreSQL LISTEN/NOTIFY
+; keeps idle consumers blocked without repeatedly booting PHP.
 
 [program:worker-interactive]
 command=/usr/local/bin/stashd-entrypoint worker interactive
@@ -40,20 +37,8 @@ stdout_logfile_maxbytes=0
 stderr_logfile=/dev/fd/2
 stderr_logfile_maxbytes=0
 
-[program:worker-discovery]
-command=/usr/local/bin/stashd-entrypoint worker discovery
-directory=__APP_DIR__
-autostart=true
-autorestart=true
-startsecs=10
-startretries=999999
-stdout_logfile=/dev/fd/1
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/fd/2
-stderr_logfile_maxbytes=0
-
-[program:worker-bulk]
-command=/usr/local/bin/stashd-entrypoint worker bulk
+[program:worker-background]
+command=/usr/local/bin/stashd-entrypoint worker background
 directory=__APP_DIR__
 autostart=true
 autorestart=true
