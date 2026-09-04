@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Jobs\JobId;
-use App\Jobs\JobIntent;
+use App\Jobs\JobType;
 use App\Jobs\JobRepository;
 use Tempest\DateTime\Duration;
 
 test('progressEtaSeconds round-trips through Duration on insert and update', function (): void {
     $jobs = $this->container->get(JobRepository::class);
-    $job = $jobs->create(intent: JobIntent::Enrich, entityType: 'test');
+    $job = $jobs->create(intent: JobType::core('core.enrich'), entityType: 'test');
 
     expect($job->progressEtaSeconds)->toBeNull();
 

@@ -16,22 +16,34 @@ TMP="$(mktemp -d)"
 PUID="$(id -u)"
 PGID="$(id -g)"
 
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    CONTAINER=docker
+elif command -v podman >/dev/null 2>&1; then
+    CONTAINER=podman
+else
+    echo "e2e failed: docker or podman is required" >&2
+    exit 127
+fi
+
 cleanup() {
-    docker rm -f "$NAME" >/dev/null 2>&1 || true
-    docker rm -f "$PG_NAME" >/dev/null 2>&1 || true
-    docker network rm "$NETWORK" >/dev/null 2>&1 || true
-    rm -rf "$TMP"
+    $CONTAINER rm -f "$NAME" >/dev/null 2>&1 || true
+    $CONTAINER rm -f "$PG_NAME" >/dev/null 2>&1 || true
+    $CONTAINER network rm "$NETWORK" >/dev/null 2>&1 || true
+
+    if ! rm -rf "$TMP" 2>/dev/null && [ "$CONTAINER" = podman ]; then
+        podman unshare rm -rf "$TMP"
+    fi
 }
 trap cleanup EXIT INT TERM
 
 mkdir -p "$TMP/data" "$TMP/media"
 if [ "$SKIP_BUILD" != "1" ]; then
-    docker build -t "$IMAGE" "$ROOT"
+    $CONTAINER build -t "$IMAGE" "$ROOT"
 fi
 
 # PostgreSQL is the default runtime, so the app cannot boot without one.
-docker network create "$NETWORK" >/dev/null 2>&1 || true
-docker run -d --name "$PG_NAME" --network "$NETWORK" --network-alias postgres \
+$CONTAINER network create "$NETWORK" >/dev/null 2>&1 || true
+$CONTAINER run -d --name "$PG_NAME" --network "$NETWORK" --network-alias postgres \
     -e POSTGRES_DB="$PG_DB" \
     -e POSTGRES_USER="$PG_USER" \
     -e POSTGRES_PASSWORD="$PG_PASSWORD" \
@@ -39,18 +51,18 @@ docker run -d --name "$PG_NAME" --network "$NETWORK" --network-alias postgres \
 
 pg_deadline=$(( $(date +%s) + TIMEOUT ))
 while :; do
-    if docker exec "$PG_NAME" pg_isready -U "$PG_USER" -d "$PG_DB" >/dev/null 2>&1; then
+    if $CONTAINER exec "$PG_NAME" pg_isready -U "$PG_USER" -d "$PG_DB" >/dev/null 2>&1; then
         break
     fi
     if [ "$(date +%s)" -ge "$pg_deadline" ]; then
         echo "e2e failed: PostgreSQL not ready within ${TIMEOUT}s" >&2
-        docker logs "$PG_NAME" 2>&1 || true
+        $CONTAINER logs "$PG_NAME" 2>&1 || true
         exit 1
     fi
     sleep 2
 done
 
-docker run -d --name "$NAME" --network "$NETWORK" \
+$CONTAINER run -d --name "$NAME" --network "$NETWORK" \
     -e STASHD_DATA_PATH=/data -e STASHD_MEDIA_PATH=/media \
     -e PUID="$PUID" -e PGID="$PGID" \
     -e DB_CONNECTION=pgsql \
@@ -67,7 +79,7 @@ health_deadline=$(( $(date +%s) + TIMEOUT ))
 until curl -fsS http://127.0.0.1:18475/health >/dev/null 2>&1; do
     if [ "$(date +%s)" -ge "$health_deadline" ]; then
         echo "e2e failed: health endpoint not ready within ${TIMEOUT}s" >&2
-        docker logs "$NAME" 2>&1 || true
+        $CONTAINER logs "$NAME" 2>&1 || true
         exit 1
     fi
     sleep 2

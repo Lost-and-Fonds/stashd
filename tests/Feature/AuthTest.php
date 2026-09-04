@@ -179,7 +179,7 @@ test('api token authenticates protected routes', function (): void {
         'sourceUri' => 'fake://channel/auth-demo',
     ], headers: $headers);
 
-    $preflight->assertStatus(Status::CREATED);
+    $preflight->assertStatus(Status::OK);
 });
 
 test('protected routes require setup before owner exists', function (): void {

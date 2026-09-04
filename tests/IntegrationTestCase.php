@@ -6,7 +6,10 @@ namespace Tests;
 
 use App\Auth\AuthService;
 use App\Auth\UserRepository;
-use App\Jobs\JobWorkerService;
+use App\Jobs\MessengerWorkerRunner;
+use App\Plugins\ExternalInputPluginRegistry;
+use App\Plugins\PluginInputDefinition;
+use App\Providers\Fake\FakeProvider;
 use App\Stashes\StashItemRecord;
 use App\Vault\MediaItemRecord;
 use Tempest\Database\Direction;
@@ -61,30 +64,25 @@ abstract class IntegrationTestCase extends IntegrationTest
 
     public function processAllJobs(): void
     {
-        $worker = $this->container->get(JobWorkerService::class);
-
-        while ($worker->processNextJob()) {
-        }
+        $runner = $this->container->get(MessengerWorkerRunner::class);
+        $runner->drain('interactive');
+        $runner->drain('background');
     }
 
     /** Adds a stash holding one fake channel input, via the real add-input flow. */
     public function bootstrapFakeChannelStash(string $channel): string
     {
         $headers = $this->authHeaders();
+        $this->registerFakeInputPlugin();
 
         $stash = $this->http->post('/api/v1/stashes', ['name' => 'Stash ' . $channel], headers: $headers)
             ->assertStatus(Status::CREATED);
         $stashId = $stash->body['stash']['id'];
 
-        $preflight = $this->http->post('/api/v1/commands', [
-            'type' => 'stash.preflight',
-            'options' => ['source_uri' => 'fake://channel/' . $channel],
-        ], headers: $headers)->assertStatus(Status::CREATED);
-        $this->processAllJobs();
-
         $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
-            'preflight_command_id' => $preflight->body['command_id'],
-        ], headers: $headers)->assertStatus(Status::CREATED);
+            'plugin' => 'fake-input',
+            'source' => ['reference' => 'fake://channel/' . $channel],
+        ], headers: $headers)->assertStatus(Status::ACCEPTED);
         $this->processAllJobs();
 
         return $stashId;
@@ -94,6 +92,7 @@ abstract class IntegrationTestCase extends IntegrationTest
     public function bootstrapFakeDownloadStash(string $channel = 'download-demo'): array
     {
         $headers = $this->authHeaders();
+        $this->registerFakeInputPlugin();
 
         $stash = $this->http->post('/api/v1/stashes', [
             'name' => $channel . '-' . bin2hex(random_bytes(3)),
@@ -101,15 +100,10 @@ abstract class IntegrationTestCase extends IntegrationTest
         ], headers: $headers)->assertStatus(Status::CREATED);
         $stashId = $stash->body['stash']['id'];
 
-        $preflight = $this->http->post('/api/v1/commands', [
-            'type' => 'stash.preflight',
-            'options' => ['source_uri' => 'fake://channel/' . $channel],
-        ], headers: $headers)->assertStatus(Status::CREATED);
-        $this->processAllJobs();
-
         $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
-            'preflight_command_id' => $preflight->body['command_id'],
-        ], headers: $headers)->assertStatus(Status::CREATED);
+            'plugin' => 'fake-input',
+            'source' => ['reference' => 'fake://channel/' . $channel],
+        ], headers: $headers)->assertStatus(Status::ACCEPTED);
         $this->processAllJobs();
 
         $stashItem = StashItemRecord::select()
@@ -121,38 +115,19 @@ abstract class IntegrationTestCase extends IntegrationTest
         return [$headers, $stashId, (string) $media->id];
     }
 
-    /** @return array{0: array{Authorization: string}, 1: string, 2: string} */
-    public function bootstrapYouTubeDownloadStash(string $slug = 'youtube-download-demo'): array
+    private function registerFakeInputPlugin(): void
     {
-        $headers = $this->authHeaders();
+        $definition = PluginInputDefinition::from([
+            'kind' => 'input',
+            'id' => 'fake-input',
+            'provider_key' => 'fake',
+            'name' => 'Fake Input',
+            'source_fields' => [['key' => 'reference', 'label' => 'Reference', 'type' => 'text', 'required' => true]],
+        ], __DIR__) ?? throw new \RuntimeException('Failed to create fake Input definition.');
 
-        $stash = $this->http->post('/api/v1/stashes', [
-            'name' => $slug . '-' . bin2hex(random_bytes(3)),
-            'download_policy' => 'manual_download',
-        ], headers: $headers)->assertStatus(Status::CREATED);
-        $stashId = $stash->body['stash']['id'];
-
-        $preflight = $this->http->post('/api/v1/commands', [
-            'type' => 'stash.preflight',
-            'options' => [
-                'source_uri' => 'https://www.youtube.com/channel/UCStashdDemoCh0012345678',
-                'source_title' => 'YouTube Download Demo',
-            ],
-        ], headers: $headers)->assertStatus(Status::CREATED);
-        $this->processAllJobs();
-
-        $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
-            'preflight_command_id' => $preflight->body['command_id'],
-        ], headers: $headers)->assertStatus(Status::CREATED);
-        $this->processAllJobs();
-
-        $stashItem = StashItemRecord::select()
-            ->where('stashId', $stashId)
-            ->orderBy('position', Direction::ASC)
-            ->first();
-        $media = MediaItemRecord::findById(new PrimaryKey((string) $stashItem->mediaItemId));
-
-        return [$headers, $stashId, (string) $media->id];
+        $this->container->singleton(ExternalInputPluginRegistry::class, new ExternalInputPluginRegistry([
+            $this->container->get(FakeProvider::class),
+        ], [$definition]));
     }
 
     /**

@@ -216,6 +216,11 @@ pest()->extend(IntegrationTestCase::class)
         unset($_SERVER['REMOTE_ADDR']);
 
         $this->useTestingDatabase();
+        // Tempest's baseline migration is intentionally upgrade-oriented and
+        // has no down migration. Drop the isolated test schema first so a
+        // reset cannot replay CREATE TABLE statements over the old baseline.
+        $this->container->get(Database::class)->execute(new Query('DROP SCHEMA public CASCADE'));
+        $this->container->get(Database::class)->execute(new Query('CREATE SCHEMA public'));
         $this->database->reset();
 
     })

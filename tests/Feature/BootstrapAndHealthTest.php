@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Commands\CommandRecord;
 use App\Config\StashdConfig;
-use App\Jobs\JobRecord;
 use App\Providers\ProviderRegistry;
 use App\Providers\StashdUri;
 use App\System\Boot\BootstrapService;
@@ -23,14 +21,11 @@ use Tempest\Database\Migrations\RunnableMigrations;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Query;
 
-test('boot creates schema command and job records', function (): void {
+test('boot prepares storage without creating a user job', function (): void {
     $bootstrap = $this->container->get(BootstrapService::class);
     $result = $bootstrap->boot();
 
-    expect($result['command_id'])->toStartWith('cmd_')
-        ->and($result['job_id'])->toStartWith('job_')
-        ->and(CommandRecord::findById(new PrimaryKey($result['command_id'])))->not->toBeNull()
-        ->and(JobRecord::findById(new PrimaryKey($result['job_id'])))->not->toBeNull()
+    expect($result)->toHaveKey('directories_created')
         ->and(StorageLocationRecord::select()->all())->toHaveCount(5)
         ->and(StorageCheckRecord::select()->all())->not->toBeEmpty();
 });
