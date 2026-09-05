@@ -199,7 +199,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 'title' => $media->title ?? $stashItem->displayTitle ?? 'Untitled',
                 'description' => $media->description ?? $stashItem->displayDescription,
                 'published-at' => ($media->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
-                'duration_seconds' => null,
+                'duration-seconds' => $media->durationSeconds,
                 'resources' => $resources,
             ];
             $itemStashItemIds[(string) $item->id] = (string) $stashItem->id;
@@ -266,7 +266,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                     'title' => $media->title ?? $stashItem->displayTitle ?? 'Untitled',
                     'description' => $media->description ?? $stashItem->displayDescription,
                     'published-at' => ($media->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
-                    'duration_seconds' => null,
+                    'duration-seconds' => $media->durationSeconds,
                     'resources' => $this->resources($context->broadcast, $media, $stage, $stagedAssets),
                 ];
             }
