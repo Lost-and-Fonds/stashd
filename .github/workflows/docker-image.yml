@@ -251,7 +251,7 @@ jobs:
           echo "E2E test elapsed: $(( $(date +%s) - start )) seconds" | tee -a "$GITHUB_STEP_SUMMARY"
 
   build:
-    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     needs: [quality, smoke, e2e, plugin-runtime]
     runs-on: ubuntu-latest
     steps:
