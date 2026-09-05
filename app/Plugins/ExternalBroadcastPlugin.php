@@ -681,11 +681,22 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     }
 
     /** @param array<string, AssetRecord> $stagedAssets
-     * @return list<array{reference: string, kind: string, derivation_key: ?string, url: string, media_type: ?string, size_bytes: int}>
+     * @return list<array{reference: string, kind: string, derivation-key: ?string, url: string, media-type: ?string, size-bytes: int}>
      */
     private function resources(BroadcastRecord $broadcast, MediaItemRecord $media, ?string $stage = null, array &$stagedAssets = []): array
     {
         $resources = [];
+
+        if ($media->thumbnailUri !== null && trim($media->thumbnailUri) !== '') {
+            $resources[] = [
+                'reference' => 'thumbnail',
+                'kind' => 'image',
+                'derivation-key' => null,
+                'url' => $media->thumbnailUri,
+                'media-type' => 'image/jpeg',
+                'size-bytes' => 0,
+            ];
+        }
 
         foreach (AssetRecord::select()->where('mediaItemId', (string) $media->id)->all() as $asset) {
             if (! $asset instanceof AssetRecord || $asset->state !== AssetState::Ready || $asset->path === null) {
@@ -709,10 +720,10 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             $resources[] = [
                 'reference' => $reference,
                 'kind' => $asset->kind->value,
-                'derivation_key' => $asset->derivationKey,
+                'derivation-key' => $asset->derivationKey,
                 'url' => $this->publications->url($publication),
-                'media_type' => $asset->mimeType,
-                'size_bytes' => (int) ($asset->sizeBytes ?? 0),
+                'media-type' => $asset->mimeType,
+                'size-bytes' => (int) ($asset->sizeBytes ?? 0),
             ];
         }
 
