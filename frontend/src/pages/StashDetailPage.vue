@@ -329,7 +329,9 @@ function handleLiveEvent(event: LiveEvent) {
     if (matchesStash || matchesItem) jobs.value = [nextJob, ...jobs.value.filter(job => job.id !== nextJob.id)]
   }
 
-  if (matchesStash) {
+  // Broadcast jobs include the stash ID, but their progress belongs to the
+  // broadcast card. Let those events continue through to broadcastOperations.
+  if (matchesStash && entityType !== 'broadcast') {
     stashOperation.value = operation
     if (entityType !== 'media_item' || event.event === 'job.completed' || event.event === 'job.failed') scheduleRefresh()
     return
