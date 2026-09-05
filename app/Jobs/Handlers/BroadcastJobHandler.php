@@ -130,7 +130,7 @@ final readonly class BroadcastJobHandler implements JobHandler
             'Planning broadcast' => JobProgressUpdate::ofPercent(10.0, $label),
             'Publishing broadcast' => JobProgressUpdate::ofPercent(50.0, $label),
             'Verifying broadcast' => JobProgressUpdate::ofPercent(90.0, $label),
-            default => JobProgressUpdate::indeterminate($label),
+            default => JobProgressUpdate::ofPercent(50.0, $label),
         };
     }
 
@@ -143,7 +143,7 @@ final readonly class BroadcastJobHandler implements JobHandler
     ): array {
         $result = $this->lifecycle->rebuildItem(
             $broadcastItemId,
-            fn(string $label) => $context->progress($job, JobProgressUpdate::indeterminate($label)),
+            fn(string $label) => $context->progress($job, JobProgressUpdate::ofPercent(50.0, $label)),
         );
 
         return $result->toArray();

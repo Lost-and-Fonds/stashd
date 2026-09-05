@@ -123,7 +123,7 @@ function isTerminal(operation: LifecycleOperation | undefined) {
 function operationText(operation: LifecycleOperation | undefined, verb: string) {
   if (!operation) return undefined
   if (operation.state === 'accepted') return `${verb} queued…`
-  if (operation.state === 'running') return operation.label || `${verb}…`
+  if (operation.state === 'running') return `${verb}…`
   if (operation.state === 'completed') return `${verb} complete`
   if (operation.state === 'cancelled') return `${verb} cancelled. Try again.`
   return `${verb} failed. Try again.`
@@ -340,7 +340,15 @@ function handleLiveEvent(event: LiveEvent) {
   const broadcastId = broadcast?.id ?? Object.entries(broadcastOperations.value).find(([, candidate]) => candidate?.id === jobId)?.[0]
 
   if (inputId) inputOperations.value = { ...inputOperations.value, [inputId]: operation }
-  if (broadcastId) broadcastOperations.value = { ...broadcastOperations.value, [broadcastId]: operation }
+  if (broadcastId) {
+    if (event.event === 'job.completed') {
+      const next = { ...broadcastOperations.value }
+      delete next[broadcastId]
+      broadcastOperations.value = next
+    } else {
+      broadcastOperations.value = { ...broadcastOperations.value, [broadcastId]: operation }
+    }
+  }
 
   if ((event.event === 'job.completed' || event.event === 'job.failed') && (inputId || broadcastId || matchesItem)) scheduleRefresh()
 }
@@ -572,7 +580,13 @@ async function load() {
     if (input.sync_operation) inputOperations.value = { ...inputOperations.value, [input.id]: input.sync_operation }
   }
   for (const broadcast of broadcasts.value) {
-    if (broadcast.rebuild_operation) broadcastOperations.value = { ...broadcastOperations.value, [broadcast.id]: broadcast.rebuild_operation }
+    if (broadcast.rebuild_operation?.state === 'completed') {
+      const next = { ...broadcastOperations.value }
+      delete next[broadcast.id]
+      broadcastOperations.value = next
+    } else if (broadcast.rebuild_operation) {
+      broadcastOperations.value = { ...broadcastOperations.value, [broadcast.id]: broadcast.rebuild_operation }
+    }
   }
 
   if (replacingPage) loading.value = false
