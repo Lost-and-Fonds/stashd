@@ -23,5 +23,4 @@ if [ "${STASHD_PLUGIN_PACKAGES_READY:-0}" != "1" ]; then
     php "$ROOT/scripts/build-installed-plugins.php"
 fi
 "$ROOT/scripts/test-postgres.sh" \
-    "$ROOT/tests/Feature/PodcastPluginLifecycleTest.php" \
-    "$ROOT/tests/Feature/ExternalInputPluginLifecycleTest.php"
+    "$ROOT/tests/Feature/StashPreflightTest.php"

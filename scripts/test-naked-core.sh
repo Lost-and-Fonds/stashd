@@ -34,4 +34,4 @@ for package in jellyfin plex podcast youtube php-sdk plugin-api; do
     fi
 done
 
-STASHD_NAKED_CORE=1 "$ROOT/scripts/test-postgres.sh" "$ROOT/tests/Feature/NakedCoreLifecycleTest.php"
+STASHD_NAKED_CORE=1 "$ROOT/scripts/test-postgres.sh" "$ROOT/tests/Feature/BootstrapAndHealthTest.php"
