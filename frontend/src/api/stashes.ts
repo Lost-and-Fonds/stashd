@@ -27,10 +27,22 @@ export interface InputPreflight {
   } | null
 }
 
-export async function fetchStashes(): Promise<StashApiResource[]> {
+const stashCacheTtl = 30_000
+let stashesCache: { value: StashApiResource[], fetchedAt: number } | undefined
+
+export async function fetchStashes(options: { force?: boolean } = {}): Promise<StashApiResource[]> {
+  if (!options.force && stashesCache && Date.now() - stashesCache.fetchedAt < stashCacheTtl) return stashesCache.value
+
   const body = await responseBody<{ stashes?: StashApiResource[] }>(await apiFetch('/api/v1/stashes'))
 
-  return body.stashes ?? []
+  if (!body || !Array.isArray(body.stashes)) throw new Error('Stashes response was empty.')
+  stashesCache = { value: body.stashes, fetchedAt: Date.now() }
+
+  return body.stashes
+}
+
+export function invalidateStashesCache(): void {
+  stashesCache = undefined
 }
 
 export async function syncStash(stashId: string): Promise<string[]> {
@@ -42,7 +54,9 @@ export async function syncStash(stashId: string): Promise<string[]> {
 
 export async function fetchStash(stashId: string): Promise<StashApiResource> {
   const response = await apiFetch(`/api/v1/stashes/${encodeURIComponent(stashId)}`)
-  const body = await responseBody<{ stash: StashApiResource }>(response)
+  const body = await responseBody<{ stash?: StashApiResource }>(response)
+
+  if (!body?.stash) throw new Error('Stash response was empty.')
 
   return body.stash
 }
@@ -72,6 +86,8 @@ export async function updateStash(stashId: string, input: UpdateStashInput): Pro
     body: JSON.stringify(input)
   })
   const body = await responseBody<{ stash: StashApiResource }>(response)
+  invalidateStashesCache()
+
   return body.stash
 }
 
@@ -83,6 +99,7 @@ export async function fetchStashDeleteImpact(stashId: string): Promise<StashDele
 
 export async function deleteStash(stashId: string): Promise<void> {
   await responseBody(await apiFetch(`/api/v1/stashes/${encodeURIComponent(stashId)}`, { method: 'DELETE' }))
+  invalidateStashesCache()
 }
 
 export async function retryFailedStash(stashId: string): Promise<string> {

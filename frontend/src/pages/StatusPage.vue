@@ -32,8 +32,16 @@ let jobsRefreshTimer: ReturnType<typeof setTimeout> | undefined
 const activeJobs = computed(() => jobs.value.filter(job => ['pending', 'processing', 'retrying'].includes(job.state)))
 const attention = computed(() => {
   const recentCutoff = Date.now() - 24 * 60 * 60 * 1000
+  const jobDate = (job: JobApiResource) => Date.parse(job.finished_at ?? job.updated_at ?? job.created_at ?? '')
+  const jobKey = (job: JobApiResource) => `${job.type}:${job.entity_type ?? ''}:${job.entity_id ?? ''}`
+  const latestJobs = new Map<string, JobApiResource>()
+  for (const job of jobs.value) {
+    const current = latestJobs.get(jobKey(job))
+    if (!current || jobDate(job) > jobDate(current)) latestJobs.set(jobKey(job), job)
+  }
   const failedJobs = jobs.value
     .filter(job => job.state === 'failed' && Date.parse(job.finished_at ?? job.updated_at ?? job.created_at ?? '') >= recentCutoff)
+    .filter(job => latestJobs.get(jobKey(job))?.id === job.id)
     .sort((left, right) => Date.parse(right.finished_at ?? right.updated_at ?? right.created_at ?? '') - Date.parse(left.finished_at ?? left.updated_at ?? left.created_at ?? ''))
   const visibleFailedJobs = [] as JobApiResource[]
   const failureKeys = new Set<string>()

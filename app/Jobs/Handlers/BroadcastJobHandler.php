@@ -113,11 +113,25 @@ final readonly class BroadcastJobHandler implements JobHandler
 
         $result = $this->lifecycle->rebuild(
             $broadcastId,
-            fn(string $label) => $context->progress($job, JobProgressUpdate::indeterminate($label)),
+            fn(string $label, ?float $fraction = null) => $context->progress($job, $this->rebuildProgress($label, $fraction)),
         );
 
 
         return $result->toArray();
+    }
+
+    private function rebuildProgress(string $label, ?float $fraction = null): JobProgressUpdate
+    {
+        if ($fraction !== null) {
+            return JobProgressUpdate::ofPercent($fraction * 100, $label);
+        }
+
+        return match ($label) {
+            'Planning broadcast' => JobProgressUpdate::ofPercent(10.0, $label),
+            'Publishing broadcast' => JobProgressUpdate::ofPercent(50.0, $label),
+            'Verifying broadcast' => JobProgressUpdate::ofPercent(90.0, $label),
+            default => JobProgressUpdate::indeterminate($label),
+        };
     }
 
     /** @return array<string, mixed> */

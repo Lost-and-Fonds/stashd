@@ -46,11 +46,26 @@ final readonly class MercurePublisher
             // A down/unreachable hub must never fail the job or request that
             // triggered this notification -- it's a nudge, and the UI
             // re-fetches state on reconnect regardless.
+            static $lastWarningAt = 0.0;
+            static $suppressed = 0;
+            /** @var float $lastWarningAt */
+            /** @var int $suppressed */
+            $now = microtime(true);
+
+            if ($now - $lastWarningAt < 60.0) {
+                $suppressed++;
+
+                return;
+            }
+
             $this->logger->warning('Mercure publish failed', [
                 'event' => $eventName,
                 'exception' => $exception::class,
                 'message' => $exception->getMessage(),
+                'suppressed' => $suppressed,
             ]);
+            $lastWarningAt = $now;
+            $suppressed = 0;
         }
     }
 }

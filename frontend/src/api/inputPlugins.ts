@@ -1,6 +1,7 @@
 import type { SourceFieldDeclaration } from '../adapters/normalizeSourceFields'
 import type { InputOptionDeclaration } from '../types/input'
 import type { StashApiResource } from '../types/stash'
+import { invalidateStashesCache } from './stashes'
 
 export interface InputPluginApiResource { key: string, label: string, source_fields: SourceFieldDeclaration[], input_options: InputOptionDeclaration[] }
 export interface ResolvedSource { plugin_key: string, canonical_reference: string, provider_input_id: string, kind: string, display_name: string | null, source_title?: string | null, source_avatar_uri?: string | null, size_bytes?: number | null, size_estimated?: boolean }
@@ -22,5 +23,8 @@ export async function preflightInputPlugin(plugin: string, source: Record<string
 
 export async function createStashWithInput(name: string, plugin: string, source: Record<string, boolean | number | string>, options: { title_regex_include: string | null, title_regex_exclude: string | null, provider: Record<string, boolean | string> }, resolved: ResolvedSource): Promise<StashApiResource> {
   const response = await fetch('/api/v1/stashes/with-input', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, input: { plugin, source, options, resolved_input: resolved } }) })
-  return (await body<{ stash: StashApiResource }>(response)).stash
+  const stash = (await body<{ stash: StashApiResource }>(response)).stash
+  invalidateStashesCache()
+
+  return stash
 }

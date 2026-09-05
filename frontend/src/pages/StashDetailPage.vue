@@ -117,7 +117,7 @@ function broadcastFacts(broadcast: BroadcastApiResource) {
 }
 
 function isTerminal(operation: LifecycleOperation | undefined) {
-  return operation?.state === 'completed' || operation?.state === 'failed' || operation?.state === 'rejected'
+  return operation?.state === 'completed' || operation?.state === 'failed' || operation?.state === 'cancelled' || operation?.state === 'rejected'
 }
 
 function operationText(operation: LifecycleOperation | undefined, verb: string) {
@@ -125,7 +125,16 @@ function operationText(operation: LifecycleOperation | undefined, verb: string) 
   if (operation.state === 'accepted') return `${verb} queued…`
   if (operation.state === 'running') return operation.label || `${verb}…`
   if (operation.state === 'completed') return `${verb} complete`
+  if (operation.state === 'cancelled') return `${verb} cancelled. Try again.`
   return `${verb} failed. Try again.`
+}
+
+function operationStatus(operation: LifecycleOperation): 'active' | 'complete' | 'queued' | 'failed' {
+  if (operation.state === 'completed') return 'complete'
+  if (operation.state === 'failed' || operation.state === 'cancelled' || operation.state === 'rejected') return 'failed'
+  if (operation.state === 'accepted') return 'queued'
+
+  return 'active'
 }
 
 const failedItemCount = computed(() => items.value.status_counts?.failed ?? 0)
@@ -560,10 +569,10 @@ async function load() {
   else broadcastsError.value = broadcastResult.reason instanceof Error ? broadcastResult.reason.message : 'Could not load Broadcasts.'
 
   for (const input of inputs.value) {
-    if (input.sync_operation && !isTerminal(input.sync_operation)) inputOperations.value = { ...inputOperations.value, [input.id]: input.sync_operation }
+    if (input.sync_operation) inputOperations.value = { ...inputOperations.value, [input.id]: input.sync_operation }
   }
   for (const broadcast of broadcasts.value) {
-    if (broadcast.rebuild_operation && !isTerminal(broadcast.rebuild_operation)) broadcastOperations.value = { ...broadcastOperations.value, [broadcast.id]: broadcast.rebuild_operation }
+    if (broadcast.rebuild_operation) broadcastOperations.value = { ...broadcastOperations.value, [broadcast.id]: broadcast.rebuild_operation }
   }
 
   if (replacingPage) loading.value = false
@@ -734,6 +743,13 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="mt-3 rounded-md bg-elevated p-3">
+            <OperationProgress
+              v-if="broadcastOperations[broadcast.id]"
+              label="Rebuilding broadcast"
+              :percent="broadcastOperations[broadcast.id]?.percent ?? null"
+              :stage="broadcastOperations[broadcast.id]?.label ?? undefined"
+              :status="operationStatus(broadcastOperations[broadcast.id]!)"
+            />
             <div class="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
               <div v-for="fact in broadcastFacts(broadcast)" :key="fact.label" class="flex items-center justify-between gap-3 sm:block sm:justify-normal">
                 <p class="shrink-0 font-mono text-[10px] uppercase tracking-wider text-dimmed sm:mb-1">{{ fact.label }}</p>

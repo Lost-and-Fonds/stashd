@@ -26,6 +26,7 @@ final readonly class BroadcastContext
         public array $mediaItems,
         public array $vaultOriginals,
         public array $stashInputs = [],
+        public mixed $progress = null,
     ) {}
 
     /** @return array<string, mixed> */

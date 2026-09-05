@@ -213,7 +213,13 @@ case "$ROLE" in
         # $APP_DIR is only known at runtime (see the comment near its
         # declaration above), so the per-program `directory=` lines are
         # rendered into place here rather than baked into the image.
-        sed "s#__APP_DIR__#${APP_DIR}#g" /etc/supervisor/stashd.conf.template > /etc/supervisor/conf.d/stashd.conf
+        sed "s#__APP_DIR__#${APP_DIR}#g" /etc/supervisor/stashd.conf.template \
+            | if [ "${STASHD_PAUSE_BACKGROUND_WORK:-0}" = "1" ]; then
+                sed -e '/\[program:worker-background\]/,/^\[/ s/^autostart=true/autostart=false/' \
+                    -e '/\[program:scheduler\]/,/^\[/ s/^autostart=true/autostart=false/'
+            else
+                cat
+            fi > /etc/supervisor/conf.d/stashd.conf
         log "starting supervisord"
         exec /usr/bin/supervisord -n -c /etc/supervisor/supervisord.conf
         ;;

@@ -35,7 +35,7 @@ const color = {
     <div class="flex items-center justify-between gap-2">
       <p class="truncate text-xs text-default">{{ label }}</p>
       <p class="shrink-0 font-mono text-xs text-dimmed">
-        {{ status === 'complete' ? 'complete' : (percent === null ? 'queued' : `${percent}%`) }}
+        {{ status === 'complete' ? 'complete' : (percent === null ? (status === 'queued' ? 'queued' : 'working') : `${percent}%`) }}
       </p>
     </div>
     <UProgress :model-value="percent" :color="color[status]" size="sm" />
@@ -57,7 +57,7 @@ const color = {
         <UIcon name="i-lucide-check" class="size-3.5" />
         complete
       </p>
-      <p v-else class="shrink-0 font-mono text-xs text-dimmed">{{ percent === null ? 'queued' : `${percent}%` }}</p>
+      <p v-else class="shrink-0 font-mono text-xs text-dimmed">{{ percent === null ? (status === 'queued' ? 'queued' : 'working') : `${percent}%` }}</p>
     </div>
 
     <UProgress :model-value="percent" :color="color[status]" size="lg" />

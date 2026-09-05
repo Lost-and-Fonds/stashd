@@ -47,12 +47,12 @@ function statePresentation(state: string) {
   }
 }
 
-async function load(showLoading = true) {
+async function load(showLoading = true, force = false) {
   if (showLoading) loading.value = true
   error.value = undefined
 
   try {
-    stashes.value = await fetchStashes()
+    stashes.value = await fetchStashes({ force })
   } catch (exception) {
     if (showLoading) stashes.value = []
     error.value = exception instanceof Error ? exception.message : 'Could not load Stashes.'
@@ -135,7 +135,7 @@ function refreshFromLiveEvent(event: LiveEvent) {
   if (refreshTimer) return
   refreshTimer = setTimeout(() => {
     refreshTimer = undefined
-    void load(false)
+    void load(false, true)
   }, 250)
 }
 
@@ -173,11 +173,11 @@ onBeforeUnmount(() => {
     <UAlert v-else-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not load Stashes" :description="error" />
     <UAlert v-if="syncNotice" color="success" variant="subtle" icon="i-lucide-check" :description="syncNotice" />
     <UAlert v-if="syncError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Sync failed" :description="syncError" />
-    <div v-else-if="stashes.length === 0" class="rounded-md border border-dashed border-default p-8 text-center">
+    <div v-if="!loading && !error && stashes.length === 0" class="rounded-md border border-dashed border-default p-8 text-center">
       <p class="text-sm text-muted">No Stashes yet.</p>
       <UButton label="Create your first Stash" to="/stashes/new" size="sm" class="mt-3" />
     </div>
-    <div v-else class="divide-y divide-default rounded-md border border-default">
+    <div v-else-if="!loading && !error" class="divide-y divide-default rounded-md border border-default">
       <div v-for="stash in stashes" :key="stash.id" class="flex items-start gap-3 p-4 transition-colors hover:bg-elevated/40 sm:p-5">
         <RouterLink :to="{ name: 'stash-detail', params: { id: stash.id } }" class="flex min-w-0 flex-1 items-start gap-3">
           <img v-if="stash.icon_uri" :src="stash.icon_uri" alt="" class="size-11 shrink-0 rounded-md object-cover" />

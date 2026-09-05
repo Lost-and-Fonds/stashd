@@ -672,12 +672,20 @@ final readonly class StashController
         ], Status::BAD_REQUEST);
     }
 
-    /** @return array{id: string, state: string}|null */
+    /** @return array{id: string, state: string, progress_label: ?string, progress_percent: ?float}|null */
     private function operation(?JobRecord $job): ?array
     {
         return $job === null ? null : [
             'id' => (string) $job->id,
-            'state' => $job->state->value,
+            'state' => match ($job->state) {
+                JobState::Pending, JobState::Retrying => 'accepted',
+                JobState::Processing => 'running',
+                JobState::Ready => 'completed',
+                JobState::Failed => 'failed',
+                JobState::Cancelled => 'cancelled',
+            },
+            'progress_label' => $job->progressLabel,
+            'progress_percent' => $job->progressPercent,
         ];
     }
 

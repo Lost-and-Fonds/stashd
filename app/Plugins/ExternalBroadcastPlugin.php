@@ -218,6 +218,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 $this->definition->prepareHelper === null ? null : $this->definition->helperGrant($this->definition->prepareHelper),
                 $this->httpGrants($context),
                 getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR') ?: null,
+                is_callable($context->progress) ? $context->progress : null,
             );
             $artifacts = $prepared->publication['artifacts'] ?? [];
 
@@ -275,7 +276,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 'settings' => $settings,
                 'sources' => $this->sources($context),
                 'items' => $items,
-            ], null, $this->httpGrants($context), getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR') ?: null);
+            ], null, $this->httpGrants($context), getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR') ?: null, is_callable($context->progress) ? $context->progress : null);
             /** @var array{artifact?: array{reference?: mixed}, files?: mixed} $publication */
             $publication = $result->publication;
             $reference = $publication['artifact']['reference'] ?? null;
@@ -300,6 +301,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 $publication,
                 $this->httpGrants($context),
                 getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR') ?: null,
+                is_callable($context->progress) ? $context->progress : null,
             );
         } catch (BroadcastException $exception) {
             throw $exception;

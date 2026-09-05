@@ -23,21 +23,21 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
     ) {}
 
     /** @param list<PluginHttpGrant>|null $httpGrants */
-    public function prepare(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory): PluginBroadcastResult
+    public function prepare(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory, ?callable $onProgress = null): PluginBroadcastResult
     {
-        return $this->invoke('broadcast.prepare', $stagingDirectory, $broadcast, $helper, $httpGrants, $fixtureDirectory);
+        return $this->invoke('broadcast.prepare', $stagingDirectory, $broadcast, $helper, $httpGrants, $fixtureDirectory, $onProgress);
     }
 
     /** @param list<PluginHttpGrant>|null $httpGrants */
-    public function publish(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory): PluginBroadcastResult
+    public function publish(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory, ?callable $onProgress = null): PluginBroadcastResult
     {
-        return $this->invoke('broadcast.publish', $stagingDirectory, $broadcast, $helper, $httpGrants, $fixtureDirectory);
+        return $this->invoke('broadcast.publish', $stagingDirectory, $broadcast, $helper, $httpGrants, $fixtureDirectory, $onProgress);
     }
 
     /** @param list<PluginHttpGrant>|null $httpGrants */
-    public function finalize(string $stagingDirectory, array $broadcast, array $publication, ?array $httpGrants, ?string $fixtureDirectory): PluginBroadcastResult
+    public function finalize(string $stagingDirectory, array $broadcast, array $publication, ?array $httpGrants, ?string $fixtureDirectory, ?callable $onProgress = null): PluginBroadcastResult
     {
-        return $this->invoke('broadcast.finalize', $stagingDirectory, ['request' => $broadcast, 'publication' => $publication], null, $httpGrants, $fixtureDirectory);
+        return $this->invoke('broadcast.finalize', $stagingDirectory, ['request' => $broadcast, 'publication' => $publication], null, $httpGrants, $fixtureDirectory, $onProgress);
     }
 
     /** @param list<PluginHttpGrant>|null $httpGrants */
@@ -64,16 +64,16 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
     /** @param array<string, mixed> $broadcast
      * @param  list<PluginHttpGrant>|null  $httpGrants
      */
-    private function invoke(string $method, string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory): PluginBroadcastResult
+    private function invoke(string $method, string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory, ?callable $onProgress = null): PluginBroadcastResult
     {
-        return new PluginBroadcastResult([], [], $this->normalizePublication($this->invokeRaw($method, $broadcast, $stagingDirectory, $helper, $httpGrants, $fixtureDirectory)));
+        return new PluginBroadcastResult([], [], $this->normalizePublication($this->invokeRaw($method, $broadcast, $stagingDirectory, $helper, $httpGrants, $fixtureDirectory, $onProgress)));
     }
 
     /** @param array<string, mixed> $params
      * @param  list<PluginHttpGrant>|null  $httpGrants
      * @return array<string, mixed>
      */
-    private function invokeRaw(string $method, array $params, string $stagingDirectory, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory): array
+    private function invokeRaw(string $method, array $params, string $stagingDirectory, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory, ?callable $onProgress = null): array
     {
         $package = $this->packages->activePath($this->pluginId);
 
@@ -129,7 +129,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             $process = $this->runner->start($this->pluginId, $pluginStage);
             /** @var array<string, mixed> $pluginParams */
             $pluginParams = $this->pluginParams($params);
-            $capabilityHandler = /** @param array<string, mixed> $message */ function (array $message) use ($invocation, &$resources): array {
+            $capabilityHandler = /** @param array<string, mixed> $message */ function (array $message) use ($invocation, &$resources, $onProgress): array {
                 $method = is_string($message['method'] ?? null) ? $message['method'] : '';
                 $params = $this->stringKeyed($message['params'] ?? null);
 
@@ -139,7 +139,8 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
                     'staging.write' => $this->writeStaging($invocation, $params),
                     'staging.stage' => $this->stageStaging($invocation, $params),
                     'helper.run' => $this->runHelper($invocation, $params),
-                    'event.log', 'event.progress' => ['accepted' => true],
+                    'event.log' => ['accepted' => true],
+                    'event.progress' => $this->progress($params, $onProgress),
                     default => throw new RuntimeException('Plugin capability is not supported: ' . $method),
                 };
             };
@@ -193,6 +194,22 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
         $resources[$reference] = $response->resource;
 
         return ['status' => $response->status, 'headers' => $response->headers, 'resource' => $reference];
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     * @return array{accepted: true}
+     */
+    private function progress(array $params, ?callable $onProgress): array
+    {
+        if ($onProgress !== null && is_string($params['stage'] ?? null)) {
+            $fraction = is_float($params['fraction'] ?? null) || is_int($params['fraction'] ?? null)
+                ? (float) $params['fraction']
+                : null;
+            $onProgress($params['stage'], $fraction);
+        }
+
+        return ['accepted' => true];
     }
 
     /** @param array<string, ReadableResource> $resources

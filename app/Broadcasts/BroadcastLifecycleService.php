@@ -120,7 +120,7 @@ final readonly class BroadcastLifecycleService
         if ($onProgress !== null) {
             $onProgress('Publishing broadcast');
         }
-        $publish = $this->publishOnly($broadcast, $plan);
+        $publish = $this->publishOnly($broadcast, $plan, $onProgress);
         $broadcast->lastBuiltAt = DateTime::now(Timezone::UTC);
         $broadcast->lastError = null;
         $this->broadcasts->save($broadcast);
@@ -287,9 +287,12 @@ final readonly class BroadcastLifecycleService
         return $plugin->plugin->plan($context);
     }
 
-    private function publishOnly(BroadcastRecord $broadcast, ?BroadcastPlan $plan = null): BroadcastPublishResult
+    private function publishOnly(BroadcastRecord $broadcast, ?BroadcastPlan $plan = null, ?callable $onProgress = null): BroadcastPublishResult
     {
         $context = $this->contextFactory->build($broadcast);
+        if ($onProgress !== null) {
+            $context = new BroadcastContext($context->broadcast, $context->stash, $context->stashItems, $context->mediaItems, $context->vaultOriginals, $context->stashInputs, $onProgress);
+        }
         $plugin = $this->resolvePlugin($context->broadcast->type);
         $plan ??= $plugin->plugin->plan($context);
 
