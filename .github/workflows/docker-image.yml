@@ -383,7 +383,7 @@ jobs:
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
             docker buildx imagetools create --tag "$tag" "$amd64" "$arm64"
-            docker buildx imagetools inspect "$tag" --format '{{json .Manifest.platform}}'
+            docker buildx imagetools inspect "$tag"
           done <<EOF
           ${TAGS}
           EOF
