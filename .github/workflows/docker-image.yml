@@ -185,8 +185,8 @@ jobs:
           target: prod
           load: true
           tags: stashd:smoke
-          cache-from: type=gha,scope=prod
-          cache-to: type=gha,mode=max,scope=prod
+          cache-from: type=gha,scope=prod-amd64
+          cache-to: type=gha,mode=max,scope=prod-amd64
         env:
           BUILDKIT_PROGRESS: plain
 
@@ -225,7 +225,7 @@ jobs:
           target: prod
           load: true
           tags: stashd:e2e
-          cache-from: type=gha,scope=prod
+          cache-from: type=gha,scope=prod-amd64
         env:
           BUILDKIT_PROGRESS: plain
 
