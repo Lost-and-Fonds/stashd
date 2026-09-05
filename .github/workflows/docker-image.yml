@@ -76,10 +76,10 @@ jobs:
           target: dev
           load: true
           tags: stashd:ci
-        env:
-          BUILDKIT_PROGRESS: plain
           cache-from: type=gha,scope=dev
           cache-to: type=gha,mode=max,scope=dev
+        env:
+          BUILDKIT_PROGRESS: plain
 
       - name: Record dev image build timing
         if: always()
@@ -185,10 +185,10 @@ jobs:
           target: prod
           load: true
           tags: stashd:smoke
-        env:
-          BUILDKIT_PROGRESS: plain
           cache-from: type=gha,scope=prod
           cache-to: type=gha,mode=max,scope=prod
+        env:
+          BUILDKIT_PROGRESS: plain
 
       - name: Record smoke image build timing
         if: always()
@@ -225,10 +225,9 @@ jobs:
           target: prod
           load: true
           tags: stashd:e2e
+          cache-from: type=gha,scope=prod
         env:
           BUILDKIT_PROGRESS: plain
-          cache-from: type=gha,scope=prod
-          cache-to: type=gha,mode=max,scope=prod
 
       - name: Record E2E image build timing
         if: always()
