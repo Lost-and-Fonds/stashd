@@ -843,9 +843,14 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     /** @return list<array{key: string, value: array{kind: string, value: bool|int|string}}> */
     private function settings(BroadcastContext $context): array
     {
+        $values = $context->settings();
+        $values['broadcast_name'] ??= $context->broadcast->name;
+        $values['stash_name'] ??= $context->stash->name;
+        $values['stash_description'] ??= $context->stash->description;
+        $values['stash_icon_uri'] ??= $context->stash->iconUri;
         $settings = [];
 
-        foreach ($context->settings() as $key => $value) {
+        foreach ($values as $key => $value) {
             if (! is_bool($value) && ! is_scalar($value)) {
                 continue;
             }
