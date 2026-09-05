@@ -5,25 +5,18 @@ FROM docker.io/node:22-bookworm-slim AS node
 FROM node AS frontend-assets
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --include=optional
+RUN --mount=type=cache,target=/root/.npm npm ci --include=optional
 COPY index.html vite.config.ts tsconfig*.json ./
 COPY frontend ./frontend
-RUN npm run build
+RUN --mount=type=cache,target=/root/.npm npm run build
 
-FROM docker.io/dunglas/frankenphp:1-php8.5-bookworm AS base
+FROM debian:bookworm-slim AS oci-tools
 
-ARG PUID=1000
-ARG PGID=1000
 ARG TARGETARCH=amd64
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        git unzip gosu supervisor libpq-dev libicu-dev curl bubblewrap gnupg \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg tar \
     && rm -rf /var/lib/apt/lists/*
-
-RUN install-php-extensions pdo_pgsql sockets intl \
-    && php -m | grep -i '^uri$' >/dev/null \
-    && php -r 'exit(extension_loaded("uri") ? 0 : 1);'
 
 RUN set -eux; \
     case "${TARGETARCH}" in \
@@ -43,9 +36,7 @@ RUN set -eux; \
     gpg --batch --status-fd=1 --verify "${temporary}/umoci.asc" "${temporary}/umoci" >"${temporary}/signature.txt" 2>&1; \
     grep -F 'VALIDSIG B64E4955B29FA3D463F2A9062897FAD2B7E9446F' "${temporary}/signature.txt"; \
     install -D -m 0555 "${temporary}/umoci" /usr/local/libexec/stashd/umoci; \
-    /usr/local/libexec/stashd/umoci --version | grep -F '0.6.0'; \
-    apt-get purge -y --auto-remove gnupg >/dev/null; \
-    rm -rf /var/lib/apt/lists/*
+    /usr/local/libexec/stashd/umoci --version | grep -F '0.6.0'
 
 RUN set -eux; \
     case "${TARGETARCH}" in \
@@ -61,7 +52,18 @@ RUN set -eux; \
     install -D -m 0555 "${temporary}/oras" /usr/local/libexec/stashd/oras; \
     /usr/local/libexec/stashd/oras version | grep -F '1.3.3'
 
-COPY --from=composer /usr/bin/composer /usr/bin/composer
+FROM docker.io/dunglas/frankenphp:1-php8.5-bookworm AS base
+
+ARG PUID=1000
+ARG PGID=1000
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        gosu supervisor curl bubblewrap \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN install-php-extensions pdo_pgsql intl
+COPY --from=oci-tools /usr/local/libexec/stashd /usr/local/libexec/stashd
 
 WORKDIR /var/www/html
 
@@ -85,25 +87,38 @@ CMD ["all"]
 FROM base AS dev
 
 COPY --from=node /usr/local /usr/local
+COPY --from=composer /usr/bin/composer /usr/bin/composer
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential pkg-config \
+    && apt-get install -y --no-install-recommends build-essential git pkg-config unzip \
     && rm -rf /var/lib/apt/lists/* \
     && IPE_PROCESSOR_COUNT=2 install-php-extensions xdebug pcov
 
 COPY docker/php-dev.ini /usr/local/etc/php/conf.d/zz-stashd-dev.ini
 ENV XDEBUG_MODE=off
 
+FROM base AS dependencies
+
+COPY --from=composer /usr/bin/composer /usr/bin/composer
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /var/www/html
+COPY composer.json composer.lock ./
+ENV COMPOSER_CACHE_DIR=/tmp/composer-cache
+RUN --mount=type=cache,target=/tmp/composer-cache \
+    composer install --no-dev --prefer-dist --no-progress --optimize-autoloader --no-interaction --no-scripts
+
 FROM base AS prod
 
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
-
-COPY . .
+COPY --from=dependencies /var/www/html/vendor ./vendor
+COPY composer.json ./composer.json
+COPY docker/Caddyfile ./docker/Caddyfile
+COPY app ./app
+COPY bootstrap ./bootstrap
+COPY database ./database
+COPY packages ./packages
+COPY public ./public
+COPY tempest ./tempest
 COPY --from=frontend-assets /app/public ./public
-RUN git config --global --add safe.directory /var/www/html \
-    && composer dump-autoload --optimize \
-    && php vendor/bin/tempest discovery:generate --no-interaction \
-    && rm -rf .tempest
-
-RUN chown -R stashd:stashd /var/www/html

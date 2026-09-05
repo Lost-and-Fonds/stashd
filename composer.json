@@ -66,6 +66,7 @@
     "prefer-stable": true,
     "repositories": [],
     "config": {
+        "process-timeout": 1200,
         "allow-plugins": {
             "php-http/discovery": true,
             "pestphp/pest-plugin": true

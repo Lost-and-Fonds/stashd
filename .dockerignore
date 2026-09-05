@@ -5,8 +5,6 @@
 .lerd.yaml
 
 vendor/*
-!vendor/stashd/
-vendor/stashd/*
 node_modules/
 dist/
 auto-imports.d.ts
@@ -33,3 +31,15 @@ reference/wasmtime/
 .env.*
 .phpunit.result.cache
 composer.phar
+
+# Not needed by the production image or its build stages.
+.alchemy/
+docs/
+e2e/
+test-results/
+tests/
+playwright*.config.ts
+alchemy.yml
+docker-compose*.yml
+bin/test
+bin/upgrade-rehearsal

@@ -12,4 +12,9 @@ if [ "${CI:-}" = "1" ] || [ "${CI:-}" = "true" ] || [ "${GITHUB_ACTIONS:-}" = "t
     exec "$ROOT/vendor/bin/pest" "$@"
 fi
 
+if [ -f "$ROOT/.lerd.yaml" ] && grep -q '^container:' "$ROOT/.lerd.yaml" && command -v podman >/dev/null 2>&1; then
+    SITE_NAME=$(sed -n 's/^  - //p' "$ROOT/.lerd.yaml" | head -n 1)
+    exec podman exec -w "$ROOT" "lerd-custom-${SITE_NAME:-$(basename "$ROOT")}" composer test -- "$@"
+fi
+
 exec lerd composer test -- "$@"

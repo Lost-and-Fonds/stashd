@@ -96,6 +96,11 @@ ensure_signing_key() {
             fi
         fi
 
+        if [ ! -f "$APP_DIR/.env" ] && [ "$(id -u)" -eq 0 ]; then
+            touch "$APP_DIR/.env"
+            chown "${PUID}:${PGID}" "$APP_DIR/.env" || true
+        fi
+
         run_app php tempest key:generate --no-override
 
         cp "$APP_DIR/.env" "$persisted_env"
@@ -156,7 +161,9 @@ ensure_mercure_secret() {
 # schema in place but no rows yet.
 prepare_runtime_env() {
     cd "$APP_DIR"
-    git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+    if command -v git >/dev/null 2>&1 && git -C "$APP_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+    fi
     export STASHD_DATA_PATH="$DATA_DIR"
     export STASHD_MEDIA_PATH="$MEDIA_DIR"
     if [ "$APP_DIR" = "/var/www/html" ]; then
