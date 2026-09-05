@@ -329,13 +329,6 @@ function handleLiveEvent(event: LiveEvent) {
     if (matchesStash || matchesItem) jobs.value = [nextJob, ...jobs.value.filter(job => job.id !== nextJob.id)]
   }
 
-  // Broadcast jobs include the stash ID, but their progress belongs to the
-  // broadcast card. Let those events continue through to broadcastOperations.
-  if (matchesStash && entityType !== 'broadcast') {
-    stashOperation.value = operation
-    if (entityType !== 'media_item' || event.event === 'job.completed' || event.event === 'job.failed') scheduleRefresh()
-    return
-  }
   const input = inputs.value.find(candidate => candidate.id === entityId)
   const broadcast = broadcasts.value.find(candidate => candidate.id === entityId)
   const inputId = input?.id ?? Object.entries(inputOperations.value).find(([, candidate]) => candidate?.id === jobId)?.[0]
@@ -350,6 +343,15 @@ function handleLiveEvent(event: LiveEvent) {
     } else {
       broadcastOperations.value = { ...broadcastOperations.value, [broadcastId]: operation }
     }
+  }
+
+  if (matchesStash && !inputId && !broadcastId) {
+    stashOperation.value = operation
+  }
+
+  if (matchesStash && (inputId || broadcastId)) {
+    if (entityType !== 'media_item' || event.event === 'job.completed' || event.event === 'job.failed') scheduleRefresh()
+    return
   }
 
   if ((event.event === 'job.completed' || event.event === 'job.failed') && (inputId || broadcastId || matchesItem)) scheduleRefresh()
