@@ -63,8 +63,23 @@ assert_schema_present() {
     fi
 }
 
+curl_request() {
+    curl --connect-timeout 5 --max-time 20 "$@"
+}
+
 http_status() {
-    curl -s -o /dev/null -w '%{http_code}' "$@"
+    curl_request -s -o /dev/null -w '%{http_code}' "$@"
+}
+
+diagnose_container() {
+    echo "--- container state ---" >&2
+    $CONTAINER inspect --format '{{.State.Status}} exit={{.State.ExitCode}} pid={{.State.Pid}}' "$NAME" 2>&1 || true
+    echo "--- supervisor status ---" >&2
+    $CONTAINER exec "$NAME" supervisorctl status 2>&1 || true
+    echo "--- container processes ---" >&2
+    $CONTAINER exec "$NAME" ps -ef 2>&1 || true
+    echo "--- container logs ---" >&2
+    $CONTAINER logs "$NAME" 2>&1 || true
 }
 
 # Extracts a header's value (last match, CRLF-stripped) without relying on
@@ -150,7 +165,7 @@ wait_for_health() {
             exit 1
         fi
 
-        if curl -fsS "http://127.0.0.1:18474/health" >/dev/null 2>&1; then
+        if curl_request -fsS "http://127.0.0.1:18474/health" >/dev/null 2>&1; then
             return 0
         fi
 
@@ -158,7 +173,7 @@ wait_for_health() {
     done
 
     echo "smoke failed: health endpoint not ready within ${TIMEOUT}s" >&2
-    $CONTAINER logs "$NAME" 2>&1 || true
+    diagnose_container
     exit 1
 }
 
@@ -183,7 +198,7 @@ assert_supervisor_program() {
 
 wait_for_health
 
-body="$(curl -fsS "http://127.0.0.1:18474/health")"
+body="$(curl_request -fsS "http://127.0.0.1:18474/health")"
 echo "$body"
 
 case "$body" in
@@ -239,7 +254,7 @@ if [ "$mercure_status" != "401" ]; then
 fi
 
 echo "Creating owner account for authenticated API checks..."
-setup_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/setup" \
+setup_body="$(curl_request -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/setup" \
     -H 'Content-Type: application/json' \
     -c /tmp/stashd-smoke-cookies-$$ \
     -b /tmp/stashd-smoke-cookies-$$ \
@@ -247,14 +262,14 @@ setup_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/setup" \
 echo "$setup_body"
 
 echo "Logging in to establish session (setup does not itself establish one)..."
-login_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/login" \
+login_body="$(curl_request -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/login" \
     -H 'Content-Type: application/json' \
     -c /tmp/stashd-smoke-cookies-$$ \
     -b /tmp/stashd-smoke-cookies-$$ \
     -d '{"username":"smoke","password":"smoke-password"}')"
 echo "$login_body"
 
-token="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/tokens" \
+token="$(curl_request -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/tokens" \
     -H 'Content-Type: application/json' \
     -b /tmp/stashd-smoke-cookies-$$ \
     -c /tmp/stashd-smoke-cookies-$$ \
@@ -265,7 +280,7 @@ if [ -z "$token" ]; then
     exit 1
 fi
 
-system_health="$(curl -fsS "http://127.0.0.1:18474/api/v1/system/health" \
+system_health="$(curl_request -fsS "http://127.0.0.1:18474/api/v1/system/health" \
     -H "Authorization: Bearer ${token}")"
 echo "$system_health"
 
@@ -278,10 +293,16 @@ case "$system_health" in
 esac
 
 echo "Restarting container to verify data persistence..."
-$CONTAINER restart "$NAME" >/dev/null
+echo "Stopping container process groups..."
+if ! timeout 30 "$CONTAINER" restart "$NAME" >/dev/null; then
+    echo "smoke failed: container restart did not return within 30s" >&2
+    diagnose_container
+    exit 1
+fi
+echo "Container restart returned; waiting for health..."
 wait_for_health
 
-body_after_restart="$(curl -fsS "http://127.0.0.1:18474/health")"
+body_after_restart="$(curl_request -fsS "http://127.0.0.1:18474/health")"
 echo "$body_after_restart"
 
 case "$body_after_restart" in
@@ -324,7 +345,7 @@ if [ "$(grep '^SIGNING_KEY=' "$TMP/data/.env")" != "$signing_key_initial" ]; the
     exit 1
 fi
 
-recreate_health="$(curl -fsS "http://127.0.0.1:18474/health")"
+recreate_health="$(curl_request -fsS "http://127.0.0.1:18474/health")"
 case "$recreate_health" in
     *'"status":"ok"'*) ;;
     *)
@@ -344,7 +365,7 @@ if [ "$jobs_status" != "200" ]; then
     exit 1
 fi
 
-preflight_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/stashes/preflight" \
+preflight_body="$(curl_request -fsS -X POST "http://127.0.0.1:18474/api/v1/stashes/preflight" \
     -H 'Content-Type: application/json' \
     -H "Authorization: Bearer ${token}" \
     -d '{"source_uri":"fake://channel/smoke-e2e","source_title":"Smoke E2E Channel"}')"
