@@ -198,7 +198,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 'source_reference' => $stashItem->stashInputId === null ? null : (string) $stashItem->stashInputId,
                 'title' => $media->title ?? $stashItem->displayTitle ?? 'Untitled',
                 'description' => $media->description ?? $stashItem->displayDescription,
-                'published_at' => ($media->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
+                'published-at' => ($media->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
                 'duration_seconds' => null,
                 'resources' => $resources,
             ];
@@ -265,7 +265,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                     'source_reference' => $stashItem->stashInputId === null ? null : (string) $stashItem->stashInputId,
                     'title' => $media->title ?? $stashItem->displayTitle ?? 'Untitled',
                     'description' => $media->description ?? $stashItem->displayDescription,
-                    'published_at' => ($media->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
+                    'published-at' => ($media->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
                     'duration_seconds' => null,
                     'resources' => $this->resources($context->broadcast, $media, $stage, $stagedAssets),
                 ];
