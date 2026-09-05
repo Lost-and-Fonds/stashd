@@ -76,7 +76,8 @@ jobs:
           target: dev
           load: true
           tags: stashd:ci
-          progress: plain
+        env:
+          BUILDKIT_PROGRESS: plain
           cache-from: type=gha,scope=dev
           cache-to: type=gha,mode=max,scope=dev
 
@@ -184,7 +185,8 @@ jobs:
           target: prod
           load: true
           tags: stashd:smoke
-          progress: plain
+        env:
+          BUILDKIT_PROGRESS: plain
           cache-from: type=gha,scope=prod
           cache-to: type=gha,mode=max,scope=prod
 
@@ -223,7 +225,8 @@ jobs:
           target: prod
           load: true
           tags: stashd:e2e
-          progress: plain
+        env:
+          BUILDKIT_PROGRESS: plain
           cache-from: type=gha,scope=prod
           cache-to: type=gha,mode=max,scope=prod
 
@@ -299,7 +302,8 @@ jobs:
           context: .
           target: prod
           platforms: linux/amd64,linux/arm64
-          progress: plain
+        env:
+          BUILDKIT_PROGRESS: plain
           push: ${{ startsWith(github.ref, 'refs/tags/v') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
