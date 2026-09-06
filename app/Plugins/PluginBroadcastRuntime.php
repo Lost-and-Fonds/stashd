@@ -112,6 +112,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             $credentials,
             helpers: $this->helperGrants($package, $helper),
             transport: new PluginBroadcastHttpTransport($fixtureDirectory),
+            removeStagingRoot: false,
         );
         $resources = [];
         $process = null;

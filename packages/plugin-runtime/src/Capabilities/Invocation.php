@@ -54,6 +54,7 @@ final class Invocation
         private int $inlineLimit = 65536,
         private int $maxRedirects = 3,
         private SandboxPolicy $sandboxPolicy = new SandboxPolicy(),
+        private bool $removeStagingRoot = true,
     ) {
         $this->packageRoot = $this->withinRoot($packageRoot, 'package');
 
@@ -268,7 +269,10 @@ final class Invocation
         $this->resources = [];
         $this->removeTree($this->resourceRoot);
         $this->removeTree($this->stagingRoot . '/.helper-etc');
-        $this->removeTree($this->stagingRoot);
+
+        if ($this->removeStagingRoot) {
+            $this->removeTree($this->stagingRoot);
+        }
     }
 
     public function cancel(): void
