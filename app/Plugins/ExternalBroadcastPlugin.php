@@ -864,6 +864,13 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         $values['stash_name'] ??= $context->stash->name;
         $values['stash_description'] ??= $context->stash->description;
         $values['stash_icon_uri'] ??= $context->stash->iconUri;
+        $sourceSettings = $values['source_settings'] ?? null;
+        if (is_array($sourceSettings) && count($sourceSettings) === 1) {
+            $singleSourceSettings = reset($sourceSettings);
+            if (is_array($singleSourceSettings) && isset($singleSourceSettings['season']) && is_int($singleSourceSettings['season'])) {
+                $values['season'] ??= $singleSourceSettings['season'];
+            }
+        }
         $settings = [];
 
         foreach ($values as $key => $value) {
