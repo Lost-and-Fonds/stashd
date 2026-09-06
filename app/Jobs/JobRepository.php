@@ -99,7 +99,7 @@ final class JobRepository
             ->where('intent', $intent->value)
             ->where('entityType', $entityType)
             ->where('entityId', $entityId)
-            ->orderBy('createdAt', Direction::DESC)
+            ->orderBy('updatedAt', Direction::DESC)
             ->first();
 
         return $job instanceof JobRecord ? $job : null;
