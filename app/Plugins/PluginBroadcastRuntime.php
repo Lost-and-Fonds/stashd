@@ -12,7 +12,6 @@ use Stashd\PluginRuntime\Capabilities\Invocation;
 use Stashd\PluginRuntime\Capabilities\ReadableResource;
 use Stashd\PluginRuntime\Package\PackageManager;
 use Stashd\PluginRuntime\Runner\PluginRunner;
-use Tempest\Support\Filesystem;
 
 final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
 {
@@ -106,17 +105,9 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             }
         }
 
-        $pluginStage = $stagingDirectory . '/.plugin-' . bin2hex(random_bytes(6));
-
-        try {
-            Filesystem\create_directory($pluginStage, 0700);
-        } catch (\Throwable $exception) {
-            throw new RuntimeException('Plugin Broadcast staging could not be created.', 0, $exception);
-        }
-        $this->copyOutputs($stagingDirectory, $pluginStage);
         $invocation = new Invocation(
             $package,
-            $pluginStage,
+            $stagingDirectory,
             array_values(array_unique($prefixes)),
             $credentials,
             helpers: $this->helperGrants($package, $helper),
@@ -126,7 +117,7 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
         $process = null;
 
         try {
-            $process = $this->runner->start($this->pluginId, $pluginStage);
+            $process = $this->runner->start($this->pluginId, $stagingDirectory);
             /** @var array<string, mixed> $pluginParams */
             $pluginParams = $this->pluginParams($params);
             $capabilityHandler = /** @param array<string, mixed> $message */ function (array $message) use ($invocation, &$resources, $onProgress): array {
@@ -157,8 +148,6 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
 
                 throw new RuntimeException($message);
             }
-
-            $this->copyOutputs($pluginStage, $stagingDirectory);
 
             return $result;
         } finally {
@@ -418,25 +407,4 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
         return $result;
     }
 
-    private function copyOutputs(string $source, string $destination): void
-    {
-        foreach (Filesystem\list_directory($source) as $from) {
-            $entry = basename($from);
-
-            if (str_starts_with($entry, '.')) {
-                continue;
-            }
-            $to = $destination . '/' . $entry;
-
-            if (Filesystem\is_directory($from)) {
-                if (! Filesystem\is_directory($to)) {
-                    Filesystem\create_directory($to, 0700);
-                }
-                $this->copyOutputs($from, $to);
-
-                continue;
-            }
-            Filesystem\copy_file($from, $to, overwrite: true);
-        }
-    }
 }

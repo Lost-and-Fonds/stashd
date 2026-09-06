@@ -23,10 +23,10 @@ final readonly class MessengerWorkerRunner
         if (function_exists('pcntl_async_signals') && function_exists('pcntl_signal') && function_exists('pcntl_alarm')) {
             pcntl_async_signals(true);
             pcntl_signal(SIGALRM, static function () use ($worker): void {
-                $worker->keepalive(300);
-                pcntl_alarm(300);
+                $worker->keepalive(120);
+                pcntl_alarm(60);
             });
-            pcntl_alarm(300);
+            pcntl_alarm(60);
         }
 
         try {

@@ -46,8 +46,8 @@ final class MessengerTransportRegistry
             'queue_name' => $name,
             'auto_setup' => true,
             // Long jobs stay leased while the worker sends Messenger keepalives.
-            // A missing keepalive for 15 minutes is the stall/redelivery signal.
-            'redeliver_timeout' => 900,
+            // Keep a generous recovery window for slow media/filesystem work.
+            'redeliver_timeout' => 1800,
         ], $dbal);
         $connection->setup();
 
