@@ -90,6 +90,34 @@ So, for example, one stash might eventually contain:
 
 The transport is an implementation detail. The archive is the point.
 
+### Fixity
+
+Preservation is not just keeping a file around. At some point, you also need to be able to answer:
+
+**Is this still the same file I originally preserved?**
+
+Stashd already has some basic integrity machinery. Downloads are staged before being promoted into the Vault, routine checks can verify that files still exist, have the expected size and remain readable, and deeper checks can validate media or recalculate checksums.
+
+That is useful, but it is not the finished fixity model.
+
+The direction is to make fixity a first-class property of every preserved asset:
+
+- record a cryptographic checksum when an asset enters the Vault
+- retain the algorithm used rather than assuming one forever
+- periodically recalculate and compare those checksums
+- keep an append-only history of verification events and their outcomes
+- distinguish between a missing file, unavailable storage and actual checksum corruption
+- expose integrity state clearly through the API and UI
+- keep detection separate from repair, so Stashd never silently replaces damaged material and calls the problem solved
+
+Filesystem features such as ZFS checksums and scrubs are extremely useful, but they solve a slightly different problem. Stashd's fixity records should travel **with the archive**, independently of whichever filesystem happens to contain it.
+
+Longer term, I also want Stashd's preservation metadata to be broadly compatible with established archival practice — particularly PREMIS-style objects and events — and to support portable manifests or preservation packages when exporting a Vault.
+
+The eventual goal is simple:
+
+> Years after something was archived, Stashd should be able to show not only what was preserved, but that the preserved copy is still intact, when it was last checked, and what has happened to it since ingest.
+
 ### Prefer good existing tools over reinventing them
 
 Stashd should not contain a bespoke implementation of every protocol on Earth.
@@ -173,6 +201,42 @@ One of the long-term goals is that adding support for another source or destinat
 The plugin API is still evolving, because this whole project is still evolving.
 
 Expect breakage.
+
+## Planned plugins
+
+This is a wishlist, not a release roadmap. Some of these will happen sooner than others, some will change shape, and some may turn out not to be worth doing.
+
+### Inputs
+
+- **Podcast** — preserve existing podcast feeds, including audio, artwork, metadata, chapters and transcripts.
+- **Websites** — scheduled snapshots, change detection, linked assets and eventually WARC-style archival.
+- **Social media** — preserve public posts and media, especially where they relate to other items in the same stash.
+- **BitTorrent / RSS** — watch feeds and archive matching releases automatically.
+- **Archive import** — ingest existing archives such as WARC, ZIM and structured filesystem collections.
+- **Physical media** — workflows for preserving CDs, DVDs, Blu-rays, LaserDiscs, MiniDisc, VHS and other physical formats, including disc images, captures, checksums, technical metadata and provenance.
+
+The physical-media side is especially interesting because the source is not a URL at all. Stashd should still be able to answer the same questions: **what is this, where did it come from, how was it captured, and can we prove the preserved copy has not changed?**
+
+### Enrichment
+
+- **Media metadata** — enrich imported films, television and other media from sources such as TMDB or TVDB.
+- **Transcription and captions** — generate or improve transcripts for preserved audio and video.
+- **Relationship detection** — identify links between items, such as a blog post, social post and podcast episode belonging to the same work.
+
+### Broadcasts
+
+- **Internet Archive** — optionally publish suitable material to the Internet Archive.
+- **ZIM** — export selected Vault content for Kiwix and offline use.
+- **Static archive** — produce a portable, browsable archive that does not require a running Stashd instance.
+
+### Storage and backup
+
+- **Object storage** — replicate Vault data to S3-compatible storage.
+- **Remote storage** — backup and replication through established filesystem and transfer protocols.
+
+The rule is simple:
+
+> A plugin should solve a real preservation, enrichment or access problem — not just exist because something has an API.
 
 ## What Stashd is not
 
