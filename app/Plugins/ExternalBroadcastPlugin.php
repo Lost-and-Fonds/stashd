@@ -351,19 +351,18 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
 
     public function prune(BroadcastContext $context): BroadcastPruneResult
     {
+        /** @var list<string> $removed */
         $removed = [];
+        $expected = [];
 
         if ($this->definition->outputPath !== null) {
             $path = $this->paths->broadcastFile($context->broadcast, ...explode('/', $this->definition->outputPath));
-
-            if (Filesystem\is_file($path) && $this->tryDeleteFile($path)) {
-                $removed[] = $path;
-            }
+            $expected[$path] = true;
         }
 
         foreach ($this->items->listForBroadcast(BroadcastId::fromPrimaryKey($context->broadcast->id)) as $item) {
-            if ($item->publishedPath !== null && Filesystem\is_file($item->publishedPath) && $this->tryDeleteFile($item->publishedPath)) {
-                $removed[] = $item->publishedPath;
+            if ($item->publishedPath !== null) {
+                $expected[$item->publishedPath] = true;
             }
         }
         $root = $this->paths->claimRoot($context->broadcast);
@@ -376,15 +375,21 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             if (basename($path) === '.stashd-broadcast') {
                 continue;
             }
-            $this->removeGeneratedPath($path, $removed);
+            $this->removeGeneratedPath($path, $removed, $expected);
         }
 
         return new BroadcastPruneResult(count($removed), $removed);
     }
 
-    /** @param list<string> $removed */
-    private function removeGeneratedPath(string $path, array &$removed): void
+    /** @param list<string> $removed
+     *  @param array<string, true> $expected
+     */
+    private function removeGeneratedPath(string $path, array &$removed, array $expected): void
     {
+        if (isset($expected[$path])) {
+            return;
+        }
+
         if (is_link($path) || Filesystem\is_file($path)) {
             if ($this->tryDeleteFile($path)) {
                 $removed[] = $path;
@@ -401,9 +406,12 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             if (str_starts_with(basename($child), '.')) {
                 continue;
             }
-            $this->removeGeneratedPath($child, $removed);
+            $this->removeGeneratedPath($child, $removed, $expected);
         }
-        @rmdir($path);
+
+        if (Filesystem\list_directory($path) === []) {
+            @rmdir($path);
+        }
     }
 
     public function acceptsDownloadPolicy(BroadcastRecord $broadcast, DownloadPolicy $policy): bool
