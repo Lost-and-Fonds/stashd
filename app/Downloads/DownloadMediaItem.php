@@ -60,13 +60,6 @@ final readonly class DownloadMediaItem
         bool $force = false,
         ?callable $onProgress = null,
     ): DownloadExecutionResult {
-        if ($force) {
-            throw DownloadException::withCode(
-                'download_force_not_supported',
-                'Force re-download is not supported yet.',
-            );
-        }
-
         $mediaItem = $this->mediaItems->find($mediaItemId)
             ?? throw DownloadException::withCode('media_item_not_found', 'Media item not found.');
 
@@ -89,8 +82,19 @@ final readonly class DownloadMediaItem
         $this->assertStorageReady();
 
         $existingOriginal = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::VaultOriginal);
+        $preserveExisting = $force
+            && $mediaItem->state === MediaItemState::Ready
+            && $existingOriginal?->state === AssetState::Ready
+            && $existingOriginal->path !== null
+            && Filesystem\is_file($existingOriginal->path);
+        $originalAssets = $preserveExisting
+            ? array_map(static fn(AssetRecord $asset): array => ['asset' => $asset, 'snapshot' => clone $asset], array_values(array_filter(
+                $this->assets->listForMediaItem($mediaItemId),
+                static fn(AssetRecord $asset): bool => $asset->state === AssetState::Ready,
+            )))
+            : [];
 
-        if ($existingOriginal !== null && $existingOriginal->state === AssetState::Ready) {
+        if (! $force && $existingOriginal !== null && $existingOriginal->state === AssetState::Ready) {
             if ($existingOriginal->path !== null && Filesystem\is_file($existingOriginal->path)) {
                 $this->ensureMediaItemReady($mediaItem);
 
@@ -108,7 +112,7 @@ final readonly class DownloadMediaItem
         $pendingAssets = [];
 
         try {
-            $this->prepareMediaItemForDownload($mediaItem);
+            $this->prepareMediaItemForDownload($mediaItem, $force);
             $request = new DownloadRequest(
                 mediaItemId: $mediaItemId,
                 stashId: $stashId,
@@ -129,10 +133,10 @@ final readonly class DownloadMediaItem
             $this->assertDownloadOutputsComplete($download);
 
             foreach ($download->files as $file) {
-                $pendingAssets[] = $this->createProcessingAsset($mediaItemId, $file);
+                $pendingAssets[] = $this->createProcessingAsset($mediaItemId, $file, $force);
             }
 
-            $ingested = $this->ingestAllFiles($mediaItem, $download, $pendingAssets);
+            $ingested = $this->ingestAllFiles($mediaItem, $download, $pendingAssets, $force);
             $this->transitions->transitionMediaItem($mediaItem, MediaItemState::Ready);
             $this->tempStaging->cleanupSuccess($tempDirectory);
 
@@ -145,8 +149,13 @@ final readonly class DownloadMediaItem
             );
         } catch (\Throwable $throwable) {
             $this->tempStaging->markFailed($tempDirectory);
-            $this->markAssetsFailed($pendingAssets);
-            $this->failMediaItem($mediaItem);
+            if ($preserveExisting) {
+                $this->restoreAssets($originalAssets);
+                $this->restoreMediaItem($mediaItem);
+            } else {
+                $this->markAssetsFailed($pendingAssets);
+                $this->failMediaItem($mediaItem);
+            }
 
             if ($throwable instanceof DownloadException) {
                 throw $throwable;
@@ -204,8 +213,12 @@ final readonly class DownloadMediaItem
         }
     }
 
-    private function prepareMediaItemForDownload(MediaItemRecord $mediaItem): void
+    private function prepareMediaItemForDownload(MediaItemRecord $mediaItem, bool $force = false): void
     {
+        if ($force && $mediaItem->state === MediaItemState::Ready) {
+            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::DownloadPending);
+        }
+
         if ($mediaItem->state === MediaItemState::Discovered) {
             $this->transitions->transitionMediaItem($mediaItem, MediaItemState::MetadataReady);
             $mediaItem->metadataCapturedAt ??= DateTime::now(Timezone::UTC);
@@ -233,12 +246,12 @@ final readonly class DownloadMediaItem
         }
     }
 
-    private function createProcessingAsset(MediaItemId $mediaItemId, DownloadedFile $file): AssetRecord
+    private function createProcessingAsset(MediaItemId $mediaItemId, DownloadedFile $file, bool $replaceExisting = false): AssetRecord
     {
         $existing = $this->assets->findByMediaItemAndRole($mediaItemId, $file->role);
 
         if ($existing !== null) {
-            if ($existing->state === AssetState::Ready) {
+            if ($existing->state === AssetState::Ready && ! $replaceExisting) {
                 throw DownloadException::withCode(
                     'asset_already_ready',
                     'Refusing to overwrite ready Vault asset.',
@@ -272,10 +285,12 @@ final readonly class DownloadMediaItem
         MediaItemRecord $mediaItem,
         DownloadResult $download,
         array $pendingAssets,
+        bool $replaceExisting = false,
     ): int {
         /** @var list<array{asset: AssetRecord, file: DownloadedFile, destination: string, checksum: ?string, sizeBytes: ?int}> $planned */
         $planned = [];
         $movedDestinations = [];
+        $backups = [];
 
         try {
             foreach ($download->files as $index => $file) {
@@ -289,6 +304,26 @@ final readonly class DownloadMediaItem
                 $sizeBytes = $file->sizeBytes ?? filesize($file->tempPath);
                 $checksum = VaultChecksum::computeFile($file->tempPath);
 
+                if ($replaceExisting && $asset->path !== null && $asset->path !== $destination && Filesystem\is_file($asset->path)) {
+                    $backup = $asset->path . '.refetch-' . bin2hex(random_bytes(6));
+
+                    if (! rename($asset->path, $backup)) {
+                        throw new \RuntimeException("Unable to stage existing Vault file for replacement: {$asset->path}");
+                    }
+
+                    $backups[$asset->path] = $backup;
+                }
+
+                if ($replaceExisting && Filesystem\is_file($destination)) {
+                    $backup = $destination . '.refetch-' . bin2hex(random_bytes(6));
+
+                    if (! rename($destination, $backup)) {
+                        throw new \RuntimeException("Unable to stage existing Vault file for replacement: {$destination}");
+                    }
+
+                    $backups[$destination] = $backup;
+                }
+
                 $this->fileMover->moveIntoPlace($file->tempPath, $destination);
                 $movedDestinations[] = $destination;
 
@@ -300,14 +335,21 @@ final readonly class DownloadMediaItem
                     'sizeBytes' => is_int($sizeBytes) ? $sizeBytes : null,
                 ];
             }
+
+            foreach ($planned as $entry) {
+                $this->finalizeAsset($mediaItem, $entry['asset'], $entry['file'], $entry['destination'], $download, $entry['checksum'], $entry['sizeBytes']);
+            }
+
+            foreach ($backups as $backup) {
+                if (Filesystem\is_file($backup)) {
+                    Filesystem\delete_file($backup);
+                }
+            }
         } catch (\Throwable $throwable) {
             $this->rollbackVaultFiles($movedDestinations);
+            $this->restoreVaultFiles($backups);
 
             throw $throwable;
-        }
-
-        foreach ($planned as $entry) {
-            $this->finalizeAsset($mediaItem, $entry['asset'], $entry['file'], $entry['destination'], $download, $entry['checksum'], $entry['sizeBytes']);
         }
 
         return count($planned);
@@ -320,6 +362,42 @@ final readonly class DownloadMediaItem
             if (Filesystem\is_file($path)) {
                 Filesystem\delete_file($path);
             }
+        }
+    }
+
+    /** @param array<string, string> $backups */
+    private function restoreVaultFiles(array $backups): void
+    {
+        foreach ($backups as $destination => $backup) {
+            if (Filesystem\is_file($destination)) {
+                Filesystem\delete_file($destination);
+            }
+
+            if (Filesystem\is_file($backup)) {
+                rename($backup, $destination);
+            }
+        }
+    }
+
+    /** @param list<array{asset: AssetRecord, snapshot: AssetRecord}> $originalAssets */
+    private function restoreAssets(array $originalAssets): void
+    {
+        foreach ($originalAssets as $entry) {
+            $asset = $entry['asset'];
+            $snapshot = $entry['snapshot'];
+
+            foreach (get_object_vars($snapshot) as $property => $value) {
+                $asset->{$property} = $value;
+            }
+
+            $this->assets->save($asset);
+        }
+    }
+
+    private function restoreMediaItem(MediaItemRecord $mediaItem): void
+    {
+        if ($mediaItem->state === MediaItemState::Downloading) {
+            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::Ready);
         }
     }
 

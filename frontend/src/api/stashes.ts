@@ -115,6 +115,7 @@ export interface StashItemsQuery {
   offset: number
   search?: string
   status?: string
+  includeIgnored?: boolean
   sort?: string
   direction?: 'asc' | 'desc'
 }
@@ -123,6 +124,7 @@ export async function fetchStashItems(stashId: string, query: StashItemsQuery): 
   const parameters = new URLSearchParams({ limit: String(query.limit), offset: String(query.offset) })
   if (query.search) parameters.set('search', query.search)
   if (query.status) parameters.set('status', query.status)
+  if (query.includeIgnored !== undefined) parameters.set('include_ignored', String(query.includeIgnored))
   if (query.sort) parameters.set('sort', query.sort)
   if (query.direction) parameters.set('dir', query.direction)
 

@@ -11,6 +11,7 @@ use App\Broadcasts\BroadcastRepository;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\Stashes\Api\StashResource;
+use App\Stashes\DownloadPolicy;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashRecord;
 use App\Stashes\StashRepository;
@@ -21,6 +22,11 @@ use App\Vault\Api\MediaItemResource;
 use App\Vault\Api\VaultItemSummaryResource;
 use App\Config\StashdConfig;
 use App\Http\Api\ApiJson;
+use App\Jobs\Api\JobResource;
+use App\Jobs\JobDispatcher;
+use App\Jobs\JobRepository;
+use App\Jobs\JobType;
+use App\Support\PrefixedUlid;
 use Tempest\Http\ContentType;
 use Tempest\Http\Response;
 use Tempest\Http\Responses\NotFound;
@@ -29,6 +35,7 @@ use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
 use Tempest\Router\Get;
+use Tempest\Router\Post;
 use Tempest\Router\WithMiddleware;
 
 #[AllowApiClients]
@@ -43,6 +50,8 @@ final readonly class MediaItemController
         private BroadcastItemRepository $broadcastItems,
         private BroadcastRepository $broadcasts,
         private StashdConfig $config,
+        private JobRepository $jobs,
+        private JobDispatcher $jobDispatcher,
     ) {}
 
     #[Get('/api/v1/items')]
@@ -115,6 +124,61 @@ final readonly class MediaItemController
                 pluginMetadata: $pluginMetadata,
             )->toArray(),
         ]);
+    }
+
+    #[Post('/api/v1/items/{id}/refetch')]
+    public function refetch(string $id): Json
+    {
+        $item = $this->findMediaItem($id);
+
+        if ($item === null) {
+            return $this->notFound();
+        }
+
+        $mediaItemId = MediaItemId::fromPrimaryKey($item->id);
+        $stashItems = $this->stashItems->listForMediaItem($mediaItemId);
+        $stashItem = $stashItems[0] ?? null;
+
+        if (count($stashItems) > 1) {
+            $stashes = $this->stashes->listByIds(array_map(static fn($candidate): string => (string) $candidate->stashId, $stashItems));
+
+            foreach ($stashItems as $candidate) {
+                if (($stashes[(string) $candidate->stashId] ?? null)?->downloadPolicy !== DownloadPolicy::MetadataOnly) {
+                    $stashItem = $candidate;
+                    break;
+                }
+            }
+        }
+
+        if ($stashItem === null) {
+            return new Json([
+                'error' => [
+                    'code' => 'stash_item_not_found',
+                    'message' => 'Media item is not part of a Stash.',
+                ],
+            ], Status::UNPROCESSABLE_ENTITY);
+        }
+
+        $active = $this->jobs->pendingOrProcessing(JobType::core('core.download'), PrefixedUlid::parse((string) $item->id));
+
+        if ($active !== null) {
+            return new Json(['job' => JobResource::fromRecord($active)->toArray()], Status::ACCEPTED);
+        }
+
+        $job = $this->jobDispatcher->dispatch(
+            type: 'core.download',
+            entityType: 'media_item',
+            entityId: (string) $item->id,
+            stashId: (string) $stashItem->stashId,
+            payload: [
+                'media_item_id' => (string) $item->id,
+                'stash_id' => (string) $stashItem->stashId,
+                'force' => true,
+            ],
+            workload: 'background',
+        );
+
+        return new Json(['job' => JobResource::fromRecord($job)->toArray()], Status::ACCEPTED);
     }
 
     #[Get('/api/v1/items/{id}/playback')]

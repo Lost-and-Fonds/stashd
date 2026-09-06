@@ -1,4 +1,5 @@
 import { apiFetch } from './auth'
+import type { JobApiResource } from './status'
 
 export interface VaultItemApiResource {
   id: string
@@ -106,4 +107,12 @@ export async function fetchVaultItem(id: string): Promise<VaultItemDetailRespons
   const body = await response.json().catch(() => null) as { error?: { message?: unknown } } | null
   if (!response.ok) throw new Error(typeof body?.error?.message === 'string' ? body.error.message : `Request failed (${response.status}).`)
   return body as VaultItemDetailResponse
+}
+
+export async function refetchVaultItem(id: string): Promise<JobApiResource> {
+  const response = await apiFetch(`/api/v1/items/${encodeURIComponent(id)}/refetch`, { method: 'POST' })
+  const body = await response.json().catch(() => null) as { job?: JobApiResource, error?: { message?: unknown } } | null
+  if (!response.ok) throw new Error(typeof body?.error?.message === 'string' ? body.error.message : `Request failed (${response.status}).`)
+  if (!body?.job) throw new Error('Refetch job was not created.')
+  return body.job
 }

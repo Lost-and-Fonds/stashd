@@ -393,7 +393,7 @@ function itemTitle(item: StashItemApiResource) {
 }
 
 function itemState(item: StashItemApiResource) {
-  return item.media_item?.state ?? item.state
+  return item.state === 'ignored' ? 'ignored' : item.media_item?.state ?? item.state
 }
 
 function itemDuration(item: StashItemApiResource) {
@@ -438,9 +438,15 @@ function sortHeader(label: string, key: string) {
 }
 
 function itemStatusCell(item: StashItemApiResource) {
-  const meta = item.media_item?.upstream_state && item.media_item.upstream_state !== 'available'
+  const meta = item.state === 'ignored'
+    ? statePresentation('ignored')
+    : item.media_item?.upstream_state && item.media_item.upstream_state !== 'available'
     ? statePresentation(item.media_item.upstream_state)
     : statePresentation(itemState(item))
+  if (item.state === 'ignored') {
+    return h('span', { class: ['inline-flex items-center gap-1.5', meta.text] }, '◌ ignored')
+  }
+
   return h('span', { class: 'inline-flex items-center gap-1.5' }, [
     h('span', { class: ['size-1.5 rounded-full', meta.dot] }),
     h('span', { class: ['text-xs', meta.text] }, meta.label)
@@ -478,6 +484,7 @@ const itemTableUi = {
 
 const itemSearch = ref(typeof route.query.search === 'string' ? route.query.search : '')
 const itemStatusFilter = ref(typeof route.query.status === 'string' ? route.query.status : 'all')
+const showIgnored = ref(route.query.ignored === '1')
 const itemStatusFilterOptions = [
   { label: 'All statuses', value: 'all' },
   { label: 'Ready', value: 'ready' },
@@ -499,6 +506,7 @@ const itemsRangeLabel = computed(() => {
 function clearItemFilters() {
   itemSearch.value = ''
   itemStatusFilter.value = 'all'
+  showIgnored.value = true
 }
 
 async function loadItems() {
@@ -515,6 +523,7 @@ async function loadItems() {
       offset: (itemsPage.value - 1) * itemsPageSize,
       search: itemSearch.value.trim() || undefined,
       status: itemStatusFilter.value === 'all' ? undefined : itemStatusFilter.value,
+      includeIgnored: showIgnored.value || itemStatusFilter.value === 'ignored',
       sort: itemSort.value.key,
       direction: itemSort.value.direction
     })
@@ -604,6 +613,8 @@ function syncItemQuery() {
   else delete query.search
   if (itemStatusFilter.value !== 'all') query.status = itemStatusFilter.value
   else delete query.status
+  if (showIgnored.value) query.ignored = '1'
+  else delete query.ignored
   if (itemsPage.value > 1) query.page = String(itemsPage.value)
   else delete query.page
   if (itemSort.value.key !== 'published') query.sort = itemSort.value.key
@@ -613,11 +624,12 @@ function syncItemQuery() {
   void router.replace({ query })
 }
 
-watch([itemSearch, itemStatusFilter], () => { itemsPage.value = 1 })
-watch([itemSearch, itemStatusFilter, itemsPage, itemSort], () => { syncItemQuery(); void loadItems() })
-watch(() => [route.query.search, route.query.status, route.query.page, route.query.sort, route.query.dir], ([search, status, page, sort, dir]) => {
+watch([itemSearch, itemStatusFilter, showIgnored], () => { itemsPage.value = 1 })
+watch([itemSearch, itemStatusFilter, showIgnored, itemsPage, itemSort], () => { syncItemQuery(); void loadItems() })
+watch(() => [route.query.search, route.query.status, route.query.page, route.query.sort, route.query.dir, route.query.ignored], ([search, status, page, sort, dir, ignored]) => {
   itemSearch.value = typeof search === 'string' ? search : ''
   itemStatusFilter.value = typeof status === 'string' ? status : 'all'
+  showIgnored.value = ignored === '1'
   itemsPage.value = Math.max(1, Number(page) || 1)
   itemSort.value = { key: typeof sort === 'string' ? sort : 'published', direction: dir === 'asc' ? 'asc' : 'desc' }
 })
@@ -807,6 +819,7 @@ onBeforeUnmount(() => {
       <div class="flex flex-col gap-2 sm:flex-row">
         <UInput v-model="itemSearch" placeholder="Search items" icon="i-lucide-search" class="sm:max-w-sm sm:flex-1" />
         <USelect v-model="itemStatusFilter" :items="itemStatusFilterOptions" value-key="value" class="sm:w-40" />
+        <UButton :label="showIgnored ? 'Hide ignored' : 'Show ignored'" :icon="showIgnored ? 'i-lucide-eye-off' : 'i-lucide-eye'" :variant="showIgnored ? 'soft' : 'ghost'" color="neutral" size="sm" @click="showIgnored = !showIgnored" />
         <UButton v-if="failedItemCount" :label="`Retry failed (${failedItemCount})`" icon="i-lucide-refresh-cw" variant="soft" color="error" size="sm" :loading="retrying" @click="retryFailed" />
       </div>
 
@@ -836,8 +849,13 @@ onBeforeUnmount(() => {
             <div class="min-w-0 flex-1 space-y-1">
               <p class="truncate font-mono text-sm text-highlighted">{{ itemTitle(item) }}</p>
               <div class="flex items-center gap-1.5">
-                <span class="size-1.5 rounded-full" :class="statePresentation(itemState(item)).dot" />
-                <span class="text-xs" :class="statePresentation(itemState(item)).text">{{ statePresentation(itemState(item)).label }}</span>
+                <template v-if="item.state === 'ignored'">
+                  <span class="text-xs text-dimmed">◌ ignored</span>
+                </template>
+                <template v-else>
+                  <span class="size-1.5 rounded-full" :class="statePresentation(itemState(item)).dot" />
+                  <span class="text-xs" :class="statePresentation(itemState(item)).text">{{ statePresentation(itemState(item)).label }}</span>
+                </template>
               </div>
               <p class="font-mono text-xs text-dimmed">
                 <time v-if="item.media_item?.published_at" :datetime="item.media_item.published_at">{{ relativeDate(item.media_item.published_at) }}</time>
@@ -862,8 +880,8 @@ onBeforeUnmount(() => {
 
       <div v-else class="rounded-md bg-muted p-4 text-center">
         <UIcon v-if="discoveryJob" name="i-lucide-loader-circle" class="mb-2 size-5 animate-spin text-primary" />
-        <p class="text-sm text-muted">{{ discoveryJob ? 'Discovery is underway. Items will appear here shortly.' : itemSearch || itemStatusFilter !== 'all' ? 'No items match these filters.' : 'No items in this Stash.' }}</p>
-        <UButton v-if="itemSearch || itemStatusFilter !== 'all'" label="Clear filters" variant="ghost" color="neutral" size="sm" class="mt-2" @click="clearItemFilters" />
+        <p class="text-sm text-muted">{{ discoveryJob ? 'Discovery is underway. Items will appear here shortly.' : itemSearch || itemStatusFilter !== 'all' || !showIgnored ? 'No items match these filters.' : 'No items in this Stash.' }}</p>
+        <UButton v-if="itemSearch || itemStatusFilter !== 'all' || !showIgnored" label="Clear filters" variant="ghost" color="neutral" size="sm" class="mt-2" @click="clearItemFilters" />
       </div>
     </section>
 

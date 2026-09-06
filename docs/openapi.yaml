@@ -1006,6 +1006,25 @@ paths:
                   item: { $ref: "#/components/schemas/MediaItem" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/items/{id}/refetch:
+    post:
+      operationId: refetchItem
+      tags: [Items]
+      summary: Queue a forced re-download of a preserved media item
+      parameters:
+        - $ref: "#/components/parameters/MediaItemId"
+      responses:
+        "202":
+          description: Refetch job
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job: { $ref: "#/components/schemas/Job" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
   /api/v1/items/{id}/playback:
     get:
       operationId: playbackItem

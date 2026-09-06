@@ -2,7 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { fetchVaultItem, type VaultItemDetailResponse } from '../api/vault'
+import { fetchVaultItem, refetchVaultItem, type VaultItemDetailResponse } from '../api/vault'
+import { fetchJobs, type JobApiResource } from '../api/status'
 import { subscribeLiveUpdates, type LiveEvent } from '../live/mercure'
 
 const route = useRoute()
@@ -10,6 +11,8 @@ const router = useRouter()
 const detail = ref<VaultItemDetailResponse>()
 const loading = ref(true)
 const refreshing = ref(false)
+const refetching = ref(false)
+const refetchJob = ref<JobApiResource>()
 const error = ref<string>()
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let unsubscribe: (() => void) | undefined
@@ -68,6 +71,35 @@ async function load() {
   }
 }
 
+async function loadRefetchJob() {
+  try {
+    const itemId = String(route.params.itemId)
+    const job = (await fetchJobs()).find(candidate =>
+      candidate.type === 'core.download'
+      && candidate.entity_id === itemId
+      && ['processing', 'pending', 'retrying'].includes(candidate.state)
+    )
+    if (job) refetchJob.value = job
+  } catch {
+    // The item itself remains useful if the optional progress lookup fails.
+  }
+}
+
+async function refetch() {
+  if (refetching.value) return
+
+  refetching.value = true
+  error.value = undefined
+
+  try {
+    refetchJob.value = await refetchVaultItem(String(route.params.itemId))
+  } catch (exception) {
+    error.value = exception instanceof Error ? exception.message : 'Could not refetch item.'
+  } finally {
+    refetching.value = false
+  }
+}
+
 function scheduleLiveRefresh() {
   if (refreshTimer) return
   refreshTimer = setTimeout(() => {
@@ -78,6 +110,24 @@ function scheduleLiveRefresh() {
 
 function handleLiveEvent(event: LiveEvent) {
   const itemId = String(route.params.itemId)
+
+  if (event.event === 'job.created' || event.event === 'job.progress' || event.event === 'job.completed' || event.event === 'job.failed') {
+    const payload = event.payload
+    const entityId = payload.entityId ?? payload.entity_id
+    const entityType = payload.entityType ?? payload.entity_type
+    if (payload.type === 'core.download' && entityType === 'media_item' && entityId === itemId) {
+      refetchJob.value = {
+        ...(refetchJob.value ?? { id: payload.id, type: 'core.download', state: 'processing' }),
+        id: payload.id,
+        type: payload.type,
+        entity_id: entityId,
+        state: event.event === 'job.completed' ? 'completed' : event.event === 'job.failed' ? 'failed' : payload.state ?? 'processing',
+        progress_percent: payload.progressPercent ?? payload.progress_percent ?? refetchJob.value?.progress_percent ?? null,
+        progress_label: payload.progressLabel ?? payload.progress_label ?? refetchJob.value?.progress_label ?? null,
+        last_error: payload.lastError ?? payload.last_error ?? refetchJob.value?.last_error ?? null,
+      }
+    }
+  }
 
   if (event.event === 'activity.created') {
     const type = event.payload.type ?? ''
@@ -94,6 +144,7 @@ function handleLiveEvent(event: LiveEvent) {
 
 onMounted(() => {
   void load()
+  void loadRefetchJob()
   unsubscribe = subscribeLiveUpdates(handleLiveEvent)
 })
 onBeforeUnmount(() => {
@@ -118,7 +169,7 @@ onBeforeUnmount(() => {
       <header class="space-y-2">
         <div class="flex items-start justify-between gap-4">
           <h1 class="font-mono text-2xl leading-tight text-highlighted">{{ detail.item.title || 'Untitled item' }}</h1>
-          <UButton label="Refetch" icon="i-lucide-refresh-cw" variant="soft" color="neutral" size="sm" :loading="refreshing" @click="load" />
+          <UButton label="Refetch" icon="i-lucide-refresh-cw" variant="soft" color="neutral" size="sm" :loading="refetching" :disabled="refetchJob && ['processing', 'pending', 'retrying'].includes(refetchJob.state)" @click="refetch" />
         </div>
         <p class="text-sm text-muted">
           {{ itemKind ?? 'Unknown kind' }} · {{ detail.item.provider_key }} · {{ formatBytes(detail.preserved_size_bytes) }} preserved
@@ -126,6 +177,14 @@ onBeforeUnmount(() => {
       </header>
 
       <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not refetch item" :description="error" />
+
+      <OperationProgress
+        v-if="refetchJob"
+        label="Refetching item"
+        :stage="refetchJob.progress_label ?? undefined"
+        :percent="refetchJob.progress_percent ?? null"
+        :status="refetchJob.state === 'completed' ? 'complete' : ['failed', 'cancelled'].includes(refetchJob.state) ? 'failed' : ['pending', 'retrying'].includes(refetchJob.state) ? 'queued' : 'active'"
+      />
 
       <section v-if="playableAsset && playbackUrl" class="space-y-3">
         <h2 class="text-base font-medium text-highlighted">Preview</h2>

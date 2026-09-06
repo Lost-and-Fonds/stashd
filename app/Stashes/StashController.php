@@ -260,6 +260,9 @@ final readonly class StashController
 
         $rawIncludeIgnored = $request->get('include_ignored');
         $includeIgnored = ! (is_string($rawIncludeIgnored) && $rawIncludeIgnored === 'false');
+        if ($status === MediaItemState::Ignored) {
+            $includeIgnored = true;
+        }
 
         $rawSort = $request->get('sort');
         $sort = is_string($rawSort) ? $rawSort : 'position';

@@ -212,9 +212,13 @@ final class StashItemRepository
         }
 
         if ($status !== null) {
-            $query->whereHas('mediaItem', function (SelectQueryBuilder $mediaItemQuery) use ($status): void {
-                $mediaItemQuery->where('state', $status);
-            });
+            if ($status === MediaItemState::Ignored) {
+                $query->where('state', StashItemState::Ignored);
+            } else {
+                $query->whereHas('mediaItem', function (SelectQueryBuilder $mediaItemQuery) use ($status): void {
+                    $mediaItemQuery->where('state', $status);
+                });
+            }
         }
 
         return $query;
