@@ -26,7 +26,7 @@ enum MediaItemState: string
             self::Ready => [self::MetadataReady, self::DownloadPending, self::Missing],
             self::Failed => [self::Discovered, self::DownloadPending, self::Missing],
             self::Ignored => [self::Discovered],
-            self::Missing => [self::DownloadPending, self::Failed],
+            self::Missing => [self::Ready, self::DownloadPending, self::Failed],
         };
     }
 

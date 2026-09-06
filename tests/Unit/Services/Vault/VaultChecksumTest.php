@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Vault;
 
-use App\Vault\VaultChecksum;
+use App\Fixity\ChecksumComparisonOutcome;
+use App\Fixity\VaultChecksum;
 
 test('vault checksum formats and verifies sha256 digests', function (): void {
     $path = sys_get_temp_dir() . '/stashd-checksum-' . bin2hex(random_bytes(4));
@@ -12,17 +13,19 @@ test('vault checksum formats and verifies sha256 digests', function (): void {
     $computed = VaultChecksum::computeFile($path);
 
     expect($computed)->toBe('sha256:' . hash('sha256', 'stashd-checksum-fixture'))
-        ->and(VaultChecksum::verifyFile($path, $computed))->toBeTrue()
-        ->and(VaultChecksum::verifyFile($path, 'sha256:' . str_repeat('0', 64)))->toBeFalse();
+        ->and(VaultChecksum::verifyFile($path, $computed)->outcome)->toBe(ChecksumComparisonOutcome::Match)
+        ->and(VaultChecksum::verifyFile($path, 'sha256:' . str_repeat('0', 64))->outcome)->toBe(ChecksumComparisonOutcome::Mismatch)
+        ->and(VaultChecksum::verifyFile($path, 'sha256:' . str_repeat('0', 64))->observedChecksum)->toBe($computed);
 
     unlink($path);
 });
 
-test('vault checksum verify passes when stored checksum is absent', function (): void {
+test('vault checksum reports an absent stored checksum as unverified', function (): void {
     $path = sys_get_temp_dir() . '/stashd-checksum-' . bin2hex(random_bytes(4));
     file_put_contents($path, 'no-checksum-yet');
 
-    expect(VaultChecksum::verifyFile($path, null))->toBeTrue();
+    expect(VaultChecksum::verifyFile($path, null)->outcome)->toBe(ChecksumComparisonOutcome::Unverified)
+        ->and(VaultChecksum::verifyFile($path, null)->observedChecksum)->toBe('sha256:' . hash('sha256', 'no-checksum-yet'));
 
     unlink($path);
 });

@@ -1680,6 +1680,10 @@ components:
         container: { type: string, nullable: true }
         size_bytes: { type: integer, nullable: true }
         checksum: { type: string, nullable: true }
+        fixity_status:
+          type: string
+          nullable: true
+          enum: [unverified, verified, mismatch, missing, verifying]
         duration_seconds: { type: integer, nullable: true }
         last_verified_at: { type: string, format: date-time, nullable: true }
         missing_at: { type: string, format: date-time, nullable: true }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Vault\Api;
 
 use App\Http\Api\ApiJson;
+use App\Fixity\FixityStatus;
 use App\Support\DurationSeconds;
 use App\Vault\AssetRecord;
 use App\Vault\AssetRegenerationGuidance;
@@ -14,11 +15,12 @@ final readonly class AssetResource
     public function __construct(
         private AssetRecord $asset,
         private ?AssetRegenerationGuidance $guidance = null,
+        private ?FixityStatus $fixityStatus = null,
     ) {}
 
-    public static function fromRecord(AssetRecord $asset, ?AssetRegenerationGuidance $guidance = null): self
+    public static function fromRecord(AssetRecord $asset, ?AssetRegenerationGuidance $guidance = null, ?FixityStatus $fixityStatus = null): self
     {
-        return new self($asset, $guidance);
+        return new self($asset, $guidance, $fixityStatus);
     }
 
     /** @return array<string, mixed> */
@@ -38,6 +40,7 @@ final readonly class AssetResource
             'container' => $this->asset->container,
             'sizeBytes' => $this->asset->sizeBytes,
             'checksum' => $this->asset->checksum,
+            'fixityStatus' => $this->fixityStatus?->value,
             'durationSeconds' => DurationSeconds::toSeconds($this->asset->durationSeconds),
             'lastVerifiedAt' => $this->asset->lastVerifiedAt,
             'missingAt' => $this->asset->missingAt,

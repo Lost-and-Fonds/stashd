@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Vault;
+namespace App\Fixity;
 
 use Closure;
 
@@ -50,18 +50,32 @@ final class VaultChecksum
         return self::ALGORITHM . ':' . strtolower($hexDigest);
     }
 
-    public static function verifyFile(string $path, ?string $storedChecksum, ?Closure $onChunk = null): bool
+    public static function verifyFile(string $path, ?string $storedChecksum, ?Closure $onChunk = null): ChecksumComparison
     {
-        if ($storedChecksum === null || $storedChecksum === '') {
-            return true;
-        }
-
         $computed = self::computeFile($path, $onChunk);
 
         if ($computed === null) {
-            return false;
+            return new ChecksumComparison(
+                outcome: ChecksumComparisonOutcome::Unavailable,
+                expectedChecksum: $storedChecksum,
+                observedChecksum: null,
+            );
         }
 
-        return hash_equals(strtolower($storedChecksum), strtolower($computed));
+        if ($storedChecksum === null || $storedChecksum === '') {
+            return new ChecksumComparison(
+                outcome: ChecksumComparisonOutcome::Unverified,
+                expectedChecksum: null,
+                observedChecksum: $computed,
+            );
+        }
+
+        return new ChecksumComparison(
+            outcome: hash_equals(strtolower($storedChecksum), strtolower($computed))
+                ? ChecksumComparisonOutcome::Match
+                : ChecksumComparisonOutcome::Mismatch,
+            expectedChecksum: $storedChecksum,
+            observedChecksum: $computed,
+        );
     }
 }

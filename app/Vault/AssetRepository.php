@@ -179,19 +179,19 @@ final class AssetRepository
         return $assets;
     }
 
-    public function countReadyVaultAssets(): int
+    public function countVerifiableVaultAssets(): int
     {
         return AssetRecord::count()
-            ->where('state', AssetState::Ready)
+            ->whereIn('state', [AssetState::Ready, AssetState::Stale, AssetState::Missing])
             ->whereNotNull('path')
             ->execute();
     }
 
     /** @return list<AssetRecord> */
-    public function listReadyVaultAssetsPage(?string $afterId, int $limit): array
+    public function listVerifiableVaultAssetsPage(?string $afterId, int $limit): array
     {
         $query = AssetRecord::select()
-            ->where('state', AssetState::Ready)
+            ->whereIn('state', [AssetState::Ready, AssetState::Stale, AssetState::Missing])
             ->whereNotNull('path')
             ->orderBy('id', Direction::ASC)
             ->limit($limit);

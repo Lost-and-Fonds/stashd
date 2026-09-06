@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Vault;
+namespace App\Fixity;
 
 final readonly class VaultVerifyResult
 {
@@ -11,6 +11,7 @@ final readonly class VaultVerifyResult
         public int $missing,
         public int $restored,
         public int $checksumMismatch,
+        public int $unverified,
         public bool $storageUnavailable,
     ) {}
 
@@ -22,6 +23,7 @@ final readonly class VaultVerifyResult
             'missing' => $this->missing,
             'restored' => $this->restored,
             'checksum_mismatch' => $this->checksumMismatch,
+            'unverified' => $this->unverified,
             'storage_unavailable' => $this->storageUnavailable,
         ];
     }

@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Downloads;
 
 use App\Config\StashdConfig;
+use App\Fixity\PreservationEventRepository;
+use App\Fixity\PreservationEventType;
+use App\Fixity\PreservationOutcome;
+use App\Fixity\VaultChecksum;
 use App\Providers\StashdUri;
 use App\Stashes\StashId;
 use App\Stashes\StashInputRepository;
@@ -17,6 +21,7 @@ use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
 use App\System\Storage\StorageLocationState;
 use App\System\Storage\StorageRootService;
+use App\Vault\AssetId;
 use App\Vault\AssetRecord;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
@@ -27,7 +32,6 @@ use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemState;
 use App\Vault\MoveFileIntoVault;
 use App\Vault\StageDownloadFiles;
-use App\Vault\VaultChecksum;
 use App\Vault\VaultPathBuilder;
 use InvalidArgumentException;
 use Tempest\DateTime\DateTime;
@@ -51,6 +55,7 @@ final readonly class DownloadMediaItem
         private MoveFileIntoVault $fileMover,
         private StateTransitionService $transitions,
         private StashdConfig $config,
+        private PreservationEventRepository $preservationEvents,
     ) {}
 
     public function execute(
@@ -136,7 +141,7 @@ final readonly class DownloadMediaItem
                 $pendingAssets[] = $this->createProcessingAsset($mediaItemId, $file, $force);
             }
 
-            $ingested = $this->ingestAllFiles($mediaItem, $download, $pendingAssets, $force);
+            $ingested = $this->ingestAllFiles($mediaItem, $download, $pendingAssets, $force, (string) $jobId);
             $this->transitions->transitionMediaItem($mediaItem, MediaItemState::Ready);
             $this->tempStaging->cleanupSuccess($tempDirectory);
 
@@ -149,6 +154,7 @@ final readonly class DownloadMediaItem
             );
         } catch (\Throwable $throwable) {
             $this->tempStaging->markFailed($tempDirectory);
+
             if ($preserveExisting) {
                 $this->restoreAssets($originalAssets);
                 $this->restoreMediaItem($mediaItem);
@@ -286,6 +292,7 @@ final readonly class DownloadMediaItem
         DownloadResult $download,
         array $pendingAssets,
         bool $replaceExisting = false,
+        ?string $jobId = null,
     ): int {
         /** @var list<array{asset: AssetRecord, file: DownloadedFile, destination: string, checksum: ?string, sizeBytes: ?int}> $planned */
         $planned = [];
@@ -337,7 +344,7 @@ final readonly class DownloadMediaItem
             }
 
             foreach ($planned as $entry) {
-                $this->finalizeAsset($mediaItem, $entry['asset'], $entry['file'], $entry['destination'], $download, $entry['checksum'], $entry['sizeBytes']);
+                $this->finalizeAsset($mediaItem, $entry['asset'], $entry['file'], $entry['destination'], $download, $entry['checksum'], $entry['sizeBytes'], $jobId);
             }
 
             foreach ($backups as $backup) {
@@ -409,6 +416,7 @@ final readonly class DownloadMediaItem
         DownloadResult $download,
         ?string $checksum,
         ?int $sizeBytes,
+        ?string $jobId,
     ): void {
         $asset->path = $destination;
         $asset->relativePath = $this->vaultPaths->relativeFile(
@@ -421,11 +429,20 @@ final readonly class DownloadMediaItem
         $asset->sizeBytes = $sizeBytes;
         $asset->checksum = $checksum;
         $asset->durationSeconds = DurationSeconds::toDuration($file->durationSeconds);
-        $asset->lastVerifiedAt = DateTime::now(Timezone::UTC);
+        $asset->lastVerifiedAt = null;
         $asset->missingAt = null;
         $asset->missingReason = null;
         $this->assets->save($asset);
         $this->transitions->transitionAsset($asset, AssetState::Ready);
+        $this->preservationEvents->create(
+            assetId: AssetId::fromPrimaryKey($asset->id),
+            eventType: PreservationEventType::FixityGenerated,
+            outcome: PreservationOutcome::Success,
+            expectedChecksum: $checksum,
+            observedChecksum: $checksum,
+            jobId: $jobId,
+            detail: ['source' => 'staged_download'],
+        );
 
         if ($file->role === AssetRole::SourceJson) {
             $mediaItem->metadataCapturedAt = $download->attemptedAt;

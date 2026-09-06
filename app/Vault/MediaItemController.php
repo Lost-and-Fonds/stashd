@@ -21,6 +21,7 @@ use App\Vault\Api\MediaItemDetailResource;
 use App\Vault\Api\MediaItemResource;
 use App\Vault\Api\VaultItemSummaryResource;
 use App\Config\StashdConfig;
+use App\Fixity\FixityStatusResolver;
 use App\Http\Api\ApiJson;
 use App\Jobs\Api\JobResource;
 use App\Jobs\JobDispatcher;
@@ -52,6 +53,7 @@ final readonly class MediaItemController
         private StashdConfig $config,
         private JobRepository $jobs,
         private JobDispatcher $jobDispatcher,
+        private FixityStatusResolver $fixityStatus,
     ) {}
 
     #[Get('/api/v1/items')]
@@ -252,6 +254,7 @@ final readonly class MediaItemController
                         vaultOriginalReady: $vaultOriginalReady,
                         mediaItemUpstreamState: $mediaItem->upstreamState,
                     ),
+                    $this->fixityStatus->forAsset($asset),
                 )->toArray(),
                 $assets,
             ),

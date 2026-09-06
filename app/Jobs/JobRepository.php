@@ -93,6 +93,16 @@ final class JobRepository
             ->first() !== null;
     }
 
+    public function hasPendingOrProcessingEntity(JobType $intent, string $entityType, string $entityId): bool
+    {
+        return JobRecord::select()
+            ->where('intent', $intent->value)
+            ->where('entityType', $entityType)
+            ->where('entityId', $entityId)
+            ->whereIn('state', [JobState::Pending, JobState::Processing, JobState::Retrying])
+            ->first() !== null;
+    }
+
     public function latestForEntity(JobType $intent, string $entityType, string $entityId): ?JobRecord
     {
         $job = JobRecord::select()

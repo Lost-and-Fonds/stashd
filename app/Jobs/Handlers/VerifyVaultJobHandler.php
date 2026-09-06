@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Jobs\Handlers;
 
+use App\Fixity\VerifyAssetOutcome;
+use App\Fixity\VerifyVaultAssets;
 use App\Jobs\JobHandler;
 use App\Jobs\JobProgressReporter;
 use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Vault\AssetId;
-use App\Vault\VerifyVaultAssets;
+use RuntimeException;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
@@ -29,11 +31,19 @@ final readonly class VerifyVaultJobHandler implements JobHandler
         $payload = $job->payload ?? [];
 
         if (isset($payload['asset_id']) && is_string($payload['asset_id']) && $payload['asset_id'] !== '') {
-            $outcome = $this->verify->verifyAsset(AssetId::parse($payload['asset_id']));
+            $verification = $this->verify->verifyAsset(AssetId::parse($payload['asset_id']), (string) $job->id);
+            $outcome = $verification->outcome;
+
+            if ($outcome === VerifyAssetOutcome::StorageUnavailable) {
+                throw new RuntimeException('Vault storage is unavailable; verification was not attempted.');
+            }
+
             $result = [
                 'scope' => 'asset',
                 'asset_id' => $payload['asset_id'],
                 'outcome' => $outcome->value,
+                'expected_checksum' => $verification->expectedChecksum,
+                'observed_checksum' => $verification->observedChecksum,
             ];
         } else {
             $lastProgressAt = 0.0;
@@ -46,9 +56,16 @@ final readonly class VerifyVaultJobHandler implements JobHandler
 
                 $context->progress($job, JobProgressUpdate::ofSteps($checked, $total, 'Verifying Vault assets'));
                 $lastProgressAt = $now;
-            });
+            }, (string) $job->id);
+
+            if ($verifyResult->storageUnavailable) {
+                throw new RuntimeException('Vault storage is unavailable; verification was not attempted.');
+            }
+
             $result = ['scope' => 'vault', ...$verifyResult->toArray()];
         }
+
+        $job->payload = [...$payload, 'result' => $result];
 
 
         $job->progressCurrent = 1;

@@ -25,6 +25,7 @@ test('fresh databases converge from the supported baseline', function (): void {
         ->toContain('2026_08_21_remove_broadcast_publication_token_columns')
         ->toContain('2026_08_22_add_asset_derivation_key')
         ->toContain('2026_08_23_normalize_legacy_asset_roles')
+        ->toContain('2026_09_07_create_preservation_events')
         ->not->toContain('2026_06_17_create_domain_schema')
         ->and(Migration::all())->toHaveCount(count($names));
 
@@ -36,6 +37,8 @@ test('fresh databases converge from the supported baseline', function (): void {
         ->not->toContain('tokenSecretId')
         ->not->toContain('tokenPreview')
         ->and($assetColumns)->toContain('derivationKey');
+
+    expect(schemaTableExists($database, 'preservation_events'))->toBeTrue();
 });
 
 test('the historical podcast audio role is normalized to a derived asset', function (): void {
@@ -102,6 +105,7 @@ test('unknown legacy history is refused instead of adopted', function (): void {
 
 function prepareLegacyBaseline(Database $database): void
 {
+    $database->execute(new Query('DROP TABLE IF EXISTS preservation_events'));
     $database->execute(new Query('DROP TABLE published_resources'));
     $database->execute(new Query('DROP INDEX assets_derived_identity'));
     $database->execute(new Query('ALTER TABLE media_items DROP COLUMN IF EXISTS "sizeEstimated"'));
