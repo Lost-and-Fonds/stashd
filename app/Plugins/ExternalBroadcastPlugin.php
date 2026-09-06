@@ -713,10 +713,12 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 $reference = 'resources/' . (string) $asset->id . '.' . $extension;
                 $destination = $stage . '/' . $reference;
 
-                try {
-                    Filesystem\copy_file($asset->path, $destination, overwrite: true);
-                } catch (\Throwable $exception) {
-                    throw BroadcastException::withCode('broadcast_plugin_staging_failed', 'Broadcast asset could not be staged.', $exception);
+                if (! isset($stagedAssets[$reference]) || ! Filesystem\is_file($destination)) {
+                    try {
+                        Filesystem\copy_file($asset->path, $destination, overwrite: true);
+                    } catch (\Throwable $exception) {
+                        throw BroadcastException::withCode('broadcast_plugin_staging_failed', 'Broadcast asset could not be staged.', $exception);
+                    }
                 }
                 $stagedAssets[$reference] = $asset;
             }
