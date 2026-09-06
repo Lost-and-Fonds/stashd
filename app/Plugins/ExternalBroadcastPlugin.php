@@ -309,7 +309,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         } catch (BroadcastException $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
-            throw BroadcastException::withCode('broadcast_plugin_unavailable', 'External Broadcast plugin execution failed.', $exception);
+            throw BroadcastException::withCode('broadcast_plugin_unavailable', sprintf('External Broadcast plugin execution failed: %s', $exception->getMessage()), $exception);
         } finally {
             $this->removeStage($stage);
         }
