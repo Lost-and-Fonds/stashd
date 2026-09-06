@@ -89,6 +89,12 @@ function statePresentation(state: string) {
   return stateMeta[state] ?? { label: state.replaceAll('_', ' '), dot: 'bg-neutral-400', text: 'text-dimmed' }
 }
 
+function broadcastPresentation(broadcast: BroadcastApiResource) {
+  return broadcast.configuration
+    ? { label: 'needs configuration', dot: 'bg-warning', text: 'text-warning' }
+    : statePresentation(broadcast.state)
+}
+
 function monogram(name: string) {
   return name.charAt(0).toUpperCase()
 }
@@ -399,8 +405,14 @@ function itemState(item: StashItemApiResource) {
 function itemDuration(item: StashItemApiResource) {
   const seconds = item.media_item?.duration_seconds
   if (seconds === null || seconds === undefined) return '—'
+  if (seconds < 60) return `${seconds}s`
+
   const minutes = Math.floor(seconds / 60)
-  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+
+  if (hours === 0) return `${minutes}m`
+  return remainingMinutes === 0 ? `${hours}h` : `${hours}h ${remainingMinutes}m`
 }
 
 function itemSize(item: StashItemApiResource) {
@@ -753,28 +765,34 @@ onBeforeUnmount(() => {
       <UAlert v-if="broadcastsError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Could not load Broadcasts" :description="broadcastsError" />
 
       <template v-else-if="broadcasts.length">
-        <div v-for="broadcast in broadcasts" :key="broadcast.id" class="rounded-md bg-muted p-3.5">
+        <div v-for="broadcast in broadcasts" :key="broadcast.id" class="rounded-md bg-muted p-3.5" :class="broadcast.configuration ? 'opacity-70' : ''">
           <div class="flex items-center gap-3">
             <UIcon name="i-lucide-radio" class="size-4 shrink-0 text-muted" />
             <div class="min-w-0 flex-1">
               <p class="truncate font-mono text-sm text-highlighted">{{ broadcast.name }}</p>
-              <p class="mt-0.5 flex items-center gap-1.5 text-xs" :class="statePresentation(broadcast.state).text">
-                <span class="size-1.5 rounded-full" :class="statePresentation(broadcast.state).dot" />
-                {{ statePresentation(broadcast.state).label }}
+              <p class="mt-0.5 flex items-center gap-1.5 text-xs" :class="broadcastPresentation(broadcast).text">
+                <span class="size-1.5 rounded-full" :class="broadcastPresentation(broadcast).dot" />
+                {{ broadcastPresentation(broadcast).label }}
               </p>
             </div>
             <div class="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
-              <p v-if="operationText(broadcastOperations[broadcast.id], 'Rebuild')" class="text-xs" :class="broadcastOperations[broadcast.id]?.state === 'failed' ? 'text-error' : 'text-dimmed'">
+              <p v-if="!broadcast.configuration && operationText(broadcastOperations[broadcast.id], 'Rebuild')" class="text-xs" :class="broadcastOperations[broadcast.id]?.state === 'failed' ? 'text-error' : 'text-dimmed'">
                 {{ operationText(broadcastOperations[broadcast.id], 'Rebuild') }}
               </p>
-              <UButton :label="broadcastOperations[broadcast.id] && !isTerminal(broadcastOperations[broadcast.id]) ? 'Rebuilding…' : 'Rebuild'" icon="i-lucide-refresh-cw" :loading="broadcastOperations[broadcast.id]?.state === 'running'" :disabled="Boolean(broadcastOperations[broadcast.id] && !isTerminal(broadcastOperations[broadcast.id]))" variant="ghost" color="neutral" size="sm" @click="rebuild(broadcast)" />
+              <UButton :label="broadcastOperations[broadcast.id] && !isTerminal(broadcastOperations[broadcast.id]) ? 'Rebuilding…' : 'Rebuild'" icon="i-lucide-refresh-cw" :loading="broadcastOperations[broadcast.id]?.state === 'running'" :disabled="Boolean(broadcast.configuration || (broadcastOperations[broadcast.id] && !isTerminal(broadcastOperations[broadcast.id])))" variant="ghost" color="neutral" size="sm" @click="rebuild(broadcast)" />
               <UButton label="Details" icon="i-lucide-arrow-up-right" :to="`/broadcasts/${broadcast.id}`" variant="subtle" color="neutral" size="sm" />
             </div>
           </div>
 
+          <UAlert v-if="broadcast.configuration" class="mt-3" color="warning" variant="subtle" icon="i-lucide-plug-zap" title="Connection required" :description="broadcast.configuration.message">
+            <template #actions>
+              <UButton label="Configure connection" icon="i-lucide-settings" to="/settings/connections" variant="soft" color="warning" size="xs" />
+            </template>
+          </UAlert>
+
           <div class="mt-3 rounded-md bg-elevated p-3">
             <OperationProgress
-              v-if="broadcastOperations[broadcast.id]"
+              v-if="broadcastOperations[broadcast.id] && !broadcast.configuration"
               label="Rebuilding broadcast"
               :percent="broadcastOperations[broadcast.id]?.percent ?? null"
               :stage="broadcastOperations[broadcast.id]?.label ?? undefined"

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Broadcasts;
 
 use App\Stashes\StashId;
+use App\Connections\ConnectionRepository;
+use App\Plugins\ExternalBroadcastPlugin;
 use App\System\State\StateTransitionService;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -20,6 +22,7 @@ final readonly class BroadcastLifecycleService
         private BroadcastItemRepository $broadcastItems,
         private BroadcastContextFactory $contextFactory,
         private BroadcastPluginRegistry $plugins,
+        private ConnectionRepository $connections,
         private StateTransitionService $transitions,
         private BroadcastPathBuilder $paths,
         private PublishedResourceService $publications,
@@ -108,6 +111,8 @@ final readonly class BroadcastLifecycleService
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
 
+        $this->backfillConnection($broadcast);
+
         $this->transitionToProcessing($broadcast);
 
         if ($onProgress !== null) {
@@ -152,6 +157,7 @@ final readonly class BroadcastLifecycleService
             ?? throw BroadcastException::withCode('broadcast_item_not_found', 'Broadcast item not found.');
         $broadcast = $this->broadcasts->find($item->broadcastId)
             ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
+        $this->backfillConnection($broadcast);
         $plugin = $this->resolvePlugin($broadcast->type);
 
         if (! $plugin->plugin->supportsItemRebuild()) {
@@ -346,6 +352,35 @@ final readonly class BroadcastLifecycleService
         }
 
         return $plugin;
+    }
+
+    public function backfillConnection(BroadcastRecord $broadcast): void
+    {
+        $plugin = $this->resolvePlugin($broadcast->type)->plugin;
+
+        if (! $plugin instanceof ExternalBroadcastPlugin) {
+            return;
+        }
+
+        $settingKey = $plugin->connectionSettingKey();
+        $settings = $broadcast->settings ?? [];
+
+        if ($settingKey === null || isset($settings[$settingKey])) {
+            return;
+        }
+
+        $connections = array_values(array_filter(
+            $this->connections->listAll(),
+            static fn($connection): bool => in_array($connection->type, $plugin->broadcastKeys(), true),
+        ));
+
+        if (count($connections) !== 1) {
+            return;
+        }
+
+        $settings[$settingKey] = (string) $connections[0]->id;
+        $broadcast->settings = $settings;
+        $this->broadcasts->save($broadcast);
     }
 
     private function applyVerifyState(

@@ -6,6 +6,7 @@ namespace App\Broadcasts;
 
 use App\Broadcasts\Api\BroadcastItemResource;
 use App\Broadcasts\Api\BroadcastResource;
+use App\Connections\ConnectionRepository;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
@@ -52,6 +53,7 @@ final readonly class BroadcastController
         private JobRepository $jobs,
         private JobDispatcher $jobDispatcher,
         private JobDefinitionRegistry $jobDefinitions,
+        private ConnectionRepository $connections,
         private ActivityEventService $activity,
     ) {}
 
@@ -517,6 +519,7 @@ final readonly class BroadcastController
     /** @return array<string, mixed> */
     private function mapBroadcast(BroadcastRecord $broadcast, ?BroadcastContext $context = null): array
     {
+        $this->lifecycle->backfillConnection($broadcast);
         $broadcastId = BroadcastId::fromPrimaryKey($broadcast->id);
 
         $extra = [
@@ -546,6 +549,7 @@ final readonly class BroadcastController
             ...$extra,
             'plugin_detail_fields' => $metadata,
             'plugin_actions' => $actions,
+            'configuration' => $this->configuration($broadcast, $plugin),
             'plugin_source_options' => $plugin instanceof BroadcastPluginSourceOptions
                 ? array_map(
                     $this->mapControl(...),
@@ -553,6 +557,28 @@ final readonly class BroadcastController
                 )
                 : [],
             'rebuild_operation' => $this->operation($this->jobs->latestForEntity(JobType::core('core.broadcast'), 'broadcast', (string) $broadcast->id)),
+        ];
+    }
+
+    /** @return array{state: string, message: string, actionUrl: string}|null */
+    private function configuration(BroadcastRecord $broadcast, ?BroadcastPlugin $plugin): ?array
+    {
+        if (! $plugin instanceof ExternalBroadcastPlugin) {
+            return null;
+        }
+
+        $settingKey = $plugin->connectionSettingKey();
+        $settings = $broadcast->settings ?? [];
+        $connectionId = $settingKey === null ? null : ($settings[$settingKey] ?? null);
+
+        if (is_string($connectionId) && PrefixedUlid::isValid($connectionId) && $this->connections->find(PrefixedUlid::parse($connectionId)) !== null) {
+            return null;
+        }
+
+        return [
+            'state' => 'needs_configuration',
+            'message' => 'Connect a media server before rebuilding this Broadcast.',
+            'actionUrl' => '/settings/connections',
         ];
     }
 
