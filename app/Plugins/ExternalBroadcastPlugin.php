@@ -827,11 +827,14 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
 
     private function removeStage(string $stage): void
     {
-        try {
-            Filesystem\delete_directory($stage);
-        } catch (\Throwable) {
-            // Best-effort cleanup must not mask the publication result.
+        if (! Filesystem\is_directory($stage)) {
+            return;
         }
+
+        // A broadcast stage can contain tens of gigabytes of source media.
+        // Do not make Messenger wait for the recursive unlink before it can
+        // acknowledge the completed publication.
+        exec('/bin/rm -rf -- ' . escapeshellarg($stage) . ' >/dev/null 2>&1 &');
     }
 
     private function tryDeleteFile(string $path): bool
