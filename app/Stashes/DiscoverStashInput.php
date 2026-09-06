@@ -35,10 +35,18 @@ final readonly class DiscoverStashInput
         $provider = $this->providers->resolveForUri($uri);
         $resolved = $provider->resolveInput($uri);
 
-        return $this->executeResolved($resolved, $sourceUri, $sourceTitle, $payload['provider_options'] ?? null, $intent, $onProgress);
+        return $this->executeResolved(
+            $resolved,
+            $sourceUri,
+            $sourceTitle,
+            $payload['provider_options'] ?? null,
+            $intent,
+            $onProgress,
+            ($payload['backfill_missing'] ?? false) === true,
+        );
     }
 
-    public function executeResolved(ResolvedInput $resolved, string $sourceUri, ?string $sourceTitle, mixed $providerOptions, ?JobType $intent = null, ?callable $onProgress = null): InputPreflightResult
+    public function executeResolved(ResolvedInput $resolved, string $sourceUri, ?string $sourceTitle, mixed $providerOptions, ?JobType $intent = null, ?callable $onProgress = null, bool $backfillMissing = false): InputPreflightResult
     {
         $intent ??= JobType::core('core.preflight');
         $provider = $this->providers->get($resolved->providerKey);
@@ -66,7 +74,9 @@ final readonly class DiscoverStashInput
         // configured), so this is a no-op when only the cheap one exists.
         $selectionOptions = match ($intent->value) {
             'core.preflight', 'core.initial_backfill' => new StrategySelectionOptions(preferHighestCapability: true),
-            'core.sync_input' => new StrategySelectionOptions(preferIncremental: true),
+            'core.sync_input' => $backfillMissing
+                ? new StrategySelectionOptions(preferHighestCapability: true)
+                : new StrategySelectionOptions(preferIncremental: true),
             default => null,
         };
         $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);

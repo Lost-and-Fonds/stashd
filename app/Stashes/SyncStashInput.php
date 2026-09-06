@@ -45,10 +45,18 @@ final readonly class SyncStashInput
             ?? throw new RuntimeException('Stash input belongs to a stash that no longer exists.');
 
         try {
+            $backfillMissing = $this->stashItems->hasMissingDiscoveryMetadata($stashInputId);
+            $providerOptions = $input->options === null ? [] : $input->options->provider;
+
+            if ($backfillMissing) {
+                $providerOptions['skip_size_enrichment'] = true;
+            }
+
             $discovered = $this->discovery->execute([
                 'source_uri' => $input->sourceUri,
                 'source_title' => $input->title,
-                'provider_options' => $input->options === null ? [] : $input->options->provider,
+                'provider_options' => $providerOptions,
+                'backfill_missing' => $backfillMissing,
             ], JobType::core('core.sync_input'));
 
             $counts = new DiscoveredItemCommitCounts();

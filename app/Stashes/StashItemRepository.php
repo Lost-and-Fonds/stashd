@@ -123,6 +123,25 @@ final class StashItemRepository
             ->execute();
     }
 
+    public function hasMissingDiscoveryMetadata(StashInputId $stashInputId): bool
+    {
+        /** @var list<array{id: string}> $rows */
+        $rows = $this->database->fetch(new Query(
+            'SELECT "media_items"."id"
+             FROM "stash_items"
+             JOIN "media_items" ON "media_items"."id" = "stash_items"."mediaItemId"
+             WHERE "stash_items"."stashInputId" = ?
+               AND ("media_items"."description" IS NULL
+                    OR "media_items"."durationSeconds" IS NULL
+                    OR "media_items"."publishedAt" IS NULL
+                    OR "media_items"."thumbnailUri" IS NULL)
+             LIMIT 1',
+            [$stashInputId->toString()],
+        ));
+
+        return $rows !== [];
+    }
+
     public function countForStash(
         StashId $stashId,
         ?string $search = null,

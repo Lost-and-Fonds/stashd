@@ -156,7 +156,7 @@ final readonly class MediaItemController
                     'code' => 'stash_item_not_found',
                     'message' => 'Media item is not part of a Stash.',
                 ],
-            ], Status::UNPROCESSABLE_ENTITY);
+            ], Status::UNPROCESSABLE_CONTENT);
         }
 
         $active = $this->jobs->pendingOrProcessing(JobType::core('core.download'), PrefixedUlid::parse((string) $item->id));
