@@ -885,10 +885,12 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     {
         $sourceSettings = $context->settings()['source_settings'] ?? [];
         $sourceSettings = is_array($sourceSettings) ? $sourceSettings : [];
+        $singleSourceSettings = count($sourceSettings) === 1 ? reset($sourceSettings) : null;
+        $singleSourceSettings = is_array($singleSourceSettings) ? $singleSourceSettings : [];
 
-        return array_map(function ($input) use ($sourceSettings): array {
+        return array_map(function ($input) use ($sourceSettings, $singleSourceSettings): array {
             $reference = (string) $input->id;
-            $settings = is_array($sourceSettings[$reference] ?? null) ? $sourceSettings[$reference] : [];
+            $settings = is_array($sourceSettings[$reference] ?? null) ? $sourceSettings[$reference] : $singleSourceSettings;
 
             return [
                 'reference' => $reference,
