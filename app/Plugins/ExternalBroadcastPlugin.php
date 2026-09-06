@@ -234,6 +234,9 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 }
             }
             /** @var list<array<string, mixed>> $validArtifacts */
+            if (is_callable($context->progress)) {
+                ($context->progress)('Finalizing prepared media', 0.5);
+            }
             $this->promoteDerivedArtifacts($context, $stage, $validArtifacts, $stagedAssets);
 
             foreach ($items as $itemData) {

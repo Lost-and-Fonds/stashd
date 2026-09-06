@@ -35,7 +35,7 @@ const color = {
     <div class="flex items-center justify-between gap-2">
       <p class="truncate text-xs text-default">{{ label }}</p>
       <p class="shrink-0 font-mono text-xs text-dimmed">
-        {{ status === 'complete' ? 'complete' : (percent === null ? (status === 'queued' ? 'queued' : 'working') : `${percent}%`) }}
+        {{ status === 'complete' ? 'complete' : (percent === null ? (status === 'queued' ? 'queued' : 'working') : `${Math.round(percent)}%`) }}
       </p>
     </div>
     <UProgress :model-value="percent" :color="color[status]" size="sm" />
@@ -47,7 +47,7 @@ const color = {
   <div v-else-if="variant === 'compact'" class="flex w-20 items-center gap-1.5">
     <UProgress :model-value="percent" :color="color[status]" size="sm" class="flex-1" />
     <UIcon v-if="status === 'complete'" name="i-lucide-check" class="size-3.5 shrink-0 text-success" />
-    <span v-else class="w-8 shrink-0 text-right font-mono text-xs text-dimmed">{{ percent === null ? '—' : `${percent}%` }}</span>
+    <span v-else class="w-8 shrink-0 text-right font-mono text-xs text-dimmed">{{ percent === null ? '—' : `${Math.round(percent)}%` }}</span>
   </div>
 
   <div v-else class="space-y-1.5">
@@ -57,7 +57,7 @@ const color = {
         <UIcon name="i-lucide-check" class="size-3.5" />
         complete
       </p>
-      <p v-else class="shrink-0 font-mono text-xs text-dimmed">{{ percent === null ? (status === 'queued' ? 'queued' : 'working') : `${percent}%` }}</p>
+      <p v-else class="shrink-0 font-mono text-xs text-dimmed">{{ percent === null ? (status === 'queued' ? 'queued' : 'working') : `${Math.round(percent)}%` }}</p>
     </div>
 
     <UProgress :model-value="percent" :color="color[status]" size="lg" />

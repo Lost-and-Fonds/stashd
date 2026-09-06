@@ -767,6 +767,7 @@ onBeforeUnmount(() => {
               :percent="broadcastOperations[broadcast.id]?.percent ?? null"
               :stage="broadcastOperations[broadcast.id]?.label ?? undefined"
               :status="operationStatus(broadcastOperations[broadcast.id]!)"
+              class="mb-3"
             />
             <div class="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
               <div v-for="fact in broadcastFacts(broadcast)" :key="fact.label" class="flex items-center justify-between gap-3 sm:block sm:justify-normal">
