@@ -6,8 +6,10 @@ namespace App\Fixity;
 
 use App\Config\StashdConfig;
 use App\System\State\StateTransitionService;
+use App\System\Storage\FilesystemProbe;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
+use App\System\Storage\StorageLocationRecord;
 use App\System\Storage\StorageLocationState;
 use App\Vault\AssetId;
 use App\Vault\AssetRecord;
@@ -32,6 +34,7 @@ final readonly class VerifyVaultAssets
         private StateTransitionService $transitions,
         private PreservationEventRepository $events,
         private StashdConfig $config,
+        private FilesystemProbe $filesystem,
     ) {}
 
     /** @param null|Closure(int, int): void $onProgress */
@@ -66,7 +69,7 @@ final readonly class VerifyVaultAssets
             }
 
             foreach ($assets as $asset) {
-                if (! $this->isVaultRootReadable()) {
+                if ($this->isVaultStorageUnavailable()) {
                     return new VaultVerifyResult(
                         checked: $checked,
                         missing: $missing,
@@ -143,7 +146,7 @@ final readonly class VerifyVaultAssets
 
     private function verifyAssetRecord(AssetRecord $asset, ?Closure $onChecksumChunk = null, ?string $jobId = null): FixityVerificationResult
     {
-        if (! $this->isVaultRootReadable()) {
+        if ($this->isVaultStorageUnavailable()) {
             return new FixityVerificationResult(
                 outcome: VerifyAssetOutcome::StorageUnavailable,
                 expectedChecksum: $asset->checksum,
@@ -281,12 +284,14 @@ final readonly class VerifyVaultAssets
         );
     }
 
+    /** @phpstan-impure */
     private function isVaultStorageUnavailable(): bool
     {
         $vault = $this->storageLocations->findByKey(StorageLocationKey::Vault);
 
         return ($vault !== null && in_array($vault->state, [StorageLocationState::Unavailable, StorageLocationState::Missing], true))
-            || ! $this->isVaultRootReadable();
+            || ! $this->isVaultRootReadable()
+            || $this->vaultFilesystemChanged($vault);
     }
 
     private function isVaultRootReadable(): bool
@@ -294,6 +299,17 @@ final readonly class VerifyVaultAssets
         $path = $this->config->vaultPath();
 
         return Filesystem\is_directory($path) && Filesystem\is_readable($path);
+    }
+
+    private function vaultFilesystemChanged(?StorageLocationRecord $vault): bool
+    {
+        if ($vault?->filesystemId === null) {
+            return false;
+        }
+
+        $current = $this->filesystem->filesystemId($this->config->vaultPath());
+
+        return $current !== null && $current !== $vault->filesystemId;
     }
 
     private function syncMediaItemAfterAssetMissing(AssetRecord $asset): void

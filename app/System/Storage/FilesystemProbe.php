@@ -6,6 +6,19 @@ namespace App\System\Storage;
 
 final class FilesystemProbe
 {
+    public function filesystemId(string $path): ?string
+    {
+        $root = realpath($path);
+
+        if ($root === false) {
+            return null;
+        }
+
+        $stat = @stat($root);
+
+        return $stat === false ? null : (string) $stat['dev'];
+    }
+
     public function probeWritable(string $path): FilesystemProbeResult
     {
         if (! is_dir($path)) {

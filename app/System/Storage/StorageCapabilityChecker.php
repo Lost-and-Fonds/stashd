@@ -67,7 +67,7 @@ final readonly class StorageCapabilityChecker
             writable: $writable,
             freeBytes: is_numeric($freeBytes) ? (int) $freeBytes : null,
             totalBytes: is_numeric($totalBytes) ? (int) $totalBytes : null,
-            filesystemId: $writable ? $this->filesystemId($path) : null,
+            filesystemId: $writable ? $this->probe->filesystemId($path) : null,
             supportsHardlinks: $withinRootHardlink->ok,
             supportsSymlinks: $writable && $this->probeSymlinks($path),
             lastError: $lastError ?? ($withinRootHardlink->ok ? null : $withinRootHardlink->message),
@@ -179,18 +179,5 @@ final readonly class StorageCapabilityChecker
         }
 
         return $linked;
-    }
-
-    private function filesystemId(string $path): ?string
-    {
-        $root = realpath($path);
-
-        if ($root === false) {
-            return null;
-        }
-
-        $stat = stat($root);
-
-        return $stat === false ? null : (string) $stat['dev'];
     }
 }

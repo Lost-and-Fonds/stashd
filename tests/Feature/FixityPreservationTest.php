@@ -5,6 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Downloads\DownloadMediaItem;
+use App\Downloads\DownloadedFile;
+use App\Downloads\DownloaderInterface;
+use App\Downloads\DownloadException;
+use App\Downloads\DownloadProbeResult;
+use App\Downloads\DownloadRequest;
+use App\Downloads\DownloadResult;
 use App\Config\StashdConfig;
 use App\Fixity\FixityStatus;
 use App\Fixity\FixityStatusResolver;
@@ -16,6 +22,7 @@ use App\Fixity\VerifyVaultAssets;
 use App\Jobs\JobRepository;
 use App\Stashes\StashId;
 use App\Support\PrefixedUlidGenerator;
+use App\System\Storage\FilesystemProbe;
 use App\Vault\AssetId;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
@@ -26,6 +33,83 @@ use App\Vault\MediaItemState;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
 use App\System\Storage\StorageLocationState;
+use App\Vault\AssetKind;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
+
+final class FailingChecksumStream
+{
+    public mixed $context = null;
+
+    public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
+    {
+        return false;
+    }
+
+    /** @return array<string, int> */
+    public function url_stat(string $path, int $flags): array
+    {
+        $now = time();
+
+        return [
+            'dev' => 1,
+            'ino' => 1,
+            'mode' => 0100644,
+            'nlink' => 1,
+            'uid' => 0,
+            'gid' => 0,
+            'rdev' => -1,
+            'size' => 1,
+            'atime' => $now,
+            'mtime' => $now,
+            'ctime' => $now,
+            'blksize' => -1,
+            'blocks' => -1,
+        ];
+    }
+}
+
+final readonly class FailingChecksumDownloader implements DownloaderInterface
+{
+    public function implementationName(): string
+    {
+        return 'failing-checksum-test';
+    }
+
+    public function implementationVersion(): ?string
+    {
+        return 'test';
+    }
+
+    public function probe(): DownloadProbeResult
+    {
+        return new DownloadProbeResult(true, $this->implementationName(), $this->implementationVersion());
+    }
+
+    public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult
+    {
+        return new DownloadResult(
+            files: [new DownloadedFile(
+                tempPath: 'stashd-failing-checksum://asset',
+                filename: 'failed.fake',
+                role: AssetRole::VaultOriginal,
+                kind: AssetKind::Video,
+                mimeType: 'application/x-stashd-fake',
+                container: 'fake',
+                sizeBytes: 1,
+            )],
+            implementation: $this->implementationName(),
+            implementationVersion: $this->implementationVersion(),
+            sourceUri: $request->canonicalUri,
+            attemptedAt: DateTime::now(Timezone::UTC),
+        );
+    }
+
+    public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array
+    {
+        throw DownloadException::withCode('captions_unavailable', 'Not used by this test downloader.');
+    }
+}
 
 test('ingest establishes a baseline and verification records committed-object evidence', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('fixity-ingest');
@@ -74,6 +158,38 @@ test('ingest establishes a baseline and verification records committed-object ev
     $response = $this->http->get('/api/v1/items/' . $mediaItemId . '/assets', headers: $headers);
     $original = array_values(array_filter($response->body['assets'], static fn(array $candidate): bool => $candidate['role'] === AssetRole::VaultOriginal->value))[0];
     expect($original['fixity_status'])->toBe(FixityStatus::Verified->value);
+});
+
+test('ingest fails before finalization when the baseline checksum cannot be generated', function (): void {
+    [, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('fixity-ingest-checksum-failure');
+    $this->container->singleton(DownloaderInterface::class, new FailingChecksumDownloader());
+    expect(stream_wrapper_register('stashd-failing-checksum', FailingChecksumStream::class))->toBeTrue();
+
+    $exception = null;
+    set_error_handler(static fn(): bool => true, E_WARNING);
+
+    try {
+        $this->container->get(DownloadMediaItem::class)->execute(
+            mediaItemId: MediaItemId::parse($mediaItemId),
+            stashId: StashId::parse($stashId),
+            jobId: $this->container->get(PrefixedUlidGenerator::class)->generate('job'),
+        );
+    } catch (DownloadException $caught) {
+        $exception = $caught;
+    } finally {
+        restore_error_handler();
+        stream_wrapper_unregister('stashd-failing-checksum');
+    }
+
+    $assets = $this->container->get(AssetRepository::class);
+    $asset = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::VaultOriginal);
+    $events = $this->container->get(PreservationEventRepository::class)->listForAsset(AssetId::fromPrimaryKey($asset->id));
+
+    expect($exception)->toBeInstanceOf(DownloadException::class)
+        ->and($exception?->errorCode)->toBe('checksum_failed')
+        ->and($asset->state)->toBe(AssetState::Failed)
+        ->and($asset->path)->toBeNull()
+        ->and($events)->toBeEmpty();
 });
 
 test('mismatch and restoration retain both digests and append history', function (): void {
@@ -233,6 +349,49 @@ test('bulk verification detects a Vault root that disappears after the last stor
         rename($offlinePath, $vaultPath);
     }
 
+    $asset = $assets->find($assetId);
+
+    expect($result->storageUnavailable)->toBeTrue()
+        ->and($result->checked)->toBe(0)
+        ->and($asset->state)->toBe(AssetState::Ready)
+        ->and(count($events->listForAsset($assetId)))->toBe($beforeEvents);
+});
+
+test('bulk verification stops when the Vault filesystem identity changes', function (): void {
+    [, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('fixity-filesystem-identity');
+    $this->container->get(DownloadMediaItem::class)->execute(
+        mediaItemId: MediaItemId::parse($mediaItemId),
+        stashId: StashId::parse($stashId),
+        jobId: $this->container->get(PrefixedUlidGenerator::class)->generate('job'),
+    );
+
+    $assets = $this->container->get(AssetRepository::class);
+    $events = $this->container->get(PreservationEventRepository::class);
+    $asset = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::VaultOriginal);
+    $assetId = AssetId::fromPrimaryKey($asset->id);
+    $vaultPath = $this->container->get(StashdConfig::class)->vaultPath();
+    $currentFilesystemId = $this->container->get(FilesystemProbe::class)->filesystemId($vaultPath);
+    $beforeEvents = count($events->listForAsset($assetId));
+
+    expect($currentFilesystemId)->not->toBeNull();
+
+    $this->container->get(StorageLocationRepository::class)->upsert(
+        key: StorageLocationKey::Vault,
+        role: StorageLocationKey::Vault,
+        label: 'Vault',
+        path: $vaultPath,
+        state: StorageLocationState::Ready,
+        readable: true,
+        writable: true,
+        freeBytes: null,
+        totalBytes: null,
+        filesystemId: 'changed-' . $currentFilesystemId,
+        supportsHardlinks: true,
+        supportsSymlinks: true,
+        lastError: null,
+    );
+
+    $result = $this->container->get(VerifyVaultAssets::class)->verifyAll();
     $asset = $assets->find($assetId);
 
     expect($result->storageUnavailable)->toBeTrue()
