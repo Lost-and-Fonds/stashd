@@ -152,9 +152,9 @@ final class M7Progress implements ProgressReporter
 {
     public function __construct(private M7Rpc $rpc) {}
 
-    public function report(string $stage): void
+    public function report(string $stage, ?float $fraction = null): void
     {
-        $this->rpc->call('event.progress', ['stage' => $stage]);
+        $this->rpc->call('event.progress', ['stage' => $stage, 'fraction' => $fraction]);
     }
 }
 
@@ -181,15 +181,19 @@ final class M7ExampleBroadcast implements BroadcastPlugin
 {
     public function __construct(private PluginContext $context, private M7Rpc $rpc) {}
 
-    public function prepare(PublishRequest $request, PluginContext $context): Preparation
+    // The fixture manifest is legacy 0.1, so these two methods accept both the
+    // old SDK signature and the current invocation-context signature.
+    public function prepare(PublishRequest $request, ...$arguments): Preparation
     {
-        $this->context->progress->report('prepare');
+        $context = ($arguments[0] ?? null) instanceof PluginContext ? $arguments[0] : $this->context;
+        $context->progress->report('prepare');
 
         return new Preparation();
     }
 
-    public function publish(PublishRequest $request, PluginContext $context): Publication
+    public function publish(PublishRequest $request, ...$arguments): Publication
     {
+        $context = ($arguments[0] ?? null) instanceof PluginContext ? $arguments[0] : $this->context;
         $context->logger->info('example broadcast publish');
         $context->progress->report('publish');
         $small = $context->http->request('GET', 'https://allowed.test/small', [], null, 'fixture-token');
