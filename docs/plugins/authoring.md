@@ -13,7 +13,7 @@ For PHP-specific class signatures and a minimal repository skeleton, see
 The source-of-truth order is:
 
 1. [`plugin-api` WIT](https://github.com/Lost-and-Fonds/plugin-api/tree/main/wit)
-   for language-neutral lifecycle and value semantics.
+   for language-neutral lifecycle, values, errors, and host capabilities.
 2. Core's plugin runtime and manifest validation for current execution,
    packaging, sandbox, and application integration.
 3. The SDK for the language you are writing in. At present that is the
@@ -21,10 +21,14 @@ The source-of-truth order is:
 4. First-party plugins as worked examples, not as a replacement for the
    contract.
 
+The current language-neutral contract is `stashd:plugin@0.2.0`. The current PHP
+binding is the independently versioned `0.3.x` SDK.
+
 This ordering is deliberate. The WIT survived the retirement of the old
 Wasmtime production experiment because it describes *meaning*, not a particular
-runtime. Production plugins now communicate with Core as sandboxed processes
-using RPC v1, but their Input and Broadcast shapes still follow that contract.
+runtime. Production plugins communicate with Core as sandboxed processes using
+RPC v1, but their Input/Broadcast semantics and host capabilities are defined by
+the contract rather than by PHP or RPC implementation details.
 
 ## 2. Choose the contract world
 
@@ -74,12 +78,15 @@ recognises generic roles:
 - `metadata`
 
 The plugin/helper writes into its invocation staging area and then asks the host
-to stage a relative path with a role and optional media type. The returned
-reference is opaque. The plugin does **not** choose a Vault path or promote the
-file itself.
+to stage a relative path with an optional media type. The returned reference is
+opaque. The plugin does **not** choose a Vault path or promote the file itself.
 
 This is a central Stashd invariant: acquisition creates evidence in staging;
 Core performs authoritative Vault promotion, provenance, and fixity work.
+
+Input host capabilities are invocation-scoped WIT imports. The PHP SDK exposes
+them through the `PluginContext` passed to the Input factory; another SDK may use
+a different language-native shape.
 
 ### Broadcast: Vault material → disposable publication
 
@@ -113,10 +120,6 @@ Core exposes to the server.
 that logically depends on the completed publication, for example notifying an
 external service. It returns the resulting publication.
 
-The PHP SDK passes a `PluginContext` to this method as an ergonomic capability
-container. That extra PHP parameter is **not part of the language-neutral WIT
-signature**; the SDK constructs it from host capability calls.
-
 #### `operation`
 
 `operation(operation-request)` supports explicit auxiliary actions such as
@@ -124,8 +127,23 @@ looking up choices or interacting with a configured destination. Treat operation
 names as plugin-owned public API: stable names, validated payloads, predictable
 results.
 
-Again, PHP currently supplies a `PluginContext` parameter for convenience. A
-future SDK may expose those capabilities differently.
+#### Broadcast capabilities
+
+The four WIT lifecycle functions take request values only, but the
+`broadcast-world` imports host capabilities for the invocation. In PHP SDK 0.3,
+**all four** Broadcast methods receive a `PluginContext` as a language binding
+for those imports:
+
+```php
+prepare(PublishRequest $request, PluginContext $context)
+publish(PublishRequest $request, PluginContext $context)
+finalize(FinalizationRequest $request, PluginContext $context)
+operation(OperationRequest $request, PluginContext $context)
+```
+
+`PluginContext` is therefore a PHP ergonomic binding, not an extra
+language-neutral ABI parameter. Do not attach host capabilities to request DTOs
+or copy the PHP presentation mechanically into a future SDK.
 
 ## 3. Use capabilities instead of reaching around the sandbox
 
@@ -147,9 +165,21 @@ Therefore the correct question is never “how do I get the Vault path?” It is
 
 ### HTTP
 
-The host HTTP capability is the normal way to call provider APIs. The manifest
-declares allowed URL prefixes and, optionally, which operations can use them.
-Credentials can be attached by the host as a query parameter or header.
+Contract 0.2 defines a generic HTTP request with:
+
+- method: `GET`, `POST`, `PUT`, `PATCH`, or `DELETE`;
+- URL;
+- optional logical credential name;
+- arbitrary request headers;
+- request body bytes.
+
+The response includes status, headers, and body bytes. This is intentionally
+provider-neutral: do not grow provider-specific HTTP helpers in Core merely to
+avoid using the generic request shape.
+
+The manifest declares allowed URL prefixes and, optionally, which operations can
+use them. Credentials can be attached by the host as a query parameter or
+header.
 
 Keep grants narrow. Prefer:
 
@@ -166,6 +196,11 @@ https://api.example.com/
 when only the former is necessary. Never construct a grant broad enough merely
 to make development easier.
 
+Host HTTP failures include denied access, unavailable credentials,
+authentication rejection, rate limiting, upstream unavailability, and generic
+failure. Map provider-facing lifecycle failures to the plugin error model when
+they cross back through `resolve`, `publish`, etc.
+
 ### Credentials
 
 The plugin declares a logical credential key and the host maps it to an
@@ -178,11 +213,11 @@ plugin data. Do not persist or log them.
 ### Staging
 
 Staging is the only writable publication/acquisition workspace a plugin should
-assume. Paths supplied to staging calls are package/invocation-relative and are
-validated at the host boundary.
+assume. Paths supplied to staging calls are invocation-relative and validated at
+the host boundary.
 
-Input staging can run a declared helper and stage an artifact with a generic
-role. Broadcast staging can run a helper, write bytes, and stage files.
+Input staging can run a declared helper and stage an artifact. Broadcast
+staging can run a helper, write bytes, and stage files.
 
 ### Helpers
 
@@ -204,12 +239,13 @@ Use host logging and progress capabilities rather than writing a second status
 system. Logs are diagnostic; progress is structured job state. Neither may
 contain secrets.
 
+Both Input and Broadcast progress calls support an optional fractional progress
+value in addition to the human-readable stage.
+
 ## 4. Error semantics
 
-The language-neutral contract carries structured plugin errors with a message
-and a `retryable` flag.
-
-Input defines:
+Input and Broadcast now share the same seven language-neutral plugin failure
+categories:
 
 - `unsupported`
 - `not-found`
@@ -219,27 +255,60 @@ Input defines:
 - `invalid-data`
 - `failed`
 
-Broadcast currently defines:
+Each carries:
 
-- `unsupported`
-- `not-found`
-- `unavailable`
-- `invalid-data`
-- `failed`
+```json
+{
+  "message": "human-readable explanation",
+  "retryable": true
+}
+```
+
+On the wire the result error is a WIT-style variant, for example:
+
+```json
+{
+  "tag": "rate-limited",
+  "value": {
+    "message": "remote quota exceeded",
+    "retryable": true
+  }
+}
+```
 
 Choose errors by what the caller can do next. “The provider returned 503” is
-usually unavailable/retryable; “this URL is not a channel” is unsupported or
-invalid-data and is not fixed by retrying.
+usually `unavailable` and retryable; “this URL is not a channel” is
+`unsupported` or `invalid-data` and is not fixed by retrying.
 
-**Current PHP transport caveat:** error plumbing is not yet as rich as the WIT
-model. The Input server currently maps thrown exception messages to wire error
-codes heuristically, and the Broadcast server turns uncaught exceptions into a
-generic non-retryable plugin failure. Do not build provider semantics around
-those implementation quirks. Treat the WIT error model as the direction of the
-public contract and keep plugin exceptions/messages precise until the SDK's
-typed error transport is completed.
+PHP SDK 0.3 exposes typed plugin failures instead of inferring meaning from
+exception strings. Throw a `PluginFailureException` carrying a `PluginFailure`
+and `PluginErrorCode` when provider logic intentionally returns a contract
+failure. Unclassified exceptions are converted to non-retryable `failed`.
+Capability unavailability is mapped to retryable `unavailable`.
 
-## 5. Manifest and application integration
+Core understands the typed `{tag,value}` form and preserves retryability through
+Input, download, Broadcast, and Connection error boundaries. It also accepts the
+legacy flat error form while 0.1 plugins are being migrated; new plugins should
+not emit that legacy shape.
+
+## 5. DTO and wire strictness
+
+Contract values should be treated as typed values, not vaguely shaped JSON.
+PHP SDK 0.3 rejects malformed required fields, list entries, variants, and
+integer values instead of silently coercing them.
+
+That means plugin tests should catch malformed data early rather than depend on
+behaviour such as:
+
+- missing strings becoming `""`;
+- numeric strings becoming integers;
+- malformed option values being skipped;
+- invalid variants quietly falling back to defaults.
+
+If a field is required by WIT, provide it with the correct type. If it is an
+`option<T>`, use `null` only where the contract permits it.
+
+## 6. Manifest and application integration
 
 Every package has a `plugin.json`. Its stable package identity fields are:
 
@@ -251,7 +320,9 @@ Every package has a `plugin.json`. Its stable package identity fields are:
 - `entrypoint`
 
 Current production packages normally place it at
-`stashd-plugin/plugin.json`.
+`stashd-plugin/plugin.json`. New plugins should declare `api_version: "0.2"`.
+Core currently accepts `0.1` as an explicit migration compatibility line, but
+first-party plugins have moved to 0.2.
 
 The manifest also declares the host-side information Core needs to wire the
 plugin without understanding the provider: source prefixes and fields, UI
@@ -259,11 +330,11 @@ options, HTTP grants, credentials, helpers, supported file kinds, publication
 behaviour, and similar metadata.
 
 See [Manifest reference](manifest.md) before adding a field. The JSON schema is
-currently intentionally permissive and some application-integration fields are
+intentionally permissive in places and some application-integration fields are
 parsed by Core classes rather than fully described by the schema. Existing use
 is not automatically a frozen public API.
 
-## 6. Package layout and OCI build
+## 7. Package layout and OCI build
 
 A typical current PHP plugin looks like:
 
@@ -308,7 +379,7 @@ The manifest has a `helpers_lock` field, but the current builder specifically
 reads `stashd-plugin/helpers.lock.json`. Treat that fixed path as current tooling
 behaviour until the builder and schema are made fully declarative.
 
-## 7. Installation, activation, and development links
+## 8. Installation, activation, and development links
 
 Core stores installed versions separately from the active version. Packages are
 immutable once installed. Activation changes a symlink; rollback activates an
@@ -328,7 +399,39 @@ docker compose exec stashd php tempest stashd:plugin-install \
 Use the plugin's release workflow to build/publish artifacts rather than
 checking `vendor/` or downloaded helper binaries into source control.
 
-## 8. Testing strategy
+## 9. RPC v1 and cross-language compatibility
+
+Ordinary plugin authors should mostly ignore transport details, but SDK authors
+and boundary tests need a stable representation.
+
+RPC v1 uses:
+
+```text
+4-byte unsigned big-endian JSON byte length
+UTF-8 JSON object payload
+```
+
+The plugin initiates a hello request advertising its supported protocol range;
+Core replies with the selected v1 range before lifecycle dispatch begins.
+
+The JSON mapping follows the contract compatibility rules:
+
+- scalars → JSON scalars;
+- records → objects;
+- lists → arrays;
+- enums → strings;
+- variants → `{"tag": "...", "value": ...}` for payload-bearing cases;
+- results → exactly one of `{"ok": ...}` or `{"error": ...}`;
+- resource references → opaque invocation-scoped handles.
+
+Inline WIT byte values use the host's current JSON string representation in RPC
+capability payloads. `resource.read` chunks use base64.
+
+Do not infer these details from one PHP class. The language-neutral conformance
+fixtures in `plugin-api/tests/contract/fixtures/` are specifically intended to
+be replayed by future SDKs.
+
+## 10. Testing strategy
 
 A plugin should be testable without booting the whole Stashd application.
 
@@ -338,10 +441,11 @@ At minimum test:
 - canonicalisation and provider-ID stability;
 - refresh versus complete discovery behaviour;
 - provider response mapping to contract DTOs;
-- error cases (unsupported, missing, auth, rate limit, malformed data);
+- all relevant typed error cases and retryability;
 - acquisition/publication output shapes;
 - helper argument construction without invoking arbitrary host tools;
 - capability denial/unavailability paths;
+- strict rejection of malformed contract values;
 - manifest/package assumptions relevant to the plugin.
 
 For PHP plugins, use the SDK and first-party plugin contract tests as the model
@@ -354,22 +458,24 @@ When changing the contract itself, also run the `plugin-api` contract suite:
 ./tests/contract/run.sh
 ```
 
-When changing Core's runtime/host integration, follow Core's testing rules and
-use `./bin/test`; do not invoke Pest/PHPUnit directly on the host.
+When changing SDK mapping, exercise the cross-language fixtures as well. When
+changing Core's runtime/host integration, follow Core's testing rules and use
+`./bin/test`; do not invoke Pest/PHPUnit directly on the host.
 
-## 9. First-party examples worth copying
+## 11. First-party examples worth copying
 
 ### YouTube Input
 
 Use [`Lost-and-Fonds/youtube`](https://github.com/Lost-and-Fonds/youtube) for:
 
-- an Input factory receiving host capabilities;
+- an Input factory receiving `PluginContext`;
 - URL prefix/source-field declarations;
 - cheap refresh versus more expensive complete discovery;
 - optional Data API credentials;
 - operation-scoped HTTP grants;
 - multiple pinned helper artifacts;
-- staging primary media, metadata, artwork, and captions.
+- staging primary media, metadata, artwork, and captions;
+- an `api_version: "0.2"` Input package using PHP SDK `^0.3`.
 
 Copy the *shape*, not YouTube-specific assumptions.
 
@@ -378,22 +484,25 @@ Copy the *shape*, not YouTube-specific assumptions.
 Use [`Lost-and-Fonds/podcast`](https://github.com/Lost-and-Fonds/podcast) for:
 
 - a file-producing Broadcast;
+- `PluginContext` on all Broadcast lifecycle calls;
 - UI options;
 - supported input file kinds;
 - a declared `ffmpeg` helper;
 - a deterministic output path/media type;
-- preparation followed by publication.
+- preparation followed by publication;
+- an `api_version: "0.2"` Broadcast package using PHP SDK `^0.3`.
 
 Jellyfin and Plex are better references for Broadcasts that need a configured
 external Connection and server-side operations.
 
-## 10. Design rules that save review time
+## 12. Design rules that save review time
 
 - Keep provider semantics out of Core.
 - Do not parse provider responses in Core “just for this one field.”
 - Do not ask for direct Vault or database access.
 - Do not make a plugin a Core Composer dependency.
 - Do not assume PHP DTOs are the protocol.
+- Do not attach capabilities to contract request DTOs because one SDK once did.
 - Do not invent a new lifecycle method without first changing the canonical
   contract.
 - Do not add broad network grants when a narrow prefix is sufficient.
@@ -405,11 +514,12 @@ external Connection and server-side operations.
 - Prefer a maintained upstream tool/library over reimplementing a mature
   protocol, but keep provider-specific orchestration in the plugin.
 
-## 11. Completion checklist
+## 13. Completion checklist
 
 Before calling a plugin complete, verify all of the following:
 
 - The plugin implements an existing WIT world (Input or Broadcast).
+- New work targets contract `0.2` and a compatible current SDK.
 - Its stable IDs/references are documented and tested.
 - Manifest identity/version/runtime/API fields are valid.
 - All required network destinations are declared narrowly.
@@ -419,7 +529,8 @@ Before calling a plugin complete, verify all of the following:
 - No code assumes direct DB/Vault/host filesystem access.
 - `refresh`/`complete` or `prepare`/`publish` semantics are distinct where they
   need to be.
-- Error and retry behaviour is tested.
+- Typed errors and retryability are tested.
+- Malformed DTO/wire values fail loudly in tests.
 - The repository has focused contract tests and its normal lint/static checks
   pass.
 - The OCI build succeeds for each advertised architecture.

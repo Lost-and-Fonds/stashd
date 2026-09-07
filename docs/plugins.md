@@ -30,12 +30,12 @@ sandbox runner enforce that today. The architecture and contract are designed
 so that other runtimes/SDKs can follow, but they are not yet executable merely
 because the contract is language-neutral.
 
-In short:
+The current contract line is:
 
 ```text
-plugin-api / WIT            normative language-neutral semantics
+plugin-api / WIT            stashd:plugin@0.2.0
         ↓
-SDK                         language-specific authoring adapter
+PHP SDK                     0.3.x authoring binding
         ↓
 RPC v1 + host capabilities  production process boundary
         ↓
@@ -90,6 +90,10 @@ resolve → discover → acquire
 `resolve` validates/normalises a source, `discover` enumerates media items, and
 `acquire` creates staged artifacts for Stashd to promote into the Vault.
 
+Host HTTP, staging, helper, progress, and log capabilities are invocation-scoped
+imports in the WIT. The PHP SDK exposes them to an Input through the
+`PluginContext` passed to the plugin factory.
+
 The first-party YouTube plugin is the best complete Input example:
 [`Lost-and-Fonds/youtube`](https://github.com/Lost-and-Fonds/youtube).
 
@@ -103,6 +107,10 @@ prepare → publish → finalize
                   ↘ operation
 ```
 
+All four lifecycle calls may use invocation-scoped host capabilities. WIT models
+those as imported capabilities rather than request fields. PHP SDK 0.3 exposes
+them consistently by passing a `PluginContext` to every Broadcast method.
+
 The first-party Podcast plugin is a compact file-producing example:
 [`Lost-and-Fonds/podcast`](https://github.com/Lost-and-Fonds/podcast).
 Jellyfin and Plex are useful examples when an external service/Connection is
@@ -113,14 +121,38 @@ media may eventually introduce new plugin contracts or may fit an existing
 contract. **Do not invent a new plugin kind because it appears in the project
 wishlist.** Only Input and Broadcast are contract worlds today.
 
+## Contract 0.2 at a glance
+
+Contract `0.2` reconciles the WIT with the production runtime rather than
+pretending earlier implementation drift did not happen. Important guarantees
+for plugin authors are now explicit:
+
+- generic HTTP requests support method, URL, optional credential, headers, and
+  a request body, and responses include headers as well as status/body;
+- Input and Broadcast expose the same seven typed plugin failure categories:
+  `unsupported`, `not-found`, `authentication`, `rate-limited`, `unavailable`,
+  `invalid-data`, and `failed`;
+- every plugin failure carries a human-readable `message` and a `retryable`
+  boolean;
+- host capabilities are invocation-scoped and language-neutral;
+- DTO decoding is strict: malformed required fields or variant values are
+  rejected rather than silently coerced;
+- RPC v1 remains the transport, including an explicit hello/version handshake;
+- cross-language JSON conformance fixtures live in `plugin-api/tests/contract/fixtures`.
+
+RPC v1 frames remain a four-byte unsigned big-endian length followed by a UTF-8
+JSON object. Inline byte values use the host's current JSON string
+representation in capability payloads. Chunks returned by `resource.read` are
+base64-encoded.
+
 ## Documentation map
 
 - [Authoring plugins](plugins/authoring.md) — architecture, lifecycles,
   capabilities, packaging, testing, and worked patterns.
 - [Manifest reference](plugins/manifest.md) — `plugin.json`, helpers, credentials,
   grants, Input fields, and Broadcast fields.
-- [PHP SDK](plugins/php-sdk.md) — the current PHP implementation, exact interfaces,
-  entrypoints, and repository skeleton.
+- [PHP SDK](plugins/php-sdk.md) — the current PHP 0.3 binding, exact interfaces,
+  typed failures, entrypoints, and repository skeleton.
 - [Agent playbook](plugins/agents.md) — an operational path for Luna and other
   coding agents, including a copy-paste task template.
 - [Plugin runtime boundary](architecture/plugin-runtime.md) — host/runtime design
@@ -171,10 +203,16 @@ has general host networking.
 
 ## Compatibility status
 
-The current contract package is `stashd:plugin@0.1.0`; package manifests use
-`api_version: "0.1"`. The host currently performs an exact API-version check.
-The API is still evolving, so treat contract changes deliberately and run the
-contract/conformance suites when changing a boundary.
+The current contract package is `stashd:plugin@0.2.0`; new package manifests
+should use `api_version: "0.2"` and current PHP plugins should target
+`stashd/php-sdk:^0.3`.
 
-The WIT files, not generated schema reports, PHP DTOs, first-party plugin code,
-or this prose, remain the final authority when two descriptions disagree.
+Core currently accepts both `0.2` and legacy `0.1` manifests as an explicit
+migration allowance. That is compatibility support, not a recommendation to
+start new work on `0.1`. First-party YouTube and Podcast plugins have moved to
+`0.2`.
+
+The API is still evolving, so treat contract changes deliberately and run the
+contract/conformance suites when changing a boundary. The WIT files, not PHP
+DTOs, first-party plugin code, generated reports, or this prose, remain the
+canonical language-neutral contract once a reconciliation has landed.

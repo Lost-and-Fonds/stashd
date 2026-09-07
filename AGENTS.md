@@ -40,6 +40,39 @@ or public media catalogue.
 - Use code-as-paragraphs vertical spacing: separate logical control-flow and
   terminal steps with blank lines, without padding trivial blocks.
 
+## Plugin work: read this first
+
+For any task involving plugin authoring, plugin manifests, provider ports,
+plugin runtime behavior, host capabilities, WIT, RPC, or SDK work, read:
+
+1. [`docs/plugins/agents.md`](docs/plugins/agents.md)
+2. [`docs/plugins/authoring.md`](docs/plugins/authoring.md)
+3. [`docs/plugins/manifest.md`](docs/plugins/manifest.md)
+4. [`docs/plugins/php-sdk.md`](docs/plugins/php-sdk.md) for PHP work
+5. the relevant WIT in `Lost-and-Fonds/plugin-api`
+
+Do this **before** treating old runtime fixtures, comments, or first-party
+implementation quirks as architecture.
+
+Current plugin baseline for new work:
+
+```text
+contract    stashd:plugin@0.2.0
+manifest    api_version: "0.2"
+PHP SDK     stashd/php-sdk:^0.3
+runtime     php
+RPC         v1
+```
+
+Core accepts legacy `api_version: "0.1"` manifests during migration, but new
+plugins should target 0.2. The WIT is the canonical language-neutral contract;
+PHP `PluginContext` is an SDK binding for invocation-scoped host capabilities,
+not the ABI itself.
+
+If plugin-api, Core runtime behavior, SDK behavior, and first-party plugins
+disagree, make a mismatch inventory and reconcile the boundary deliberately.
+Do not automatically force one layer to mimic another.
+
 ## Verification
 
 Do not rediscover the project's test strategy for every task.
@@ -56,10 +89,16 @@ Start with the narrowest relevant test and expand only across boundaries touched
 by the change. Prefer existing Composer/package scripts over ad-hoc commands.
 Do not begin by running the entire test universe.
 
+For plugin contract changes, also run the `plugin-api` contract suite and update
+or replay `plugin-api/tests/contract/fixtures/` when wire mapping changes. For
+SDK changes, run the SDK's own tests/static checks in addition to affected
+first-party plugin suites.
+
 The project uses Lerd for local PHP development and Docker/Podman for
 deployment. See [local development](docs/development/local-development.md),
 [workflow](docs/development/workflow.md), and the relevant architecture docs.
 
 For security-sensitive work, read [security practices](docs/development/security.md).
-For plugins, read [the plugin runtime boundary](docs/architecture/plugin-runtime.md)
-and [the migration roadmap](docs/development/plugin-migration.md).
+For plugin runtime internals, also read
+[the plugin runtime boundary](docs/architecture/plugin-runtime.md) and
+[the migration roadmap](docs/development/plugin-migration.md).

@@ -10,8 +10,24 @@ This page separates three different categories that are easy to blur together:
   plugin;
 - **current tooling conventions** used by the PHP/OCI builder.
 
-The canonical lifecycle/value contract remains the WIT in `plugin-api`; the
-manifest describes packaging and host integration around that contract.
+The canonical lifecycle/value/capability contract remains the WIT in
+`plugin-api`; the manifest describes packaging and host integration around that
+contract.
+
+## Current compatibility line
+
+New plugins should target:
+
+```text
+WIT package       stashd:plugin@0.2.0
+manifest          api_version: "0.2"
+PHP SDK           stashd/php-sdk:^0.3
+production runtime php
+```
+
+Core currently accepts both `0.2` and legacy `0.1` manifests as an explicit
+migration allowance. Do not use that compatibility path as a reason to begin
+new work on 0.1.
 
 ## Required package fields
 
@@ -21,7 +37,7 @@ manifest describes packaging and host integration around that contract.
   "name": "Example",
   "version": "0.1.0",
   "runtime": "php",
-  "api_version": "0.1",
+  "api_version": "0.2",
   "entrypoint": "stashd-plugin/plugin.php"
 }
 ```
@@ -55,14 +71,14 @@ version/digest slot is rejected; bump the version.
 The runtime needed to execute the entrypoint.
 
 **Current production value: `php` only.** The contract is language-neutral, but
-the current manifest schema, validator, and Bubblewrap command only support the
-PHP runtime. A future SDK/runtime must add host support before a different value
-can be installed.
+the current manifest validator and Bubblewrap command support the PHP runtime.
+A future SDK/runtime must add host support before a different value can be
+installed.
 
 ### `api_version`
 
-The plugin API compatibility line. Current Core uses `0.1` and checks exact
-equality.
+The plugin API compatibility line. New plugins use `0.2`. Core currently accepts
+`0.2` and legacy `0.1` during migration.
 
 Do not confuse API version with plugin package version or SDK version:
 
@@ -71,6 +87,9 @@ plugin version   release of one integration
 api_version      contract line understood by Core/plugin
 SDK version      release of a language-specific authoring package
 ```
+
+The first-party YouTube and Podcast plugins now declare `0.2` and require PHP
+SDK `^0.3`.
 
 ### `entrypoint`
 
@@ -163,14 +182,14 @@ The corresponding lock file pins materialised helper artifacts:
 ```
 
 For an archive, `archive_binary` identifies the path to extract from the pinned
-`.tar.xz` artifact. The builder verifies SHA-256 before copying the executable
+archive artifact. The builder verifies SHA-256 before copying the executable
 into the package.
 
 The current builder expects a helper lock even when it is empty.
 
 ## Credentials
 
-Input plugins can expose credentials to Stashd without receiving raw secrets as
+Plugins can expose credentials to Stashd without receiving raw secrets as
 ordinary configuration:
 
 ```json
@@ -201,6 +220,9 @@ A credential being optional does not mean every operation works without it. An
 Input can, for example, use public feeds for `refresh` and require an API key
 for `complete`.
 
+The contract 0.2 HTTP capability carries the *logical credential name* in its
+request. The host remains responsible for resolving/injecting the actual secret.
+
 ## HTTP grants
 
 Declare the network authority a plugin needs:
@@ -224,6 +246,11 @@ Declare the network authority a plugin needs:
 `allowed_prefixes` is required. `operations` narrows the grant to named host
 operations. `credential` asks the host to attach a configured secret to the
 request. Placement is `query` or `header`.
+
+Contract 0.2's HTTP capability itself is generic: method, URL, optional logical
+credential, request headers and body; responses include status, headers and
+body. The manifest controls which network authority that generic capability may
+exercise.
 
 Prefer the narrowest prefix and operation set that works. The manifest is the
 security declaration, not merely UI metadata.
@@ -283,9 +310,10 @@ Fields the user supplies when creating/resolving a source. Current Core accepts:
 Each field can have `key`, `label`, `required`, `choices`, and `description` as
 appropriate.
 
-**Schema status:** `source_fields` is currently consumed by Core but is not yet
-fully described by the package JSON Schema. This is application-integration
-surface, not evidence that arbitrary extra manifest keys are stable.
+**Schema status:** `source_fields` is consumed by Core but has historically been
+less completely described by the package JSON Schema than the application
+parser. Treat this as application-integration surface, not evidence that
+arbitrary extra manifest keys are stable.
 
 ### `input_options`
 
@@ -293,10 +321,12 @@ Options passed into discovery/acquisition. The shared option schema supports UI
 types including `text`, `textarea`, `url`, `select`, `number`, `boolean`, and
 `bool`, plus labels, defaults, choices, descriptions, and applicability hints.
 
-There is currently some drift between the permissive manifest schema and
-Core's Input option parser (notably around accepted default value types). Follow
-an existing first-party option shape and cover any new option type/default with
-a host integration test before depending on it.
+Do not confuse permissive manifest/UI parsing with the contract wire values.
+PHP SDK 0.3 now decodes contract DTOs strictly: malformed option variants and
+wrong scalar types are rejected instead of coerced.
+
+When introducing a new option shape/default, cover both the host integration and
+plugin DTO path in tests.
 
 ### `operations`
 
@@ -351,7 +381,7 @@ Media kinds the Broadcast can consume. If absent, current Core defaults to
 
 Optional deterministic output location and media type for a publication. Use
 these for formats such as a podcast feed where a conventional output file is
-part of the Broadcast contract.
+part of the Broadcast behaviour.
 
 ### `supports_item_rebuild`
 
@@ -383,10 +413,10 @@ Check the nearest first-party Broadcast and Core's
 
 ### Connection-oriented fields
 
-Jellyfin/Plex-style Broadcasts can use host Connections. Core currently has
-integration fields such as `connection_setting_key`, `library_setting_key`, and
-a Broadcast credential declaration used to build HTTP grants from the
-configured Connection.
+Jellyfin/Plex-style Broadcasts can use host Connections. Core has integration
+fields such as `connection_setting_key`, `library_setting_key`, and Broadcast
+credential declarations used to build HTTP grants from the configured
+Connection.
 
 These are more application-specific than the base package contract. Prefer
 copying the current media-server pattern exactly rather than generalising it in
@@ -407,8 +437,8 @@ normal Input/Broadcast lifecycle.
 
 ## Additional properties and schema drift
 
-The v0.1 JSON Schema currently permits additional properties. That lets Core
-evolve integration metadata without making package installation impossible,
+The current manifest schema permits additional properties in places. That lets
+Core evolve integration metadata without making package installation impossible,
 but it has a consequence:
 
 > “The manifest validator accepted my field” does not mean “Core implements my
@@ -428,16 +458,16 @@ When adding or changing manifest surface:
 
 ## Worked Input manifest
 
-The first-party YouTube manifest demonstrates an Input with source prefixes,
-source fields, optional credentials, operation-scoped HTTP grants, options, and
-pinned helpers:
+The first-party YouTube manifest demonstrates a contract-0.2 Input with source
+prefixes, source fields, optional credentials, operation-scoped HTTP grants,
+options, and pinned helpers:
 
 <https://github.com/Lost-and-Fonds/youtube/blob/main/stashd-plugin/plugin.json>
 
 ## Worked Broadcast manifest
 
-The first-party Podcast manifest demonstrates supported file kinds, publication
-metadata, UI options, a preparation helper, PHP requirements, and architecture
-declarations:
+The first-party Podcast manifest demonstrates a contract-0.2 Broadcast with
+supported file kinds, publication metadata, UI options, a preparation helper,
+PHP requirements, and architecture declarations:
 
 <https://github.com/Lost-and-Fonds/podcast/blob/main/stashd-plugin/plugin.json>
