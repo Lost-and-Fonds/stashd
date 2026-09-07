@@ -1663,6 +1663,16 @@ components:
         last_seen_upstream_at: { type: string, format: date-time, nullable: true }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+        preservation_health:
+          type: string
+          nullable: true
+          enum: [healthy, attention, checking, critical, unknown]
+        asset_fixity_counts:
+          type: object
+          additionalProperties: { type: integer }
+        asset_health_counts:
+          type: object
+          additionalProperties: { type: integer }
 
     Asset:
       type: object
@@ -1683,9 +1693,14 @@ components:
         fixity_status:
           type: string
           nullable: true
-          enum: [unverified, verified, mismatch, missing, verifying]
+          enum: [unverified, verified, mismatch, missing, verifying, due]
+        preservation_health:
+          type: string
+          nullable: true
+          enum: [healthy, attention, checking, critical, unknown]
         duration_seconds: { type: integer, nullable: true }
         last_verified_at: { type: string, format: date-time, nullable: true }
+        verification_due_at: { type: string, format: date-time, nullable: true }
         missing_at: { type: string, format: date-time, nullable: true }
         missing_reason: { type: string, nullable: true }
         created_at: { type: string, format: date-time }
@@ -1919,3 +1934,20 @@ components:
                   last_error: { type: string, nullable: true }
                   free_bytes: { type: integer, nullable: true }
                   total_bytes: { type: integer, nullable: true }
+        preservation:
+          type: object
+          nullable: true
+          properties:
+            health: { type: string, enum: [healthy, attention, checking, critical, unknown] }
+            fixity_counts:
+              type: object
+              additionalProperties: { type: integer }
+            health_counts:
+              type: object
+              additionalProperties: { type: integer }
+            total_preserved_assets: { type: integer }
+            verifiable_assets: { type: integer }
+            oldest_successful_verification_at: { type: string, format: date-time, nullable: true }
+            critical_items: { type: integer }
+            attention_items: { type: integer }
+            storage_unavailable: { type: boolean }

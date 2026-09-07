@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\System\Health;
 
+use App\Fixity\PreservationHealthService;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
 use App\System\Storage\StorageLocationState;
@@ -12,7 +13,10 @@ final readonly class HealthService
 {
     private const string VERSION = '0.1.0-dev';
 
-    public function __construct(private StorageLocationRepository $storageLocations) {}
+    public function __construct(
+        private StorageLocationRepository $storageLocations,
+        private PreservationHealthService $preservation,
+    ) {}
 
     public function report(): HealthReport
     {
@@ -63,6 +67,7 @@ final readonly class HealthService
             storageLocations: $storagePayload,
             version: self::VERSION,
             storageMessage: $storageMessage,
+            preservation: $this->preservation->vaultSummary(),
         );
     }
 

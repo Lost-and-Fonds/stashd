@@ -103,6 +103,24 @@ final class JobRepository
             ->first() !== null;
     }
 
+    /** @return array<string, true> */
+    public function pendingOrProcessingEntityIds(JobType $intent, string $entityType): array
+    {
+        $ids = [];
+
+        foreach (JobRecord::select()
+            ->where('intent', $intent->value)
+            ->where('entityType', $entityType)
+            ->whereIn('state', [JobState::Pending, JobState::Processing, JobState::Retrying])
+            ->all() as $job) {
+            if ($job instanceof JobRecord && is_string($job->entityId)) {
+                $ids[$job->entityId] = true;
+            }
+        }
+
+        return $ids;
+    }
+
     public function latestForEntity(JobType $intent, string $entityType, string $entityId): ?JobRecord
     {
         $job = JobRecord::select()

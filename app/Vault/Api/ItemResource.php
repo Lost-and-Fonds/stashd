@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Vault\Api;
 
 use App\Http\Api\ApiJson;
+use App\Fixity\PreservationHealthSummary;
 use App\Support\DurationSeconds;
 use App\Vault\ItemRecord;
 
@@ -12,11 +13,12 @@ final readonly class ItemResource
 {
     public function __construct(
         private ItemRecord $item,
+        private ?PreservationHealthSummary $preservation = null,
     ) {}
 
-    public static function fromRecord(ItemRecord $item): self
+    public static function fromRecord(ItemRecord $item, ?PreservationHealthSummary $preservation = null): self
     {
-        return new self($item);
+        return new self($item, $preservation);
     }
 
     /** @return array<string, mixed> */
@@ -39,6 +41,7 @@ final readonly class ItemResource
             'lastSeenUpstreamAt' => $this->item->lastSeenUpstreamAt,
             'createdAt' => $this->item->createdAt,
             'updatedAt' => $this->item->updatedAt,
+            ...($this->preservation?->toArray() ?? []),
         ]);
     }
 }

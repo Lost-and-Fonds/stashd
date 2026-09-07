@@ -22,6 +22,7 @@ use App\Vault\Api\ItemResource;
 use App\Vault\Api\VaultItemSummaryResource;
 use App\Config\StashdConfig;
 use App\Fixity\FixityStatusResolver;
+use App\Fixity\PreservationHealthResolver;
 use App\Http\Api\ApiJson;
 use App\Jobs\Api\JobResource;
 use App\Jobs\JobDispatcher;
@@ -54,6 +55,7 @@ final readonly class ItemController
         private JobRepository $jobs,
         private JobDispatcher $jobDispatcher,
         private FixityStatusResolver $fixityStatus,
+        private PreservationHealthResolver $preservationHealth,
     ) {}
 
     #[Get('/api/v1/items')]
@@ -64,6 +66,25 @@ final readonly class ItemController
         $rawKind = $request->get('kind');
         $search = is_string($rawSearch) ? trim($rawSearch) : '';
         $kind = is_string($rawKind) ? trim($rawKind) : '';
+
+        $items = $this->items->listVaultSummary($limit, $offset, $search === '' ? null : $search, $kind === '' ? null : $kind);
+        $preservedAssets = $this->assets->listPreservedForItems(array_map(
+            static fn(VaultItemSummary $item): string => (string) $item->item->id,
+            $items,
+        ));
+        $healthByItem = $this->preservationHealth->forItems($preservedAssets);
+
+        $items = array_map(
+            static fn(VaultItemSummary $item): VaultItemSummary => new VaultItemSummary(
+                item: $item->item,
+                kind: $item->kind,
+                stashCount: $item->stashCount,
+                broadcastCount: $item->broadcastCount,
+                preservedSizeBytes: $item->preservedSizeBytes,
+                preservation: $healthByItem[(string) $item->item->id] ?? null,
+            ),
+            $items,
+        );
 
         return new Json([
             'items' => array_map(
@@ -124,6 +145,7 @@ final readonly class ItemController
                 broadcasts: $broadcasts,
                 preservedSizeBytes: $this->assets->preservedSizeBytesForItem($itemId),
                 pluginMetadata: $pluginMetadata,
+                preservation: $this->preservationHealth->forItem($this->assets->listForItem($itemId)),
             )->toArray(),
         ]);
     }
@@ -230,6 +252,7 @@ final readonly class ItemController
 
         $itemId = ItemId::fromPrimaryKey($item->id);
         $assets = $this->assets->listForItem($itemId);
+        $fixityStatuses = $this->fixityStatus->forAssets($assets);
 
         $vaultOriginal = $this->assets->findByItemAndRole($itemId, AssetRole::VaultOriginal);
         $vaultOriginalReady = $vaultOriginal?->state === AssetState::Ready;
@@ -254,7 +277,9 @@ final readonly class ItemController
                         vaultOriginalReady: $vaultOriginalReady,
                         itemUpstreamState: $item->upstreamState,
                     ),
-                    $this->fixityStatus->forAsset($asset),
+                    $fixityStatuses[(string) $asset->id] ?? null,
+                    $this->preservationHealth->forAsset($asset, $fixityStatuses[(string) $asset->id] ?? null),
+                    $this->fixityStatus->verificationDueAt($asset),
                 )->toArray(),
                 $assets,
             ),

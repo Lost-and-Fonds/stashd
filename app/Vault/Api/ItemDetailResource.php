@@ -6,6 +6,7 @@ namespace App\Vault\Api;
 
 use App\Broadcasts\Api\BroadcastResource;
 use App\Broadcasts\BroadcastRecord;
+use App\Fixity\PreservationHealthSummary;
 use App\Http\Api\ApiJson;
 use App\Stashes\Api\StashResource;
 use App\Stashes\StashRecord;
@@ -28,6 +29,7 @@ final readonly class ItemDetailResource
         private array $broadcasts,
         private int $preservedSizeBytes,
         private ?array $pluginMetadata = null,
+        private ?PreservationHealthSummary $preservation = null,
     ) {}
 
     /**
@@ -43,15 +45,16 @@ final readonly class ItemDetailResource
         array $broadcasts,
         int $preservedSizeBytes,
         ?array $pluginMetadata = null,
+        ?PreservationHealthSummary $preservation = null,
     ): self {
-        return new self($item, $assets, $stashes, $broadcasts, $preservedSizeBytes, $pluginMetadata);
+        return new self($item, $assets, $stashes, $broadcasts, $preservedSizeBytes, $pluginMetadata, $preservation);
     }
 
     /** @return array<string, mixed> */
     public function toArray(): array
     {
         return ApiJson::encode([
-            'item' => ItemResource::fromRecord($this->item)->toArray(),
+            'item' => ItemResource::fromRecord($this->item, $this->preservation)->toArray(),
             'assets' => array_map(fn(AssetRecord $asset): array => $this->asset($asset), $this->assets),
             'stashes' => array_map(static fn(StashRecord $stash): array => StashResource::fromRecord($stash)->toArray(), $this->stashes),
             'broadcasts' => array_map(static fn(BroadcastRecord $broadcast): array => BroadcastResource::fromRecord($broadcast)->toArray(), $this->broadcasts),

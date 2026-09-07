@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\System\Health;
 
+use App\Fixity\VaultPreservationSummary;
+
 final readonly class HealthReport
 {
     public function __construct(
@@ -15,6 +17,7 @@ final readonly class HealthReport
         public array $storageLocations,
         public string $version,
         public ?string $storageMessage = null,
+        public ?VaultPreservationSummary $preservation = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -41,6 +44,7 @@ final readonly class HealthReport
                 'message' => $this->storageMessage,
                 'locations' => $this->storageLocations,
             ],
+            'preservation' => $this->preservation?->toArray(),
         ];
     }
 }

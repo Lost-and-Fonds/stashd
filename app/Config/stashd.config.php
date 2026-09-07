@@ -30,6 +30,7 @@ return new StashdConfig(
     pgid: (int) $envString('PGID', '1000'),
     umask: $envString('UMASK', '0022'),
     httpPort: $envString('STASHD_HTTP_PORT', '8474'),
+    verificationIntervalDays: max(1, (int) $envString('STASHD_VERIFICATION_INTERVAL_DAYS', '90')),
     workers: [
         'interactive' => [
             'min_workers' => max(1, (int) $envString('STASHD_INTERACTIVE_MIN_WORKERS', '1')),

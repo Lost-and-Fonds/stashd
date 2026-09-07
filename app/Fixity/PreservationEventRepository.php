@@ -50,15 +50,52 @@ final class PreservationEventRepository
         return $record;
     }
 
-    public function latestForAsset(AssetId $assetId): ?PreservationEventRecord
+    public function latestForAsset(AssetId $assetId, ?PreservationEventType $eventType = null): ?PreservationEventRecord
     {
-        $event = PreservationEventRecord::select()
-            ->where('assetId', $assetId->toString())
+        $query = PreservationEventRecord::select()
+            ->where('assetId', $assetId->toString());
+
+        if ($eventType !== null) {
+            $query->where('eventType', $eventType);
+        }
+
+        $event = $query
             ->orderBy('occurredAt', Direction::DESC)
             ->orderBy('id', Direction::DESC)
             ->first();
 
         return $event instanceof PreservationEventRecord ? $event : null;
+    }
+
+    /** @param list<AssetId> $assetIds
+     * @return array<string, PreservationEventRecord>
+     */
+    public function latestForAssets(array $assetIds, ?PreservationEventType $eventType = null): array
+    {
+        if ($assetIds === []) {
+            return [];
+        }
+
+        $latest = [];
+        $query = PreservationEventRecord::select()
+            ->whereIn('assetId', array_map(static fn(AssetId $assetId): string => $assetId->toString(), $assetIds));
+
+        if ($eventType !== null) {
+            $query->where('eventType', $eventType);
+        }
+
+        $events = $query
+            ->orderBy('occurredAt', Direction::DESC)
+            ->orderBy('id', Direction::DESC)
+            ->all();
+
+        foreach ($events as $event) {
+            if ($event instanceof PreservationEventRecord) {
+                $latest[(string) $event->assetId] ??= $event;
+            }
+        }
+
+        return $latest;
     }
 
     /** @return list<PreservationEventRecord> */

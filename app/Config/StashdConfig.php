@@ -17,6 +17,7 @@ final readonly class StashdConfig
         public string $httpPort,
         /** @var array<string, array{min_workers: int, max_workers: int}> */
         public array $workers = [],
+        public int $verificationIntervalDays = 90,
     ) {}
 
     public function vaultPath(): string

@@ -4,13 +4,8 @@ declare(strict_types=1);
 
 namespace App\Fixity;
 
-use App\Config\StashdConfig;
 use App\System\State\StateTransitionService;
-use App\System\Storage\FilesystemProbe;
-use App\System\Storage\StorageLocationKey;
-use App\System\Storage\StorageLocationRepository;
-use App\System\Storage\StorageLocationRecord;
-use App\System\Storage\StorageLocationState;
+use App\System\Storage\VaultStorageAvailability;
 use App\Vault\AssetId;
 use App\Vault\AssetRecord;
 use App\Vault\AssetRepository;
@@ -30,11 +25,9 @@ final readonly class VerifyVaultAssets
     public function __construct(
         private AssetRepository $assets,
         private ItemRepository $items,
-        private StorageLocationRepository $storageLocations,
         private StateTransitionService $transitions,
         private PreservationEventRepository $events,
-        private StashdConfig $config,
-        private FilesystemProbe $filesystem,
+        private VaultStorageAvailability $storage,
     ) {}
 
     /** @param null|Closure(int, int): void $onProgress */
@@ -287,29 +280,7 @@ final readonly class VerifyVaultAssets
     /** @phpstan-impure */
     private function isVaultStorageUnavailable(): bool
     {
-        $vault = $this->storageLocations->findByKey(StorageLocationKey::Vault);
-
-        return ($vault !== null && in_array($vault->state, [StorageLocationState::Unavailable, StorageLocationState::Missing], true))
-            || ! $this->isVaultRootReadable()
-            || $this->vaultFilesystemChanged($vault);
-    }
-
-    private function isVaultRootReadable(): bool
-    {
-        $path = $this->config->vaultPath();
-
-        return Filesystem\is_directory($path) && Filesystem\is_readable($path);
-    }
-
-    private function vaultFilesystemChanged(?StorageLocationRecord $vault): bool
-    {
-        if ($vault?->filesystemId === null) {
-            return false;
-        }
-
-        $current = $this->filesystem->filesystemId($this->config->vaultPath());
-
-        return $current !== null && $current !== $vault->filesystemId;
+        return $this->storage->isUnavailable();
     }
 
     private function syncItemAfterAssetMissing(AssetRecord $asset): void

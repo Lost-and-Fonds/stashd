@@ -147,6 +147,39 @@ final class AssetRepository
         return $assets;
     }
 
+    /** @param list<string> $itemIds
+     * @return list<AssetRecord>
+     */
+    public function listPreservedForItems(array $itemIds): array
+    {
+        if ($itemIds === []) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            AssetRecord::select()
+                ->whereIn('itemId', $itemIds)
+                ->whereIn('role', AssetRole::preserved())
+                ->whereNull('broadcastId')
+                ->whereNull('broadcastItemId')
+                ->all(),
+            static fn(mixed $asset): bool => $asset instanceof AssetRecord,
+        ));
+    }
+
+    /** @return list<AssetRecord> */
+    public function listPreservedForHealth(): array
+    {
+        return array_values(array_filter(
+            AssetRecord::select()
+                ->whereIn('role', AssetRole::preserved())
+                ->whereNull('broadcastId')
+                ->whereNull('broadcastItemId')
+                ->all(),
+            static fn(mixed $asset): bool => $asset instanceof AssetRecord,
+        ));
+    }
+
     /** @return list<AssetRecord> */
     public function listReadyPreservedForItem(ItemId $itemId): array
     {

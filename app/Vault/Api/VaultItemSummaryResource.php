@@ -20,7 +20,7 @@ final readonly class VaultItemSummaryResource
     public function toArray(): array
     {
         return ApiJson::encode([
-            ...ItemResource::fromRecord($this->summary->item)->toArray(),
+            ...ItemResource::fromRecord($this->summary->item, $this->summary->preservation)->toArray(),
             'kind' => $this->summary->kind,
             'stashCount' => $this->summary->stashCount,
             'broadcastCount' => $this->summary->broadcastCount,

@@ -14,6 +14,9 @@ use App\Downloads\DownloadResult;
 use App\Config\StashdConfig;
 use App\Fixity\FixityStatus;
 use App\Fixity\FixityStatusResolver;
+use App\Fixity\PreservationHealth;
+use App\Fixity\PreservationHealthResolver;
+use App\Fixity\PreservationHealthService;
 use App\Fixity\PreservationEventRepository;
 use App\Fixity\PreservationEventType;
 use App\Fixity\PreservationOutcome;
@@ -157,7 +160,140 @@ test('ingest establishes a baseline and verification records committed-object ev
 
     $response = $this->http->get('/api/v1/items/' . $itemId . '/assets', headers: $headers);
     $original = array_values(array_filter($response->body['assets'], static fn(array $candidate): bool => $candidate['role'] === AssetRole::VaultOriginal->value))[0];
-    expect($original['fixity_status'])->toBe(FixityStatus::Verified->value);
+    expect($original['fixity_status'])->toBe(FixityStatus::Verified->value)
+        ->and($original['preservation_health'])->toBe(PreservationHealth::Healthy->value)
+        ->and($original['verification_due_at'])->not->toBeNull();
+
+    $itemResponse = $this->http->get('/api/v1/items/' . $itemId, headers: $headers);
+    expect($itemResponse->body['item']['preservation_health'])->toBe(PreservationHealth::Attention->value)
+        ->and($itemResponse->body['item']['asset_fixity_counts'][FixityStatus::Verified->value])->toBe(1);
+});
+
+test('verification policy uses an exact boundary and item health respects the canonical asset', function (): void {
+    [, $stashId, $itemId] = $this->bootstrapFakeDownloadStash('fixity-health-policy');
+    $this->container->get(DownloadItem::class)->execute(
+        itemId: ItemId::parse($itemId),
+        stashId: StashId::parse($stashId),
+        jobId: $this->container->get(PrefixedUlidGenerator::class)->generate('job'),
+    );
+
+    $assets = $this->container->get(AssetRepository::class);
+    $events = $this->container->get(PreservationEventRepository::class);
+    $original = $assets->findByItemAndRole(ItemId::parse($itemId), AssetRole::VaultOriginal);
+    $verifiedAt = DateTime::parse('2026-01-01T00:00:00Z', Timezone::UTC);
+    $assetId = AssetId::fromPrimaryKey($original->id);
+    $original->lastVerifiedAt = $verifiedAt;
+    $assets->save($original);
+    $events->create(
+        assetId: $assetId,
+        eventType: PreservationEventType::FixityCheck,
+        outcome: PreservationOutcome::Success,
+        occurredAt: $verifiedAt,
+        expectedChecksum: $original->checksum,
+        observedChecksum: $original->checksum,
+    );
+
+    $fixity = $this->container->get(FixityStatusResolver::class);
+    $dueAt = $verifiedAt->plusDays(90);
+    expect($fixity->forAsset($original, $dueAt->minusSeconds(1)))->toBe(FixityStatus::Verified)
+        ->and($fixity->forAsset($original, $dueAt))->toBe(FixityStatus::Due)
+        ->and($this->container->get(PreservationHealthResolver::class)->forAsset($original, FixityStatus::Due))->toBe(PreservationHealth::Attention);
+
+    $original->checksum = null;
+    $assets->save($original);
+    expect($fixity->forAsset($original, $dueAt))->toBe(FixityStatus::Unverified);
+
+    $original->checksum = 'sha256:' . str_repeat('a', 64);
+    $original->state = AssetState::Stale;
+    $assets->save($original);
+    expect($fixity->forAsset($original, $dueAt))->toBe(FixityStatus::Mismatch);
+
+    $support = $assets->create(
+        itemId: ItemId::parse($itemId),
+        role: AssetRole::SourceThumbnail,
+        kind: AssetKind::Image,
+        state: AssetState::Ready,
+    );
+    $health = $this->container->get(PreservationHealthResolver::class);
+    $statuses = [
+        (string) $original->id => FixityStatus::Verified,
+        (string) $support->id => FixityStatus::Mismatch,
+    ];
+    expect($health->forItem([$original, $support], $statuses)->health)->toBe(PreservationHealth::Attention);
+
+    $statuses[(string) $original->id] = FixityStatus::Missing;
+    expect($health->forItem([$original, $support], $statuses)->health)->toBe(PreservationHealth::Critical);
+
+    $statuses[(string) $original->id] = FixityStatus::Verified;
+    $statuses[(string) $support->id] = FixityStatus::Verified;
+    expect($health->forItem([$original, $support], $statuses)->health)->toBe(PreservationHealth::Healthy);
+});
+
+test('Vault preservation summary aggregates fixity counts and remains evidence-only when storage is unavailable', function (): void {
+    [$headers, $stashId, $itemId] = $this->bootstrapFakeDownloadStash('fixity-health-summary');
+    $this->container->get(DownloadItem::class)->execute(
+        itemId: ItemId::parse($itemId),
+        stashId: StashId::parse($stashId),
+        jobId: $this->container->get(PrefixedUlidGenerator::class)->generate('job'),
+    );
+
+    $assets = $this->container->get(AssetRepository::class);
+    $events = $this->container->get(PreservationEventRepository::class);
+    $original = $assets->findByItemAndRole(ItemId::parse($itemId), AssetRole::VaultOriginal);
+    $verifiedAt = DateTime::now(Timezone::UTC)->minusDays(1);
+    $original->lastVerifiedAt = $verifiedAt;
+    $assets->save($original);
+    $events->create(
+        assetId: AssetId::fromPrimaryKey($original->id),
+        eventType: PreservationEventType::FixityCheck,
+        outcome: PreservationOutcome::Success,
+        occurredAt: $verifiedAt,
+        expectedChecksum: $original->checksum,
+        observedChecksum: $original->checksum,
+    );
+    $assets->create(
+        itemId: ItemId::parse($itemId),
+        role: AssetRole::SourceThumbnail,
+        kind: AssetKind::Image,
+        state: AssetState::Ready,
+    );
+
+    $summary = $this->container->get(PreservationHealthService::class)->vaultSummary();
+    expect($summary->health)->toBe(PreservationHealth::Attention)
+        ->and($summary->totalPreservedAssets)->toBe(4)
+        ->and($summary->verifiableAssets)->toBe(3)
+        ->and($summary->fixityCounts[FixityStatus::Verified->value])->toBe(1)
+        ->and($summary->fixityCounts[FixityStatus::Unverified->value])->toBe(3)
+        ->and($summary->healthCounts[PreservationHealth::Healthy->value])->toBe(1)
+        ->and($summary->healthCounts[PreservationHealth::Attention->value])->toBe(3)
+        ->and($summary->attentionItems)->toBe(1)
+        ->and(substr($summary->oldestSuccessfulVerificationAt?->toRfc3339() ?? '', 0, 19))->toBe(substr($verifiedAt->toRfc3339(), 0, 19));
+
+    $before = $original->lastVerifiedAt;
+    $this->container->get(StorageLocationRepository::class)->upsert(
+        key: StorageLocationKey::Vault,
+        role: StorageLocationKey::Vault,
+        label: 'Vault',
+        path: $this->container->get(StashdConfig::class)->vaultPath(),
+        state: StorageLocationState::Unavailable,
+        readable: false,
+        writable: false,
+        freeBytes: null,
+        totalBytes: null,
+        filesystemId: null,
+        supportsHardlinks: false,
+        supportsSymlinks: false,
+        lastError: 'test storage unavailable',
+    );
+
+    $unavailable = $this->container->get(PreservationHealthService::class)->vaultSummary();
+    expect($unavailable->health)->toBe(PreservationHealth::Unknown)
+        ->and($unavailable->storageUnavailable)->toBeTrue()
+        ->and(substr($assets->find(AssetId::fromPrimaryKey($original->id))->lastVerifiedAt?->toRfc3339() ?? '', 0, 19))->toBe(substr($before?->toRfc3339() ?? '', 0, 19));
+
+    $response = $this->http->get('/api/v1/system/health', headers: $headers);
+    expect($response->body['preservation']['health'])->toBe(PreservationHealth::Unknown->value)
+        ->and($response->body['preservation']['storage_unavailable'])->toBeTrue();
 });
 
 test('ingest fails before finalization when the baseline checksum cannot be generated', function (): void {

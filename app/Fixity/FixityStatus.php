@@ -11,4 +11,5 @@ enum FixityStatus: string
     case Mismatch = 'mismatch';
     case Missing = 'missing';
     case Verifying = 'verifying';
+    case Due = 'due';
 }

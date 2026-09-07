@@ -6,9 +6,11 @@ namespace App\Vault\Api;
 
 use App\Http\Api\ApiJson;
 use App\Fixity\FixityStatus;
+use App\Fixity\PreservationHealth;
 use App\Support\DurationSeconds;
 use App\Vault\AssetRecord;
 use App\Vault\AssetRegenerationGuidance;
+use Tempest\DateTime\DateTime;
 
 final readonly class AssetResource
 {
@@ -16,11 +18,13 @@ final readonly class AssetResource
         private AssetRecord $asset,
         private ?AssetRegenerationGuidance $guidance = null,
         private ?FixityStatus $fixityStatus = null,
+        private ?PreservationHealth $preservationHealth = null,
+        private ?DateTime $verificationDueAt = null,
     ) {}
 
-    public static function fromRecord(AssetRecord $asset, ?AssetRegenerationGuidance $guidance = null, ?FixityStatus $fixityStatus = null): self
+    public static function fromRecord(AssetRecord $asset, ?AssetRegenerationGuidance $guidance = null, ?FixityStatus $fixityStatus = null, ?PreservationHealth $preservationHealth = null, ?DateTime $verificationDueAt = null): self
     {
-        return new self($asset, $guidance, $fixityStatus);
+        return new self($asset, $guidance, $fixityStatus, $preservationHealth, $verificationDueAt);
     }
 
     /** @return array<string, mixed> */
@@ -41,8 +45,10 @@ final readonly class AssetResource
             'sizeBytes' => $this->asset->sizeBytes,
             'checksum' => $this->asset->checksum,
             'fixityStatus' => $this->fixityStatus?->value,
+            'preservationHealth' => $this->preservationHealth?->value,
             'durationSeconds' => DurationSeconds::toSeconds($this->asset->durationSeconds),
             'lastVerifiedAt' => $this->asset->lastVerifiedAt,
+            'verificationDueAt' => $this->verificationDueAt,
             'missingAt' => $this->asset->missingAt,
             'missingReason' => $this->asset->missingReason,
             'createdAt' => $this->asset->createdAt,
