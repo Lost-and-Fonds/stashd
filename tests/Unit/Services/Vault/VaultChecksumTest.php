@@ -6,6 +6,7 @@ namespace Tests\Unit\Services\Vault;
 
 use App\Fixity\ChecksumComparisonOutcome;
 use App\Fixity\VaultChecksum;
+use RuntimeException;
 
 test('vault checksum formats and verifies sha256 digests', function (): void {
     $path = sys_get_temp_dir() . '/stashd-checksum-' . bin2hex(random_bytes(4));
@@ -43,4 +44,9 @@ test('vault checksum invokes its callback while streaming large files', function
         ->and($chunks)->toBe(3);
 
     unlink($path);
+});
+
+test('required checksum generation rejects an unavailable path', function (): void {
+    expect(fn() => VaultChecksum::requiredFile(__DIR__))
+        ->toThrow(RuntimeException::class, 'Unable to compute SHA-256 checksum');
 });

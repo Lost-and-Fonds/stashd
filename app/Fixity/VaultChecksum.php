@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Fixity;
 
 use Closure;
+use RuntimeException;
 
 /** SHA-256 checksum helper for Vault assets. Stored format: `sha256:{hex}`. */
 final class VaultChecksum
@@ -15,6 +16,10 @@ final class VaultChecksum
 
     public static function computeFile(string $path, ?Closure $onChunk = null): ?string
     {
+        if (! is_file($path) || ! is_readable($path)) {
+            return null;
+        }
+
         $handle = @fopen($path, 'rb');
 
         if ($handle === false) {
@@ -25,7 +30,7 @@ final class VaultChecksum
 
         try {
             while (! feof($handle)) {
-                $chunk = fread($handle, self::CHUNK_BYTES);
+                $chunk = @fread($handle, self::CHUNK_BYTES);
 
                 if ($chunk === false) {
                     return null;
@@ -43,6 +48,12 @@ final class VaultChecksum
         }
 
         return self::format(hash_final($hash));
+    }
+
+    public static function requiredFile(string $path, ?Closure $onChunk = null): string
+    {
+        return self::computeFile($path, $onChunk)
+            ?? throw new RuntimeException("Unable to compute SHA-256 checksum for: {$path}");
     }
 
     public static function format(string $hexDigest): string

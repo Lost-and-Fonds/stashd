@@ -294,7 +294,7 @@ final readonly class DownloadMediaItem
         bool $replaceExisting = false,
         ?string $jobId = null,
     ): int {
-        /** @var list<array{asset: AssetRecord, file: DownloadedFile, destination: string, checksum: ?string, sizeBytes: ?int}> $planned */
+        /** @var list<array{asset: AssetRecord, file: DownloadedFile, destination: string, checksum: string, sizeBytes: ?int}> $planned */
         $planned = [];
         $movedDestinations = [];
         $backups = [];
@@ -309,7 +309,16 @@ final readonly class DownloadMediaItem
                 );
 
                 $sizeBytes = $file->sizeBytes ?? filesize($file->tempPath);
-                $checksum = VaultChecksum::computeFile($file->tempPath);
+
+                try {
+                    $checksum = VaultChecksum::requiredFile($file->tempPath);
+                } catch (\RuntimeException $exception) {
+                    throw DownloadException::withCode(
+                        'checksum_failed',
+                        'Unable to compute the required SHA-256 checksum before Vault ingest.',
+                        $exception,
+                    );
+                }
 
                 if ($replaceExisting && $asset->path !== null && $asset->path !== $destination && Filesystem\is_file($asset->path)) {
                     $backup = $asset->path . '.refetch-' . bin2hex(random_bytes(6));
@@ -414,7 +423,7 @@ final readonly class DownloadMediaItem
         DownloadedFile $file,
         string $destination,
         DownloadResult $download,
-        ?string $checksum,
+        string $checksum,
         ?int $sizeBytes,
         ?string $jobId,
     ): void {

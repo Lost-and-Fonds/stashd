@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Fixity;
 
+use App\Config\StashdConfig;
 use App\System\State\StateTransitionService;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
@@ -30,14 +31,13 @@ final readonly class VerifyVaultAssets
         private StorageLocationRepository $storageLocations,
         private StateTransitionService $transitions,
         private PreservationEventRepository $events,
+        private StashdConfig $config,
     ) {}
 
     /** @param null|Closure(int, int): void $onProgress */
     public function verifyAll(?Closure $onProgress = null, ?string $jobId = null): VaultVerifyResult
     {
-        $vault = $this->storageLocations->findByKey(StorageLocationKey::Vault);
-
-        if ($vault !== null && in_array($vault->state, [StorageLocationState::Unavailable, StorageLocationState::Missing], true)) {
+        if ($this->isVaultStorageUnavailable()) {
             return new VaultVerifyResult(
                 checked: 0,
                 missing: 0,
@@ -66,6 +66,17 @@ final readonly class VerifyVaultAssets
             }
 
             foreach ($assets as $asset) {
+                if (! $this->isVaultRootReadable()) {
+                    return new VaultVerifyResult(
+                        checked: $checked,
+                        missing: $missing,
+                        restored: $restored,
+                        checksumMismatch: $checksumMismatch,
+                        unverified: $unverified,
+                        storageUnavailable: true,
+                    );
+                }
+
                 $result = $this->verifyAssetRecord(
                     $asset,
                     $onProgress === null ? null : function () use ($onProgress, &$checked, $total): void {
@@ -75,6 +86,17 @@ final readonly class VerifyVaultAssets
                 );
                 $checked++;
                 $onProgress?->__invoke($checked, $total);
+
+                if ($result->outcome === VerifyAssetOutcome::StorageUnavailable) {
+                    return new VaultVerifyResult(
+                        checked: $checked - 1,
+                        missing: $missing,
+                        restored: $restored,
+                        checksumMismatch: $checksumMismatch,
+                        unverified: $unverified,
+                        storageUnavailable: true,
+                    );
+                }
 
                 match ($result->outcome) {
                     VerifyAssetOutcome::Missing => $missing++,
@@ -109,9 +131,7 @@ final readonly class VerifyVaultAssets
             return new FixityVerificationResult(VerifyAssetOutcome::NotFound);
         }
 
-        $vault = $this->storageLocations->findByKey(StorageLocationKey::Vault);
-
-        if ($vault !== null && in_array($vault->state, [StorageLocationState::Unavailable, StorageLocationState::Missing], true)) {
+        if ($this->isVaultStorageUnavailable()) {
             return new FixityVerificationResult(
                 outcome: VerifyAssetOutcome::StorageUnavailable,
                 expectedChecksum: $asset->checksum,
@@ -123,6 +143,13 @@ final readonly class VerifyVaultAssets
 
     private function verifyAssetRecord(AssetRecord $asset, ?Closure $onChecksumChunk = null, ?string $jobId = null): FixityVerificationResult
     {
+        if (! $this->isVaultRootReadable()) {
+            return new FixityVerificationResult(
+                outcome: VerifyAssetOutcome::StorageUnavailable,
+                expectedChecksum: $asset->checksum,
+            );
+        }
+
         if ($asset->path === null) {
             return new FixityVerificationResult(
                 outcome: VerifyAssetOutcome::Skipped,
@@ -148,6 +175,17 @@ final readonly class VerifyVaultAssets
         }
 
         if ($comparison->outcome === ChecksumComparisonOutcome::Unverified) {
+            $restored = in_array($asset->state, [AssetState::Missing, AssetState::Stale], true);
+            $asset->lastVerifiedAt = null;
+            $asset->missingAt = null;
+            $asset->missingReason = null;
+
+            if ($restored) {
+                $this->transitions->transitionAsset($asset, AssetState::Ready);
+                $this->syncMediaItemAfterAssetRestore($asset);
+            }
+
+            $this->assets->save($asset);
             $this->events->create(
                 assetId: AssetId::fromPrimaryKey($asset->id),
                 eventType: PreservationEventType::FixityCheck,
@@ -160,6 +198,7 @@ final readonly class VerifyVaultAssets
             return new FixityVerificationResult(
                 outcome: VerifyAssetOutcome::Unverified,
                 observedChecksum: $comparison->observedChecksum,
+                restored: $restored,
             );
         }
 
@@ -223,8 +262,8 @@ final readonly class VerifyVaultAssets
             $this->transitions->transitionAsset($asset, AssetState::Stale);
         }
 
-        $asset->missingAt = DateTime::now(Timezone::UTC);
-        $asset->missingReason = 'checksum_mismatch';
+        $asset->missingAt = null;
+        $asset->missingReason = null;
         $this->assets->save($asset);
         $this->events->create(
             assetId: AssetId::fromPrimaryKey($asset->id),
@@ -240,6 +279,21 @@ final readonly class VerifyVaultAssets
             expectedChecksum: $comparison->expectedChecksum,
             observedChecksum: $comparison->observedChecksum,
         );
+    }
+
+    private function isVaultStorageUnavailable(): bool
+    {
+        $vault = $this->storageLocations->findByKey(StorageLocationKey::Vault);
+
+        return ($vault !== null && in_array($vault->state, [StorageLocationState::Unavailable, StorageLocationState::Missing], true))
+            || ! $this->isVaultRootReadable();
+    }
+
+    private function isVaultRootReadable(): bool
+    {
+        $path = $this->config->vaultPath();
+
+        return Filesystem\is_directory($path) && Filesystem\is_readable($path);
     }
 
     private function syncMediaItemAfterAssetMissing(AssetRecord $asset): void

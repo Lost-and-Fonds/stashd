@@ -21,6 +21,8 @@ use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
 use App\Vault\MediaItemId;
+use App\Vault\MediaItemRepository;
+use App\Vault\MediaItemState;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
 use App\System\Storage\StorageLocationState;
@@ -61,6 +63,14 @@ test('ingest establishes a baseline and verification records committed-object ev
         ->and($events[1]->eventType)->toBe(PreservationEventType::FixityCheck)
         ->and($events[1]->outcome)->toBe(PreservationOutcome::Success);
 
+    $secondVerification = $this->container->get(VerifyVaultAssets::class)->verifyAsset(AssetId::fromPrimaryKey($asset->id), (string) $jobId);
+    $events = $this->container->get(PreservationEventRepository::class)->listForAsset(AssetId::fromPrimaryKey($asset->id));
+
+    expect($secondVerification->outcome)->toBe(VerifyAssetOutcome::Ok)
+        ->and($events)->toHaveCount(3)
+        ->and($events[2]->eventType)->toBe(PreservationEventType::FixityCheck)
+        ->and($events[2]->outcome)->toBe(PreservationOutcome::Success);
+
     $response = $this->http->get('/api/v1/items/' . $mediaItemId . '/assets', headers: $headers);
     $original = array_values(array_filter($response->body['assets'], static fn(array $candidate): bool => $candidate['role'] === AssetRole::VaultOriginal->value))[0];
     expect($original['fixity_status'])->toBe(FixityStatus::Verified->value);
@@ -89,6 +99,8 @@ test('mismatch and restoration retain both digests and append history', function
         ->and($verification->observedChecksum)->toBe('sha256:' . hash('sha256', 'tampered'))
         ->and($asset->checksum)->toBe($expected)
         ->and($asset->state)->toBe(AssetState::Stale)
+        ->and($asset->missingAt)->toBeNull()
+        ->and($asset->missingReason)->toBeNull()
         ->and($this->container->get(FixityStatusResolver::class)->forAsset($asset))->toBe(FixityStatus::Mismatch)
         ->and($events)->toHaveCount(2)
         ->and($events[1]->outcome)->toBe(PreservationOutcome::Mismatch)
@@ -132,22 +144,29 @@ test('missing files, checksumless assets, and unavailable storage keep distinct 
     $asset = $assets->find(AssetId::fromPrimaryKey($asset->id));
     expect($asset->state)->toBe(AssetState::Ready);
 
-    $checksumless = $assets->create(
-        mediaItemId: MediaItemId::parse($mediaItemId),
-        role: AssetRole::SourceThumbnail,
-        kind: $asset->kind,
-        state: AssetState::Ready,
-        path: $asset->path,
-    );
-    $unknown = $this->container->get(VerifyVaultAssets::class)->verifyAsset(AssetId::fromPrimaryKey($checksumless->id));
-    $checksumless = $assets->find(AssetId::fromPrimaryKey($checksumless->id));
-    $unknownEvent = $events->latestForAsset(AssetId::fromPrimaryKey($checksumless->id));
+    unlink($asset->path);
+    $this->container->get(VerifyVaultAssets::class)->verifyAsset(AssetId::fromPrimaryKey($asset->id));
+    $asset = $assets->find(AssetId::fromPrimaryKey($asset->id));
+    $asset->checksum = null;
+    $assets->save($asset);
+    file_put_contents($asset->path, $original);
+
+    $unknown = $this->container->get(VerifyVaultAssets::class)->verifyAsset(AssetId::fromPrimaryKey($asset->id));
+    $asset = $assets->find(AssetId::fromPrimaryKey($asset->id));
+    $unknownEvent = $events->latestForAsset(AssetId::fromPrimaryKey($asset->id));
+    $mediaItem = $this->container->get(MediaItemRepository::class)->find(MediaItemId::parse($mediaItemId));
 
     expect($unknown->outcome)->toBe(VerifyAssetOutcome::Unverified)
+        ->and($unknown->restored)->toBeTrue()
         ->and($unknown->observedChecksum)->not->toBeNull()
-        ->and($checksumless->lastVerifiedAt)->toBeNull()
+        ->and($asset->state)->toBe(AssetState::Ready)
+        ->and($asset->missingAt)->toBeNull()
+        ->and($asset->missingReason)->toBeNull()
+        ->and($asset->lastVerifiedAt)->toBeNull()
         ->and($unknownEvent->outcome)->toBe(PreservationOutcome::Unverified)
-        ->and($this->container->get(FixityStatusResolver::class)->forAsset($checksumless))->toBe(FixityStatus::Unverified);
+        ->and($unknownEvent->observedChecksum)->toBe($unknown->observedChecksum)
+        ->and($mediaItem->state)->toBe(MediaItemState::Ready)
+        ->and($this->container->get(FixityStatusResolver::class)->forAsset($asset))->toBe(FixityStatus::Unverified);
 
     $vault = $this->container->get(StorageLocationRepository::class)->upsert(
         key: StorageLocationKey::Vault,
@@ -172,4 +191,52 @@ test('missing files, checksumless assets, and unavailable storage keep distinct 
         ->and($single->outcome)->toBe(VerifyAssetOutcome::StorageUnavailable)
         ->and(count($events->listForAsset(AssetId::fromPrimaryKey($asset->id))))->toBe($before)
         ->and($assets->find(AssetId::fromPrimaryKey($asset->id))->state)->toBe(AssetState::Ready);
+});
+
+test('bulk verification detects a Vault root that disappears after the last storage check', function (): void {
+    [, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('fixity-root-disappears');
+    $this->container->get(DownloadMediaItem::class)->execute(
+        mediaItemId: MediaItemId::parse($mediaItemId),
+        stashId: StashId::parse($stashId),
+        jobId: $this->container->get(PrefixedUlidGenerator::class)->generate('job'),
+    );
+
+    $assets = $this->container->get(AssetRepository::class);
+    $events = $this->container->get(PreservationEventRepository::class);
+    $asset = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::VaultOriginal);
+    $assetId = AssetId::fromPrimaryKey($asset->id);
+    $beforeEvents = count($events->listForAsset($assetId));
+    $vaultPath = $this->container->get(StashdConfig::class)->vaultPath();
+    $offlinePath = $vaultPath . '.offline-' . bin2hex(random_bytes(4));
+
+    expect(rename($vaultPath, $offlinePath))->toBeTrue();
+
+    try {
+        $this->container->get(StorageLocationRepository::class)->upsert(
+            key: StorageLocationKey::Vault,
+            role: StorageLocationKey::Vault,
+            label: 'Vault',
+            path: $vaultPath,
+            state: StorageLocationState::Ready,
+            readable: true,
+            writable: true,
+            freeBytes: null,
+            totalBytes: null,
+            filesystemId: null,
+            supportsHardlinks: true,
+            supportsSymlinks: true,
+            lastError: null,
+        );
+
+        $result = $this->container->get(VerifyVaultAssets::class)->verifyAll();
+    } finally {
+        rename($offlinePath, $vaultPath);
+    }
+
+    $asset = $assets->find($assetId);
+
+    expect($result->storageUnavailable)->toBeTrue()
+        ->and($result->checked)->toBe(0)
+        ->and($asset->state)->toBe(AssetState::Ready)
+        ->and(count($events->listForAsset($assetId)))->toBe($beforeEvents);
 });
