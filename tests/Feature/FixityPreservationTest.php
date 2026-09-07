@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Downloads\DownloadMediaItem;
+use App\Downloads\DownloadItem;
 use App\Downloads\DownloadedFile;
 use App\Downloads\DownloaderInterface;
 use App\Downloads\DownloadException;
@@ -27,9 +27,9 @@ use App\Vault\AssetId;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
-use App\Vault\MediaItemId;
-use App\Vault\MediaItemRepository;
-use App\Vault\MediaItemState;
+use App\Vault\ItemId;
+use App\Vault\ItemRepository;
+use App\Vault\ItemState;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
 use App\System\Storage\StorageLocationState;
@@ -112,17 +112,17 @@ final readonly class FailingChecksumDownloader implements DownloaderInterface
 }
 
 test('ingest establishes a baseline and verification records committed-object evidence', function (): void {
-    [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('fixity-ingest');
+    [$headers, $stashId, $itemId] = $this->bootstrapFakeDownloadStash('fixity-ingest');
     $jobId = $this->container->get(PrefixedUlidGenerator::class)->generate('job');
 
-    $this->container->get(DownloadMediaItem::class)->execute(
-        mediaItemId: MediaItemId::parse($mediaItemId),
+    $this->container->get(DownloadItem::class)->execute(
+        itemId: ItemId::parse($itemId),
         stashId: StashId::parse($stashId),
         jobId: $jobId,
     );
 
     $assets = $this->container->get(AssetRepository::class);
-    $asset = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::VaultOriginal);
+    $asset = $assets->findByItemAndRole(ItemId::parse($itemId), AssetRole::VaultOriginal);
     expect($asset)->not->toBeNull();
 
     $events = $this->container->get(PreservationEventRepository::class)->listForAsset(AssetId::fromPrimaryKey($asset->id));
@@ -155,13 +155,13 @@ test('ingest establishes a baseline and verification records committed-object ev
         ->and($events[2]->eventType)->toBe(PreservationEventType::FixityCheck)
         ->and($events[2]->outcome)->toBe(PreservationOutcome::Success);
 
-    $response = $this->http->get('/api/v1/items/' . $mediaItemId . '/assets', headers: $headers);
+    $response = $this->http->get('/api/v1/items/' . $itemId . '/assets', headers: $headers);
     $original = array_values(array_filter($response->body['assets'], static fn(array $candidate): bool => $candidate['role'] === AssetRole::VaultOriginal->value))[0];
     expect($original['fixity_status'])->toBe(FixityStatus::Verified->value);
 });
 
 test('ingest fails before finalization when the baseline checksum cannot be generated', function (): void {
-    [, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('fixity-ingest-checksum-failure');
+    [, $stashId, $itemId] = $this->bootstrapFakeDownloadStash('fixity-ingest-checksum-failure');
     $this->container->singleton(DownloaderInterface::class, new FailingChecksumDownloader());
     expect(stream_wrapper_register('stashd-failing-checksum', FailingChecksumStream::class))->toBeTrue();
 
@@ -169,8 +169,8 @@ test('ingest fails before finalization when the baseline checksum cannot be gene
     set_error_handler(static fn(): bool => true, E_WARNING);
 
     try {
-        $this->container->get(DownloadMediaItem::class)->execute(
-            mediaItemId: MediaItemId::parse($mediaItemId),
+        $this->container->get(DownloadItem::class)->execute(
+            itemId: ItemId::parse($itemId),
             stashId: StashId::parse($stashId),
             jobId: $this->container->get(PrefixedUlidGenerator::class)->generate('job'),
         );
@@ -182,7 +182,7 @@ test('ingest fails before finalization when the baseline checksum cannot be gene
     }
 
     $assets = $this->container->get(AssetRepository::class);
-    $asset = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::VaultOriginal);
+    $asset = $assets->findByItemAndRole(ItemId::parse($itemId), AssetRole::VaultOriginal);
     $events = $this->container->get(PreservationEventRepository::class)->listForAsset(AssetId::fromPrimaryKey($asset->id));
 
     expect($exception)->toBeInstanceOf(DownloadException::class)
@@ -193,15 +193,15 @@ test('ingest fails before finalization when the baseline checksum cannot be gene
 });
 
 test('mismatch and restoration retain both digests and append history', function (): void {
-    [, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('fixity-history');
-    $this->container->get(DownloadMediaItem::class)->execute(
-        mediaItemId: MediaItemId::parse($mediaItemId),
+    [, $stashId, $itemId] = $this->bootstrapFakeDownloadStash('fixity-history');
+    $this->container->get(DownloadItem::class)->execute(
+        itemId: ItemId::parse($itemId),
         stashId: StashId::parse($stashId),
         jobId: $this->container->get(PrefixedUlidGenerator::class)->generate('job'),
     );
 
     $assets = $this->container->get(AssetRepository::class);
-    $asset = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::VaultOriginal);
+    $asset = $assets->findByItemAndRole(ItemId::parse($itemId), AssetRole::VaultOriginal);
     $expected = $asset->checksum;
     $original = file_get_contents($asset->path);
     file_put_contents($asset->path, 'tampered');
@@ -236,16 +236,16 @@ test('mismatch and restoration retain both digests and append history', function
 });
 
 test('missing files, checksumless assets, and unavailable storage keep distinct semantics', function (): void {
-    [, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('fixity-edge-cases');
-    $this->container->get(DownloadMediaItem::class)->execute(
-        mediaItemId: MediaItemId::parse($mediaItemId),
+    [, $stashId, $itemId] = $this->bootstrapFakeDownloadStash('fixity-edge-cases');
+    $this->container->get(DownloadItem::class)->execute(
+        itemId: ItemId::parse($itemId),
         stashId: StashId::parse($stashId),
         jobId: $this->container->get(PrefixedUlidGenerator::class)->generate('job'),
     );
 
     $assets = $this->container->get(AssetRepository::class);
     $events = $this->container->get(PreservationEventRepository::class);
-    $asset = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::VaultOriginal);
+    $asset = $assets->findByItemAndRole(ItemId::parse($itemId), AssetRole::VaultOriginal);
     $original = file_get_contents($asset->path);
     unlink($asset->path);
 
@@ -270,7 +270,7 @@ test('missing files, checksumless assets, and unavailable storage keep distinct 
     $unknown = $this->container->get(VerifyVaultAssets::class)->verifyAsset(AssetId::fromPrimaryKey($asset->id));
     $asset = $assets->find(AssetId::fromPrimaryKey($asset->id));
     $unknownEvent = $events->latestForAsset(AssetId::fromPrimaryKey($asset->id));
-    $mediaItem = $this->container->get(MediaItemRepository::class)->find(MediaItemId::parse($mediaItemId));
+    $item = $this->container->get(ItemRepository::class)->find(ItemId::parse($itemId));
 
     expect($unknown->outcome)->toBe(VerifyAssetOutcome::Unverified)
         ->and($unknown->restored)->toBeTrue()
@@ -281,7 +281,7 @@ test('missing files, checksumless assets, and unavailable storage keep distinct 
         ->and($asset->lastVerifiedAt)->toBeNull()
         ->and($unknownEvent->outcome)->toBe(PreservationOutcome::Unverified)
         ->and($unknownEvent->observedChecksum)->toBe($unknown->observedChecksum)
-        ->and($mediaItem->state)->toBe(MediaItemState::Ready)
+        ->and($item->state)->toBe(ItemState::Ready)
         ->and($this->container->get(FixityStatusResolver::class)->forAsset($asset))->toBe(FixityStatus::Unverified);
 
     $vault = $this->container->get(StorageLocationRepository::class)->upsert(
@@ -310,16 +310,16 @@ test('missing files, checksumless assets, and unavailable storage keep distinct 
 });
 
 test('bulk verification detects a Vault root that disappears after the last storage check', function (): void {
-    [, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('fixity-root-disappears');
-    $this->container->get(DownloadMediaItem::class)->execute(
-        mediaItemId: MediaItemId::parse($mediaItemId),
+    [, $stashId, $itemId] = $this->bootstrapFakeDownloadStash('fixity-root-disappears');
+    $this->container->get(DownloadItem::class)->execute(
+        itemId: ItemId::parse($itemId),
         stashId: StashId::parse($stashId),
         jobId: $this->container->get(PrefixedUlidGenerator::class)->generate('job'),
     );
 
     $assets = $this->container->get(AssetRepository::class);
     $events = $this->container->get(PreservationEventRepository::class);
-    $asset = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::VaultOriginal);
+    $asset = $assets->findByItemAndRole(ItemId::parse($itemId), AssetRole::VaultOriginal);
     $assetId = AssetId::fromPrimaryKey($asset->id);
     $beforeEvents = count($events->listForAsset($assetId));
     $vaultPath = $this->container->get(StashdConfig::class)->vaultPath();
@@ -358,16 +358,16 @@ test('bulk verification detects a Vault root that disappears after the last stor
 });
 
 test('bulk verification stops when the Vault filesystem identity changes', function (): void {
-    [, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('fixity-filesystem-identity');
-    $this->container->get(DownloadMediaItem::class)->execute(
-        mediaItemId: MediaItemId::parse($mediaItemId),
+    [, $stashId, $itemId] = $this->bootstrapFakeDownloadStash('fixity-filesystem-identity');
+    $this->container->get(DownloadItem::class)->execute(
+        itemId: ItemId::parse($itemId),
         stashId: StashId::parse($stashId),
         jobId: $this->container->get(PrefixedUlidGenerator::class)->generate('job'),
     );
 
     $assets = $this->container->get(AssetRepository::class);
     $events = $this->container->get(PreservationEventRepository::class);
-    $asset = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::VaultOriginal);
+    $asset = $assets->findByItemAndRole(ItemId::parse($itemId), AssetRole::VaultOriginal);
     $assetId = AssetId::fromPrimaryKey($asset->id);
     $vaultPath = $this->container->get(StashdConfig::class)->vaultPath();
     $currentFilesystemId = $this->container->get(FilesystemProbe::class)->filesystemId($vaultPath);

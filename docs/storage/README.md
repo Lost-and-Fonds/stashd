@@ -31,7 +31,7 @@ POST item.download (async command)
        6. Verify all temp outputs exist before any Vault write
        7. SHA-256 checksum (`sha256:{hex}`) + AtomicFileMover into Vault (no overwrite)
        8. Mark all assets ready only after full batch ingest; rollback partial Vault files on failure
-       9. Media item → ready via StateTransitionService
+       9. Item → ready via StateTransitionService
       10. Temp cleanup on success; `.failed` marker on error
 ```
 
@@ -78,8 +78,8 @@ Rules:
 
 - DB is expected state; filesystem is verified reality
 - Missing Vault file → asset `missing`, `missing_reason=vault_file_missing`
-- Vault original missing → media item `missing`
-- Sidecar missing (metadata/source) → asset `missing`; media item stays `ready`
+- Vault original missing → item `missing`
+- Sidecar missing (metadata/source) → asset `missing`; item stays `ready`
 - Checksum mismatch → asset `stale`, `missing_reason=checksum_mismatch` (distinct from missing)
 - Unavailable Vault **storage root** → verification skipped (`storage_unavailable=true`, `checked=0`); does **not** mark every asset missing
 

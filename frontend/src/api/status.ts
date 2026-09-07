@@ -38,7 +38,7 @@ export interface JobApiResource {
   started_at?: string | null
   finished_at?: string | null
   updated_at?: string | null
-  payload?: { stash_id?: string | null, media_item_id?: string | null } | null
+  payload?: { stash_id?: string | null, item_id?: string | null } | null
 }
 
 export interface ActivityApiResource {
@@ -49,7 +49,7 @@ export interface ActivityApiResource {
   entity_type?: string | null
   entity_id?: string | null
   stash_id?: string | null
-  media_item_id?: string | null
+  item_id?: string | null
   broadcast_id?: string | null
   job_id?: string | null
   created_at: string

@@ -25,7 +25,7 @@ use App\Stashes\StashRepository;
 use App\Support\PrefixedUlid;
 use App\System\Storage\PathSanitizer;
 use App\System\Activity\ActivityEventService;
-use App\Vault\MediaItemRepository;
+use App\Vault\ItemRepository;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
@@ -48,7 +48,7 @@ final readonly class BroadcastController
         private BroadcastItemRepository $broadcastItems,
         private BroadcastLifecycleService $lifecycle,
         private BroadcastContextFactory $contexts,
-        private MediaItemRepository $mediaItems,
+        private ItemRepository $items,
         private BroadcastPathBuilder $paths,
         private JobRepository $jobs,
         private JobDispatcher $jobDispatcher,
@@ -605,15 +605,15 @@ final readonly class BroadcastController
      */
     private function mapBroadcastItems(array $items): array
     {
-        $mediaItemsById = $this->mediaItems->listByIds(array_values(array_unique(array_map(
-            static fn(BroadcastItemRecord $item): string => (string) $item->mediaItemId,
+        $itemsById = $this->items->listByIds(array_values(array_unique(array_map(
+            static fn(BroadcastItemRecord $item): string => (string) $item->itemId,
             $items,
         ))));
 
         return array_map(
             static fn(BroadcastItemRecord $item): array => BroadcastItemResource::fromRecord(
                 $item,
-                $mediaItemsById[(string) $item->mediaItemId] ?? null,
+                $itemsById[(string) $item->itemId] ?? null,
             )->toArray(),
             $items,
         );

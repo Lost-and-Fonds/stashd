@@ -17,8 +17,8 @@ use App\Stashes\StashRecord;
 use App\Stashes\StashRepository;
 use App\Support\Http\QueryPagination;
 use App\Vault\Api\AssetResource;
-use App\Vault\Api\MediaItemDetailResource;
-use App\Vault\Api\MediaItemResource;
+use App\Vault\Api\ItemDetailResource;
+use App\Vault\Api\ItemResource;
 use App\Vault\Api\VaultItemSummaryResource;
 use App\Config\StashdConfig;
 use App\Fixity\FixityStatusResolver;
@@ -41,10 +41,10 @@ use Tempest\Router\WithMiddleware;
 
 #[AllowApiClients]
 #[WithMiddleware(RequireAuthMiddleware::class)]
-final readonly class MediaItemController
+final readonly class ItemController
 {
     public function __construct(
-        private MediaItemRepository $mediaItems,
+        private ItemRepository $items,
         private AssetRepository $assets,
         private StashItemRepository $stashItems,
         private StashRepository $stashes,
@@ -68,11 +68,11 @@ final readonly class MediaItemController
         return new Json([
             'items' => array_map(
                 static fn(VaultItemSummary $item): array => VaultItemSummaryResource::fromRecord($item)->toArray(),
-                $this->mediaItems->listVaultSummary($limit, $offset, $search === '' ? null : $search, $kind === '' ? null : $kind),
+                $this->items->listVaultSummary($limit, $offset, $search === '' ? null : $search, $kind === '' ? null : $kind),
             ),
-            'total' => $this->mediaItems->countVaultSummary($search === '' ? null : $search, $kind === '' ? null : $kind),
-            'vault_total' => $this->mediaItems->count(),
-            'preserved_size_bytes' => $this->mediaItems->totalPreservedSizeBytes(),
+            'total' => $this->items->countVaultSummary($search === '' ? null : $search, $kind === '' ? null : $kind),
+            'vault_total' => $this->items->count(),
+            'preserved_size_bytes' => $this->items->totalPreservedSizeBytes(),
             'limit' => $limit,
             'offset' => $offset,
         ]);
@@ -81,20 +81,20 @@ final readonly class MediaItemController
     #[Get('/api/v1/items/{id}')]
     public function show(string $id): Json
     {
-        $item = $this->findMediaItem($id);
+        $item = $this->findItem($id);
 
         if ($item === null) {
             return $this->notFound();
         }
 
-        $mediaItemId = MediaItemId::fromPrimaryKey($item->id);
+        $itemId = ItemId::fromPrimaryKey($item->id);
         $stashIds = array_values(array_unique(array_map(
             static fn($stashItem): string => (string) $stashItem->stashId,
-            $this->stashItems->listForMediaItem($mediaItemId),
+            $this->stashItems->listForItem($itemId),
         )));
         $broadcastIds = array_values(array_unique(array_map(
             static fn($broadcastItem): string => (string) $broadcastItem->broadcastId,
-            $this->broadcastItems->listForMediaItem($mediaItemId),
+            $this->broadcastItems->listForItem($itemId),
         )));
         $stashesById = $this->stashes->listByIds($stashIds);
         $broadcastsById = $this->broadcasts->listByIds($broadcastIds);
@@ -108,7 +108,7 @@ final readonly class MediaItemController
             $broadcastIds,
         )));
 
-        $metadataAsset = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::MetadataJson);
+        $metadataAsset = $this->assets->findByItemAndRole($itemId, AssetRole::MetadataJson);
         $pluginMetadata = null;
 
         if ($metadataAsset?->state === AssetState::Ready && $metadataAsset->path !== null && is_file($metadataAsset->path)) {
@@ -117,12 +117,12 @@ final readonly class MediaItemController
         }
 
         return new Json([
-            ...MediaItemDetailResource::fromRecord(
+            ...ItemDetailResource::fromRecord(
                 item: $item,
-                assets: $this->assets->listReadyPreservedForMediaItem($mediaItemId),
+                assets: $this->assets->listReadyPreservedForItem($itemId),
                 stashes: $stashes,
                 broadcasts: $broadcasts,
-                preservedSizeBytes: $this->assets->preservedSizeBytesForMediaItem($mediaItemId),
+                preservedSizeBytes: $this->assets->preservedSizeBytesForItem($itemId),
                 pluginMetadata: $pluginMetadata,
             )->toArray(),
         ]);
@@ -131,14 +131,14 @@ final readonly class MediaItemController
     #[Post('/api/v1/items/{id}/refetch')]
     public function refetch(string $id): Json
     {
-        $item = $this->findMediaItem($id);
+        $item = $this->findItem($id);
 
         if ($item === null) {
             return $this->notFound();
         }
 
-        $mediaItemId = MediaItemId::fromPrimaryKey($item->id);
-        $stashItems = $this->stashItems->listForMediaItem($mediaItemId);
+        $itemId = ItemId::fromPrimaryKey($item->id);
+        $stashItems = $this->stashItems->listForItem($itemId);
         $stashItem = $stashItems[0] ?? null;
 
         if (count($stashItems) > 1) {
@@ -156,7 +156,7 @@ final readonly class MediaItemController
             return new Json([
                 'error' => [
                     'code' => 'stash_item_not_found',
-                    'message' => 'Media item is not part of a Stash.',
+                    'message' => 'Item is not part of a Stash.',
                 ],
             ], Status::UNPROCESSABLE_CONTENT);
         }
@@ -169,11 +169,11 @@ final readonly class MediaItemController
 
         $job = $this->jobDispatcher->dispatch(
             type: 'core.download',
-            entityType: 'media_item',
+            entityType: 'item',
             entityId: (string) $item->id,
             stashId: (string) $stashItem->stashId,
             payload: [
-                'media_item_id' => (string) $item->id,
+                'item_id' => (string) $item->id,
                 'stash_id' => (string) $stashItem->stashId,
                 'force' => true,
             ],
@@ -186,13 +186,13 @@ final readonly class MediaItemController
     #[Get('/api/v1/items/{id}/playback')]
     public function playback(string $id): Response
     {
-        $item = $this->findMediaItem($id);
+        $item = $this->findItem($id);
 
         if ($item === null) {
             return new NotFound();
         }
 
-        $asset = $this->assets->findByMediaItemAndRole(MediaItemId::fromPrimaryKey($item->id), AssetRole::VaultOriginal);
+        $asset = $this->assets->findByItemAndRole(ItemId::fromPrimaryKey($item->id), AssetRole::VaultOriginal);
 
         if ($asset === null || $asset->state !== AssetState::Ready || $asset->path === null || ! is_file($asset->path)) {
             return new NotFound();
@@ -222,16 +222,16 @@ final readonly class MediaItemController
     #[Get('/api/v1/items/{id}/assets')]
     public function assets(string $id): Json
     {
-        $mediaItem = $this->findMediaItem($id);
+        $item = $this->findItem($id);
 
-        if ($mediaItem === null) {
+        if ($item === null) {
             return $this->notFound();
         }
 
-        $mediaItemId = MediaItemId::fromPrimaryKey($mediaItem->id);
-        $assets = $this->assets->listForMediaItem($mediaItemId);
+        $itemId = ItemId::fromPrimaryKey($item->id);
+        $assets = $this->assets->listForItem($itemId);
 
-        $vaultOriginal = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::VaultOriginal);
+        $vaultOriginal = $this->assets->findByItemAndRole($itemId, AssetRole::VaultOriginal);
         $vaultOriginalReady = $vaultOriginal?->state === AssetState::Ready;
 
         $broadcastNamesById = [];
@@ -252,7 +252,7 @@ final readonly class MediaItemController
                         asset: $asset,
                         broadcastName: $asset->broadcastId === null ? null : $broadcastNamesById[(string) $asset->broadcastId],
                         vaultOriginalReady: $vaultOriginalReady,
-                        mediaItemUpstreamState: $mediaItem->upstreamState,
+                        itemUpstreamState: $item->upstreamState,
                     ),
                     $this->fixityStatus->forAsset($asset),
                 )->toArray(),
@@ -261,21 +261,21 @@ final readonly class MediaItemController
         ]);
     }
 
-    /** Which stashes contain this media item — no back-reference existed before T12. */
+    /** Which stashes contain this item — no back-reference existed before T12. */
     #[Get('/api/v1/items/{id}/stashes')]
     public function stashes(string $id): Json
     {
-        $mediaItem = $this->findMediaItem($id);
+        $item = $this->findItem($id);
 
-        if ($mediaItem === null) {
+        if ($item === null) {
             return $this->notFound();
         }
 
-        $mediaItemId = MediaItemId::fromPrimaryKey($mediaItem->id);
+        $itemId = ItemId::fromPrimaryKey($item->id);
 
         $stashIds = array_values(array_unique(array_map(
             static fn($stashItem): string => (string) $stashItem->stashId,
-            $this->stashItems->listForMediaItem($mediaItemId),
+            $this->stashItems->listForItem($itemId),
         )));
 
         $stashesById = $this->stashes->listByIds($stashIds);
@@ -292,21 +292,21 @@ final readonly class MediaItemController
         ]);
     }
 
-    /** Which broadcasts include this media item — no back-reference existed before T12. */
+    /** Which broadcasts include this item — no back-reference existed before T12. */
     #[Get('/api/v1/items/{id}/broadcasts')]
     public function broadcasts(string $id): Json
     {
-        $mediaItem = $this->findMediaItem($id);
+        $item = $this->findItem($id);
 
-        if ($mediaItem === null) {
+        if ($item === null) {
             return $this->notFound();
         }
 
-        $mediaItemId = MediaItemId::fromPrimaryKey($mediaItem->id);
+        $itemId = ItemId::fromPrimaryKey($item->id);
 
         $broadcastIds = array_values(array_unique(array_map(
             static fn($broadcastItem): string => (string) $broadcastItem->broadcastId,
-            $this->broadcastItems->listForMediaItem($mediaItemId),
+            $this->broadcastItems->listForItem($itemId),
         )));
 
         $broadcastsById = $this->broadcasts->listByIds($broadcastIds);
@@ -323,9 +323,9 @@ final readonly class MediaItemController
         ]);
     }
 
-    private function findMediaItem(string $id): ?MediaItemRecord
+    private function findItem(string $id): ?ItemRecord
     {
-        return MediaItemId::isValid($id) ? $this->mediaItems->find(MediaItemId::parse($id)) : null;
+        return ItemId::isValid($id) ? $this->items->find(ItemId::parse($id)) : null;
     }
 
     private function notFound(): Json
@@ -333,7 +333,7 @@ final readonly class MediaItemController
         return new Json([
             'error' => [
                 'code' => 'not_found',
-                'message' => 'Media item not found.',
+                'message' => 'Item not found.',
             ],
         ], Status::NOT_FOUND);
     }

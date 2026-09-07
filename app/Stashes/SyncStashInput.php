@@ -102,9 +102,9 @@ final readonly class SyncStashInput
         }
 
         if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
-            foreach ($counts->downloadableMediaItemIds as $mediaItemId) {
-                $this->jobDispatcher->dispatch('core.download', 'media_item', $mediaItemId, $stashId->toString(), [
-                    'media_item_id' => $mediaItemId,
+            foreach ($counts->downloadableItemIds as $itemId) {
+                $this->jobDispatcher->dispatch('core.download', 'item', $itemId, $stashId->toString(), [
+                    'item_id' => $itemId,
                     'stash_id' => $stashId->toString(),
                 ], 'background');
             }
@@ -116,7 +116,7 @@ final readonly class SyncStashInput
             stashId: $stashId->toString(),
             stashInputId: $stashInputId->toString(),
             itemsDiscovered: count($discovered->discoveredItems),
-            mediaItemsCreated: $counts->mediaItemsCreated,
+            itemsCreated: $counts->itemsCreated,
             stashItemsCreated: $counts->stashItemsCreated,
         );
     }
@@ -127,7 +127,7 @@ final readonly class SyncStashInput
         $byProviderItemId = [];
 
         foreach ($this->stashItems->listForStash($stashId, stashInputId: $stashInputId) as $stashItem) {
-            $byProviderItemId[$stashItem->mediaItem->providerItemId] = $stashItem;
+            $byProviderItemId[$stashItem->item->providerItemId] = $stashItem;
         }
 
         foreach ($discoveredItems as $index => $item) {

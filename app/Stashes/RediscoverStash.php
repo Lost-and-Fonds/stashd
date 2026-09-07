@@ -7,7 +7,7 @@ namespace App\Stashes;
 use App\Jobs\JobType;
 use App\Providers\ProviderDates;
 use App\Support\DurationSeconds;
-use App\Vault\MediaItemRepository;
+use App\Vault\ItemRepository;
 use InvalidArgumentException;
 
 final readonly class RediscoverStash
@@ -16,7 +16,7 @@ final readonly class RediscoverStash
         private StashRepository $stashes,
         private StashInputRepository $inputs,
         private DiscoverStashInput $discovery,
-        private MediaItemRepository $mediaItems,
+        private ItemRepository $items,
     ) {}
 
     /** @return array{inputs: int, discovered: int, matched: int, updated: int, fields: int} */
@@ -39,54 +39,54 @@ final readonly class RediscoverStash
                 'backfill_missing' => true,
             ], JobType::core('core.initial_backfill'));
 
-            foreach ($discovered->discoveredItems as $item) {
+            foreach ($discovered->discoveredItems as $discoveredItem) {
                 $result['discovered']++;
-                $providerItemId = $item['provider_item_id'] ?? null;
+                $providerItemId = $discoveredItem['provider_item_id'] ?? null;
 
                 if (! is_string($providerItemId) || $providerItemId === '') {
                     continue;
                 }
 
-                $mediaItem = $this->mediaItems->findByProviderIdentity($input->providerKey, $providerItemId);
+                $item = $this->items->findByProviderIdentity($input->providerKey, $providerItemId);
 
-                if ($mediaItem === null) {
+                if ($item === null) {
                     continue;
                 }
 
                 $result['matched']++;
                 $fields = 0;
 
-                if ($mediaItem->description === null && is_string($item['description'] ?? null)) {
-                    $mediaItem->description = $item['description'];
+                if ($item->description === null && is_string($discoveredItem['description'] ?? null)) {
+                    $item->description = $discoveredItem['description'];
                     $fields++;
                 }
 
-                if ($mediaItem->durationSeconds === null && is_int($item['duration_seconds'] ?? null)) {
-                    $mediaItem->durationSeconds = DurationSeconds::toDuration($item['duration_seconds']);
+                if ($item->durationSeconds === null && is_int($discoveredItem['duration_seconds'] ?? null)) {
+                    $item->durationSeconds = DurationSeconds::toDuration($discoveredItem['duration_seconds']);
                     $fields++;
                 }
 
-                if ($mediaItem->publishedAt === null && is_string($item['published_at'] ?? null)) {
-                    $publishedAt = ProviderDates::tryParse($item['published_at']);
+                if ($item->publishedAt === null && is_string($discoveredItem['published_at'] ?? null)) {
+                    $publishedAt = ProviderDates::tryParse($discoveredItem['published_at']);
 
                     if ($publishedAt !== null) {
-                        $mediaItem->publishedAt = $publishedAt;
+                        $item->publishedAt = $publishedAt;
                         $fields++;
                     }
                 }
 
-                if ($mediaItem->thumbnailUri === null && is_string($item['thumbnail_uri'] ?? null)) {
-                    $mediaItem->thumbnailUri = $item['thumbnail_uri'];
+                if ($item->thumbnailUri === null && is_string($discoveredItem['thumbnail_uri'] ?? null)) {
+                    $item->thumbnailUri = $discoveredItem['thumbnail_uri'];
                     $fields++;
                 }
 
-                if ($mediaItem->contentType === null && is_string($item['content_type'] ?? null)) {
-                    $mediaItem->contentType = $item['content_type'];
+                if ($item->contentType === null && is_string($discoveredItem['content_type'] ?? null)) {
+                    $item->contentType = $discoveredItem['content_type'];
                     $fields++;
                 }
 
                 if ($fields > 0) {
-                    $this->mediaItems->save($mediaItem);
+                    $this->items->save($item);
                     $result['updated']++;
                     $result['fields'] += $fields;
                 }

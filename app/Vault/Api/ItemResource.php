@@ -6,15 +6,15 @@ namespace App\Vault\Api;
 
 use App\Http\Api\ApiJson;
 use App\Support\DurationSeconds;
-use App\Vault\MediaItemRecord;
+use App\Vault\ItemRecord;
 
-final readonly class MediaItemResource
+final readonly class ItemResource
 {
     public function __construct(
-        private MediaItemRecord $item,
+        private ItemRecord $item,
     ) {}
 
-    public static function fromRecord(MediaItemRecord $item): self
+    public static function fromRecord(ItemRecord $item): self
     {
         return new self($item);
     }

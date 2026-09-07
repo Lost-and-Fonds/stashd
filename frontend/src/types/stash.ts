@@ -39,12 +39,12 @@ export interface StashApiResource {
 
 export interface StashDeleteImpact {
   shared_items: Array<{
-    media_item_id: string
+    item_id: string
     title: string
     shared_with_stashes: Array<{ id: string, name: string }>
   }>
   orphaned_items: Array<{
-    media_item_id: string
+    item_id: string
     title: string
   }>
 }

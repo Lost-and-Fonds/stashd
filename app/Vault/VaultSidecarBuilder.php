@@ -21,7 +21,7 @@ final class VaultSidecarBuilder
     {
         $payload = [
             'schema_version' => 1,
-            'media_item_id' => $request->mediaItemId->toString(),
+            'item_id' => $request->itemId->toString(),
             'provider_key' => $request->providerKey,
             'provider_item_id' => $request->providerItemId,
             'canonical_uri' => $request->canonicalUri->toString(),

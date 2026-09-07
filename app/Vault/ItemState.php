@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
-enum MediaItemState: string
+enum ItemState: string
 {
     case Discovered = 'discovered';
     case MetadataReady = 'metadata_ready';
@@ -15,7 +15,7 @@ enum MediaItemState: string
     case Ignored = 'ignored';
     case Missing = 'missing';
 
-    /** @return list<MediaItemState> */
+    /** @return list<ItemState> */
     public function allowedTransitions(): array
     {
         return match ($this) {

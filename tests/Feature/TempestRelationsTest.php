@@ -9,8 +9,8 @@ use App\Stashes\StashItemRecord;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashRecord;
 use App\Stashes\StashRepository;
-use App\Vault\MediaItemId;
-use App\Vault\MediaItemRepository;
+use App\Vault\ItemId;
+use App\Vault\ItemRepository;
 
 /*
  * Proves Tempest declared relations (#[HasMany]/#[BelongsTo]) hydrate on
@@ -21,19 +21,19 @@ use App\Vault\MediaItemRepository;
 beforeEach(function (): void {
     $stashes = $this->container->get(StashRepository::class);
     $items = $this->container->get(StashItemRepository::class);
-    $media = $this->container->get(MediaItemRepository::class);
+    $media = $this->container->get(ItemRepository::class);
 
     $this->stash = $stashes->create(name: 'Relations Spike');
     $this->stashId = StashId::fromPrimaryKey($this->stash->id);
 
     foreach (['one', 'two'] as $key) {
-        $mediaItem = $media->create(
+        $item = $media->create(
             providerKey: 'fake',
             providerItemId: "relations-{$key}",
             canonicalUri: "fake://item/relations-{$key}",
             title: "Relations {$key}",
         );
-        $items->create(stashId: $this->stashId, mediaItemId: MediaItemId::fromPrimaryKey($mediaItem->id));
+        $items->create(stashId: $this->stashId, itemId: ItemId::fromPrimaryKey($item->id));
     }
 });
 

@@ -22,7 +22,7 @@ final class AssetRepository
     ) {}
 
     public function create(
-        MediaItemId $mediaItemId,
+        ItemId $itemId,
         AssetRole $role,
         AssetKind $kind,
         AssetState $state = AssetState::Pending,
@@ -41,7 +41,7 @@ final class AssetRepository
             role: $role,
             kind: $kind,
             state: $state,
-            mediaItemId: $mediaItemId,
+            itemId: $itemId,
             path: $path,
             relativePath: $relativePath,
             mimeType: $mimeType,
@@ -75,11 +75,11 @@ final class AssetRepository
         return $record;
     }
 
-    public function findByMediaItemAndRole(MediaItemId $mediaItemId, AssetRole $role): ?AssetRecord
+    public function findByItemAndRole(ItemId $itemId, AssetRole $role): ?AssetRecord
     {
         /** @var AssetRecord|null $asset */
         $asset = AssetRecord::select()
-            ->where('mediaItemId', $mediaItemId->toString())
+            ->where('itemId', $itemId->toString())
             ->where('role', $role)
             ->first();
 
@@ -96,10 +96,10 @@ final class AssetRepository
         return $asset instanceof AssetRecord ? $asset : null;
     }
 
-    public function findDerived(MediaItemId $mediaItemId, AssetKind $kind, string $derivationKey): ?AssetRecord
+    public function findDerived(ItemId $itemId, AssetKind $kind, string $derivationKey): ?AssetRecord
     {
         $asset = AssetRecord::select()
-            ->where('mediaItemId', $mediaItemId->toString())
+            ->where('itemId', $itemId->toString())
             ->where('role', AssetRole::Derived)
             ->where('kind', $kind)
             ->where('derivationKey', $derivationKey)
@@ -109,19 +109,19 @@ final class AssetRepository
     }
 
     /**
-     * @param  list<string>  $mediaItemIds
-     * @return array<string, AssetRecord> keyed by media item id
+     * @param  list<string>  $itemIds
+     * @return array<string, AssetRecord> keyed by item id
      */
-    public function readyVaultOriginalsByMediaItem(array $mediaItemIds): array
+    public function readyVaultOriginalsByItem(array $itemIds): array
     {
-        if ($mediaItemIds === []) {
+        if ($itemIds === []) {
             return [];
         }
 
         $originals = [];
 
         foreach (AssetRecord::select()
-            ->whereIn('mediaItemId', $mediaItemIds)
+            ->whereIn('itemId', $itemIds)
             ->where('role', AssetRole::VaultOriginal)
             ->where('state', AssetState::Ready)
             ->whereNotNull('path')
@@ -130,28 +130,28 @@ final class AssetRepository
                 continue;
             }
 
-            $originals[(string) $asset->mediaItemId] ??= $asset;
+            $originals[(string) $asset->itemId] ??= $asset;
         }
 
         return $originals;
     }
 
     /** @return list<AssetRecord> */
-    public function listForMediaItem(MediaItemId $mediaItemId): array
+    public function listForItem(ItemId $itemId): array
     {
         /** @var list<AssetRecord> $assets */
         $assets = AssetRecord::select()
-            ->where('mediaItemId', $mediaItemId->toString())
+            ->where('itemId', $itemId->toString())
             ->all();
 
         return $assets;
     }
 
     /** @return list<AssetRecord> */
-    public function listReadyPreservedForMediaItem(MediaItemId $mediaItemId): array
+    public function listReadyPreservedForItem(ItemId $itemId): array
     {
         return array_values(array_filter(
-            $this->listForMediaItem($mediaItemId),
+            $this->listForItem($itemId),
             static fn(AssetRecord $asset): bool => $asset->state === AssetState::Ready
                 && in_array($asset->role, AssetRole::preserved(), true)
                 && $asset->broadcastId === null
@@ -159,11 +159,11 @@ final class AssetRepository
         ));
     }
 
-    public function preservedSizeBytesForMediaItem(MediaItemId $mediaItemId): int
+    public function preservedSizeBytesForItem(ItemId $itemId): int
     {
         return array_sum(array_map(
             static fn(AssetRecord $asset): int => $asset->sizeBytes ?? 0,
-            $this->listReadyPreservedForMediaItem($mediaItemId),
+            $this->listReadyPreservedForItem($itemId),
         ));
     }
 
@@ -215,23 +215,23 @@ final class AssetRepository
      * Total on-disk size across every asset for each of the given media
      * items, in one query — avoids an N+1 per stash item on the items list.
      *
-     * @param  list<string>  $mediaItemIds
-     * @return array<string, int> keyed by media item id
+     * @param  list<string>  $itemIds
+     * @return array<string, int> keyed by item id
      */
-    public function totalSizeBytesByMediaItem(array $mediaItemIds): array
+    public function totalSizeBytesByItem(array $itemIds): array
     {
-        if ($mediaItemIds === []) {
+        if ($itemIds === []) {
             return [];
         }
 
         $totals = [];
 
-        foreach (AssetRecord::select()->whereIn('mediaItemId', $mediaItemIds)->all() as $asset) {
+        foreach (AssetRecord::select()->whereIn('itemId', $itemIds)->all() as $asset) {
             if (! $asset instanceof AssetRecord) {
                 continue;
             }
 
-            $key = (string) $asset->mediaItemId;
+            $key = (string) $asset->itemId;
             $totals[$key] = ($totals[$key] ?? 0) + ($asset->sizeBytes ?? 0);
         }
 

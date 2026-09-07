@@ -9,10 +9,10 @@ use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
-use App\Vault\MediaItemId;
+use App\Vault\ItemId;
 
 test('derived asset identity keeps different opaque derivations separate', function (): void {
-    [, , $mediaItemId] = $this->bootstrapFakeDownloadStash('derived-asset-identity');
+    [, , $itemId] = $this->bootstrapFakeDownloadStash('derived-asset-identity');
     $config = $this->container->get(StashdConfig::class);
     $assets = $this->container->get(AssetRepository::class);
     $root = $config->vaultPath() . '/derived-identity-tests';
@@ -22,7 +22,7 @@ test('derived asset identity keeps different opaque derivations separate', funct
         $path = $root . '/' . $key . '.audio';
         file_put_contents($path, $bytes);
         $assets->create(
-            mediaItemId: MediaItemId::parse($mediaItemId),
+            itemId: ItemId::parse($itemId),
             role: AssetRole::Derived,
             kind: AssetKind::Audio,
             state: AssetState::Ready,
@@ -36,7 +36,7 @@ test('derived asset identity keeps different opaque derivations separate', funct
     }
 
     $derived = array_values(array_filter(
-        $assets->listForMediaItem(MediaItemId::parse($mediaItemId)),
+        $assets->listForItem(ItemId::parse($itemId)),
         static fn($asset): bool => $asset->role === AssetRole::Derived,
     ));
 

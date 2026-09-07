@@ -27,7 +27,7 @@ final class AssetRecord
         public AssetRole $role,
         public AssetKind $kind,
         public AssetState $state,
-        public ?MediaItemId $mediaItemId = null,
+        public ?ItemId $itemId = null,
         public ?BroadcastId $broadcastId = null,
         public ?BroadcastItemId $broadcastItemId = null,
         public ?string $path = null,

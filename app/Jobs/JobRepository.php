@@ -169,18 +169,18 @@ final class JobRepository
     }
 
     /**
-     * The error message from each media item's most recent download job, but
+     * The error message from each item's most recent download job, but
      * only for items whose most recent attempt is the one that failed --
      * covers what the "why did this fail" tooltip needs without depending on
-     * listRecent()'s bounded window, which a media item's download job can
+     * listRecent()'s bounded window, which an item's download job can
      * easily fall out of by the time someone looks at a long-failed item.
      *
-     * @param  list<string>  $mediaItemIds
-     * @return array<string, string> lastError keyed by media item id
+     * @param  list<string>  $itemIds
+     * @return array<string, string> lastError keyed by item id
      */
-    public function latestDownloadFailureByMediaItem(array $mediaItemIds): array
+    public function latestDownloadFailureByItem(array $itemIds): array
     {
-        if ($mediaItemIds === []) {
+        if ($itemIds === []) {
             return [];
         }
 
@@ -189,24 +189,24 @@ final class JobRepository
         // monotonic and breaks the tie in actual creation order.
         /** @var list<JobRecord> $jobs */
         $jobs = array_values(JobRecord::select()
-            ->where('entityType', 'media_item')
+            ->whereIn('entityType', ['item', 'media_item'])
             ->where('intent', JobType::core('core.download')->value)
-            ->whereIn('entityId', $mediaItemIds)
+            ->whereIn('entityId', $itemIds)
             ->orderBy('createdAt', Direction::DESC)
             ->orderBy('id', Direction::DESC)
             ->all());
 
-        $latestByMediaItem = [];
+        $latestByItem = [];
 
         foreach ($jobs as $job) {
-            $latestByMediaItem[(string) $job->entityId] ??= $job;
+            $latestByItem[(string) $job->entityId] ??= $job;
         }
 
         $failures = [];
 
-        foreach ($latestByMediaItem as $mediaItemId => $job) {
+        foreach ($latestByItem as $itemId => $job) {
             if ($job->state === JobState::Failed && $job->lastError !== null) {
-                $failures[$mediaItemId] = $job->lastError;
+                $failures[$itemId] = $job->lastError;
             }
         }
 

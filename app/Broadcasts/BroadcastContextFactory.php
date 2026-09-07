@@ -10,8 +10,8 @@ use App\Stashes\StashItemRepository;
 use App\Stashes\StashItemState;
 use App\Stashes\StashRepository;
 use App\Vault\AssetRepository;
-use App\Vault\MediaItemRepository;
-use App\Vault\MediaItemState;
+use App\Vault\ItemRepository;
+use App\Vault\ItemState;
 
 final readonly class BroadcastContextFactory
 {
@@ -20,7 +20,7 @@ final readonly class BroadcastContextFactory
         private StashRepository $stashes,
         private StashItemRepository $stashItems,
         private StashInputRepository $stashInputs,
-        private MediaItemRepository $mediaItems,
+        private ItemRepository $items,
         private AssetRepository $assets,
     ) {}
 
@@ -35,32 +35,32 @@ final readonly class BroadcastContextFactory
 
         $stashItems = $this->stashItems->listForStash($stashId);
 
-        $mediaItems = [];
-        $readyMediaItemIds = [];
+        $items = [];
+        $readyItemIds = [];
 
         foreach ($stashItems as $stashItem) {
-            $mediaItemId = (string) $stashItem->mediaItemId;
-            $mediaItem = isset($stashItem->mediaItem)
-                ? $stashItem->mediaItem
-                : $this->mediaItems->find($stashItem->mediaItemId);
+            $itemId = (string) $stashItem->itemId;
+            $item = isset($stashItem->item)
+                ? $stashItem->item
+                : $this->items->find($stashItem->itemId);
 
-            if ($mediaItem === null) {
+            if ($item === null) {
                 continue;
             }
 
-            $mediaItems[$mediaItemId] = $mediaItem;
+            $items[$itemId] = $item;
 
-            if ($mediaItem->state === MediaItemState::Ready) {
-                $readyMediaItemIds[] = $mediaItemId;
+            if ($item->state === ItemState::Ready) {
+                $readyItemIds[] = $itemId;
             }
         }
 
-        $readyVaultOriginals = $this->assets->readyVaultOriginalsByMediaItem($readyMediaItemIds);
+        $readyVaultOriginals = $this->assets->readyVaultOriginalsByItem($readyItemIds);
         $vaultOriginals = [];
 
-        foreach ($mediaItems as $mediaItemId => $mediaItem) {
-            $vaultOriginals[$mediaItemId] = $mediaItem->state === MediaItemState::Ready
-                ? $readyVaultOriginals[$mediaItemId] ?? null
+        foreach ($items as $itemId => $item) {
+            $vaultOriginals[$itemId] = $item->state === ItemState::Ready
+                ? $readyVaultOriginals[$itemId] ?? null
                 : null;
         }
 
@@ -68,7 +68,7 @@ final readonly class BroadcastContextFactory
             broadcast: $broadcast,
             stash: $stash,
             stashItems: $stashItems,
-            mediaItems: $mediaItems,
+            items: $items,
             vaultOriginals: $vaultOriginals,
             stashInputs: $this->stashInputs->listForStash($stashId),
         );
@@ -106,7 +106,7 @@ final readonly class BroadcastContextFactory
                 continue;
             }
 
-            $vault = $context->vaultOriginals[(string) $stashItem->mediaItemId] ?? null;
+            $vault = $context->vaultOriginals[(string) $stashItem->itemId] ?? null;
 
             if ($vault === null) {
                 continue;

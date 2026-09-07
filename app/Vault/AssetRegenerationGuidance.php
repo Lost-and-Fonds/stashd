@@ -30,14 +30,14 @@ final readonly class AssetRegenerationGuidance
         AssetRecord $asset,
         ?string $broadcastName,
         bool $vaultOriginalReady,
-        UpstreamState $mediaItemUpstreamState,
+        UpstreamState $itemUpstreamState,
     ): self {
         $isGenerated = $asset->broadcastId !== null || $asset->derivedFromAssetId !== null;
 
         if (! $isGenerated) {
             return new self(
                 generatedBy: null,
-                canRegenerate: $mediaItemUpstreamState === UpstreamState::Available,
+                canRegenerate: $itemUpstreamState === UpstreamState::Available,
                 safeToDelete: false,
             );
         }

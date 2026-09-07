@@ -14,8 +14,8 @@ use Tempest\DateTime\Duration;
 use Tempest\Mapper\CastWith;
 use Tempest\Mapper\SerializeWith;
 
-#[Table(name: 'media_items')]
-final class MediaItemRecord
+#[Table(name: 'items')]
+final class ItemRecord
 {
     use IsDatabaseModel;
 
@@ -26,7 +26,7 @@ final class MediaItemRecord
         public string $providerItemId,
         public string $canonicalUri,
         public string $title,
-        public MediaItemState $state,
+        public ItemState $state,
         public UpstreamState $upstreamState,
         public ?string $description = null,
         public ?string $creatorName = null,

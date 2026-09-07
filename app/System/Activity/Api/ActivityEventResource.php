@@ -29,7 +29,7 @@ final readonly class ActivityEventResource
             'entityType' => $this->event->entityType,
             'entityId' => $this->event->entityId,
             'stashId' => $this->event->stashId,
-            'mediaItemId' => $this->event->mediaItemId,
+            'itemId' => $this->event->itemId,
             'broadcastId' => $this->event->broadcastId,
             'jobId' => $this->event->jobId,
             'createdAt' => $this->event->createdAt,

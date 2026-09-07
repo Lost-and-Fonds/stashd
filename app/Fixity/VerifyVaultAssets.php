@@ -16,8 +16,8 @@ use App\Vault\AssetRecord;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
-use App\Vault\MediaItemRepository;
-use App\Vault\MediaItemState;
+use App\Vault\ItemRepository;
+use App\Vault\ItemState;
 use Closure;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
@@ -29,7 +29,7 @@ final readonly class VerifyVaultAssets
 
     public function __construct(
         private AssetRepository $assets,
-        private MediaItemRepository $mediaItems,
+        private ItemRepository $items,
         private StorageLocationRepository $storageLocations,
         private StateTransitionService $transitions,
         private PreservationEventRepository $events,
@@ -185,7 +185,7 @@ final readonly class VerifyVaultAssets
 
             if ($restored) {
                 $this->transitions->transitionAsset($asset, AssetState::Ready);
-                $this->syncMediaItemAfterAssetRestore($asset);
+                $this->syncItemAfterAssetRestore($asset);
             }
 
             $this->assets->save($asset);
@@ -212,7 +212,7 @@ final readonly class VerifyVaultAssets
 
         if ($restored) {
             $this->transitions->transitionAsset($asset, AssetState::Ready);
-            $this->syncMediaItemAfterAssetRestore($asset);
+            $this->syncItemAfterAssetRestore($asset);
             $this->assets->save($asset);
         } else {
             $this->assets->save($asset);
@@ -244,7 +244,7 @@ final readonly class VerifyVaultAssets
         $asset->missingAt = DateTime::now(Timezone::UTC);
         $asset->missingReason = 'vault_file_missing';
         $this->assets->save($asset);
-        $this->syncMediaItemAfterAssetMissing($asset);
+        $this->syncItemAfterAssetMissing($asset);
         $this->events->create(
             assetId: AssetId::fromPrimaryKey($asset->id),
             eventType: PreservationEventType::FixityCheck,
@@ -312,33 +312,33 @@ final readonly class VerifyVaultAssets
         return $current !== null && $current !== $vault->filesystemId;
     }
 
-    private function syncMediaItemAfterAssetMissing(AssetRecord $asset): void
+    private function syncItemAfterAssetMissing(AssetRecord $asset): void
     {
-        if ($asset->mediaItemId === null || $asset->role !== AssetRole::VaultOriginal) {
+        if ($asset->itemId === null || $asset->role !== AssetRole::VaultOriginal) {
             return;
         }
 
-        $mediaItem = $this->mediaItems->find($asset->mediaItemId);
+        $item = $this->items->find($asset->itemId);
 
-        if ($mediaItem === null) {
+        if ($item === null) {
             return;
         }
 
-        if ($mediaItem->state === MediaItemState::Ready || $mediaItem->state === MediaItemState::Failed) {
-            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::Missing);
+        if ($item->state === ItemState::Ready || $item->state === ItemState::Failed) {
+            $this->transitions->transitionItem($item, ItemState::Missing);
         }
     }
 
-    private function syncMediaItemAfterAssetRestore(AssetRecord $asset): void
+    private function syncItemAfterAssetRestore(AssetRecord $asset): void
     {
-        if ($asset->mediaItemId === null || $asset->role !== AssetRole::VaultOriginal) {
+        if ($asset->itemId === null || $asset->role !== AssetRole::VaultOriginal) {
             return;
         }
 
-        $mediaItem = $this->mediaItems->find($asset->mediaItemId);
+        $item = $this->items->find($asset->itemId);
 
-        if ($mediaItem?->state === MediaItemState::Missing) {
-            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::Ready);
+        if ($item?->state === ItemState::Missing) {
+            $this->transitions->transitionItem($item, ItemState::Ready);
         }
     }
 }

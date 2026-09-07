@@ -1,6 +1,6 @@
 # Providers
 
-Stashd's bundled providers resolve inputs and discover media items. External Input plugins own provider-specific mechanisms and return facts or staged artifacts to the normal Stashd pipeline.
+Stashd's bundled providers resolve inputs and discover items. External Input plugins own provider-specific mechanisms and return facts or staged artifacts to the normal Stashd pipeline.
 
 | Capability | Interface / adapter | Phase |
 |---|---|---|
@@ -79,10 +79,10 @@ POST /api/v1/commands  type=stash.preflight  source_uri=<url>
 GET /api/v1/stashes/preflight/{commandId}/review
 
 POST /api/v1/commands  type=stash.create_from_preflight
-  → stash, stash_input, media_items, media_item_sources, stash_items
+  → stash, stash_input, items, item_sources, stash_items
 ```
 
-Media items deduplicate globally by `(providerKey, providerItemId)`.
+Items deduplicate globally by `(providerKey, providerItemId)`.
 
 Downloads (when enabled):
 

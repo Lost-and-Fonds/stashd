@@ -40,8 +40,8 @@ use App\Vault\AssetRecord;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
-use App\Vault\MediaItemId;
-use App\Vault\MediaItemRecord;
+use App\Vault\ItemId;
+use App\Vault\ItemRecord;
 use App\Vault\MoveFileIntoVault;
 use App\Vault\VaultPathBuilder;
 use Tempest\Database\PrimaryKey;
@@ -170,21 +170,21 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         $failed = [];
 
         foreach ($this->contexts->publishableStashItems($context) as $stashItem) {
-            $media = $context->mediaItems[(string) $stashItem->mediaItemId] ?? null;
+            $preservedItem = $context->items[(string) $stashItem->itemId] ?? null;
             $item = $this->findOrCreateItem(
                 $context,
                 StashItemId::fromPrimaryKey($stashItem->id),
-                $stashItem->mediaItemId,
+                $stashItem->itemId,
             );
 
-            if (! $media instanceof MediaItemRecord) {
+            if (! $preservedItem instanceof ItemRecord) {
                 $this->failItem($item, 'item_unavailable');
                 $failed[] = (string) $stashItem->id;
 
                 continue;
             }
 
-            $resources = $this->resources($context->broadcast, $media, $stage, $stagedAssets);
+            $resources = $this->resources($context->broadcast, $preservedItem, $stage, $stagedAssets);
 
             if ($resources === []) {
                 $this->failItem($item, 'resource_unavailable');
@@ -196,10 +196,10 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             $items[] = [
                 'id' => (string) $item->id,
                 'source_reference' => $stashItem->stashInputId === null ? null : (string) $stashItem->stashInputId,
-                'title' => $media->title ?? $stashItem->displayTitle ?? 'Untitled',
-                'description' => $media->description ?? $stashItem->displayDescription,
-                'published-at' => ($media->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
-                'duration-seconds' => $media->durationSeconds,
+                'title' => $preservedItem->title ?? $stashItem->displayTitle ?? 'Untitled',
+                'description' => $preservedItem->description ?? $stashItem->displayDescription,
+                'published-at' => ($preservedItem->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
+                'duration-seconds' => $preservedItem->durationSeconds,
                 'resources' => $resources,
             ];
             $itemStashItemIds[(string) $item->id] = (string) $stashItem->id;
@@ -253,9 +253,9 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             $items = [];
 
             foreach ($this->contexts->publishableStashItems($context) as $stashItem) {
-                $media = $context->mediaItems[(string) $stashItem->mediaItemId] ?? null;
+                $preservedItem = $context->items[(string) $stashItem->itemId] ?? null;
 
-                if (! $media instanceof MediaItemRecord) {
+                if (! $preservedItem instanceof ItemRecord) {
                     continue;
                 }
                 $item = $this->items->findByBroadcastAndStashItem(BroadcastId::fromPrimaryKey($context->broadcast->id), StashItemId::fromPrimaryKey($stashItem->id));
@@ -266,11 +266,11 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 $items[] = [
                     'id' => (string) $item->id,
                     'source_reference' => $stashItem->stashInputId === null ? null : (string) $stashItem->stashInputId,
-                    'title' => $media->title ?? $stashItem->displayTitle ?? 'Untitled',
-                    'description' => $media->description ?? $stashItem->displayDescription,
-                    'published-at' => ($media->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
-                    'duration-seconds' => $media->durationSeconds,
-                    'resources' => $this->resources($context->broadcast, $media, $stage, $stagedAssets),
+                    'title' => $preservedItem->title ?? $stashItem->displayTitle ?? 'Untitled',
+                    'description' => $preservedItem->description ?? $stashItem->displayDescription,
+                    'published-at' => ($preservedItem->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
+                    'duration-seconds' => $preservedItem->durationSeconds,
+                    'resources' => $this->resources($context->broadcast, $preservedItem, $stage, $stagedAssets),
                 ];
             }
 
@@ -658,7 +658,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
 
         if ($asset === null) {
             $asset = $this->assets->create(
-                mediaItemId: MediaItemId::parse((string) $item->mediaItemId),
+                itemId: ItemId::parse((string) $item->itemId),
                 role: AssetRole::Hardlink,
                 kind: $source->kind,
                 state: AssetState::Ready,
@@ -694,23 +694,23 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     /** @param array<string, AssetRecord> $stagedAssets
      * @return list<array{reference: string, kind: string, derivation-key: ?string, url: string, media-type: ?string, size-bytes: int}>
      */
-    private function resources(BroadcastRecord $broadcast, MediaItemRecord $media, ?string $stage = null, array &$stagedAssets = []): array
+    private function resources(BroadcastRecord $broadcast, ItemRecord $preservedItem, ?string $stage = null, array &$stagedAssets = []): array
     {
         $resources = [];
 
-        if ($media->thumbnailUri !== null && trim($media->thumbnailUri) !== '') {
+        if ($preservedItem->thumbnailUri !== null && trim($preservedItem->thumbnailUri) !== '') {
             $resources[] = [
                 'reference' => 'thumbnail',
                 'kind' => 'image',
                 'derivation-key' => null,
-                'url' => $media->thumbnailUri,
+                'url' => $preservedItem->thumbnailUri,
                 'media-type' => 'image/jpeg',
                 'size-bytes' => 0,
             ];
         }
 
         foreach (AssetRecord::select()
-            ->where('mediaItemId', (string) $media->id)
+            ->where('itemId', (string) $preservedItem->id)
             ->whereNull('broadcastId')
             ->whereNull('broadcastItemId')
             ->all() as $asset) {
@@ -769,16 +769,16 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             if (! $source instanceof AssetRecord || $sourceId === null || ! Filesystem\is_file($stagePath)) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an unavailable derived artifact.');
             }
-            $media = $context->mediaItems[$this->itemMediaId($context, $itemId)] ?? null;
+            $preservedItem = $context->items[$this->itemIdForBroadcastItem($context, $itemId)] ?? null;
 
-            if (! $media instanceof MediaItemRecord) {
+            if (! $preservedItem instanceof ItemRecord) {
                 throw BroadcastException::withCode('broadcast_plugin_invalid_output', 'Broadcast plugin returned an artifact for an unknown item.');
             }
             $assetKind = AssetKind::tryFrom($kind) ?? AssetKind::Other;
             $extension = pathinfo($reference, PATHINFO_EXTENSION) ?: 'bin';
             $derivationDigest = substr(hash('sha256', $derivationKey), 0, 16);
-            $destination = $this->vaultPaths->vaultFile((string) $media->providerKey, (string) $media->providerItemId, 'derived-' . $derivationDigest . '.' . $extension);
-            $existing = $this->assets->findDerived(MediaItemId::fromPrimaryKey($media->id), $assetKind, $derivationKey);
+            $destination = $this->vaultPaths->vaultFile((string) $preservedItem->providerKey, (string) $preservedItem->providerItemId, 'derived-' . $derivationDigest . '.' . $extension);
+            $existing = $this->assets->findDerived(ItemId::fromPrimaryKey($preservedItem->id), $assetKind, $derivationKey);
 
             if ($existing instanceof AssetRecord
                 && $existing->state === AssetState::Ready
@@ -795,7 +795,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
 
             if ($existing instanceof AssetRecord) {
                 $existing->path = $destination;
-                $existing->relativePath = $this->vaultPaths->relativeFile((string) $media->providerKey, (string) $media->providerItemId, basename($destination));
+                $existing->relativePath = $this->vaultPaths->relativeFile((string) $preservedItem->providerKey, (string) $preservedItem->providerItemId, basename($destination));
                 $existing->mimeType = is_string($artifact['media_type'] ?? null) ? $artifact['media_type'] : null;
                 $existing->sizeBytes = filesize($destination) ?: null;
                 $existing->checksum = hash_file('sha256', $destination) ?: null;
@@ -807,12 +807,12 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 continue;
             }
             $asset = $this->assets->create(
-                mediaItemId: MediaItemId::fromPrimaryKey($media->id),
+                itemId: ItemId::fromPrimaryKey($preservedItem->id),
                 role: AssetRole::Derived,
                 kind: $assetKind,
                 state: AssetState::Ready,
                 path: $destination,
-                relativePath: $this->vaultPaths->relativeFile((string) $media->providerKey, (string) $media->providerItemId, basename($destination)),
+                relativePath: $this->vaultPaths->relativeFile((string) $preservedItem->providerKey, (string) $preservedItem->providerItemId, basename($destination)),
                 mimeType: is_string($artifact['media_type'] ?? null) ? $artifact['media_type'] : null,
                 container: $extension,
                 sizeBytes: filesize($destination) ?: null,
@@ -824,13 +824,13 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         }
     }
 
-    private function itemMediaId(BroadcastContext $context, string $broadcastItemId): string
+    private function itemIdForBroadcastItem(BroadcastContext $context, string $broadcastItemId): string
     {
         foreach ($this->contexts->publishableStashItems($context) as $stashItem) {
             $item = $this->items->findByBroadcastAndStashItem(BroadcastId::fromPrimaryKey($context->broadcast->id), StashItemId::fromPrimaryKey($stashItem->id));
 
             if ((string) $item?->id === $broadcastItemId) {
-                return (string) $stashItem->mediaItemId;
+                return (string) $stashItem->itemId;
             }
         }
 
@@ -930,11 +930,11 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         return $encoded;
     }
 
-    private function findOrCreateItem(BroadcastContext $context, StashItemId $stashItemId, MediaItemId $mediaItemId): BroadcastItemRecord
+    private function findOrCreateItem(BroadcastContext $context, StashItemId $stashItemId, ItemId $itemId): BroadcastItemRecord
     {
         $existing = $this->items->findByBroadcastAndStashItem(BroadcastId::fromPrimaryKey($context->broadcast->id), $stashItemId);
 
-        return $existing ?? $this->items->create(BroadcastId::fromPrimaryKey($context->broadcast->id), $stashItemId, $mediaItemId);
+        return $existing ?? $this->items->create(BroadcastId::fromPrimaryKey($context->broadcast->id), $stashItemId, $itemId);
     }
 
     private function readyItem(BroadcastItemRecord $item): void

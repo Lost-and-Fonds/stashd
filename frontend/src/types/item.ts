@@ -18,10 +18,10 @@ export interface ItemFixture {
 export interface StashItemApiResource {
   id: string
   stash_id: string
-  media_item_id: string
+  item_id: string
   state: string
   display_title?: string | null
-  media_item: {
+  item: {
     title: string
     state: string
     thumbnail_uri?: string | null

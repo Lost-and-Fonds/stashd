@@ -7,13 +7,13 @@ namespace App\Downloads;
 use App\Providers\StashdUri;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\StashId;
-use App\Vault\MediaItemId;
+use App\Vault\ItemId;
 use Tempest\DateTime\DateTime;
 
 final readonly class DownloadRequest
 {
     public function __construct(
-        public MediaItemId $mediaItemId,
+        public ItemId $itemId,
         public StashId $stashId,
         public string $providerKey,
         public string $providerItemId,

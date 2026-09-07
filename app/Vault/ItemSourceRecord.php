@@ -11,18 +11,18 @@ use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 use Tempest\DateTime\DateTime;
 
-#[Table(name: 'media_item_sources')]
-final class MediaItemSourceRecord
+#[Table(name: 'item_sources')]
+final class ItemSourceRecord
 {
     use IsDatabaseModel;
 
     public PrimaryKey $id;
 
-    #[BelongsTo(ownerJoin: 'mediaItemId')]
-    public MediaItemRecord $mediaItem;
+    #[BelongsTo(ownerJoin: 'itemId')]
+    public ItemRecord $item;
 
     public function __construct(
-        public MediaItemId $mediaItemId,
+        public ItemId $itemId,
         public string $providerKey,
         public string $providerInputId,
         public string $discoveredUri,

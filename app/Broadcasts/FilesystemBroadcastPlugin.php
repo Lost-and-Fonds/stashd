@@ -7,7 +7,7 @@ namespace App\Broadcasts;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\StashItemId;
 use App\System\State\StateTransitionService;
-use App\Vault\MediaItemId;
+use App\Vault\ItemId;
 
 /** Core-owned hardlink view; it has no provider dependency. */
 #[StashdBroadcast('Filesystem', 'Hardlinked filesystem broadcast.')]
@@ -62,8 +62,8 @@ final readonly class FilesystemBroadcastPlugin implements BroadcastPlugin, Broad
         $position = 0;
 
         foreach ($context->stashItems as $stashItem) {
-            $asset = $context->vaultOriginals[(string) $stashItem->mediaItemId] ?? null;
-            $media = $context->mediaItems[(string) $stashItem->mediaItemId] ?? null;
+            $asset = $context->vaultOriginals[(string) $stashItem->itemId] ?? null;
+            $media = $context->items[(string) $stashItem->itemId] ?? null;
 
             if ($asset === null || $asset->path === null || $media === null || ! is_file($asset->path)) {
                 $skipped[] = (string) $stashItem->id;
@@ -76,7 +76,7 @@ final readonly class FilesystemBroadcastPlugin implements BroadcastPlugin, Broad
             $relative = $this->paths->relativeFile('Season 01', $filename);
             $files[] = new BroadcastPlannedFile(
                 stashItemId: (string) $stashItem->id,
-                mediaItemId: (string) $stashItem->mediaItemId,
+                itemId: (string) $stashItem->itemId,
                 sourceAssetId: (string) $asset->id,
                 sourcePath: $asset->path,
                 relativePath: $relative,
@@ -95,7 +95,7 @@ final readonly class FilesystemBroadcastPlugin implements BroadcastPlugin, Broad
 
         foreach ($plan->files as $planned) {
             $item = $this->items->findByBroadcastAndStashItem(BroadcastId::parse($plan->broadcastId), StashItemId::parse($planned->stashItemId))
-                ?? $this->items->create(BroadcastId::parse($plan->broadcastId), StashItemId::parse($planned->stashItemId), MediaItemId::parse($planned->mediaItemId));
+                ?? $this->items->create(BroadcastId::parse($plan->broadcastId), StashItemId::parse($planned->stashItemId), ItemId::parse($planned->itemId));
             $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Processing);
             $this->hardlinks->publishHardlink($planned->sourcePath, $planned->absolutePath, $root);
             $item->publishedPath = $planned->absolutePath;
@@ -116,7 +116,7 @@ final readonly class FilesystemBroadcastPlugin implements BroadcastPlugin, Broad
 
         foreach ($this->items->listForBroadcast(BroadcastId::parse((string) $context->broadcast->id)) as $item) {
             $path = $item->publishedPath;
-            $source = $context->vaultOriginals[(string) $item->mediaItemId]?->path;
+            $source = $context->vaultOriginals[(string) $item->itemId]?->path;
 
             if (is_string($path) && is_string($source) && $this->hardlinks->verifyHardlink($source, $path)) {
                 $valid[] = (string) $item->id;

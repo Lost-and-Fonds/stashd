@@ -24,7 +24,7 @@ final readonly class JobRealtimeResource
     public function toArray(): array
     {
         $payload = $this->job->payload ?? [];
-        $mediaItemId = $payload['media_item_id'] ?? ($this->job->entityType === 'media_item' ? $this->job->entityId : null);
+        $itemId = $payload['item_id'] ?? $payload['media_item_id'] ?? (in_array($this->job->entityType, ['item', 'media_item'], true) ? $this->job->entityId : null);
         $stashId = $payload['stash_id'] ?? null;
 
         return ApiJson::encode([
@@ -33,7 +33,7 @@ final readonly class JobRealtimeResource
             'entityType' => $this->job->entityType,
             'entityId' => $this->job->entityId,
             'stashId' => is_string($stashId) ? $stashId : null,
-            'mediaItemId' => is_string($mediaItemId) ? $mediaItemId : null,
+            'itemId' => is_string($itemId) ? $itemId : null,
             'state' => $this->job->state->value,
             'progressCurrent' => $this->job->progressCurrent,
             'progressTotal' => $this->job->progressTotal,

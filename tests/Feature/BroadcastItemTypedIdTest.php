@@ -12,26 +12,26 @@ use App\Stashes\StashId;
 use App\Stashes\StashItemId;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashRepository;
-use App\Vault\MediaItemId;
-use App\Vault\MediaItemRepository;
+use App\Vault\ItemId;
+use App\Vault\ItemRepository;
 
-test('BroadcastItemRecord::broadcastId/stashItemId/mediaItemId round-trip as typed IDs through insert, where-lookup, and reload', function (): void {
+test('BroadcastItemRecord::broadcastId/stashItemId/itemId round-trip as typed IDs through insert, where-lookup, and reload', function (): void {
     $stashes = $this->container->get(StashRepository::class);
     $broadcasts = $this->container->get(BroadcastRepository::class);
-    $mediaItems = $this->container->get(MediaItemRepository::class);
+    $items = $this->container->get(ItemRepository::class);
     $stashItems = $this->container->get(StashItemRepository::class);
     $broadcastItems = $this->container->get(BroadcastItemRepository::class);
 
     $stash = $stashes->create('Broadcast Typed ID Stash');
     $stashId = StashId::parse((string) $stash->id);
-    $mediaItem = $mediaItems->create(
+    $item = $items->create(
         providerKey: 'fake',
         providerItemId: 'broadcast-typed-id-item',
         canonicalUri: 'fake://item/broadcast-typed-id-item',
         title: 'Broadcast Typed ID Item',
     );
-    $mediaItemId = MediaItemId::parse((string) $mediaItem->id);
-    $stashItem = $stashItems->create(stashId: $stashId, mediaItemId: $mediaItemId);
+    $itemId = ItemId::parse((string) $item->id);
+    $stashItem = $stashItems->create(stashId: $stashId, itemId: $itemId);
     $stashItemId = StashItemId::parse((string) $stashItem->id);
 
     $broadcast = $broadcasts->create(
@@ -45,13 +45,13 @@ test('BroadcastItemRecord::broadcastId/stashItemId/mediaItemId round-trip as typ
     $created = $broadcastItems->create(
         broadcastId: $broadcastId,
         stashItemId: $stashItemId,
-        mediaItemId: $mediaItemId,
+        itemId: $itemId,
     );
 
     expect($created->broadcastId)->toBeInstanceOf(BroadcastId::class)
         ->and($created->broadcastId->toString())->toBe($broadcastId->toString())
         ->and($created->stashItemId)->toBeInstanceOf(StashItemId::class)
-        ->and($created->mediaItemId)->toBeInstanceOf(MediaItemId::class);
+        ->and($created->itemId)->toBeInstanceOf(ItemId::class);
 
     // Multi-column WHERE lookup on typed-ID-backed columns: the property
     // caster only fixes hydration/persistence, not raw bound-param binding,
@@ -63,5 +63,5 @@ test('BroadcastItemRecord::broadcastId/stashItemId/mediaItemId round-trip as typ
     $reloaded = $broadcastItems->find(BroadcastItemId::parse((string) $created->id));
     expect($reloaded?->broadcastId)->toBeInstanceOf(BroadcastId::class)
         ->and($reloaded?->broadcastId->toString())->toBe($broadcastId->toString())
-        ->and($reloaded?->mediaItemId->toString())->toBe($mediaItemId->toString());
+        ->and($reloaded?->itemId->toString())->toBe($itemId->toString());
 });

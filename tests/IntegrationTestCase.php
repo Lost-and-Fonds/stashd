@@ -11,7 +11,7 @@ use App\Plugins\ExternalInputPluginRegistry;
 use App\Plugins\PluginInputDefinition;
 use App\Providers\Fake\FakeProvider;
 use App\Stashes\StashItemRecord;
-use App\Vault\MediaItemRecord;
+use App\Vault\ItemRecord;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 use Tempest\Discovery\DiscoveryLocation;
@@ -110,9 +110,9 @@ abstract class IntegrationTestCase extends IntegrationTest
             ->where('stashId', $stashId)
             ->orderBy('position', Direction::ASC)
             ->first();
-        $media = MediaItemRecord::findById(new PrimaryKey((string) $stashItem->mediaItemId));
+        $item = ItemRecord::findById(new PrimaryKey((string) $stashItem->itemId));
 
-        return [$headers, $stashId, (string) $media->id];
+        return [$headers, $stashId, (string) $item->id];
     }
 
     private function registerFakeInputPlugin(): void
@@ -135,15 +135,15 @@ abstract class IntegrationTestCase extends IntegrationTest
      */
     public function bootstrapFakeDownloadBroadcast(string $channel = 'broadcast-demo'): array
     {
-        [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapJellyfinDownloadBroadcast($channel);
+        [$headers, $stashId, $itemId, $broadcastId] = $this->bootstrapJellyfinDownloadBroadcast($channel);
 
-        return [$headers, $stashId, $mediaItemId, $broadcastId];
+        return [$headers, $stashId, $itemId, $broadcastId];
     }
 
     /** @return array{0: array{Authorization: string}, 1: string, 2: string, 3: string, 4: string} */
     public function bootstrapJellyfinDownloadBroadcast(string $channel = 'jellyfin-broadcast-demo'): array
     {
-        [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash($channel);
+        [$headers, $stashId, $itemId] = $this->bootstrapFakeDownloadStash($channel);
 
         $server = $this->http->post('/api/v1/connections', [
             'plugin_key' => 'jellyfin',
@@ -167,7 +167,7 @@ abstract class IntegrationTestCase extends IntegrationTest
             ],
         ], headers: $headers)->assertStatus(Status::CREATED);
 
-        return [$headers, $stashId, $mediaItemId, $create->body['broadcast']['id'], $connectionId];
+        return [$headers, $stashId, $itemId, $create->body['broadcast']['id'], $connectionId];
     }
 
     protected function setUp(): void

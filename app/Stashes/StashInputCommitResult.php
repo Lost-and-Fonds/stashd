@@ -9,12 +9,12 @@ final readonly class StashInputCommitResult
     public function __construct(
         public string $stashId,
         public string $stashInputId,
-        public int $mediaItemsCreated,
-        public int $mediaItemsReused,
+        public int $itemsCreated,
+        public int $itemsReused,
         public int $stashItemsCreated,
         public int $stashItemsReused,
         /** @var list<string> */
-        public array $downloadableMediaItemIds = [],
+        public array $downloadableItemIds = [],
     ) {}
 
     /** @return array<string, mixed> */
@@ -23,8 +23,8 @@ final readonly class StashInputCommitResult
         return [
             'stash_id' => $this->stashId,
             'stash_input_id' => $this->stashInputId,
-            'media_items_created' => $this->mediaItemsCreated,
-            'media_items_reused' => $this->mediaItemsReused,
+            'items_created' => $this->itemsCreated,
+            'items_reused' => $this->itemsReused,
             'stash_items_created' => $this->stashItemsCreated,
             'stash_items_reused' => $this->stashItemsReused,
         ];

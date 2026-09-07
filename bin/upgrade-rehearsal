@@ -111,8 +111,8 @@ fi
 echo "Migration records:"
 psql -Atc 'SELECT name FROM migrations ORDER BY name'
 echo "Structural counts:"
-psql -Atc "SELECT 'stashes=' || count(*) FROM stashes UNION ALL SELECT 'stash_inputs=' || count(*) FROM stash_inputs UNION ALL SELECT 'broadcasts=' || count(*) FROM broadcasts UNION ALL SELECT 'media_items=' || count(*) FROM media_items ORDER BY 1"
+psql -Atc "SELECT 'stashes=' || count(*) FROM stashes UNION ALL SELECT 'stash_inputs=' || count(*) FROM stash_inputs UNION ALL SELECT 'broadcasts=' || count(*) FROM broadcasts UNION ALL SELECT 'items=' || count(*) FROM items ORDER BY 1"
 echo "Relevant columns (table|column|type|nullable):"
-psql -Atc "SELECT table_name || '|' || column_name || '|' || data_type || '|' || is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('stashes', 'stash_inputs', 'broadcasts', 'media_items', 'media_item_sources', 'broadcast_items') ORDER BY table_name, ordinal_position"
+psql -Atc "SELECT table_name || '|' || column_name || '|' || data_type || '|' || is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('stashes', 'stash_inputs', 'broadcasts', 'items', 'item_sources', 'broadcast_items') ORDER BY table_name, ordinal_position"
 echo "JSON object keys (table|column|key|rows), without values:"
 psql -Atc "SELECT 'broadcasts|settings|' || key || '|' || count(*) FROM broadcasts CROSS JOIN LATERAL jsonb_object_keys(COALESCE(\"settings\"::jsonb, '{}'::jsonb)) key GROUP BY key UNION ALL SELECT 'stash_inputs|options|' || key || '|' || count(*) FROM stash_inputs CROSS JOIN LATERAL jsonb_object_keys(COALESCE(\"options\"::jsonb, '{}'::jsonb)) key GROUP BY key ORDER BY 1"

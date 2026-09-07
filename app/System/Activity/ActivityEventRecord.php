@@ -24,7 +24,7 @@ final class ActivityEventRecord
         public ?string $entityType = null,
         public ?string $entityId = null,
         public ?string $stashId = null,
-        public ?string $mediaItemId = null,
+        public ?string $itemId = null,
         public ?string $broadcastId = null,
         public ?string $jobId = null,
         public ?string $groupKey = null,

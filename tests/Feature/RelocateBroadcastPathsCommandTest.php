@@ -17,11 +17,11 @@ use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
-use App\Vault\MediaItemId;
+use App\Vault\ItemId;
 use Tempest\Console\ExitCode;
 
 test('relocation command moves an old ID-keyed broadcast root to the new type+name-keyed root and rewrites asset paths', function (): void {
-    [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('relocate-command');
+    [$headers, $stashId, $itemId] = $this->bootstrapFakeDownloadStash('relocate-command');
 
     $broadcasts = $this->container->get(BroadcastRepository::class);
     $broadcast = $broadcasts->create(
@@ -40,7 +40,7 @@ test('relocation command moves an old ID-keyed broadcast root to the new type+na
 
     $assets = $this->container->get(AssetRepository::class);
     $asset = $assets->create(
-        mediaItemId: MediaItemId::parse($mediaItemId),
+        itemId: ItemId::parse($itemId),
         role: AssetRole::Hardlink,
         kind: AssetKind::Video,
         state: AssetState::Ready,

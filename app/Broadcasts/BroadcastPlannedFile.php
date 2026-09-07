@@ -9,7 +9,7 @@ final readonly class BroadcastPlannedFile
 {
     public function __construct(
         public string $stashItemId,
-        public string $mediaItemId,
+        public string $itemId,
         public string $sourceAssetId,
         public string $sourcePath,
         public string $relativePath,
@@ -22,7 +22,7 @@ final readonly class BroadcastPlannedFile
     {
         return [
             'stash_item_id' => $this->stashItemId,
-            'media_item_id' => $this->mediaItemId,
+            'item_id' => $this->itemId,
             'source_asset_id' => $this->sourceAssetId,
             'source_path' => $this->sourcePath,
             'relative_path' => $this->relativePath,

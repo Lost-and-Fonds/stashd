@@ -6,7 +6,7 @@ namespace App\Broadcasts;
 
 use App\Stashes\StashItemId;
 use App\Support\PrefixedUlidGenerator;
-use App\Vault\MediaItemId;
+use App\Vault\ItemId;
 use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
@@ -24,14 +24,14 @@ final class BroadcastItemRepository
     public function create(
         BroadcastId $broadcastId,
         StashItemId $stashItemId,
-        MediaItemId $mediaItemId,
+        ItemId $itemId,
         BroadcastItemState $state = BroadcastItemState::Pending,
     ): BroadcastItemRecord {
         $id = $this->ids->generate('bitem')->toString();
         $record = new BroadcastItemRecord(
             broadcastId: $broadcastId,
             stashItemId: $stashItemId,
-            mediaItemId: $mediaItemId,
+            itemId: $itemId,
             state: $state,
         );
         $record->id = new PrimaryKey($id);
@@ -85,12 +85,12 @@ final class BroadcastItemRepository
     }
 
     /** @return list<BroadcastItemRecord> */
-    public function listForMediaItem(MediaItemId $mediaItemId): array
+    public function listForItem(ItemId $itemId): array
     {
         /** @var list<BroadcastItemRecord> $records */
         $records = BroadcastItemRecord::select()
             ->with('broadcast')
-            ->where('mediaItemId', $mediaItemId->toString())
+            ->where('itemId', $itemId->toString())
             ->all();
 
         return $records;

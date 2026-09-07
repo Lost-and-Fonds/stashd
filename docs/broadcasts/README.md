@@ -103,7 +103,7 @@ Podcast feeds emit iTunes, Atom, `content`, and Podcasting 2.0 namespaces. Descr
 Podcast feed metadata supports a `<podcast:funding url="...">` tag. The external Podcast Component resolves the funding URL from its declared settings and item facts:
 
 1. Manual `settings['funding_url']` on the broadcast, if non-blank — always wins.
-2. Otherwise, `PodcastFundingLinkDetector` scans the descriptions of media items actually included in that rebuild (active stash items with a successfully selected Vault asset) for a recognizable funding link.
+2. Otherwise, `PodcastFundingLinkDetector` scans the descriptions of items actually included in that rebuild (active stash items with a successfully selected Vault asset) for a recognizable funding link.
 
 The v1 detector is intentionally conservative. It only recognizes:
 
@@ -249,7 +249,7 @@ Creating a broadcast automatically queues its first rebuild. Broadcast work runs
 A broadcast or item becomes `stale` when:
 
 - Source Vault asset is missing or not ready
-- Media item is not `ready`
+- Item is not `ready`
 - Stash item is not `active`
 - Generated file is missing
 - Hardlink target is invalid (inode mismatch)

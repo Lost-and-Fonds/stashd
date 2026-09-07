@@ -11,14 +11,14 @@ use App\Providers\ProviderRegistry;
 use App\Providers\ResolvedInput;
 use App\Providers\StashdUri;
 use App\System\State\StateTransitionService;
-use App\Vault\MediaItemRepository;
+use App\Vault\ItemRepository;
 
 final readonly class UpdateStashInputOptions
 {
     public function __construct(
         private StashInputRepository $inputs,
         private StashItemRepository $stashItems,
-        private MediaItemRepository $mediaItems,
+        private ItemRepository $items,
         private ProviderRegistry $providers,
         private StashInputFilter $filter,
         private StateTransitionService $transitions,
@@ -30,21 +30,21 @@ final readonly class UpdateStashInputOptions
     {
         $input = $this->inputs->updateOptions($input, $options);
         $declaredOptions = $this->declaredOptions($input);
-        $downloadableMediaItemIds = [];
+        $downloadableItemIds = [];
 
         foreach ($this->stashItems->listForStash(
             StashId::fromPrimaryKey($stash->id),
             stashInputId: StashInputId::fromPrimaryKey($input->id),
         ) as $stashItem) {
-            $mediaItem = $this->mediaItems->find($stashItem->mediaItemId);
+            $item = $this->items->find($stashItem->itemId);
 
-            if ($mediaItem === null) {
+            if ($item === null) {
                 continue;
             }
 
             $reason = $this->filter->ignoredReason(
-                $mediaItem->title,
-                $mediaItem->contentType,
+                $item->title,
+                $item->contentType,
                 $options,
                 $declaredOptions,
             );
@@ -52,7 +52,7 @@ final readonly class UpdateStashInputOptions
             if ($reason === null && $stashItem->state === StashItemState::Ignored && $this->filter->isFilterReason($stashItem->ignoredReason)) {
                 $stashItem->ignoredReason = null;
                 $this->transitions->transitionStashItem($stashItem, StashItemState::Active);
-                $downloadableMediaItemIds[] = (string) $mediaItem->id;
+                $downloadableItemIds[] = (string) $item->id;
             }
 
             if ($reason !== null && $stashItem->state === StashItemState::Active) {
@@ -69,9 +69,9 @@ final readonly class UpdateStashInputOptions
         }
 
         if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
-            foreach ($downloadableMediaItemIds as $mediaItemId) {
-                $this->jobDispatcher->dispatch('core.download', 'media_item', $mediaItemId, (string) $stash->id, [
-                    'media_item_id' => $mediaItemId,
+            foreach ($downloadableItemIds as $itemId) {
+                $this->jobDispatcher->dispatch('core.download', 'item', $itemId, (string) $stash->id, [
+                    'item_id' => $itemId,
                     'stash_id' => (string) $stash->id,
                 ], 'background');
             }

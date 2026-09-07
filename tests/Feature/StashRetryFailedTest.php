@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Stashes\StashItemRecord;
-use App\Vault\MediaItemId;
-use App\Vault\MediaItemRepository;
-use App\Vault\MediaItemState;
+use App\Vault\ItemId;
+use App\Vault\ItemRepository;
+use App\Vault\ItemState;
 use Tempest\Database\Direction;
 use Tempest\Http\Status;
 
 test('retry-failed creates independent download jobs for failed items only', function (): void {
     [$headers, $stashIdA] = $this->bootstrapFakeDownloadStash('retry-all-a');
-    [$headersB, $stashIdB, $mediaItemIdB] = $this->bootstrapFakeDownloadStash('retry-all-b');
+    [$headersB, $stashIdB, $itemIdB] = $this->bootstrapFakeDownloadStash('retry-all-b');
 
     $itemsA = StashItemRecord::select()
         ->where('stashId', $stashIdA)
@@ -21,41 +21,41 @@ test('retry-failed creates independent download jobs for failed items only', fun
         ->all();
     expect($itemsA)->toHaveCount(3);
 
-    $mediaItems = $this->container->get(MediaItemRepository::class);
+    $items = $this->container->get(ItemRepository::class);
 
     // Two of three items in stash A fail; the third is left untouched so we
     // can prove it's not retried.
-    $failedMediaItemIdsA = [(string) $itemsA[0]->mediaItemId, (string) $itemsA[1]->mediaItemId];
+    $failedItemIdsA = [(string) $itemsA[0]->itemId, (string) $itemsA[1]->itemId];
 
-    foreach ($failedMediaItemIdsA as $mediaItemId) {
-        $mediaItem = $mediaItems->find(MediaItemId::parse($mediaItemId));
-        $mediaItem->state = MediaItemState::Failed;
-        $mediaItems->save($mediaItem);
+    foreach ($failedItemIdsA as $itemId) {
+        $item = $items->find(ItemId::parse($itemId));
+        $item->state = ItemState::Failed;
+        $items->save($item);
     }
-    $untouchedMediaItemIdA = (string) $itemsA[2]->mediaItemId;
-    $untouchedStateBefore = $mediaItems->find(MediaItemId::parse($untouchedMediaItemIdA))->state;
+    $untouchedItemIdA = (string) $itemsA[2]->itemId;
+    $untouchedStateBefore = $items->find(ItemId::parse($untouchedItemIdA))->state;
 
     // A failed item in a different stash must never be retried by stash A's request.
-    $mediaItemB = $mediaItems->find(MediaItemId::parse($mediaItemIdB));
-    $mediaItemB->state = MediaItemState::Failed;
-    $mediaItems->save($mediaItemB);
+    $itemB = $items->find(ItemId::parse($itemIdB));
+    $itemB->state = ItemState::Failed;
+    $items->save($itemB);
 
     $response = $this->http->post('/api/v1/stashes/' . $stashIdA . '/retry-failed', [], headers: $headers)->assertStatus(Status::ACCEPTED);
     expect($response->body['created_count'])->toBe(2)
         ->and($response->body['jobs'])->toHaveCount(2);
 
-    foreach ($failedMediaItemIdsA as $mediaItemId) {
-        expect($mediaItems->find(MediaItemId::parse($mediaItemId))->state)->toBe(MediaItemState::DownloadPending);
+    foreach ($failedItemIdsA as $itemId) {
+        expect($items->find(ItemId::parse($itemId))->state)->toBe(ItemState::DownloadPending);
     }
 
     $this->processAllJobs();
 
-    foreach ($failedMediaItemIdsA as $mediaItemId) {
-        expect($mediaItems->find(MediaItemId::parse($mediaItemId))->state)->toBe(MediaItemState::Ready);
+    foreach ($failedItemIdsA as $itemId) {
+        expect($items->find(ItemId::parse($itemId))->state)->toBe(ItemState::Ready);
     }
 
-    expect($mediaItems->find(MediaItemId::parse($untouchedMediaItemIdA))->state)->toBe($untouchedStateBefore)
-        ->and($mediaItems->find(MediaItemId::parse($mediaItemIdB))->state)->toBe(MediaItemState::Failed);
+    expect($items->find(ItemId::parse($untouchedItemIdA))->state)->toBe($untouchedStateBefore)
+        ->and($items->find(ItemId::parse($itemIdB))->state)->toBe(ItemState::Failed);
 });
 
 test('retry-failed rejects an unknown stash id', function (): void {

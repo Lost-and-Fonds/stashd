@@ -115,7 +115,7 @@ function handleLiveEvent(event: LiveEvent) {
     const payload = event.payload
     const entityId = payload.entityId ?? payload.entity_id
     const entityType = payload.entityType ?? payload.entity_type
-    if (payload.type === 'core.download' && entityType === 'media_item' && entityId === itemId) {
+    if (payload.type === 'core.download' && entityType === 'item' && entityId === itemId) {
       refetchJob.value = {
         ...(refetchJob.value ?? { id: payload.id, type: 'core.download', state: 'processing' }),
         id: payload.id,
@@ -131,14 +131,14 @@ function handleLiveEvent(event: LiveEvent) {
 
   if (event.event === 'activity.created') {
     const type = event.payload.type ?? ''
-    const matchesItem = event.payload.entityType === 'media_item' && event.payload.entityId === itemId
+    const matchesItem = event.payload.entityType === 'item' && event.payload.entityId === itemId
     if (matchesItem && ['download.completed', 'download.failed'].includes(type)) scheduleLiveRefresh()
     if (type === 'vault.verify_completed') scheduleLiveRefresh()
     return
   }
 
   if ((event.event === 'job.completed' || event.event === 'job.failed')
-    && event.payload.entityType === 'media_item'
+    && event.payload.entityType === 'item'
     && event.payload.entityId === itemId) scheduleLiveRefresh()
 }
 

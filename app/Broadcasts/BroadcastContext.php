@@ -8,22 +8,22 @@ use App\Stashes\StashInputRecord;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashRecord;
 use App\Vault\AssetRecord;
-use App\Vault\MediaItemRecord;
+use App\Vault\ItemRecord;
 
 /** Runtime context for broadcast lifecycle operations. */
 final readonly class BroadcastContext
 {
     /**
      * @param  list<StashItemRecord>  $stashItems
-     * @param  array<string, MediaItemRecord>  $mediaItems  keyed by media item id
-     * @param  array<string, AssetRecord|null>  $vaultOriginals  keyed by media item id
+     * @param  array<string, ItemRecord>  $items  keyed by item id
+     * @param  array<string, AssetRecord|null>  $vaultOriginals  keyed by item id
      * @param  list<StashInputRecord>  $stashInputs
      */
     public function __construct(
         public BroadcastRecord $broadcast,
         public StashRecord $stash,
         public array $stashItems,
-        public array $mediaItems,
+        public array $items,
         public array $vaultOriginals,
         public array $stashInputs = [],
         public mixed $progress = null,

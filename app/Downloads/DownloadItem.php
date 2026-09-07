@@ -26,10 +26,10 @@ use App\Vault\AssetRecord;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
-use App\Vault\MediaItemId;
-use App\Vault\MediaItemRecord;
-use App\Vault\MediaItemRepository;
-use App\Vault\MediaItemState;
+use App\Vault\ItemId;
+use App\Vault\ItemRecord;
+use App\Vault\ItemRepository;
+use App\Vault\ItemState;
 use App\Vault\MoveFileIntoVault;
 use App\Vault\StageDownloadFiles;
 use App\Vault\VaultPathBuilder;
@@ -38,12 +38,12 @@ use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 use Tempest\Support\Filesystem;
 
-final readonly class DownloadMediaItem
+final readonly class DownloadItem
 {
     public function __construct(
         private DownloaderInterface $downloader,
         private DownloadPolicyEvaluator $policy,
-        private MediaItemRepository $mediaItems,
+        private ItemRepository $items,
         private StashRepository $stashes,
         private StashItemRepository $stashItems,
         private StashInputRepository $stashInputs,
@@ -59,22 +59,22 @@ final readonly class DownloadMediaItem
     ) {}
 
     public function execute(
-        MediaItemId $mediaItemId,
+        ItemId $itemId,
         StashId $stashId,
         PrefixedUlid $jobId,
         bool $force = false,
         ?callable $onProgress = null,
     ): DownloadExecutionResult {
-        $mediaItem = $this->mediaItems->find($mediaItemId)
-            ?? throw DownloadException::withCode('media_item_not_found', 'Media item not found.');
+        $item = $this->items->find($itemId)
+            ?? throw DownloadException::withCode('item_not_found', 'Item not found.');
 
         $stash = $this->stashes->find($stashId)
             ?? throw DownloadException::withCode('stash_not_found', 'Stash not found.');
 
-        $stashItem = $this->stashItems->findByStashAndMediaItem($stashId, $mediaItemId);
+        $stashItem = $this->stashItems->findByStashAndItem($stashId, $itemId);
 
         if ($stashItem === null) {
-            throw DownloadException::withCode('stash_item_not_found', 'Media item is not part of the requested stash.');
+            throw DownloadException::withCode('stash_item_not_found', 'Item is not part of the requested stash.');
         }
 
         $stashInput = $stashItem->stashInputId !== null ? $this->stashInputs->find($stashItem->stashInputId) : null;
@@ -86,28 +86,28 @@ final readonly class DownloadMediaItem
         $this->policy->assertExplicitDownloadAllowed($stash->downloadPolicy);
         $this->assertStorageReady();
 
-        $existingOriginal = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::VaultOriginal);
+        $existingOriginal = $this->assets->findByItemAndRole($itemId, AssetRole::VaultOriginal);
         $preserveExisting = $force
-            && $mediaItem->state === MediaItemState::Ready
+            && $item->state === ItemState::Ready
             && $existingOriginal?->state === AssetState::Ready
             && $existingOriginal->path !== null
             && Filesystem\is_file($existingOriginal->path);
         $originalAssets = $preserveExisting
             ? array_map(static fn(AssetRecord $asset): array => ['asset' => $asset, 'snapshot' => clone $asset], array_values(array_filter(
-                $this->assets->listForMediaItem($mediaItemId),
+                $this->assets->listForItem($itemId),
                 static fn(AssetRecord $asset): bool => $asset->state === AssetState::Ready,
             )))
             : [];
 
         if (! $force && $existingOriginal !== null && $existingOriginal->state === AssetState::Ready) {
             if ($existingOriginal->path !== null && Filesystem\is_file($existingOriginal->path)) {
-                $this->ensureMediaItemReady($mediaItem);
+                $this->ensureItemReady($item);
 
                 return new DownloadExecutionResult(
-                    mediaItemId: $mediaItemId->toString(),
+                    itemId: $itemId->toString(),
                     stashId: $stashId->toString(),
                     skipped: true,
-                    assetsReady: count($this->assets->listForMediaItem($mediaItemId)),
+                    assetsReady: count($this->assets->listForItem($itemId)),
                     warnings: $warnings,
                 );
             }
@@ -117,20 +117,20 @@ final readonly class DownloadMediaItem
         $pendingAssets = [];
 
         try {
-            $this->prepareMediaItemForDownload($mediaItem, $force);
+            $this->prepareItemForDownload($item, $force);
             $request = new DownloadRequest(
-                mediaItemId: $mediaItemId,
+                itemId: $itemId,
                 stashId: $stashId,
-                providerKey: $mediaItem->providerKey,
-                providerItemId: $mediaItem->providerItemId,
-                canonicalUri: StashdUri::parse($mediaItem->canonicalUri),
+                providerKey: $item->providerKey,
+                providerItemId: $item->providerItemId,
+                canonicalUri: StashdUri::parse($item->canonicalUri),
                 downloadPolicy: $stash->downloadPolicy,
                 tempDirectory: $tempDirectory,
                 force: $force,
-                durationSeconds: DurationSeconds::toSeconds($mediaItem->durationSeconds),
-                thumbnailUri: $mediaItem->thumbnailUri !== null ? StashdUri::parse($mediaItem->thumbnailUri) : null,
-                title: $mediaItem->title,
-                publishedAt: $mediaItem->publishedAt,
+                durationSeconds: DurationSeconds::toSeconds($item->durationSeconds),
+                thumbnailUri: $item->thumbnailUri !== null ? StashdUri::parse($item->thumbnailUri) : null,
+                title: $item->title,
+                publishedAt: $item->publishedAt,
                 providerOptions: $providerOptions,
             );
 
@@ -138,15 +138,15 @@ final readonly class DownloadMediaItem
             $this->assertDownloadOutputsComplete($download);
 
             foreach ($download->files as $file) {
-                $pendingAssets[] = $this->createProcessingAsset($mediaItemId, $file, $force);
+                $pendingAssets[] = $this->createProcessingAsset($itemId, $file, $force);
             }
 
-            $ingested = $this->ingestAllFiles($mediaItem, $download, $pendingAssets, $force, (string) $jobId);
-            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::Ready);
+            $ingested = $this->ingestAllFiles($item, $download, $pendingAssets, $force, (string) $jobId);
+            $this->transitions->transitionItem($item, ItemState::Ready);
             $this->tempStaging->cleanupSuccess($tempDirectory);
 
             return new DownloadExecutionResult(
-                mediaItemId: $mediaItemId->toString(),
+                itemId: $itemId->toString(),
                 stashId: $stashId->toString(),
                 skipped: false,
                 assetsReady: $ingested,
@@ -157,10 +157,10 @@ final readonly class DownloadMediaItem
 
             if ($preserveExisting) {
                 $this->restoreAssets($originalAssets);
-                $this->restoreMediaItem($mediaItem);
+                $this->restoreItem($item);
             } else {
                 $this->markAssetsFailed($pendingAssets);
-                $this->failMediaItem($mediaItem);
+                $this->failItem($item);
             }
 
             if ($throwable instanceof DownloadException) {
@@ -200,10 +200,10 @@ final readonly class DownloadMediaItem
         }
     }
 
-    private function ensureMediaItemReady(MediaItemRecord $mediaItem): void
+    private function ensureItemReady(ItemRecord $item): void
     {
-        if ($mediaItem->state !== MediaItemState::Ready) {
-            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::Ready);
+        if ($item->state !== ItemState::Ready) {
+            $this->transitions->transitionItem($item, ItemState::Ready);
         }
     }
 
@@ -219,42 +219,42 @@ final readonly class DownloadMediaItem
         }
     }
 
-    private function prepareMediaItemForDownload(MediaItemRecord $mediaItem, bool $force = false): void
+    private function prepareItemForDownload(ItemRecord $item, bool $force = false): void
     {
-        if ($force && $mediaItem->state === MediaItemState::Ready) {
-            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::DownloadPending);
+        if ($force && $item->state === ItemState::Ready) {
+            $this->transitions->transitionItem($item, ItemState::DownloadPending);
         }
 
-        if ($mediaItem->state === MediaItemState::Discovered) {
-            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::MetadataReady);
-            $mediaItem->metadataCapturedAt ??= DateTime::now(Timezone::UTC);
-            $this->mediaItems->save($mediaItem);
+        if ($item->state === ItemState::Discovered) {
+            $this->transitions->transitionItem($item, ItemState::MetadataReady);
+            $item->metadataCapturedAt ??= DateTime::now(Timezone::UTC);
+            $this->items->save($item);
         }
 
-        if ($mediaItem->state === MediaItemState::MetadataReady) {
-            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::DownloadPending);
+        if ($item->state === ItemState::MetadataReady) {
+            $this->transitions->transitionItem($item, ItemState::DownloadPending);
         }
 
-        if ($mediaItem->state === MediaItemState::DownloadPending) {
-            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::Downloading);
+        if ($item->state === ItemState::DownloadPending) {
+            $this->transitions->transitionItem($item, ItemState::Downloading);
         }
 
-        if ($mediaItem->state === MediaItemState::Missing || $mediaItem->state === MediaItemState::Failed) {
-            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::DownloadPending);
-            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::Downloading);
+        if ($item->state === ItemState::Missing || $item->state === ItemState::Failed) {
+            $this->transitions->transitionItem($item, ItemState::DownloadPending);
+            $this->transitions->transitionItem($item, ItemState::Downloading);
         }
 
-        if ($mediaItem->state !== MediaItemState::Downloading) {
+        if ($item->state !== ItemState::Downloading) {
             throw DownloadException::withCode(
-                'invalid_media_item_state',
-                'Media item cannot start download from state: ' . $mediaItem->state->value,
+                'invalid_item_state',
+                'Item cannot start download from state: ' . $item->state->value,
             );
         }
     }
 
-    private function createProcessingAsset(MediaItemId $mediaItemId, DownloadedFile $file, bool $replaceExisting = false): AssetRecord
+    private function createProcessingAsset(ItemId $itemId, DownloadedFile $file, bool $replaceExisting = false): AssetRecord
     {
-        $existing = $this->assets->findByMediaItemAndRole($mediaItemId, $file->role);
+        $existing = $this->assets->findByItemAndRole($itemId, $file->role);
 
         if ($existing !== null) {
             if ($existing->state === AssetState::Ready && ! $replaceExisting) {
@@ -272,7 +272,7 @@ final readonly class DownloadMediaItem
         }
 
         $asset = $this->assets->create(
-            mediaItemId: $mediaItemId,
+            itemId: $itemId,
             role: $file->role,
             kind: $file->kind,
             state: AssetState::Pending,
@@ -288,7 +288,7 @@ final readonly class DownloadMediaItem
      * @param  list<AssetRecord>  $pendingAssets
      */
     private function ingestAllFiles(
-        MediaItemRecord $mediaItem,
+        ItemRecord $item,
         DownloadResult $download,
         array $pendingAssets,
         bool $replaceExisting = false,
@@ -303,8 +303,8 @@ final readonly class DownloadMediaItem
             foreach ($download->files as $index => $file) {
                 $asset = $pendingAssets[$index];
                 $destination = $this->vaultPaths->vaultFile(
-                    $mediaItem->providerKey,
-                    $mediaItem->providerItemId,
+                    $item->providerKey,
+                    $item->providerItemId,
                     $file->filename,
                 );
 
@@ -353,7 +353,7 @@ final readonly class DownloadMediaItem
             }
 
             foreach ($planned as $entry) {
-                $this->finalizeAsset($mediaItem, $entry['asset'], $entry['file'], $entry['destination'], $download, $entry['checksum'], $entry['sizeBytes'], $jobId);
+                $this->finalizeAsset($item, $entry['asset'], $entry['file'], $entry['destination'], $download, $entry['checksum'], $entry['sizeBytes'], $jobId);
             }
 
             foreach ($backups as $backup) {
@@ -410,15 +410,15 @@ final readonly class DownloadMediaItem
         }
     }
 
-    private function restoreMediaItem(MediaItemRecord $mediaItem): void
+    private function restoreItem(ItemRecord $item): void
     {
-        if ($mediaItem->state === MediaItemState::Downloading) {
-            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::Ready);
+        if ($item->state === ItemState::Downloading) {
+            $this->transitions->transitionItem($item, ItemState::Ready);
         }
     }
 
     private function finalizeAsset(
-        MediaItemRecord $mediaItem,
+        ItemRecord $item,
         AssetRecord $asset,
         DownloadedFile $file,
         string $destination,
@@ -429,8 +429,8 @@ final readonly class DownloadMediaItem
     ): void {
         $asset->path = $destination;
         $asset->relativePath = $this->vaultPaths->relativeFile(
-            $mediaItem->providerKey,
-            $mediaItem->providerItemId,
+            $item->providerKey,
+            $item->providerItemId,
             $file->filename,
         );
         $asset->mimeType = $file->mimeType;
@@ -454,8 +454,8 @@ final readonly class DownloadMediaItem
         );
 
         if ($file->role === AssetRole::SourceJson) {
-            $mediaItem->metadataCapturedAt = $download->attemptedAt;
-            $this->mediaItems->save($mediaItem);
+            $item->metadataCapturedAt = $download->attemptedAt;
+            $this->items->save($item);
         }
     }
 
@@ -469,10 +469,10 @@ final readonly class DownloadMediaItem
         }
     }
 
-    private function failMediaItem(MediaItemRecord $mediaItem): void
+    private function failItem(ItemRecord $item): void
     {
-        if ($mediaItem->state === MediaItemState::Downloading) {
-            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::Failed);
+        if ($item->state === ItemState::Downloading) {
+            $this->transitions->transitionItem($item, ItemState::Failed);
         }
     }
 }

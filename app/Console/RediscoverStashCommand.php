@@ -28,7 +28,7 @@ final readonly class RediscoverStashCommand
     ): ExitCode {
         $result = $this->rediscover->execute($stashId);
 
-        $this->console->success("Rediscovered {$result['inputs']} input(s): {$result['fields']} missing field(s) filled across {$result['updated']} media item(s).");
+        $this->console->success("Rediscovered {$result['inputs']} input(s): {$result['fields']} missing field(s) filled across {$result['updated']} item(s).");
 
         return ExitCode::SUCCESS;
     }

@@ -13,7 +13,7 @@ use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobDispatcher;
 use App\Support\PrefixedUlid;
-use App\Vault\MediaItemId;
+use App\Vault\ItemId;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
@@ -24,9 +24,10 @@ final readonly class DownloadCaptionsJobHandler implements JobHandler
     public function handle(JobRecord $job, JobProgressReporter $context): void
     {
         $payload = $job->payload ?? [];
-        $mediaItemId = is_string($payload['media_item_id'] ?? null) ? $payload['media_item_id'] : '';
+        $rawItemId = $payload['item_id'] ?? $payload['media_item_id'] ?? null;
+        $itemId = is_string($rawItemId) ? $rawItemId : '';
         $languages = is_string($payload['languages'] ?? null) ? $payload['languages'] : 'en';
-        $this->captions->execute(MediaItemId::parse($mediaItemId), PrefixedUlid::parse((string) $job->id), $languages, ($payload['include_auto'] ?? false) === true);
+        $this->captions->execute(ItemId::parse($itemId), PrefixedUlid::parse((string) $job->id), $languages, ($payload['include_auto'] ?? false) === true);
 
         $job->progressCurrent = 1;
         $job->progressTotal = 1;
@@ -37,7 +38,7 @@ final readonly class DownloadCaptionsJobHandler implements JobHandler
         $context->progress($job, JobProgressUpdate::ofSteps(1, 1, $job->progressLabel));
 
 
-        foreach ($this->broadcastItems->listForMediaItem(MediaItemId::parse($mediaItemId)) as $item) {
+        foreach ($this->broadcastItems->listForItem(ItemId::parse($itemId)) as $item) {
             $this->dispatch->dispatch(
                 'core.broadcast',
                 entityType: 'broadcast',

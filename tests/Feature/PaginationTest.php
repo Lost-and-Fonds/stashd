@@ -7,21 +7,21 @@ namespace Tests\Feature;
 use App\Stashes\StashId;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashRepository;
-use App\Vault\MediaItemId;
-use App\Vault\MediaItemRepository;
+use App\Vault\ItemId;
+use App\Vault\ItemRepository;
 use Tempest\Http\Status;
 
 test('GET /api/v1/stashes/{id}/items paginates with limit/offset and reports total', function (): void {
     $headers = $this->authHeaders();
     $stashes = $this->container->get(StashRepository::class);
-    $mediaItems = $this->container->get(MediaItemRepository::class);
+    $items = $this->container->get(ItemRepository::class);
     $stashItems = $this->container->get(StashItemRepository::class);
 
     $stash = $stashes->create('Pagination Stash');
     $stashId = StashId::parse((string) $stash->id);
 
     for ($i = 1; $i <= 5; $i++) {
-        $mediaItem = $mediaItems->create(
+        $item = $items->create(
             providerKey: 'fake',
             providerItemId: "pagination-item-{$i}",
             canonicalUri: "fake://item/pagination-item-{$i}",
@@ -29,7 +29,7 @@ test('GET /api/v1/stashes/{id}/items paginates with limit/offset and reports tot
         );
         $stashItems->create(
             stashId: $stashId,
-            mediaItemId: MediaItemId::parse((string) $mediaItem->id),
+            itemId: ItemId::parse((string) $item->id),
             position: $i,
         );
     }
@@ -71,10 +71,10 @@ test('GET /api/v1/stashes/{id}/items caps limit at 200', function (): void {
 
 test('GET /api/v1/items paginates with limit/offset and reports total', function (): void {
     $headers = $this->authHeaders();
-    $mediaItems = $this->container->get(MediaItemRepository::class);
+    $items = $this->container->get(ItemRepository::class);
 
     for ($i = 1; $i <= 5; $i++) {
-        $mediaItems->create(
+        $items->create(
             providerKey: 'fake',
             providerItemId: "vault-pagination-item-{$i}",
             canonicalUri: "fake://item/vault-pagination-item-{$i}",

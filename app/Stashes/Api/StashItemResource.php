@@ -7,24 +7,24 @@ namespace App\Stashes\Api;
 use App\Http\Api\ApiJson;
 use App\Stashes\StashItemRecord;
 use App\Support\DurationSeconds;
-use App\Vault\MediaItemRecord;
+use App\Vault\ItemRecord;
 
 final readonly class StashItemResource
 {
     public function __construct(
         private StashItemRecord $item,
-        private ?MediaItemRecord $mediaItem = null,
+        private ?ItemRecord $relatedItem = null,
         private ?int $totalAssetSizeBytes = null,
         private ?string $downloadFailureReason = null,
     ) {}
 
     public static function fromRecord(
         StashItemRecord $item,
-        ?MediaItemRecord $mediaItem = null,
+        ?ItemRecord $relatedItem = null,
         ?int $totalAssetSizeBytes = null,
         ?string $downloadFailureReason = null,
     ): self {
-        return new self($item, $mediaItem, $totalAssetSizeBytes, $downloadFailureReason);
+        return new self($item, $relatedItem, $totalAssetSizeBytes, $downloadFailureReason);
     }
 
     /** @return array<string, mixed> */
@@ -33,7 +33,7 @@ final readonly class StashItemResource
         return ApiJson::encode([
             'id' => (string) $this->item->id,
             'stashId' => (string) $this->item->stashId,
-            'mediaItemId' => (string) $this->item->mediaItemId,
+            'itemId' => (string) $this->item->itemId,
             'stashInputId' => $this->item->stashInputId === null ? null : (string) $this->item->stashInputId,
             'state' => $this->item->state->value,
             'position' => $this->item->position,
@@ -46,17 +46,17 @@ final readonly class StashItemResource
             'ignoredReason' => $this->item->ignoredReason,
             'createdAt' => $this->item->createdAt,
             'updatedAt' => $this->item->updatedAt,
-            'mediaItem' => $this->mediaItem === null ? null : [
-                'title' => $this->mediaItem->title,
-                'state' => $this->mediaItem->state->value,
-                'thumbnailUri' => $this->mediaItem->thumbnailUri,
-                'durationSeconds' => DurationSeconds::toSeconds($this->mediaItem->durationSeconds),
-                'contentType' => $this->mediaItem->contentType,
-                'publishedAt' => $this->mediaItem->publishedAt,
+            'item' => $this->relatedItem === null ? null : [
+                'title' => $this->relatedItem->title,
+                'state' => $this->relatedItem->state->value,
+                'thumbnailUri' => $this->relatedItem->thumbnailUri,
+                'durationSeconds' => DurationSeconds::toSeconds($this->relatedItem->durationSeconds),
+                'contentType' => $this->relatedItem->contentType,
+                'publishedAt' => $this->relatedItem->publishedAt,
                 'failureReason' => $this->downloadFailureReason,
-                'upstreamState' => $this->mediaItem->upstreamState->value,
-                'sizeBytes' => $this->mediaItem->sizeBytes,
-                'sizeEstimated' => $this->mediaItem->sizeEstimated,
+                'upstreamState' => $this->relatedItem->upstreamState->value,
+                'sizeBytes' => $this->relatedItem->sizeBytes,
+                'sizeEstimated' => $this->relatedItem->sizeEstimated,
             ],
             'totalAssetSizeBytes' => $this->totalAssetSizeBytes,
         ]);

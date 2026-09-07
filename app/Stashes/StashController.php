@@ -21,8 +21,8 @@ use App\Support\Http\QueryPagination;
 use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventService;
 use App\Vault\AssetRepository;
-use App\Vault\MediaItemState;
-use App\Vault\MediaItemRepository;
+use App\Vault\ItemState;
+use App\Vault\ItemRepository;
 use Tempest\Database\Direction;
 use Tempest\DateTime\DateTime;
 use Tempest\Http\Request;
@@ -45,7 +45,7 @@ final readonly class StashController
         private UpdateStashInputOptions $inputOptions,
         private ActivityEventService $activity,
         private AssetRepository $assets,
-        private MediaItemRepository $mediaItems,
+        private ItemRepository $items,
         private JobRepository $jobs,
         private JobDispatcher $jobDispatcher,
     ) {}
@@ -57,7 +57,7 @@ final readonly class StashController
             'stashes' => array_map(
                 function ($stash): array {
                     $items = $this->stashItems->listForStash(StashId::fromPrimaryKey($stash->id));
-                    $sizes = $this->assets->totalSizeBytesByMediaItem(array_map(static fn($item): string => (string) $item->mediaItemId, $items));
+                    $sizes = $this->assets->totalSizeBytesByItem(array_map(static fn($item): string => (string) $item->itemId, $items));
 
                     return StashResource::fromRecord($stash, [
                         'itemCount' => count($items),
@@ -256,11 +256,11 @@ final readonly class StashController
         $search = is_string($rawSearch) ? trim($rawSearch) : '';
 
         $rawStatus = $request->get('status');
-        $status = is_string($rawStatus) ? MediaItemState::tryFrom($rawStatus) : null;
+        $status = is_string($rawStatus) ? ItemState::tryFrom($rawStatus) : null;
 
         $rawIncludeIgnored = $request->get('include_ignored');
         $includeIgnored = ! (is_string($rawIncludeIgnored) && $rawIncludeIgnored === 'false');
-        if ($status === MediaItemState::Ignored) {
+        if ($status === ItemState::Ignored) {
             $includeIgnored = true;
         }
 
@@ -287,21 +287,21 @@ final readonly class StashController
             direction: $direction,
         );
 
-        $mediaItemIds = array_values(array_unique(array_map(
-            static fn($item): string => (string) $item->mediaItemId,
+        $itemIds = array_values(array_unique(array_map(
+            static fn($item): string => (string) $item->itemId,
             $stashItems,
         )));
 
-        $totalSizeByMediaItem = $this->assets->totalSizeBytesByMediaItem($mediaItemIds);
-        $downloadFailureByMediaItem = $this->jobs->latestDownloadFailureByMediaItem($mediaItemIds);
+        $totalSizeByItem = $this->assets->totalSizeBytesByItem($itemIds);
+        $downloadFailureByItem = $this->jobs->latestDownloadFailureByItem($itemIds);
 
         return new Json([
             'items' => array_map(
                 static fn($item): array => StashItemResource::fromRecord(
                     $item,
-                    $item->mediaItem,
-                    $totalSizeByMediaItem[(string) $item->mediaItemId] ?? null,
-                    $downloadFailureByMediaItem[(string) $item->mediaItemId] ?? null,
+                    $item->item,
+                    $totalSizeByItem[(string) $item->itemId] ?? null,
+                    $downloadFailureByItem[(string) $item->itemId] ?? null,
                 )->toArray(),
                 $stashItems,
             ),
@@ -422,27 +422,27 @@ final readonly class StashController
         }
 
         $stashId = StashId::fromPrimaryKey($stash->id);
-        $mediaItemIds = [];
+        $itemIds = [];
 
-        foreach ($this->stashItems->listForStash($stashId) as $item) {
-            $mediaItem = $this->mediaItems->find($item->mediaItemId);
+        foreach ($this->stashItems->listForStash($stashId) as $stashItem) {
+            $item = $this->items->find($stashItem->itemId);
 
-            if ($mediaItem?->state === MediaItemState::Failed) {
-                $mediaItem->state = MediaItemState::DownloadPending;
-                $this->mediaItems->save($mediaItem);
-                $mediaItemIds[(string) $item->mediaItemId] = true;
+            if ($item?->state === ItemState::Failed) {
+                $item->state = ItemState::DownloadPending;
+                $this->items->save($item);
+                $itemIds[(string) $stashItem->itemId] = true;
             }
         }
 
         $jobs = [];
 
-        foreach (array_keys($mediaItemIds) as $mediaItemId) {
+        foreach (array_keys($itemIds) as $itemId) {
             $jobs[] = $this->jobDispatcher->dispatch(
                 type: 'core.download',
-                entityType: 'media_item',
-                entityId: $mediaItemId,
+                entityType: 'item',
+                entityId: $itemId,
                 stashId: $stashId->toString(),
-                payload: ['media_item_id' => $mediaItemId, 'stash_id' => $stashId->toString(), 'force' => false],
+                payload: ['item_id' => $itemId, 'stash_id' => $stashId->toString(), 'force' => false],
                 workload: 'background',
             );
         }

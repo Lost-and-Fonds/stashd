@@ -81,7 +81,7 @@ function jobTypeLabel(type: string) {
 
 function entityLabel(job: JobApiResource) {
   if (job.entity_type === 'stash') return stashes.value.find(stash => stash.id === job.entity_id)?.name ?? 'Stash'
-  if (job.entity_type === 'media_item') return itemsById.value[job.entity_id ?? '']?.media_item?.title ?? 'Media item'
+  if (job.entity_type === 'item') return itemsById.value[job.entity_id ?? '']?.item?.title ?? 'Item'
   if (job.entity_type === 'broadcast') return broadcastsById.value[job.entity_id ?? '']?.name ?? 'Broadcast'
   if (job.entity_type === 'stash_input') return inputsById.value[job.entity_id ?? '']?.title ?? 'Input'
   return [job.entity_type, job.entity_id].filter(Boolean).join(' · ') || 'Recent job'
@@ -92,7 +92,7 @@ function stashLabel(stashId: string) {
 }
 
 function activityContext(event: ActivityApiResource) {
-  if (event.media_item_id) return itemsById.value[event.media_item_id]?.media_item?.title ?? 'Media item'
+  if (event.item_id) return itemsById.value[event.item_id]?.item?.title ?? 'Item'
   if (event.broadcast_id) return broadcastsById.value[event.broadcast_id]?.name ?? 'Broadcast'
   if (event.entity_type === 'stash_input') return inputsById.value[event.entity_id ?? '']?.title ?? 'Input'
   if (event.stash_id) return stashLabel(event.stash_id)
@@ -185,7 +185,7 @@ async function loadContext() {
     ])
     return { items: items.items, inputs, broadcasts }
   }))
-  itemsById.value = Object.fromEntries(resources.flatMap(resource => resource.items.map(item => [item.media_item_id, item])))
+  itemsById.value = Object.fromEntries(resources.flatMap(resource => resource.items.map(item => [item.item_id, item])))
   inputsById.value = Object.fromEntries(resources.flatMap(resource => resource.inputs.map(input => [input.id, input])))
   broadcastsById.value = Object.fromEntries(resources.flatMap(resource => resource.broadcasts.map(broadcast => [broadcast.id, broadcast])))
 }

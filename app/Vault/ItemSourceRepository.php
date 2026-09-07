@@ -12,23 +12,23 @@ use Tempest\DateTime\Timezone;
 
 use function Tempest\Database\query;
 
-final class MediaItemSourceRepository
+final class ItemSourceRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
     ) {}
 
     public function create(
-        MediaItemId $mediaItemId,
+        ItemId $itemId,
         string $providerKey,
         string $providerInputId,
         string $discoveredUri,
         ?StashInputId $stashInputId = null,
         ?int $position = null,
-    ): MediaItemSourceRecord {
+    ): ItemSourceRecord {
         $id = $this->ids->generate('source')->toString();
-        $record = new MediaItemSourceRecord(
-            mediaItemId: $mediaItemId,
+        $record = new ItemSourceRecord(
+            itemId: $itemId,
             providerKey: $providerKey,
             providerInputId: $providerInputId,
             discoveredUri: $discoveredUri,
@@ -38,18 +38,18 @@ final class MediaItemSourceRepository
         );
         $record->id = new PrimaryKey($id);
 
-        query(MediaItemSourceRecord::class)->insert($record)->execute();
+        query(ItemSourceRecord::class)->insert($record)->execute();
 
         return $record;
     }
 
-    public function findForMediaItemAndInput(
-        MediaItemId $mediaItemId,
+    public function findForItemAndInput(
+        ItemId $itemId,
         StashInputId $stashInputId,
-    ): ?MediaItemSourceRecord {
-        /** @var MediaItemSourceRecord|null $source */
-        $source = MediaItemSourceRecord::select()
-            ->where('mediaItemId', $mediaItemId->toString())
+    ): ?ItemSourceRecord {
+        /** @var ItemSourceRecord|null $source */
+        $source = ItemSourceRecord::select()
+            ->where('itemId', $itemId->toString())
             ->where('stashInputId', $stashInputId->toString())
             ->first();
 
@@ -58,7 +58,7 @@ final class MediaItemSourceRepository
 
     public function deleteForStashInput(StashInputId $stashInputId): void
     {
-        query(MediaItemSourceRecord::class)
+        query(ItemSourceRecord::class)
             ->delete()
             ->where('stashInputId', $stashInputId->toString())
             ->execute();

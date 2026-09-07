@@ -13,7 +13,7 @@ final readonly class BroadcastPlannedSidecar
         public string $absolutePath,
         public string $content,
         public ?string $stashItemId = null,
-        public ?string $mediaItemId = null,
+        public ?string $itemId = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -24,7 +24,7 @@ final readonly class BroadcastPlannedSidecar
             'relative_path' => $this->relativePath,
             'absolute_path' => $this->absolutePath,
             'stash_item_id' => $this->stashItemId,
-            'media_item_id' => $this->mediaItemId,
+            'item_id' => $this->itemId,
         ];
     }
 }

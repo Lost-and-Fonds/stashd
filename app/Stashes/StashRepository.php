@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Stashes;
 
 use App\Support\PrefixedUlidGenerator;
-use App\Vault\MediaItemRepository;
-use App\Vault\MediaItemSourceRepository;
+use App\Vault\ItemRepository;
+use App\Vault\ItemSourceRepository;
 use Tempest\Database\Database;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
@@ -21,8 +21,8 @@ final class StashRepository
         private PrefixedUlidGenerator $ids,
         private StashItemRepository $stashItems,
         private StashInputRepository $stashInputs,
-        private MediaItemSourceRepository $mediaItemSources,
-        private MediaItemRepository $mediaItems,
+        private ItemSourceRepository $itemSources,
+        private ItemRepository $items,
         private Database $database,
     ) {}
 
@@ -133,10 +133,10 @@ final class StashRepository
 
     /**
      * Deletes the stash. `stash_items`, `stash_inputs`, and `broadcasts` cascade
-     * at the database level (see CreateDomainSchema); media item sources do not
+     * at the database level (see CreateDomainSchema); item sources do not
      * (their FK is ON DELETE SET NULL, not CASCADE, since they're meant to be
      * orphan-tracked rather than dropped by default), so they're deleted here
-     * explicitly. Deduped `media_items` and Vault originals are left intact.
+     * explicitly. Deduped `items` and Vault originals are left intact.
      *
      * Runs in a transaction: without it, a failure between the sources cleanup
      * and the stash row's own delete (e.g. a write-lock conflict with a
@@ -149,7 +149,7 @@ final class StashRepository
 
         $committed = $this->database->withinTransaction(function () use ($stash, $stashId): void {
             foreach ($this->stashInputs->listForStash($stashId) as $input) {
-                $this->mediaItemSources->deleteForStashInput(StashInputId::fromPrimaryKey($input->id));
+                $this->itemSources->deleteForStashInput(StashInputId::fromPrimaryKey($input->id));
             }
 
             $stash->delete();
@@ -161,7 +161,7 @@ final class StashRepository
     }
 
     /**
-     * For this stash's items, reports which media items are still referenced by
+     * For this stash's items, reports which items are still referenced by
      * other stashes (shared) versus which would become orphaned in the Vault.
      *
      * @return array{sharedItems: list<array<string, mixed>>, orphanedItems: list<array<string, mixed>>}
@@ -170,24 +170,24 @@ final class StashRepository
     {
         $stashId = StashId::fromPrimaryKey($stash->id);
 
-        $mediaItemIds = array_values(array_unique(array_map(
-            static fn(StashItemRecord $item): string => (string) $item->mediaItemId,
+        $itemIds = array_values(array_unique(array_map(
+            static fn(StashItemRecord $item): string => (string) $item->itemId,
             $this->stashItems->listForStash($stashId),
         )));
 
-        if ($mediaItemIds === []) {
+        if ($itemIds === []) {
             return ['sharedItems' => [], 'orphanedItems' => []];
         }
 
-        $otherStashIdsByMediaItemId = [];
+        $otherStashIdsByItemId = [];
 
-        foreach ($this->stashItems->listForMediaItemsExcludingStash($mediaItemIds, $stashId) as $otherItem) {
-            $otherStashIdsByMediaItemId[(string) $otherItem->mediaItemId][(string) $otherItem->stashId] = true;
+        foreach ($this->stashItems->listForItemsExcludingStash($itemIds, $stashId) as $otherItem) {
+            $otherStashIdsByItemId[(string) $otherItem->itemId][(string) $otherItem->stashId] = true;
         }
 
         $otherStashIds = [];
 
-        foreach ($otherStashIdsByMediaItemId as $idsByStashId) {
+        foreach ($otherStashIdsByItemId as $idsByStashId) {
             $otherStashIds += $idsByStashId;
         }
 
@@ -195,23 +195,23 @@ final class StashRepository
             static fn(StashRecord $stash): string => $stash->name,
             $this->listByIds(array_keys($otherStashIds)),
         );
-        $mediaItemsById = $this->mediaItems->listByIds($mediaItemIds);
+        $itemsById = $this->items->listByIds($itemIds);
 
         $sharedItems = [];
         $orphanedItems = [];
 
-        foreach ($mediaItemIds as $mediaItemId) {
-            $title = $mediaItemsById[$mediaItemId]->title ?? $mediaItemId;
-            $otherStashIds = array_keys($otherStashIdsByMediaItemId[$mediaItemId] ?? []);
+        foreach ($itemIds as $itemId) {
+            $title = $itemsById[$itemId]->title ?? $itemId;
+            $otherStashIds = array_keys($otherStashIdsByItemId[$itemId] ?? []);
 
             if ($otherStashIds === []) {
-                $orphanedItems[] = ['mediaItemId' => $mediaItemId, 'title' => $title];
+                $orphanedItems[] = ['itemId' => $itemId, 'title' => $title];
 
                 continue;
             }
 
             $sharedItems[] = [
-                'mediaItemId' => $mediaItemId,
+                'itemId' => $itemId,
                 'title' => $title,
                 'sharedWithStashes' => array_map(
                     static fn(string $otherStashId): array => ['id' => $otherStashId, 'name' => $stashNamesById[$otherStashId] ?? 'Unknown stash'],

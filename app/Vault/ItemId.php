@@ -6,7 +6,7 @@ namespace App\Vault;
 
 use App\Support\Ids\PrefixedId;
 
-final readonly class MediaItemId extends PrefixedId
+final readonly class ItemId extends PrefixedId
 {
     protected const string PREFIX = 'media';
 }

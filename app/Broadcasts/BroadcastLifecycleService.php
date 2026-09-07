@@ -87,7 +87,7 @@ final readonly class BroadcastLifecycleService
         $vaultSizeBytes = 0;
 
         foreach ($eligible as $stashItem) {
-            $vaultOriginal = $context->vaultOriginals[(string) $stashItem->mediaItemId] ?? null;
+            $vaultOriginal = $context->vaultOriginals[(string) $stashItem->itemId] ?? null;
             $vaultSizeBytes += $vaultOriginal->sizeBytes ?? 0;
 
         }
@@ -297,7 +297,7 @@ final readonly class BroadcastLifecycleService
     {
         $context = $this->contextFactory->build($broadcast);
         if ($onProgress !== null) {
-            $context = new BroadcastContext($context->broadcast, $context->stash, $context->stashItems, $context->mediaItems, $context->vaultOriginals, $context->stashInputs, $onProgress);
+            $context = new BroadcastContext($context->broadcast, $context->stash, $context->stashItems, $context->items, $context->vaultOriginals, $context->stashInputs, $onProgress);
         }
         $plugin = $this->resolvePlugin($context->broadcast->type);
         $plan ??= $plugin->plugin->plan($context);

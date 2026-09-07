@@ -90,7 +90,7 @@ The current semantic input types are channel, playlist, and video. The database 
 
 #### Stored Input state
 
-`stash_inputs` stores the Stash relationship, provider key, mapped input type, source URI, provider input ID, title, sync mode, per-input options, state, failure counters, and last/next check timestamps. Provider-specific cursor state is not currently stored as a separate cursor field. The present strategies restart discovery and deduplicate against existing `MediaItem`/`MediaItemSource` identity.
+`stash_inputs` stores the Stash relationship, provider key, mapped input type, source URI, provider input ID, title, sync mode, per-input options, state, failure counters, and last/next check timestamps. Provider-specific cursor state is not currently stored as a separate cursor field. The present strategies restart discovery and deduplicate against existing `Item`/`ItemSource` identity.
 
 `StashInputOptions` stores universal title include/exclude regexes and opaque provider option values. YouTube declares `include_shorts` and `include_live`; filtered candidates are retained as ignored Stash Items with reasons rather than silently deleted.
 
@@ -121,7 +121,7 @@ item.download
   → yt-dlp/ytdlphp extraction and download
   → normalized original + metadata/source sidecars
   → Stashd validation and Vault ingest
-  → Asset rows and MediaItem state transition
+  → Asset rows and Item state transition
 ```
 
 The plugin-shaped semantic question is therefore not “may a provider write to Vault?” It is “does a provider describe an acquisition that core performs, or does it stream acquisition bytes through a granted staging capability?” The existing design strongly favours the former for ordinary network media: provider code describes source identity and acquisition policy; Stashd owns temp staging, Vault ingest, checksum, provenance, and state transitions.
@@ -190,13 +190,13 @@ The former shared PHP base class was useful migration evidence, not proof that t
 
 ### Contribution
 
-The plugin contributes candidate discovery, optional metadata enrichment, provider-specific filter declarations, incremental continuation state, and an acquisition description. For URL-like sources such as YouTube it may also contribute source recognition/resolution. That is optional: upload, watched-folder, scanner, and capture-device Inputs may be explicitly selected and configured without recognising a source reference. The plugin should not own Stash creation, MediaItem deduplication, filtering policy, download policy, or Vault promotion.
+The plugin contributes candidate discovery, optional metadata enrichment, provider-specific filter declarations, incremental continuation state, and an acquisition description. For URL-like sources such as YouTube it may also contribute source recognition/resolution. That is optional: upload, watched-folder, scanner, and capture-device Inputs may be explicitly selected and configured without recognising a source reference. The plugin should not own Stash creation, Item deduplication, filtering policy, download policy, or Vault promotion.
 
 ### Configuration and state
 
 - **Installation-wide:** optional Data API credential and provider defaults/policy.
 - **Per Input:** source/configuration identity, optional resolved source identity, input type, sync mode, filters, and opaque provider continuation state if the provider truly needs it.
-- **Authoritative PHP state:** Input identity, source URI, provider/item identity, candidate Items, source relationships, filters, sync timestamps, errors, MediaItem state, download policy, Assets, and preservation history.
+- **Authoritative PHP state:** Input identity, source URI, provider/item identity, candidate Items, source relationships, filters, sync timestamps, errors, Item state, download policy, Assets, and preservation history.
 - **Opaque plugin state:** only the minimum continuation token, remote snapshot marker, or provider cursor needed between invocations. PHP stores it and passes it back; the Rust host owns none of it.
 
 ### Invocation grants and external access

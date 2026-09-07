@@ -6,8 +6,8 @@ namespace App\Broadcasts;
 
 use App\Stashes\StashItemId;
 use App\Stashes\StashItemRecord;
-use App\Vault\MediaItemId;
-use App\Vault\MediaItemRecord;
+use App\Vault\ItemId;
+use App\Vault\ItemRecord;
 use Tempest\Database\BelongsTo;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
@@ -27,13 +27,13 @@ final class BroadcastItemRecord
     #[BelongsTo(ownerJoin: 'stashItemId')]
     public StashItemRecord $stashItem;
 
-    #[BelongsTo(ownerJoin: 'mediaItemId')]
-    public MediaItemRecord $mediaItem;
+    #[BelongsTo(ownerJoin: 'itemId')]
+    public ItemRecord $item;
 
     public function __construct(
         public BroadcastId $broadcastId,
         public StashItemId $stashItemId,
-        public MediaItemId $mediaItemId,
+        public ItemId $itemId,
         public BroadcastItemState $state,
         public ?string $publishedPath = null,
         public ?string $publishedUri = null,

@@ -13,7 +13,7 @@ export interface JobLiveEvent {
   entityType?: string | null
   entityId?: string | null
   stashId?: string | null
-  mediaItemId?: string | null
+  itemId?: string | null
   progressCurrent?: number | null
   progressTotal?: number | null
   progressPercent?: number | null
@@ -39,13 +39,13 @@ export interface ActivityLiveEvent {
   entityType?: string | null
   entityId?: string | null
   stashId?: string | null
-  mediaItemId?: string | null
+  itemId?: string | null
   broadcastId?: string | null
   jobId?: string | null
   entity_type?: string | null
   entity_id?: string | null
   stash_id?: string | null
-  media_item_id?: string | null
+  item_id?: string | null
   broadcast_id?: string | null
   job_id?: string | null
   [key: string]: unknown

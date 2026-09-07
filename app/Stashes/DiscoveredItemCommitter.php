@@ -10,15 +10,15 @@ use App\Providers\ProviderDates;
 use App\Providers\ResolvedInput;
 use App\Providers\StashdUri;
 use App\Support\DurationSeconds;
-use App\Vault\MediaItemId;
-use App\Vault\MediaItemRepository;
-use App\Vault\MediaItemSourceRepository;
+use App\Vault\ItemId;
+use App\Vault\ItemRepository;
+use App\Vault\ItemSourceRepository;
 use App\Vault\UpstreamState;
 
 use function Tempest\Support\str;
 
 /**
- * Persists a discovery result into a stash input: creates the media items,
+ * Persists a discovery result into a stash input: creates the items,
  * sources and stash items that are missing, and reports what was new.
  *
  * Sole owner of "what counts as an item we already have" -- both the initial
@@ -30,8 +30,8 @@ use function Tempest\Support\str;
 final readonly class DiscoveredItemCommitter
 {
     public function __construct(
-        private MediaItemRepository $mediaItems,
-        private MediaItemSourceRepository $mediaItemSources,
+        private ItemRepository $items,
+        private ItemSourceRepository $itemSources,
         private StashItemRepository $stashItems,
         private StashInputFilter $inputFilter,
     ) {}
@@ -48,21 +48,21 @@ final readonly class DiscoveredItemCommitter
         ?StashInputOptions $inputOptions,
         array $declaredInputOptions,
     ): DiscoveredItemCommitCounts {
-        $mediaItemsCreated = 0;
-        $mediaItemsReused = 0;
+        $itemsCreated = 0;
+        $itemsReused = 0;
         $stashItemsCreated = 0;
         $stashItemsReused = 0;
 
-        /** @var list<string> $downloadableMediaItemIds */
-        $downloadableMediaItemIds = [];
+        /** @var list<string> $downloadableItemIds */
+        $downloadableItemIds = [];
 
-        foreach ($discoveredItems as $index => $item) {
+        foreach ($discoveredItems as $index => $discoveredItem) {
 
-            $providerItemId = str(ApiJson::string($item['provider_item_id'] ?? null))->trim()->toString();
-            $canonicalUriRaw = str(ApiJson::string($item['canonical_uri'] ?? null))->trim()->toString();
-            $title = str(ApiJson::string($item['title'] ?? null, 'Untitled'))->trim()->toString();
-            $description = is_string($item['description'] ?? null) && str($item['description'])->trim()->isNotEmpty()
-                ? str($item['description'])->trim()->toString()
+            $providerItemId = str(ApiJson::string($discoveredItem['provider_item_id'] ?? null))->trim()->toString();
+            $canonicalUriRaw = str(ApiJson::string($discoveredItem['canonical_uri'] ?? null))->trim()->toString();
+            $title = str(ApiJson::string($discoveredItem['title'] ?? null, 'Untitled'))->trim()->toString();
+            $description = is_string($discoveredItem['description'] ?? null) && str($discoveredItem['description'])->trim()->isNotEmpty()
+                ? str($discoveredItem['description'])->trim()->toString()
                 : null;
 
             if ($providerItemId === '' || $canonicalUriRaw === '') {
@@ -71,69 +71,69 @@ final readonly class DiscoveredItemCommitter
 
             $canonicalUri = StashdUri::parse($canonicalUriRaw);
 
-            $existingMedia = $this->mediaItems->findByProviderIdentity($resolved->providerKey, $providerItemId);
+            $existingMedia = $this->items->findByProviderIdentity($resolved->providerKey, $providerItemId);
 
             if ($existingMedia === null) {
-                $mediaItem = $this->mediaItems->create(
+                $item = $this->items->create(
                     providerKey: $resolved->providerKey,
                     providerItemId: $providerItemId,
                     canonicalUri: $canonicalUri,
                     title: $title,
                     description: $description,
-                    durationSeconds: ApiJson::integer($item['duration_seconds'] ?? null),
-                    publishedAt: ProviderDates::tryParse(is_string($item['published_at'] ?? null) ? $item['published_at'] : null),
-                    thumbnailUri: is_string($item['thumbnail_uri'] ?? null) && str($item['thumbnail_uri'])->trim()->isNotEmpty()
-                    ? StashdUri::parse(str($item['thumbnail_uri'])->trim()->toString())
+                    durationSeconds: ApiJson::integer($discoveredItem['duration_seconds'] ?? null),
+                    publishedAt: ProviderDates::tryParse(is_string($discoveredItem['published_at'] ?? null) ? $discoveredItem['published_at'] : null),
+                    thumbnailUri: is_string($discoveredItem['thumbnail_uri'] ?? null) && str($discoveredItem['thumbnail_uri'])->trim()->isNotEmpty()
+                    ? StashdUri::parse(str($discoveredItem['thumbnail_uri'])->trim()->toString())
                     : null,
-                    contentType: is_string($item['content_type'] ?? null) ? $item['content_type'] : null,
-                    sizeBytes: ApiJson::integer($item['size_bytes'] ?? null),
-                    sizeEstimated: (bool) ($item['size_estimated'] ?? false),
-                    upstreamState: UpstreamState::tryFrom(ApiJson::string($item['upstream_state'] ?? null)) ?? UpstreamState::Available,
+                    contentType: is_string($discoveredItem['content_type'] ?? null) ? $discoveredItem['content_type'] : null,
+                    sizeBytes: ApiJson::integer($discoveredItem['size_bytes'] ?? null),
+                    sizeEstimated: (bool) ($discoveredItem['size_estimated'] ?? false),
+                    upstreamState: UpstreamState::tryFrom(ApiJson::string($discoveredItem['upstream_state'] ?? null)) ?? UpstreamState::Available,
                 );
-                $mediaItemsCreated++;
+                $itemsCreated++;
             } else {
-                $mediaItem = $existingMedia;
-                $mediaItemsReused++;
+                $item = $existingMedia;
+                $itemsReused++;
                 $changed = false;
 
-                $upstreamState = UpstreamState::tryFrom(ApiJson::string($item['upstream_state'] ?? null));
+                $upstreamState = UpstreamState::tryFrom(ApiJson::string($discoveredItem['upstream_state'] ?? null));
 
-                if ($upstreamState !== null && $mediaItem->upstreamState !== $upstreamState) {
-                    $mediaItem->upstreamState = $upstreamState;
+                if ($upstreamState !== null && $item->upstreamState !== $upstreamState) {
+                    $item->upstreamState = $upstreamState;
                     $changed = true;
                 }
 
-                if ($mediaItem->sizeBytes === null && isset($item['size_bytes'])) {
-                    $mediaItem->sizeBytes = ApiJson::integer($item['size_bytes']);
-                    $mediaItem->sizeEstimated = (bool) ($item['size_estimated'] ?? false);
+                if ($item->sizeBytes === null && isset($discoveredItem['size_bytes'])) {
+                    $item->sizeBytes = ApiJson::integer($discoveredItem['size_bytes']);
+                    $item->sizeEstimated = (bool) ($discoveredItem['size_estimated'] ?? false);
                     $changed = true;
                 }
 
-                if ($mediaItem->publishedAt === null && is_string($item['published_at'] ?? null)) {
-                    $mediaItem->publishedAt = ProviderDates::tryParse($item['published_at']);
-                    $changed = $mediaItem->publishedAt !== null || $changed;
+                if ($item->publishedAt === null && is_string($discoveredItem['published_at'] ?? null)) {
+                    $item->publishedAt = ProviderDates::tryParse($discoveredItem['published_at']);
+                    $changed = $item->publishedAt !== null || $changed;
                 }
 
-                if ($mediaItem->durationSeconds === null && isset($item['duration_seconds'])) {
-                    $mediaItem->durationSeconds = DurationSeconds::toDuration(ApiJson::integer($item['duration_seconds']));
+                if ($item->durationSeconds === null && isset($discoveredItem['duration_seconds'])) {
+                    $item->durationSeconds = DurationSeconds::toDuration(ApiJson::integer($discoveredItem['duration_seconds']));
                     $changed = true;
                 }
 
-                if ($mediaItem->thumbnailUri === null && is_string($item['thumbnail_uri'] ?? null)) {
-                    $mediaItem->thumbnailUri = $item['thumbnail_uri'];
+                if ($item->thumbnailUri === null && is_string($discoveredItem['thumbnail_uri'] ?? null)) {
+                    $item->thumbnailUri = $discoveredItem['thumbnail_uri'];
                     $changed = true;
                 }
 
                 if ($changed) {
-                    $this->mediaItems->save($mediaItem);
+                    $this->items->save($item);
                 }
             }
 
-            $mediaItemId = MediaItemId::fromPrimaryKey($mediaItem->id);
+            $itemId = ItemId::fromPrimaryKey($item->id);
 
-            if ($this->mediaItemSources->findForMediaItemAndInput($mediaItemId, $stashInputId) === null) {
-                $this->mediaItemSources->create(
-                    mediaItemId: $mediaItemId,
+            if ($this->itemSources->findForItemAndInput($itemId, $stashInputId) === null) {
+                $this->itemSources->create(
+                    itemId: $itemId,
                     providerKey: $resolved->providerKey,
                     providerInputId: $resolved->providerInputId,
                     discoveredUri: $canonicalUri->toString(),
@@ -142,13 +142,13 @@ final readonly class DiscoveredItemCommitter
                 );
             }
 
-            if ($this->stashItems->findByStashAndMediaItem($stashId, $mediaItemId) === null) {
-                $contentType = is_string($item['content_type'] ?? null) ? $item['content_type'] : null;
+            if ($this->stashItems->findByStashAndItem($stashId, $itemId) === null) {
+                $contentType = is_string($discoveredItem['content_type'] ?? null) ? $discoveredItem['content_type'] : null;
                 $ignoredReason = $this->inputFilter->ignoredReason($title, $contentType, $inputOptions, $declaredInputOptions);
 
                 $stashItem = $this->stashItems->create(
                     stashId: $stashId,
-                    mediaItemId: $mediaItemId,
+                    itemId: $itemId,
                     stashInputId: $stashInputId,
                     position: $index + 1,
                     ignoredReason: $ignoredReason,
@@ -156,8 +156,8 @@ final readonly class DiscoveredItemCommitter
                 );
                 $stashItemsCreated++;
 
-                if ($stashItem->state !== StashItemState::Ignored && $mediaItem->upstreamState === UpstreamState::Available) {
-                    $downloadableMediaItemIds[] = $mediaItemId->toString();
+                if ($stashItem->state !== StashItemState::Ignored && $item->upstreamState === UpstreamState::Available) {
+                    $downloadableItemIds[] = $itemId->toString();
                 }
             } else {
                 $stashItemsReused++;
@@ -165,11 +165,11 @@ final readonly class DiscoveredItemCommitter
         }
 
         return new DiscoveredItemCommitCounts(
-            mediaItemsCreated: $mediaItemsCreated,
-            mediaItemsReused: $mediaItemsReused,
+            itemsCreated: $itemsCreated,
+            itemsReused: $itemsReused,
             stashItemsCreated: $stashItemsCreated,
             stashItemsReused: $stashItemsReused,
-            downloadableMediaItemIds: $downloadableMediaItemIds,
+            downloadableItemIds: $downloadableItemIds,
         );
     }
 }

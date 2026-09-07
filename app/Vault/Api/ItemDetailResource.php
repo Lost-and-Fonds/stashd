@@ -11,9 +11,9 @@ use App\Stashes\Api\StashResource;
 use App\Stashes\StashRecord;
 use App\Support\DurationSeconds;
 use App\Vault\AssetRecord;
-use App\Vault\MediaItemRecord;
+use App\Vault\ItemRecord;
 
-final readonly class MediaItemDetailResource
+final readonly class ItemDetailResource
 {
     /**
      * @param list<AssetRecord> $assets
@@ -22,7 +22,7 @@ final readonly class MediaItemDetailResource
      * @param array<string, mixed>|null $pluginMetadata
      */
     public function __construct(
-        private MediaItemRecord $item,
+        private ItemRecord $item,
         private array $assets,
         private array $stashes,
         private array $broadcasts,
@@ -37,7 +37,7 @@ final readonly class MediaItemDetailResource
      * @param array<string, mixed>|null $pluginMetadata
      */
     public static function fromRecord(
-        MediaItemRecord $item,
+        ItemRecord $item,
         array $assets,
         array $stashes,
         array $broadcasts,
@@ -51,7 +51,7 @@ final readonly class MediaItemDetailResource
     public function toArray(): array
     {
         return ApiJson::encode([
-            'item' => MediaItemResource::fromRecord($this->item)->toArray(),
+            'item' => ItemResource::fromRecord($this->item)->toArray(),
             'assets' => array_map(fn(AssetRecord $asset): array => $this->asset($asset), $this->assets),
             'stashes' => array_map(static fn(StashRecord $stash): array => StashResource::fromRecord($stash)->toArray(), $this->stashes),
             'broadcasts' => array_map(static fn(BroadcastRecord $broadcast): array => BroadcastResource::fromRecord($broadcast)->toArray(), $this->broadcasts),

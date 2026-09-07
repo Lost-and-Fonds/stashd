@@ -5,21 +5,21 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Stashes\RediscoverStash;
-use App\Vault\MediaItemId;
-use App\Vault\MediaItemRepository;
+use App\Vault\ItemId;
+use App\Vault\ItemRepository;
 
 test('rediscover fills missing discovery metadata without overwriting saved values', function (): void {
-    [, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('rediscover-metadata');
-    $mediaItems = $this->container->get(MediaItemRepository::class);
-    $mediaItem = $mediaItems->find(MediaItemId::parse($mediaItemId));
-    $mediaItem->description = null;
-    $mediaItem->durationSeconds = null;
-    $mediaItem->publishedAt = null;
-    $mediaItem->title = 'Saved title';
-    $mediaItems->save($mediaItem);
+    [, $stashId, $itemId] = $this->bootstrapFakeDownloadStash('rediscover-metadata');
+    $items = $this->container->get(ItemRepository::class);
+    $item = $items->find(ItemId::parse($itemId));
+    $item->description = null;
+    $item->durationSeconds = null;
+    $item->publishedAt = null;
+    $item->title = 'Saved title';
+    $items->save($item);
 
     $result = $this->container->get(RediscoverStash::class)->execute($stashId);
-    $reloaded = $mediaItems->find(MediaItemId::parse($mediaItemId));
+    $reloaded = $items->find(ItemId::parse($itemId));
 
     expect($result)->toMatchArray(['inputs' => 1, 'discovered' => 3, 'matched' => 3, 'updated' => 1, 'fields' => 3])
         ->and($reloaded->title)->toBe('Saved title')

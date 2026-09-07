@@ -16,8 +16,8 @@ use App\Stashes\StashRecord;
 use App\Stashes\StashState;
 use App\Vault\AssetRecord;
 use App\Vault\AssetState;
-use App\Vault\MediaItemRecord;
-use App\Vault\MediaItemState;
+use App\Vault\ItemRecord;
+use App\Vault\ItemState;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
@@ -38,9 +38,9 @@ final readonly class StateTransitionService
         return $this->apply($record, $record->state, $next, 'Stash item');
     }
 
-    public function transitionMediaItem(MediaItemRecord $record, MediaItemState $next): MediaItemRecord
+    public function transitionItem(ItemRecord $record, ItemState $next): ItemRecord
     {
-        return $this->apply($record, $record->state, $next, 'Media item');
+        return $this->apply($record, $record->state, $next, 'Item');
     }
 
     public function transitionAsset(AssetRecord $record, AssetState $next): AssetRecord

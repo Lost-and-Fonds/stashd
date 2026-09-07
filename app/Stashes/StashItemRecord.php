@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
-use App\Vault\MediaItemId;
-use App\Vault\MediaItemRecord;
+use App\Vault\ItemId;
+use App\Vault\ItemRecord;
 use Tempest\Database\BelongsTo;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
@@ -22,12 +22,12 @@ final class StashItemRecord
     #[BelongsTo(ownerJoin: 'stashId')]
     public StashRecord $stash;
 
-    #[BelongsTo(ownerJoin: 'mediaItemId')]
-    public MediaItemRecord $mediaItem;
+    #[BelongsTo(ownerJoin: 'itemId')]
+    public ItemRecord $item;
 
     public function __construct(
         public StashId $stashId,
-        public MediaItemId $mediaItemId,
+        public ItemId $itemId,
         public StashItemState $state,
         public ?StashInputId $stashInputId = null,
         public ?int $position = null,

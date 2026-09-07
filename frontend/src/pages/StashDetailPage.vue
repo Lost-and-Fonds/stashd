@@ -146,12 +146,12 @@ function operationStatus(operation: LifecycleOperation): 'active' | 'complete' |
 const failedItemCount = computed(() => items.value.status_counts?.failed ?? 0)
 const pendingDownloadCount = computed(() => (items.value.status_counts?.download_pending ?? 0) + (items.value.status_counts?.downloading ?? 0))
 const activeJobs = computed(() => jobs.value.filter(job => {
-  if (job.entity_type !== 'media_item' || !['processing', 'pending', 'retrying'].includes(job.state)) return false
-  return job.payload?.stash_id === stash.value?.id || items.value.items.some(item => item.media_item_id === job.entity_id)
+  if (job.entity_type !== 'item' || !['processing', 'pending', 'retrying'].includes(job.state)) return false
+  return job.payload?.stash_id === stash.value?.id || items.value.items.some(item => item.item_id === job.entity_id)
 }))
 const activeDownloadJobs = computed(() => jobs.value.filter(job => {
   if (job.type !== 'core.download' || !['processing', 'pending', 'retrying'].includes(job.state)) return false
-  return job.payload?.stash_id === stash.value?.id || items.value.items.some(item => item.media_item_id === job.entity_id)
+  return job.payload?.stash_id === stash.value?.id || items.value.items.some(item => item.item_id === job.entity_id)
 }))
 const queuedDownloadCount = computed(() => Math.max(items.value.downloadable_count ?? 0, pendingDownloadCount.value, activeDownloadJobs.value.length))
 watch([queuedDownloadCount, () => activeJobs.value.length], ([pending, active]) => {
@@ -168,7 +168,7 @@ const downloadOperation = computed(() => {
   if (activeJobs.value.length === 0 && pending === 0) return undefined
 
   const current = activeJobs.value.find(job => job.state === 'processing') ?? activeJobs.value[0]
-  const item = current ? items.value.items.find(candidate => candidate.media_item_id === current.entity_id) : undefined
+  const item = current ? items.value.items.find(candidate => candidate.item_id === current.entity_id) : undefined
   const stage = current
     ? [...new Set([current.progress_label, item ? itemTitle(item) : undefined].filter((value): value is string => Boolean(value)))].join(' · ') || undefined
     : undefined
@@ -295,8 +295,8 @@ function handleLiveEvent(event: LiveEvent) {
   }
 
   if (event.event === 'activity.created') {
-    const mediaItemId = event.payload.mediaItemId ?? event.payload.media_item_id
-    const matchesItem = mediaItemId !== undefined && items.value.items.some(item => item.media_item_id === mediaItemId)
+    const itemId = event.payload.itemId ?? event.payload.item_id
+    const matchesItem = itemId !== undefined && items.value.items.some(item => item.item_id === itemId)
     if ((event.payload.stashId ?? event.payload.stash_id) === stash.value?.id || matchesItem) scheduleRefresh()
     return
   }
@@ -308,10 +308,10 @@ function handleLiveEvent(event: LiveEvent) {
   const entityType = event.payload.entityType ?? event.payload.entity_type
   const entityId = event.payload.entityId ?? event.payload.entity_id
   const eventStashId = event.payload.stashId ?? event.payload.stash_id
-  const eventMediaItemId = event.payload.mediaItemId ?? event.payload.media_item_id
-    ?? (entityType === 'media_item' ? entityId : undefined)
+  const eventItemId = event.payload.itemId ?? event.payload.item_id
+    ?? (entityType === 'item' ? entityId : undefined)
   const matchesStash = entityType === 'stash' && entityId === stash.value?.id || eventStashId === stash.value?.id
-  const matchesItem = eventMediaItemId !== undefined && items.value.items.some(item => item.media_item_id === eventMediaItemId)
+  const matchesItem = eventItemId !== undefined && items.value.items.some(item => item.item_id === eventItemId)
 
   if (event.event.startsWith('job.')) {
     const nextJob: JobApiResource = {
@@ -325,9 +325,9 @@ function handleLiveEvent(event: LiveEvent) {
       progress_percent: event.payload.progressPercent ?? event.payload.progress_percent,
       progress_label: event.payload.progressLabel ?? event.payload.progress_label,
       last_error: event.payload.lastError ?? event.payload.last_error,
-      payload: typeof eventMediaItemId === 'string' || typeof eventStashId === 'string'
+      payload: typeof eventItemId === 'string' || typeof eventStashId === 'string'
         ? {
-            media_item_id: typeof eventMediaItemId === 'string' ? eventMediaItemId : null,
+            item_id: typeof eventItemId === 'string' ? eventItemId : null,
             stash_id: typeof eventStashId === 'string' ? eventStashId : null
           }
         : null
@@ -356,7 +356,7 @@ function handleLiveEvent(event: LiveEvent) {
   }
 
   if (matchesStash && (inputId || broadcastId)) {
-    if (entityType !== 'media_item' || event.event === 'job.completed' || event.event === 'job.failed') scheduleRefresh()
+    if (entityType !== 'item' || event.event === 'job.completed' || event.event === 'job.failed') scheduleRefresh()
     return
   }
 
@@ -395,15 +395,15 @@ async function copyPublishedUrl(broadcast: BroadcastApiResource) {
 }
 
 function itemTitle(item: StashItemApiResource) {
-  return item.display_title || item.media_item?.title || 'Untitled item'
+  return item.display_title || item.item?.title || 'Untitled item'
 }
 
 function itemState(item: StashItemApiResource) {
-  return item.state === 'ignored' ? 'ignored' : item.media_item?.state ?? item.state
+  return item.state === 'ignored' ? 'ignored' : item.item?.state ?? item.state
 }
 
 function itemDuration(item: StashItemApiResource) {
-  const seconds = item.media_item?.duration_seconds
+  const seconds = item.item?.duration_seconds
   if (seconds === null || seconds === undefined) return '—'
   if (seconds < 60) return `${seconds}s`
 
@@ -418,11 +418,11 @@ function itemDuration(item: StashItemApiResource) {
 function itemSize(item: StashItemApiResource) {
   const bytes = item.total_asset_size_bytes
   if (bytes === null || bytes === undefined || bytes <= 0) {
-    const estimate = item.media_item?.size_bytes
+    const estimate = item.item?.size_bytes
     if (estimate === null || estimate === undefined || estimate <= 0) return '—'
-    if (estimate < 1024 * 1024) return `${item.media_item?.size_estimated ? '~' : ''}${Math.round(estimate / 1024)} KB`
-    if (estimate < 1024 * 1024 * 1024) return `${item.media_item?.size_estimated ? '~' : ''}${(estimate / (1024 * 1024)).toFixed(1)} MB`
-    return `${item.media_item?.size_estimated ? '~' : ''}${(estimate / (1024 * 1024 * 1024)).toFixed(1)} GB`
+    if (estimate < 1024 * 1024) return `${item.item?.size_estimated ? '~' : ''}${Math.round(estimate / 1024)} KB`
+    if (estimate < 1024 * 1024 * 1024) return `${item.item?.size_estimated ? '~' : ''}${(estimate / (1024 * 1024)).toFixed(1)} MB`
+    return `${item.item?.size_estimated ? '~' : ''}${(estimate / (1024 * 1024 * 1024)).toFixed(1)} GB`
   }
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
@@ -430,14 +430,14 @@ function itemSize(item: StashItemApiResource) {
 }
 
 function itemThumbnail(item: StashItemApiResource) {
-  if (item.media_item?.thumbnail_uri) return h('img', { src: item.media_item.thumbnail_uri, alt: '', class: 'aspect-video w-14 shrink-0 rounded-md object-cover sm:w-16' })
+  if (item.item?.thumbnail_uri) return h('img', { src: item.item.thumbnail_uri, alt: '', class: 'aspect-video w-14 shrink-0 rounded-md object-cover sm:w-16' })
   return h('div', { class: 'flex aspect-video w-14 shrink-0 items-center justify-center rounded-md bg-elevated sm:w-16' }, [
     h(resolveComponent('UIcon'), { name: 'i-lucide-play', class: 'size-3.5 text-dimmed' })
   ])
 }
 
 function activeJobFor(item: StashItemApiResource) {
-  return jobs.value.find(job => job.entity_type === 'media_item' && job.entity_id === item.media_item_id && ['processing', 'pending', 'retrying'].includes(job.state))
+  return jobs.value.find(job => job.entity_type === 'item' && job.entity_id === item.item_id && ['processing', 'pending', 'retrying'].includes(job.state))
 }
 
 function sortItems(key: string) {
@@ -452,8 +452,8 @@ function sortHeader(label: string, key: string) {
 function itemStatusCell(item: StashItemApiResource) {
   const meta = item.state === 'ignored'
     ? statePresentation('ignored')
-    : item.media_item?.upstream_state && item.media_item.upstream_state !== 'available'
-    ? statePresentation(item.media_item.upstream_state)
+    : item.item?.upstream_state && item.item.upstream_state !== 'available'
+    ? statePresentation(item.item.upstream_state)
     : statePresentation(itemState(item))
   if (item.state === 'ignored') {
     return h('span', { class: ['inline-flex items-center gap-1.5', meta.text] }, '◌ ignored')
@@ -471,15 +471,15 @@ const itemColumns: TableColumn<StashItemApiResource>[] = [
     header: () => sortHeader('Title', 'title'),
     cell: ({ row }) => h('div', { class: 'flex items-center gap-2.5' }, [
       itemThumbnail(row.original),
-      h(resolveComponent('RouterLink'), { to: `/vault/${row.original.media_item_id}`, class: 'block whitespace-normal font-mono text-sm text-highlighted hover:text-primary' }, () => itemTitle(row.original))
+      h(resolveComponent('RouterLink'), { to: `/vault/${row.original.item_id}`, class: 'block whitespace-normal font-mono text-sm text-highlighted hover:text-primary' }, () => itemTitle(row.original))
     ])
   },
   {
     id: 'published',
     header: () => sortHeader('Published', 'published'),
-    cell: ({ row }) => row.original.media_item?.published_at
-      ? h(resolveComponent('UTooltip'), { text: absoluteTime(row.original.media_item.published_at) }, () =>
-        h('time', { datetime: row.original.media_item?.published_at, class: 'whitespace-nowrap font-mono text-xs text-dimmed' }, relativeDate(row.original.media_item?.published_at)))
+    cell: ({ row }) => row.original.item?.published_at
+      ? h(resolveComponent('UTooltip'), { text: absoluteTime(row.original.item.published_at) }, () =>
+        h('time', { datetime: row.original.item?.published_at, class: 'whitespace-nowrap font-mono text-xs text-dimmed' }, relativeDate(row.original.item?.published_at)))
       : h('span', { class: 'font-mono text-xs text-dimmed' }, '—')
   },
   { id: 'duration', header: () => sortHeader('Duration', 'duration'), cell: ({ row }) => h('span', { class: 'font-mono text-xs text-muted' }, itemDuration(row.original)) },
@@ -861,8 +861,8 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="space-y-2 md:hidden">
-          <RouterLink v-for="item in items.items" :key="item.id" :to="`/vault/${item.media_item_id}`" class="flex items-center gap-3 rounded-md bg-muted p-3 hover:bg-elevated">
-            <img v-if="item.media_item?.thumbnail_uri" :src="item.media_item.thumbnail_uri" alt="" class="aspect-video w-14 shrink-0 rounded-md object-cover" />
+          <RouterLink v-for="item in items.items" :key="item.id" :to="`/vault/${item.item_id}`" class="flex items-center gap-3 rounded-md bg-muted p-3 hover:bg-elevated">
+            <img v-if="item.item?.thumbnail_uri" :src="item.item.thumbnail_uri" alt="" class="aspect-video w-14 shrink-0 rounded-md object-cover" />
             <div v-else class="flex aspect-video w-14 shrink-0 items-center justify-center rounded-md bg-elevated"><UIcon name="i-lucide-play" class="size-3.5 text-dimmed" /></div>
             <div class="min-w-0 flex-1 space-y-1">
               <p class="truncate font-mono text-sm text-highlighted">{{ itemTitle(item) }}</p>
@@ -876,7 +876,7 @@ onBeforeUnmount(() => {
                 </template>
               </div>
               <p class="font-mono text-xs text-dimmed">
-                <time v-if="item.media_item?.published_at" :datetime="item.media_item.published_at">{{ relativeDate(item.media_item.published_at) }}</time>
+                <time v-if="item.item?.published_at" :datetime="item.item.published_at">{{ relativeDate(item.item.published_at) }}</time>
                 <template v-else>—</template>
                 · {{ itemDuration(item) }} · {{ itemSize(item) }}
               </p>

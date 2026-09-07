@@ -6,18 +6,18 @@ namespace App\Broadcasts\Api;
 
 use App\Broadcasts\BroadcastItemRecord;
 use App\Http\Api\ApiJson;
-use App\Vault\MediaItemRecord;
+use App\Vault\ItemRecord;
 
 final readonly class BroadcastItemResource
 {
     public function __construct(
         private BroadcastItemRecord $item,
-        private ?MediaItemRecord $mediaItem = null,
+        private ?ItemRecord $relatedItem = null,
     ) {}
 
-    public static function fromRecord(BroadcastItemRecord $item, ?MediaItemRecord $mediaItem = null): self
+    public static function fromRecord(BroadcastItemRecord $item, ?ItemRecord $relatedItem = null): self
     {
-        return new self($item, $mediaItem);
+        return new self($item, $relatedItem);
     }
 
     /** @return array<string, mixed> */
@@ -27,7 +27,7 @@ final readonly class BroadcastItemResource
             'id' => (string) $this->item->id,
             'broadcastId' => (string) $this->item->broadcastId,
             'stashItemId' => (string) $this->item->stashItemId,
-            'mediaItemId' => (string) $this->item->mediaItemId,
+            'itemId' => (string) $this->item->itemId,
             'state' => $this->item->state->value,
             'publishedPath' => $this->item->publishedPath,
             'publishedUri' => $this->item->publishedUri,
@@ -36,8 +36,8 @@ final readonly class BroadcastItemResource
             'lastError' => $this->item->lastError,
             'createdAt' => $this->item->createdAt,
             'updatedAt' => $this->item->updatedAt,
-            'mediaItem' => $this->mediaItem === null ? null : [
-                'title' => $this->mediaItem->title,
+            'item' => $this->relatedItem === null ? null : [
+                'title' => $this->relatedItem->title,
             ],
         ]);
     }

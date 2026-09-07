@@ -16,7 +16,7 @@ use Tempest\DateTime\Timezone;
 
 use function Tempest\Database\query;
 
-final class MediaItemRepository
+final class ItemRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
@@ -28,7 +28,7 @@ final class MediaItemRepository
         string $providerItemId,
         StashdUri|string $canonicalUri,
         string $title,
-        MediaItemState $state = MediaItemState::Discovered,
+        ItemState $state = ItemState::Discovered,
         ?string $description = null,
         ?int $durationSeconds = null,
         ?DateTime $publishedAt = null,
@@ -37,9 +37,9 @@ final class MediaItemRepository
         ?int $sizeBytes = null,
         bool $sizeEstimated = false,
         UpstreamState $upstreamState = UpstreamState::Available,
-    ): MediaItemRecord {
+    ): ItemRecord {
         $id = $this->ids->generate('media')->toString();
-        $record = new MediaItemRecord(
+        $record = new ItemRecord(
             providerKey: $providerKey,
             providerItemId: $providerItemId,
             canonicalUri: $canonicalUri instanceof StashdUri ? $canonicalUri->toString() : $canonicalUri,
@@ -59,20 +59,20 @@ final class MediaItemRepository
         $record->createdAt ??= $now;
         $record->updatedAt ??= $now;
 
-        query(MediaItemRecord::class)->insert($record)->execute();
+        query(ItemRecord::class)->insert($record)->execute();
 
         return $record;
     }
 
-    public function find(MediaItemId $id): ?MediaItemRecord
+    public function find(ItemId $id): ?ItemRecord
     {
-        return MediaItemRecord::findById($id->toPrimaryKey());
+        return ItemRecord::findById($id->toPrimaryKey());
     }
 
-    public function findByProviderIdentity(string $providerKey, string $providerItemId): ?MediaItemRecord
+    public function findByProviderIdentity(string $providerKey, string $providerItemId): ?ItemRecord
     {
-        /** @var MediaItemRecord|null $item */
-        $item = MediaItemRecord::select()
+        /** @var ItemRecord|null $item */
+        $item = ItemRecord::select()
             ->where('providerKey', $providerKey)
             ->where('providerItemId', $providerItemId)
             ->first();
@@ -80,7 +80,7 @@ final class MediaItemRepository
         return $item;
     }
 
-    public function save(MediaItemRecord $record): MediaItemRecord
+    public function save(ItemRecord $record): ItemRecord
     {
         $record->updatedAt = DateTime::now(Timezone::UTC);
         $record->save();
@@ -88,10 +88,10 @@ final class MediaItemRepository
         return $record;
     }
 
-    /** @return list<MediaItemRecord> */
+    /** @return list<ItemRecord> */
     public function list(?int $limit = null, ?int $offset = null): array
     {
-        $query = MediaItemRecord::select()
+        $query = ItemRecord::select()
             ->orderBy('createdAt', Direction::DESC);
 
         if ($limit !== null) {
@@ -102,7 +102,7 @@ final class MediaItemRepository
             $query->offset($offset);
         }
 
-        /** @var list<MediaItemRecord> $items */
+        /** @var list<ItemRecord> $items */
         $items = $query->all();
 
         return $items;
@@ -110,7 +110,7 @@ final class MediaItemRepository
 
     public function count(): int
     {
-        return MediaItemRecord::count()->execute();
+        return ItemRecord::count()->execute();
     }
 
     /** @return list<VaultItemSummary> */
@@ -122,15 +122,15 @@ final class MediaItemRepository
         $rows = $this->database->fetch(new Query(
             'SELECT m."id",
                 (SELECT a."kind" FROM "assets" a
-                    WHERE a."mediaItemId" = m."id" AND a."role" = ? AND a."state" = ?
+                    WHERE a."itemId" = m."id" AND a."role" = ? AND a."state" = ?
                     AND a."broadcastId" IS NULL AND a."broadcastItemId" IS NULL
                     ORDER BY a."createdAt" ASC LIMIT 1) AS kind,
                 (SELECT COALESCE(SUM(a."sizeBytes"), 0) FROM "assets" a
-                    WHERE a."mediaItemId" = m."id" AND a."role" IN (' . $placeholders . ')
+                    WHERE a."itemId" = m."id" AND a."role" IN (' . $placeholders . ')
                     AND a."state" = ? AND a."broadcastId" IS NULL AND a."broadcastItemId" IS NULL) AS preserved_size_bytes,
-                (SELECT COUNT(DISTINCT si."stashId") FROM "stash_items" si WHERE si."mediaItemId" = m."id") AS stash_count,
-                (SELECT COUNT(DISTINCT bi."broadcastId") FROM "broadcast_items" bi WHERE bi."mediaItemId" = m."id") AS broadcast_count
-             FROM "media_items" m'
+                (SELECT COUNT(DISTINCT si."stashId") FROM "stash_items" si WHERE si."itemId" = m."id") AS stash_count,
+                (SELECT COUNT(DISTINCT bi."broadcastId") FROM "broadcast_items" bi WHERE bi."itemId" = m."id") AS broadcast_count
+             FROM "items" m'
                 . ($where === [] ? '' : ' WHERE ' . implode(' AND ', $where))
                 . ' ORDER BY m."createdAt" DESC, m."id" DESC LIMIT ? OFFSET ?',
             [
@@ -182,7 +182,7 @@ final class MediaItemRepository
     {
         [$where, $bindings] = $this->vaultWhere($search, $kind);
         $row = $this->database->fetchFirst(new Query(
-            'SELECT COUNT(*) AS count FROM "media_items" m' . ($where === [] ? '' : ' WHERE ' . implode(' AND ', $where)),
+            'SELECT COUNT(*) AS count FROM "items" m' . ($where === [] ? '' : ' WHERE ' . implode(' AND ', $where)),
             $bindings,
         ));
 
@@ -196,7 +196,7 @@ final class MediaItemRepository
         $row = $this->database->fetchFirst(new Query(
             'SELECT COALESCE(SUM("sizeBytes"), 0) AS total
              FROM "assets"
-             WHERE "mediaItemId" IS NOT NULL AND "role" IN (' . $placeholders . ')
+             WHERE "itemId" IS NOT NULL AND "role" IN (' . $placeholders . ')
                 AND "state" = ? AND "broadcastId" IS NULL AND "broadcastItemId" IS NULL',
             [...$roles, AssetState::Ready->value],
         ));
@@ -206,7 +206,7 @@ final class MediaItemRepository
 
     /**
      * @param  list<string>  $ids
-     * @return array<string, MediaItemRecord> keyed by id
+     * @return array<string, ItemRecord> keyed by id
      */
     public function listByIds(array $ids): array
     {
@@ -216,8 +216,8 @@ final class MediaItemRepository
 
         $byId = [];
 
-        /** @var list<MediaItemRecord> $items */
-        $items = array_values(MediaItemRecord::select()->whereIn('id', $ids)->all());
+        /** @var list<ItemRecord> $items */
+        $items = array_values(ItemRecord::select()->whereIn('id', $ids)->all());
 
         foreach ($items as $item) {
             $byId[(string) $item->id] = $item;
@@ -238,7 +238,7 @@ final class MediaItemRepository
         }
 
         if ($kind !== null && $kind !== '') {
-            $where[] = 'EXISTS (SELECT 1 FROM "assets" a WHERE a."mediaItemId" = m."id" AND a."role" = ? AND a."state" = ? AND a."broadcastId" IS NULL AND a."broadcastItemId" IS NULL AND a."kind" = ?)';
+            $where[] = 'EXISTS (SELECT 1 FROM "assets" a WHERE a."itemId" = m."id" AND a."role" = ? AND a."state" = ? AND a."broadcastId" IS NULL AND a."broadcastItemId" IS NULL AND a."kind" = ?)';
             array_push($bindings, AssetRole::VaultOriginal->value, AssetState::Ready->value, $kind);
         }
 

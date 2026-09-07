@@ -8,7 +8,7 @@ final readonly class DownloadExecutionResult
 {
     /** @param list<string> $warnings */
     public function __construct(
-        public string $mediaItemId,
+        public string $itemId,
         public string $stashId,
         public bool $skipped,
         public int $assetsReady,
@@ -19,7 +19,7 @@ final readonly class DownloadExecutionResult
     public function toArray(): array
     {
         return [
-            'media_item_id' => $this->mediaItemId,
+            'item_id' => $this->itemId,
             'stash_id' => $this->stashId,
             'skipped' => $this->skipped,
             'assets_ready' => $this->assetsReady,

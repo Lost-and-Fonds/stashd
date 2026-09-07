@@ -28,7 +28,7 @@ final readonly class AssetResource
     {
         return ApiJson::encode([
             'id' => (string) $this->asset->id,
-            'mediaItemId' => $this->asset->mediaItemId === null ? null : (string) $this->asset->mediaItemId,
+            'itemId' => $this->asset->itemId === null ? null : (string) $this->asset->itemId,
             'broadcastId' => $this->asset->broadcastId === null ? null : (string) $this->asset->broadcastId,
             'role' => $this->asset->role->value,
             'kind' => $this->asset->kind->value,

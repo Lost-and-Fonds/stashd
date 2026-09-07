@@ -17,7 +17,7 @@ use RuntimeException;
  * Preflight only resolves identity and takes a cheap sample; this class re-runs
  * full discovery (the best available plugin capability) rather than replaying
  * preflight's frozen sample, then persists the
- * stash input, media items, sources, and stash items, deduplicating against
+ * stash input, items, sources, and stash items, deduplicating against
  * whatever the stash (and the wider Vault) already has.
  */
 final readonly class CreateStashFromDiscovery
@@ -96,11 +96,11 @@ final readonly class CreateStashFromDiscovery
         return new StashInputCommitResult(
             stashId: (string) $stash->id,
             stashInputId: (string) $stashInput->id,
-            mediaItemsCreated: $counts->mediaItemsCreated,
-            mediaItemsReused: $counts->mediaItemsReused,
+            itemsCreated: $counts->itemsCreated,
+            itemsReused: $counts->itemsReused,
             stashItemsCreated: $counts->stashItemsCreated,
             stashItemsReused: $counts->stashItemsReused,
-            downloadableMediaItemIds: $counts->downloadableMediaItemIds,
+            downloadableItemIds: $counts->downloadableItemIds,
         );
     }
 
@@ -109,9 +109,9 @@ final readonly class CreateStashFromDiscovery
         $stashId = StashId::fromPrimaryKey($stash->id);
 
         if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
-            foreach ($result->downloadableMediaItemIds as $mediaItemId) {
-                $this->jobDispatcher->dispatch('core.download', 'media_item', $mediaItemId, $stashId->toString(), [
-                    'media_item_id' => $mediaItemId,
+            foreach ($result->downloadableItemIds as $itemId) {
+                $this->jobDispatcher->dispatch('core.download', 'item', $itemId, $stashId->toString(), [
+                    'item_id' => $itemId,
                     'stash_id' => $stashId->toString(),
                 ], 'background');
             }

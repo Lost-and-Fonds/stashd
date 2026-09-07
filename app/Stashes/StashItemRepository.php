@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Stashes;
 
 use App\Support\PrefixedUlidGenerator;
-use App\Vault\MediaItemId;
-use App\Vault\MediaItemState;
+use App\Vault\ItemId;
+use App\Vault\ItemState;
 use Tempest\Database\Builder\QueryBuilders\CountQueryBuilder;
 use Tempest\Database\Builder\QueryBuilders\SelectQueryBuilder;
 use Tempest\Database\Database;
@@ -27,7 +27,7 @@ final class StashItemRepository
 
     public function create(
         StashId $stashId,
-        MediaItemId $mediaItemId,
+        ItemId $itemId,
         ?StashInputId $stashInputId = null,
         StashItemState $state = StashItemState::Active,
         ?int $position = null,
@@ -36,7 +36,7 @@ final class StashItemRepository
         $id = $this->ids->generate('item')->toString();
         $record = new StashItemRecord(
             stashId: $stashId,
-            mediaItemId: $mediaItemId,
+            itemId: $itemId,
             state: $state,
             stashInputId: $stashInputId,
             position: $position,
@@ -59,12 +59,12 @@ final class StashItemRepository
         return StashItemRecord::findById($id->toPrimaryKey());
     }
 
-    public function findByStashAndMediaItem(StashId $stashId, MediaItemId $mediaItemId): ?StashItemRecord
+    public function findByStashAndItem(StashId $stashId, ItemId $itemId): ?StashItemRecord
     {
         /** @var StashItemRecord|null $record */
         $record = StashItemRecord::select()
             ->where('stashId', $stashId->toString())
-            ->where('mediaItemId', $mediaItemId->toString())
+            ->where('itemId', $itemId->toString())
             ->first();
 
         return $record;
@@ -76,30 +76,30 @@ final class StashItemRepository
         ?int $limit = null,
         ?int $offset = null,
         ?string $search = null,
-        ?MediaItemState $status = null,
+        ?ItemState $status = null,
         bool $includeIgnored = true,
         string $sort = 'position',
         Direction $direction = Direction::ASC,
         ?StashInputId $stashInputId = null,
     ): array {
         $query = $this->filteredQuery($stashId, $search, $status, $includeIgnored)
-            ->with('mediaItem');
+            ->with('item');
 
         if ($stashInputId !== null) {
             $query->where('stashInputId', $stashInputId->toString());
         }
 
         match ($sort) {
-            'title' => $query->orderBy('media_items.title', $direction),
-            'published' => $query->orderBy('media_items.publishedAt', $direction),
-            'duration' => $query->orderBy('media_items.durationSeconds', $direction),
-            'status' => $query->orderBy('media_items.state', $direction),
-            // Asset size is a per-media-item aggregate across `assets`, not a
+            'title' => $query->orderBy('items.title', $direction),
+            'published' => $query->orderBy('items.publishedAt', $direction),
+            'duration' => $query->orderBy('items.durationSeconds', $direction),
+            'status' => $query->orderBy('items.state', $direction),
+            // Asset size is a per-item aggregate across `assets`, not a
             // plain column -- no join gives us that directly, so this is a
             // correlated subquery via the query builder's raw-order escape
             // hatch rather than a second join.
             'size' => $query->orderByRaw(
-                '(SELECT COALESCE(SUM("sizeBytes"), 0) FROM "assets" WHERE "assets"."mediaItemId" = "stash_items"."mediaItemId") ' . $direction->value,
+                '(SELECT COALESCE(SUM("sizeBytes"), 0) FROM "assets" WHERE "assets"."itemId" = "stash_items"."itemId") ' . $direction->value,
             ),
             default => $query->orderBy('position', $direction),
         };
@@ -127,14 +127,14 @@ final class StashItemRepository
     {
         /** @var list<array{id: string}> $rows */
         $rows = $this->database->fetch(new Query(
-            'SELECT "media_items"."id"
+            'SELECT "items"."id"
              FROM "stash_items"
-             JOIN "media_items" ON "media_items"."id" = "stash_items"."mediaItemId"
+             JOIN "items" ON "items"."id" = "stash_items"."itemId"
              WHERE "stash_items"."stashInputId" = ?
-               AND ("media_items"."description" IS NULL
-                    OR "media_items"."durationSeconds" IS NULL
-                    OR "media_items"."publishedAt" IS NULL
-                    OR "media_items"."thumbnailUri" IS NULL)
+               AND ("items"."description" IS NULL
+                    OR "items"."durationSeconds" IS NULL
+                    OR "items"."publishedAt" IS NULL
+                    OR "items"."thumbnailUri" IS NULL)
              LIMIT 1',
             [$stashInputId->toString()],
         ));
@@ -145,7 +145,7 @@ final class StashItemRepository
     public function countForStash(
         StashId $stashId,
         ?string $search = null,
-        ?MediaItemState $status = null,
+        ?ItemState $status = null,
         bool $includeIgnored = true,
     ): int {
         return CountQueryBuilder::fromQueryBuilder(
@@ -158,11 +158,11 @@ final class StashItemRepository
      * this is what backs the item table's status summary chips, which need
      * counts across the whole stash regardless of the current page/filter.
      *
-     * @return array<string, int> media item state (value) => count
+     * @return array<string, int> item state (value) => count
      */
     public function statusCountsForStash(StashId $stashId): array
     {
-        // Tried .with('mediaItem') + .raw() + .groupBy() first, to reuse the
+        // Tried .with('item') + .raw() + .groupBy() first, to reuse the
         // relation's join instead of hand-writing it -- doesn't work: .raw()
         // appends its fragment after the compiled GROUP BY clause, not into
         // the SELECT column list, and the builder always selects full model
@@ -174,11 +174,11 @@ final class StashItemRepository
         // stays fully relation-based; this is the deliberate exception.
         /** @var list<array{state: string, count: int}> $rows */
         $rows = $this->database->fetch(new Query(
-            'SELECT "media_items"."state" AS state, COUNT(*) AS count
+            'SELECT "items"."state" AS state, COUNT(*) AS count
              FROM "stash_items"
-             JOIN "media_items" ON "media_items"."id" = "stash_items"."mediaItemId"
+             JOIN "items" ON "items"."id" = "stash_items"."itemId"
              WHERE "stash_items"."stashId" = ?
-             GROUP BY "media_items"."state"',
+             GROUP BY "items"."state"',
             [$stashId->toString()],
         ));
 
@@ -197,10 +197,10 @@ final class StashItemRepository
         $rows = $this->database->fetch(new Query(
             'SELECT COUNT(*) AS count
              FROM "stash_items"
-             JOIN "media_items" ON "media_items"."id" = "stash_items"."mediaItemId"
+             JOIN "items" ON "items"."id" = "stash_items"."itemId"
              WHERE "stash_items"."stashId" = ?
                AND "stash_items"."state" <> ?
-               AND "media_items"."state" IN (?, ?, ?, ?)',
+               AND "items"."state" IN (?, ?, ?, ?)',
             [$stashId->toString(), StashItemState::Ignored->value, 'discovered', 'metadata_ready', 'download_pending', 'downloading'],
         ));
 
@@ -211,31 +211,31 @@ final class StashItemRepository
     private function filteredQuery(
         StashId $stashId,
         ?string $search,
-        ?MediaItemState $status,
+        ?ItemState $status,
         bool $includeIgnored,
     ): SelectQueryBuilder {
         $query = StashItemRecord::select()->where('stashId', $stashId->toString());
 
         if (! $includeIgnored) {
-            // Qualified: stash_items.state and media_items.state both exist
-            // once the mediaItem join is in play (added below by sort, or by
-            // listForStash's ->with('mediaItem')) -- unqualified `state` is
+            // Qualified: stash_items.state and items.state both exist
+            // once the item join is in play (added below by sort, or by
+            // listForStash's ->with('item')) -- unqualified `state` is
             // ambiguous SQL as soon as either applies.
             $query->whereNot('state', StashItemState::Ignored);
         }
 
         if ($search !== null && $search !== '') {
-            $query->whereHas('mediaItem', function (SelectQueryBuilder $mediaItemQuery) use ($search): void {
-                $mediaItemQuery->whereLike('title', '%' . $search . '%');
+            $query->whereHas('item', function (SelectQueryBuilder $itemQuery) use ($search): void {
+                $itemQuery->whereLike('title', '%' . $search . '%');
             });
         }
 
         if ($status !== null) {
-            if ($status === MediaItemState::Ignored) {
+            if ($status === ItemState::Ignored) {
                 $query->where('state', StashItemState::Ignored);
             } else {
-                $query->whereHas('mediaItem', function (SelectQueryBuilder $mediaItemQuery) use ($status): void {
-                    $mediaItemQuery->where('state', $status);
+                $query->whereHas('item', function (SelectQueryBuilder $itemQuery) use ($status): void {
+                    $itemQuery->where('state', $status);
                 });
             }
         }
@@ -244,29 +244,29 @@ final class StashItemRepository
     }
 
     /** @return list<StashItemRecord> */
-    public function listForMediaItem(MediaItemId $mediaItemId): array
+    public function listForItem(ItemId $itemId): array
     {
         /** @var list<StashItemRecord> $records */
         $records = StashItemRecord::select()
-            ->where('mediaItemId', $mediaItemId->toString())
+            ->where('itemId', $itemId->toString())
             ->all();
 
         return $records;
     }
 
     /**
-     * @param  list<string>  $mediaItemIds
+     * @param  list<string>  $itemIds
      * @return list<StashItemRecord>
      */
-    public function listForMediaItemsExcludingStash(array $mediaItemIds, StashId $excludingStashId): array
+    public function listForItemsExcludingStash(array $itemIds, StashId $excludingStashId): array
     {
-        if ($mediaItemIds === []) {
+        if ($itemIds === []) {
             return [];
         }
 
         /** @var list<StashItemRecord> $records */
         $records = StashItemRecord::select()
-            ->whereIn('mediaItemId', $mediaItemIds)
+            ->whereIn('itemId', $itemIds)
             ->whereNot('stashId', $excludingStashId->toString())
             ->all();
 

@@ -149,13 +149,13 @@ async function downloadFirstItemsForInput(page: Page, stashId: string, stashInpu
 	while (matched.length < count) {
 		const response = await resilientApiGet(page, `/api/v1/stashes/${stashId}/items?limit=${pageSize}&offset=${offset}&include_ignored=false`);
 		const body = (await apiJson(response)) as {
-			items: { stash_input_id: string | null; media_item_id: string }[];
+			items: { stash_input_id: string | null; item_id: string }[];
 			total: number;
 		};
 
 		for (const item of body.items) {
 			if (item.stash_input_id === stashInputId) {
-				matched.push(item.media_item_id);
+				matched.push(item.item_id);
 			}
 			if (matched.length >= count) break;
 		}
@@ -166,9 +166,9 @@ async function downloadFirstItemsForInput(page: Page, stashId: string, stashInpu
 
 	step('downloadFirstItemsForInput: dispatching item.download', `${matched.length} item(s): ${matched.join(', ')}`);
 
-	for (const mediaItemId of matched) {
+	for (const itemId of matched) {
 		await page.request.post('/api/v1/commands', {
-			data: { type: 'item.download', options: { media_item_id: mediaItemId, stash_id: stashId } },
+			data: { type: 'item.download', options: { item_id: itemId, stash_id: stashId } },
 		});
 	}
 	step('downloadFirstItemsForInput: done');
@@ -191,32 +191,32 @@ async function getLatestBroadcastId(page: Page, stashId: string): Promise<string
 // *correctly* stuck at "stale" forever -- most items legitimately have no
 // asset. Waiting for the whole broadcast to reach "ready" is therefore not a
 // valid completion signal here; instead poll the specific broadcast_items
-// for the media items actually downloaded, and wait for just those to reach
+// for the items actually downloaded, and wait for just those to reach
 // "ready" (proving the download -> transcode-fallback -> publish pipeline
 // worked), ignoring the (expected) failures on everything else.
 async function waitForBroadcastItemsReady(
 	page: Page,
 	broadcastId: string,
-	mediaItemIds: string[],
+	itemIds: string[],
 	timeoutMs: number,
-): Promise<{ ready: boolean; items: { media_item_id: string; state: string; last_error: string | null }[] }> {
+): Promise<{ ready: boolean; items: { item_id: string; state: string; last_error: string | null }[] }> {
 	const deadline = Date.now() + timeoutMs;
 	let lastLoggedSummary = '';
 
 	while (Date.now() < deadline) {
 		const response = await resilientApiGet(page, `/api/v1/broadcasts/${broadcastId}/items`);
 		const body = (await apiJson(response)) as {
-			items: { media_item_id: string; state: string; last_error: string | null }[];
+			items: { item_id: string; state: string; last_error: string | null }[];
 		};
-		const tracked = body.items.filter((item) => mediaItemIds.includes(item.media_item_id));
+		const tracked = body.items.filter((item) => itemIds.includes(item.item_id));
 
-		const summary = tracked.map((item) => `${item.media_item_id.slice(-8)}=${item.state}`).join(' ');
+		const summary = tracked.map((item) => `${item.item_id.slice(-8)}=${item.state}`).join(' ');
 		if (summary !== lastLoggedSummary) {
 			step('waitForBroadcastItemsReady: polled', summary);
 			lastLoggedSummary = summary;
 		}
 
-		if (tracked.length === mediaItemIds.length && tracked.every((item) => item.state === 'ready')) {
+		if (tracked.length === itemIds.length && tracked.every((item) => item.state === 'ready')) {
 			return { ready: true, items: tracked };
 		}
 
@@ -225,9 +225,9 @@ async function waitForBroadcastItemsReady(
 
 	const response = await page.request.get(`/api/v1/broadcasts/${broadcastId}/items`);
 	const body = (await apiJson(response)) as {
-		items: { media_item_id: string; state: string; last_error: string | null }[];
+		items: { item_id: string; state: string; last_error: string | null }[];
 	};
-	return { ready: false, items: body.items.filter((item) => mediaItemIds.includes(item.media_item_id)) };
+	return { ready: false, items: body.items.filter((item) => itemIds.includes(item.item_id)) };
 }
 
 async function createStashWithLink(page: Page, title: string, link?: string): Promise<string> {
@@ -355,8 +355,8 @@ async function waitForDownloads(page: Page, stashId: string, count: number, time
 		const pageSize = 200;
 		for (;;) {
 			const response = await resilientApiGet(page, `/api/v1/stashes/${stashId}/items?limit=${pageSize}&offset=${offset}`);
-			const body = (await apiJson(response)) as { items: { media_item?: { state: string | null } }[]; total: number };
-			readyCount += body.items.filter((item) => item.media_item?.state === 'ready').length;
+			const body = (await apiJson(response)) as { items: { item?: { state: string | null } }[]; total: number };
+			readyCount += body.items.filter((item) => item.item?.state === 'ready').length;
 			offset += pageSize;
 			if (offset >= body.total) break;
 		}
@@ -413,7 +413,7 @@ test('oculusimperia: video download + audio podcast broadcast (transcode fix acc
 	await addFollowUpInput(page, 'https://www.youtube.com/@oculusimperia');
 
 	const inputId = await getLatestInputId(page, stashId);
-	const downloadedMediaItemIds = await downloadFirstItemsForInput(page, stashId, inputId, ITEMS_PER_INPUT);
+	const downloadedItemIds = await downloadFirstItemsForInput(page, stashId, inputId, ITEMS_PER_INPUT);
 
 	await waitForDownloads(page, stashId, ITEMS_PER_INPUT, 10 * 60 * 1000);
 
@@ -429,7 +429,7 @@ test('oculusimperia: video download + audio podcast broadcast (transcode fix acc
 	// broadcast_items rather than waiting for the whole broadcast to go
 	// "ready" (which, under this test's own capped-download design, it can't).
 	const broadcastId = await getLatestBroadcastId(page, stashId);
-	const result = await waitForBroadcastItemsReady(page, broadcastId, downloadedMediaItemIds, 10 * 60 * 1000);
+	const result = await waitForBroadcastItemsReady(page, broadcastId, downloadedItemIds, 10 * 60 * 1000);
 
 	console.log('OCULUSIMPERIA DOWNLOADED-ITEM FINAL STATES:', JSON.stringify(result.items, null, 2));
 	expect(result.items.every((item) => item.last_error !== 'podcast_audio_transcode_pending')).toBe(true);
