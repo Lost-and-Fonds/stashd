@@ -15,6 +15,7 @@ final readonly class VaultStorageAvailability
         private FilesystemProbe $filesystem,
     ) {}
 
+    /** @phpstan-impure */
     public function isUnavailable(): bool
     {
         $vault = $this->locations->findByKey(StorageLocationKey::Vault);

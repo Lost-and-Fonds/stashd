@@ -33,13 +33,14 @@ final readonly class FixityStatusResolver
     }
 
     /** @param list<AssetRecord> $assets
+     * @param array<string, true>|null $verifyingIds
      * @return array<string, FixityStatus>
      */
-    public function forAssets(array $assets, ?DateTime $now = null): array
+    public function forAssets(array $assets, ?DateTime $now = null, ?array $verifyingIds = null): array
     {
         $assetIds = array_map(static fn(AssetRecord $asset): AssetId => AssetId::fromPrimaryKey($asset->id), $assets);
         $events = $this->events->latestForAssets($assetIds, PreservationEventType::FixityCheck);
-        $verifying = $this->jobs->pendingOrProcessingEntityIds(JobType::core('core.verify_vault'), 'asset');
+        $verifying = $verifyingIds ?? $this->jobs->pendingOrProcessingEntityIds(JobType::core('core.verify_vault'), 'asset');
         $now ??= DateTime::now(Timezone::UTC);
         $statuses = [];
 
