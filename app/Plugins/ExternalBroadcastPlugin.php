@@ -709,7 +709,11 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
             ];
         }
 
-        foreach (AssetRecord::select()->where('mediaItemId', (string) $media->id)->all() as $asset) {
+        foreach (AssetRecord::select()
+            ->where('mediaItemId', (string) $media->id)
+            ->whereNull('broadcastId')
+            ->whereNull('broadcastItemId')
+            ->all() as $asset) {
             if (! $asset instanceof AssetRecord || $asset->state !== AssetState::Ready || $asset->path === null) {
                 continue;
             }
