@@ -9,6 +9,7 @@ use App\Console\VerificationSchedulerTickCommand;
 use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastRepository;
 use App\Fixity\FixityStatus;
+use App\Fixity\FixityStatusResolver;
 use App\Fixity\PreservationEventRepository;
 use App\Fixity\PreservationEventType;
 use App\Fixity\PreservationOutcome;
@@ -46,7 +47,7 @@ test('candidate finder selects only unverified and due participating assets in d
     $now = DateTime::parse('2026-01-01T00:00:00Z', Timezone::UTC);
 
     $create = function (AssetRole $role, AssetState $state, ?DateTime $createdAt = null) use ($assets, $itemId, $checksum): \App\Vault\AssetRecord {
-        $asset = $assets->create($itemId, $role, AssetKind::Video, $state, checksum: $checksum);
+        $asset = $assets->create($itemId, $role, AssetKind::Video, $state, path: '/vault/' . $role->value, checksum: $checksum);
 
         if ($createdAt !== null) {
             $asset->createdAt = $createdAt;
@@ -87,6 +88,8 @@ test('candidate finder selects only unverified and due participating assets in d
     $pending = $create(AssetRole::Subtitle, AssetState::Pending);
     $processing = $create(AssetRole::Subtitle, AssetState::Processing);
     $failed = $create(AssetRole::Subtitle, AssetState::Failed);
+    $checksumless = $assets->create($itemId, AssetRole::Subtitle, AssetKind::Video, AssetState::Ready, path: '/vault/checksumless');
+    $pathless = $assets->create($itemId, AssetRole::Subtitle, AssetKind::Video, AssetState::Ready, checksum: $checksum);
     $stash = $this->container->get(StashRepository::class)->create('Verification projection stash');
     $broadcast = $this->container->get(BroadcastRepository::class)->create(
         stashId: StashId::fromPrimaryKey($stash->id),
@@ -102,13 +105,16 @@ test('candidate finder selects only unverified and due participating assets in d
 
     expect($plan->eligible)->toBe(3)
         ->and($plan->alreadyQueued)->toBe(0)
+        ->and($plan->unverifiable)->toBe(2)
         ->and(array_map(static fn($asset): string => (string) $asset->id, $plan->assets))
         ->toBe([(string) $unverifiedOld->id, (string) $unverifiedNew->id, (string) $due->id])
         ->and($mismatch->state)->toBe(AssetState::Stale)
         ->and($missing->state)->toBe(AssetState::Missing)
         ->and($pending->state)->toBe(AssetState::Pending)
         ->and($processing->state)->toBe(AssetState::Processing)
-        ->and($failed->state)->toBe(AssetState::Failed);
+        ->and($failed->state)->toBe(AssetState::Failed)
+        ->and($this->container->get(FixityStatusResolver::class)->forAsset($checksumless, $now))->toBe(FixityStatus::Unverified)
+        ->and($this->container->get(FixityStatusResolver::class)->forAsset($pathless, $now))->toBe(FixityStatus::Unverified);
 });
 
 test('active verification jobs are deduplicated across pending processing and retrying states', function (): void {
@@ -118,7 +124,7 @@ test('active verification jobs are deduplicated across pending processing and re
     $item = $items->create('test', 'verification-active-' . bin2hex(random_bytes(4)), 'https://example.test/active', 'Active verification');
     $itemId = ItemId::fromPrimaryKey($item->id);
     foreach ([JobState::Pending, JobState::Processing, JobState::Retrying] as $state) {
-        $asset = $assets->create($itemId, AssetRole::VaultOriginal, AssetKind::Video, AssetState::Ready, checksum: 'sha256:' . str_repeat('b', 64));
+        $asset = $assets->create($itemId, AssetRole::VaultOriginal, AssetKind::Video, AssetState::Ready, path: '/vault/active-' . $state->value, checksum: 'sha256:' . str_repeat('b', 64));
         $job = $jobs->create(
             intent: JobType::core('core.verify_vault'),
             entityType: 'asset',
@@ -143,7 +149,7 @@ test('verification scheduling dispatches bounded asset jobs and is idempotent', 
     $itemId = ItemId::fromPrimaryKey($item->id);
 
     for ($index = 0; $index < 101; $index++) {
-        $assets->create($itemId, AssetRole::VaultOriginal, AssetKind::Video, AssetState::Ready);
+        $assets->create($itemId, AssetRole::VaultOriginal, AssetKind::Video, AssetState::Ready, path: '/vault/batch-' . $index, checksum: 'sha256:' . str_repeat('c', 64));
     }
 
     $vaultPath = $this->container->get(StashdConfig::class)->vaultPath();
@@ -173,6 +179,7 @@ test('verification scheduling dispatches bounded asset jobs and is idempotent', 
     $third = $scheduler->run(DateTime::now(Timezone::UTC));
 
     expect($first->eligible)->toBe(101)
+        ->and($first->unverifiable)->toBe(0)
         ->and($first->dispatched)->toBe(100)
         ->and($first->limitReached)->toBeTrue()
         ->and($second->eligible)->toBe(1)
@@ -197,7 +204,9 @@ test('verification scheduling skips unavailable Vault storage and the scheduled 
     $items = $this->container->get(ItemRepository::class);
     $assets = $this->container->get(AssetRepository::class);
     $item = $items->create('test', 'verification-storage-' . bin2hex(random_bytes(4)), 'https://example.test/storage', 'Storage verification');
-    $asset = $assets->create(ItemId::fromPrimaryKey($item->id), AssetRole::VaultOriginal, AssetKind::Video, AssetState::Ready);
+    $asset = $assets->create(ItemId::fromPrimaryKey($item->id), AssetRole::VaultOriginal, AssetKind::Video, AssetState::Ready, path: '/vault/scheduled', checksum: 'sha256:' . str_repeat('d', 64));
+    $checksumless = $assets->create(ItemId::fromPrimaryKey($item->id), AssetRole::Subtitle, AssetKind::Video, AssetState::Ready, path: '/vault/legacy');
+    $pathless = $assets->create(ItemId::fromPrimaryKey($item->id), AssetRole::Subtitle, AssetKind::Video, AssetState::Ready, checksum: 'sha256:' . str_repeat('e', 64));
     $scheduler = $this->container->get(VerificationScheduler::class);
     $vaultPath = $this->container->get(StashdConfig::class)->vaultPath();
     if (! is_dir($vaultPath)) {
@@ -243,4 +252,12 @@ test('verification scheduling skips unavailable Vault storage and the scheduled 
 
     expect($this->container->get(VerificationSchedulerTickCommand::class)->__invoke())->toBe(ExitCode::SUCCESS)
         ->and(JobRecord::select()->where('entityType', 'asset')->where('entityId', (string) $asset->id)->first())->not->toBeNull();
+
+    $plan = $this->container->get(VerificationCandidateFinder::class)->find();
+    expect($plan->eligible)->toBe(0)
+        ->and($plan->alreadyQueued)->toBe(1)
+        ->and($plan->unverifiable)->toBe(2)
+        ->and(JobRecord::select()->where('intent', JobType::core('core.verify_vault')->value)->all())->toHaveCount(1)
+        ->and($checksumless->lastVerifiedAt)->toBeNull()
+        ->and($pathless->lastVerifiedAt)->toBeNull();
 });

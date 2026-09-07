@@ -22,7 +22,7 @@ final readonly class VerificationScheduler
     public function run(?DateTime $now = null): VerificationScheduleResult
     {
         if ($this->storage->isUnavailable()) {
-            return new VerificationScheduleResult(0, 0, 0, true, false);
+            return new VerificationScheduleResult(0, 0, 0, 0, true, false);
         }
 
         $plan = $this->candidates->find($now);
@@ -35,6 +35,7 @@ final readonly class VerificationScheduler
                     eligible: $plan->eligible,
                     alreadyQueued: $plan->alreadyQueued,
                     dispatched: $dispatched,
+                    unverifiable: $plan->unverifiable,
                     skippedStorageUnavailable: true,
                     limitReached: false,
                 );
@@ -54,6 +55,7 @@ final readonly class VerificationScheduler
             eligible: $plan->eligible,
             alreadyQueued: $plan->alreadyQueued,
             dispatched: $dispatched,
+            unverifiable: $plan->unverifiable,
             skippedStorageUnavailable: false,
             limitReached: count($plan->assets) > self::DISPATCH_LIMIT,
         );

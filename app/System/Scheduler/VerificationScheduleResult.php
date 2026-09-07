@@ -10,6 +10,7 @@ final readonly class VerificationScheduleResult
         public int $eligible,
         public int $alreadyQueued,
         public int $dispatched,
+        public int $unverifiable,
         public bool $skippedStorageUnavailable,
         public bool $limitReached,
     ) {}
@@ -21,6 +22,7 @@ final readonly class VerificationScheduleResult
             'eligible' => $this->eligible,
             'already_queued' => $this->alreadyQueued,
             'dispatched' => $this->dispatched,
+            'unverifiable' => $this->unverifiable,
             'skipped_storage_unavailable' => $this->skippedStorageUnavailable,
             'limit_reached' => $this->limitReached,
         ];

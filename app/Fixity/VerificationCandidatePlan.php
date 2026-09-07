@@ -13,5 +13,6 @@ final readonly class VerificationCandidatePlan
         public array $assets,
         public int $eligible,
         public int $alreadyQueued,
+        public int $unverifiable = 0,
     ) {}
 }

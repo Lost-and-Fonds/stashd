@@ -24,7 +24,7 @@ final readonly class VerificationCandidateFinder
         $assets = $this->assets->listPreservedForHealth();
 
         if ($assets === []) {
-            return new VerificationCandidatePlan([], 0, 0);
+            return new VerificationCandidatePlan([], 0, 0, 0);
         }
 
         $verifyingIds = $this->jobs->pendingOrProcessingEntityIds(JobType::core('core.verify_vault'), 'asset');
@@ -32,12 +32,18 @@ final readonly class VerificationCandidateFinder
         $candidates = [];
         $eligible = 0;
         $alreadyQueued = 0;
+        $unverifiable = 0;
 
         foreach ($assets as $asset) {
             $status = $statuses[(string) $asset->id] ?? FixityStatus::Unverified;
 
             if ($status === FixityStatus::Verifying) {
                 $alreadyQueued++;
+                continue;
+            }
+
+            if ($status === FixityStatus::Unverified && ($asset->checksum === null || $asset->checksum === '' || $asset->path === null)) {
+                $unverifiable++;
                 continue;
             }
 
@@ -63,7 +69,7 @@ final readonly class VerificationCandidateFinder
             return $dateComparison !== 0 ? $dateComparison : strcmp((string) $left->id, (string) $right->id);
         });
 
-        return new VerificationCandidatePlan($candidates, $eligible, $alreadyQueued);
+        return new VerificationCandidatePlan($candidates, $eligible, $alreadyQueued, $unverifiable);
     }
 
     private static function compareDates(?DateTime $left, ?DateTime $right): int
