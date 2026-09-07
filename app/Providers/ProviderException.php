@@ -13,6 +13,7 @@ class ProviderException extends RuntimeException
         public readonly string $errorCode = 'provider_error',
         int $code = 0,
         ?\Throwable $previous = null,
+        public readonly bool $retryable = false,
     ) {
         parent::__construct($message, $code, $previous);
     }

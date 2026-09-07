@@ -181,23 +181,23 @@ final class M7ExampleBroadcast implements BroadcastPlugin
 {
     public function __construct(private PluginContext $context, private M7Rpc $rpc) {}
 
-    public function prepare(PublishRequest $request): Preparation
+    public function prepare(PublishRequest $request, PluginContext $context): Preparation
     {
         $this->context->progress->report('prepare');
 
         return new Preparation();
     }
 
-    public function publish(PublishRequest $request): Publication
+    public function publish(PublishRequest $request, PluginContext $context): Publication
     {
-        $this->context->logger->info('example broadcast publish');
-        $this->context->progress->report('publish');
-        $small = $this->context->http->request('GET', 'https://allowed.test/small', [], null, 'fixture-token');
+        $context->logger->info('example broadcast publish');
+        $context->progress->report('publish');
+        $small = $context->http->request('GET', 'https://allowed.test/small', [], null, 'fixture-token');
 
         if ($small->body() !== 'small-response') {
             throw new RuntimeException('small broker response mismatch');
         }
-        $large = $this->context->http->request('GET', 'https://allowed.test/large');
+        $large = $context->http->request('GET', 'https://allowed.test/large');
         $bytes = 0;
 
         if ($large->resource === null) {
@@ -221,7 +221,7 @@ final class M7ExampleBroadcast implements BroadcastPlugin
         if ((int) $helper['exit_code'] !== 0) {
             throw new RuntimeException('helper failed');
         }
-        $this->context->staging?->write('published/item-1.bin', 'authoritative fixture output', 'application/octet-stream');
+        $context->staging?->write('published/item-1.bin', 'authoritative fixture output', 'application/octet-stream');
 
         if (($request->settings[0]->value->value ?? null) === 'fail') {
             throw new PluginFailureException(new PluginFailure(PluginErrorCode::Failed, new PluginError('fixture publish failure', true)));
@@ -232,7 +232,7 @@ final class M7ExampleBroadcast implements BroadcastPlugin
 
     public function finalize(FinalizationRequest $request, PluginContext $context): Publication
     {
-        $this->context->progress->report('finalize');
+        $context->progress->report('finalize');
 
         return $request->publication;
     }
@@ -274,7 +274,7 @@ while (($message = FrameCodec::read(STDIN, 10.0)) !== null) {
     try {
         $method = $message['method'] ?? '';
         $result = match ($method) {
-            'broadcast.publish' => WireMapper::publication((new M7ExampleBroadcast($context, $rpc))->publish(new PublishRequest('fixture', [new Setting('mode', OptionValue::text((string) ($message['params']['mode'] ?? 'ok')))], [], [new Item('item-1', 'Fixture item', [], 'source-1')]))),
+            'broadcast.publish' => WireMapper::publication((new M7ExampleBroadcast($context, $rpc))->publish(new PublishRequest('fixture', [new Setting('mode', OptionValue::text((string) ($message['params']['mode'] ?? 'ok')))], [], [new Item('item-1', 'Fixture item', [], 'source-1')]), $context)),
             'broadcast.prepare' => ['artifacts' => []],
             'broadcast.finalize' => WireMapper::publication((new M7ExampleBroadcast($context, $rpc))->finalize(new FinalizationRequest(new PublishRequest('fixture'), new Publication(new Artifact('example:publication'))), $context)),
             'broadcast.operation' => ['choices' => [['value' => 'fixture', 'label' => 'Fixture choice']], 'values' => [['key' => 'echo', 'value' => ['tag' => 'text', 'value' => 'fixture']]]],

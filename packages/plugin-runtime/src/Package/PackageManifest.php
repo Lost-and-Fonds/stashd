@@ -28,7 +28,8 @@ final readonly class PackageManifest
         public array $architectures = [],
     ) {}
 
-    public static function fromFile(string $path, string $apiVersion = '0.1', ?string $architecture = null): self
+    /** @param string|list<string> $apiVersions */
+    public static function fromFile(string $path, string|array $apiVersions = ['0.2', '0.1'], ?string $architecture = null): self
     {
         if (! Filesystem\is_file($path)) {
             throw new PackageValidationError('plugin.json is missing');
@@ -47,7 +48,9 @@ final readonly class PackageManifest
         $data = self::object($data);
         self::validateData($data);
 
-        if ($data['api_version'] !== $apiVersion) {
+        $apiVersions = is_array($apiVersions) ? $apiVersions : [$apiVersions];
+
+        if (! in_array($data['api_version'], $apiVersions, true)) {
             throw new PackageValidationError('plugin API version is incompatible');
         }
 

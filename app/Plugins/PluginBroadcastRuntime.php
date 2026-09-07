@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
+use App\Broadcasts\BroadcastException;
 use GuzzleHttp\Psr7\Uri;
 use RuntimeException;
 use Stashd\PluginRuntime\Capabilities\CredentialGrant;
@@ -12,6 +13,7 @@ use Stashd\PluginRuntime\Capabilities\Invocation;
 use Stashd\PluginRuntime\Capabilities\ReadableResource;
 use Stashd\PluginRuntime\Package\PackageManager;
 use Stashd\PluginRuntime\Runner\PluginRunner;
+use Stashd\PluginRuntime\Runner\PluginInvocationFailure;
 
 final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
 {
@@ -140,14 +142,15 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
 
             if (isset($result['error'])) {
                 $error = is_array($result['error']) ? $result['error'] : [];
-                $message = is_string($error['message'] ?? null) ? $error['message'] : 'Plugin failed.';
+                $failure = PluginInvocationFailure::fromWire($error);
+                $message = $failure->getMessage();
                 $stderr = $process->stderr();
 
                 if (trim($stderr) !== '') {
                     $message .= ' (' . trim($stderr) . ')';
                 }
 
-                throw new RuntimeException($message);
+                throw BroadcastException::withCode('plugin_' . $failure->errorCode, $message, $failure, $failure->retryable);
             }
 
             return $result;

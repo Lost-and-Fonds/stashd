@@ -35,13 +35,30 @@ The following are stable enough for the Jellyfin plugin port:
   notifications, and cancellation/timeout errors;
 - the transport-neutral shapes extracted from the existing WIT;
 - PHP Input/Broadcast lifecycle interfaces and DTOs;
-- `PluginContext` logging, progress, HTTP, staging, and resource interfaces;
+- invocation-scoped logging, progress, HTTP, staging, helper, and resource
+  capabilities. The PHP SDK presents these through `PluginContext` on every
+  Broadcast lifecycle call and through the Input factory context;
 - v1 inline response and opaque resource-handle behavior;
 - versioned package directories, immutable packages, active-version switching,
   rollback, disable/remove, and development links.
 
 The SDK capability implementations remain host-provided. Provider ports must
 not add provider-specific behavior to these packages.
+
+## Contract and wire boundary
+
+The canonical language-neutral contract is `stashd:plugin@0.2.0` in the
+`plugin-api` repository. The PHP authoring SDK currently targets that contract
+and is versioned independently. RPC v1 remains a four-byte big-endian
+length-prefixed UTF-8 JSON stream with request IDs, a hello handshake, and
+invocation-scoped capability callbacks.
+
+Input and Broadcast lifecycle calls may use the host imports described by the
+WIT. The PHP SDK exposes those imports as `PluginContext` for every Broadcast
+method and through the Input factory. Typed plugin failures use the WIT
+`{tag,value}` variant and retain retryability; ordinary uncategorized
+exceptions are `failed` and non-retryable. Core still accepts legacy `0.1`
+plugin manifests while `0.2` is the current manifest/API declaration.
 
 ## Deferred package boundary
 

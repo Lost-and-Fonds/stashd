@@ -12,12 +12,13 @@ final class BroadcastException extends RuntimeException
         string $message,
         public readonly string $errorCode,
         ?\Throwable $previous = null,
+        public readonly bool $retryable = false,
     ) {
         parent::__construct($message, 0, $previous);
     }
 
-    public static function withCode(string $errorCode, string $message, ?\Throwable $previous = null): self
+    public static function withCode(string $errorCode, string $message, ?\Throwable $previous = null, bool $retryable = false): self
     {
-        return new self($message, $errorCode, $previous);
+        return new self($message, $errorCode, $previous, $retryable);
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Connections;
 
+use App\Broadcasts\BroadcastException;
 use App\Plugins\ExternalBroadcastPluginRegistry;
 use App\Plugins\PluginHttpGrantFactory;
 use App\Support\PrefixedUlid;
@@ -185,6 +186,8 @@ final readonly class PluginConnectionService
             );
         } catch (ConnectionException $exception) {
             throw $exception;
+        } catch (BroadcastException $exception) {
+            throw ConnectionException::withCode($exception->errorCode, $exception->getMessage(), $exception, $exception->retryable);
         } catch (\Throwable $exception) {
             throw ConnectionException::withCode('connection_unavailable', 'Connection operation failed.', $exception);
         } finally {

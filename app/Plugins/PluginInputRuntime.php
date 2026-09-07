@@ -30,6 +30,7 @@ use Stashd\PluginRuntime\Capabilities\Invocation;
 use Stashd\PluginRuntime\Package\PackageManager;
 use Stashd\PluginRuntime\Runner\PluginRunner;
 use Stashd\PluginRuntime\Runner\PluginProcess;
+use Stashd\PluginRuntime\Runner\PluginInvocationFailure;
 use Tempest\Cache\Cache;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Duration;
@@ -64,7 +65,11 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     /** @param array<string, bool|int|string> $source */
     public function resolveSource(array $source): ResolvedInput
     {
-        $result = $this->invoke('input.resolve', ['source' => $this->wireSource($source)], 'resolve', helper: $this->definition->helper);
+        try {
+            $result = $this->invoke('input.resolve', ['source' => $this->wireSource($source)], 'resolve', helper: $this->definition->helper);
+        } catch (PluginInvocationFailure $failure) {
+            throw new ProviderException($failure->getMessage(), 'plugin_' . $failure->errorCode, 0, $failure, $failure->retryable);
+        }
         $reference = self::string($result['canonical-reference'] ?? null);
 
         if ($reference === '') {
@@ -105,7 +110,12 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = [], ?callable $onProgress = null): array
     {
         $operation = $strategy->key === 'plugin.complete' ? 'complete' : 'refresh';
-        $raw = $this->invoke('input.discover', ['input_id' => $input->providerInputId, 'intent' => $operation, 'options' => $this->wireOptions($options)], $operation, helper: $this->definition->helper, onActivity: $onProgress);
+
+        try {
+            $raw = $this->invoke('input.discover', ['input_id' => $input->providerInputId, 'intent' => $operation, 'options' => $this->wireOptions($options)], $operation, helper: $this->definition->helper, onActivity: $onProgress);
+        } catch (PluginInvocationFailure $failure) {
+            throw new ProviderException($failure->getMessage(), 'plugin_' . $failure->errorCode, 0, $failure, $failure->retryable);
+        }
 
         return array_map(static function (array $item): DiscoveredItem {
             $artwork = self::nullableString($item['artwork-reference'] ?? null);
@@ -129,7 +139,13 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     {
         $item = ['id' => $request->providerItemId, 'reference' => $request->canonicalUri->toString(), 'title' => $request->title, 'description' => null, 'published-at' => $request->publishedAt?->toRfc3339(useZ: true), 'artwork-reference' => $request->thumbnailUri?->toString(), 'duration-seconds' => $request->durationSeconds];
         $kind = $request->downloadPolicy === DownloadPolicy::AudioOnly ? 'audio' : 'video';
-        $result = $this->invoke('input.acquire', ['item' => $item, 'media_kind' => $kind, 'options' => $this->wireOptions($request->providerOptions)], 'acquire', $request->tempDirectory, $this->definition->helper, $onProgress);
+
+        try {
+            $result = $this->invoke('input.acquire', ['item' => $item, 'media_kind' => $kind, 'options' => $this->wireOptions($request->providerOptions)], 'acquire', $request->tempDirectory, $this->definition->helper, $onProgress);
+        } catch (PluginInvocationFailure $failure) {
+            throw DownloadException::withCode('plugin_' . $failure->errorCode, $failure->getMessage(), $failure, $failure->retryable);
+        }
+
         $files = $this->filesFromResult($result, $request->tempDirectory);
 
         if (! array_filter($files, static fn(DownloadedFile $file): bool => $file->role === AssetRole::VaultOriginal)) {
@@ -141,7 +157,11 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
 
     public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array
     {
-        return $this->filesFromResult($this->invoke('input.acquire', ['item' => $item, 'media_kind' => $mediaKind, 'options' => $this->wireOptions($options)], 'acquire', $staging, $this->definition->helper), $staging);
+        try {
+            return $this->filesFromResult($this->invoke('input.acquire', ['item' => $item, 'media_kind' => $mediaKind, 'options' => $this->wireOptions($options)], 'acquire', $staging, $this->definition->helper), $staging);
+        } catch (PluginInvocationFailure $failure) {
+            throw DownloadException::withCode('plugin_' . $failure->errorCode, $failure->getMessage(), $failure, $failure->retryable);
+        }
     }
 
     /** @param array<string, mixed> $result
@@ -249,7 +269,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
             if (isset($result['error'])) {
                 $error = is_array($result['error']) ? $result['error'] : [];
 
-                throw new RuntimeException(self::string($error['message'] ?? null, 'plugin failed'));
+                throw PluginInvocationFailure::fromWire($error);
             }
 
             if ($staging !== null) {

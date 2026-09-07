@@ -79,6 +79,10 @@ final class PluginProcess
                 continue;
             }
 
+            if (($message['kind'] ?? null) !== 'response') {
+                throw new FrameProtocolError('plugin response kind is invalid');
+            }
+
             $deadline = microtime(true) + $timeout;
 
             if (($message['id'] ?? null) !== $id) {
@@ -201,8 +205,15 @@ final class PluginProcess
             throw new FrameProtocolError('plugin produced no handshake: ' . $this->stderr());
         }
 
-        if (($message['method'] ?? null) !== 'hello' || ! isset($message['id'])) {
+        if (($message['protocol'] ?? null) !== 1 || ($message['kind'] ?? null) !== 'request' || ($message['method'] ?? null) !== 'hello' || ! isset($message['id'])) {
             throw new FrameProtocolError('plugin handshake is invalid: ' . json_encode($message, JSON_THROW_ON_ERROR));
+        }
+        $params = is_array($message['params'] ?? null) ? $message['params'] : [];
+        $minimum = is_int($params['min'] ?? null) ? $params['min'] : 1;
+        $maximum = is_int($params['max'] ?? null) ? $params['max'] : 1;
+
+        if ($minimum > 1 || $maximum < 1 || $minimum > $maximum) {
+            throw new FrameProtocolError('plugin RPC protocol is unsupported');
         }
         FrameCodec::write($this->pipes[0], ['protocol' => 1, 'id' => $message['id'], 'kind' => 'response', 'result' => ['protocol' => 1, 'min' => 1, 'max' => 1]]);
     }

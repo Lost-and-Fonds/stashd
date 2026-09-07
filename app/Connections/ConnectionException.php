@@ -10,12 +10,13 @@ final class ConnectionException extends \RuntimeException
         public readonly string $errorCode,
         string $message,
         ?\Throwable $previous = null,
+        public readonly bool $retryable = false,
     ) {
         parent::__construct($message, previous: $previous);
     }
 
-    public static function withCode(string $code, string $message, ?\Throwable $previous = null): self
+    public static function withCode(string $code, string $message, ?\Throwable $previous = null, bool $retryable = false): self
     {
-        return new self($code, $message, $previous);
+        return new self($code, $message, $previous, $retryable);
     }
 }

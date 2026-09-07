@@ -19,7 +19,8 @@ final class PackageManager
 
     private Umoci $umoci;
 
-    public function __construct(private string $root, private string $apiVersion = '0.1', private ?string $architecture = null, ?Umoci $umoci = null)
+    /** @param string|list<string> $apiVersions */
+    public function __construct(private string $root, private string|array $apiVersions = ['0.2', '0.1'], private ?string $architecture = null, ?Umoci $umoci = null)
     {
         $this->packages = $root . '/packages';
         $this->active = $root . '/active';
@@ -73,7 +74,7 @@ final class PackageManager
             $bundle = $temporary . '/bundle';
             $this->umoci->unpack($layout, 'stashd', $bundle);
             $rootfs = $bundle . '/rootfs';
-            $manifest = PackageManifest::fromFile($this->manifestPath($rootfs), $this->apiVersion, $this->architecture ?? self::architecture());
+            $manifest = PackageManifest::fromFile($this->manifestPath($rootfs), $this->apiVersions, $this->architecture ?? self::architecture());
             $entrypoint = $rootfs . '/' . $manifest->entrypoint;
 
             if (! Filesystem\is_file($entrypoint)) {
@@ -169,7 +170,7 @@ final class PackageManager
     {
         $this->validateId($id);
         $source = realpath($source) ?: throw new PackageValidationError('linked source does not exist');
-        $manifest = PackageManifest::fromFile($this->manifestPath($source), $this->apiVersion, $this->architecture ?? self::architecture());
+        $manifest = PackageManifest::fromFile($this->manifestPath($source), $this->apiVersions, $this->architecture ?? self::architecture());
 
         if (! Filesystem\is_file($source . '/' . $manifest->entrypoint)) {
             throw new PackageValidationError('linked entrypoint is missing');
@@ -221,7 +222,7 @@ final class PackageManager
         }
 
         try {
-            return PackageManifest::fromFile($manifest, $this->apiVersion, $this->architecture ?? self::architecture())->version;
+            return PackageManifest::fromFile($manifest, $this->apiVersions, $this->architecture ?? self::architecture())->version;
         } catch (PackageValidationError) {
             return null;
         }
@@ -253,7 +254,7 @@ final class PackageManager
             }
 
             try {
-                $manifest = PackageManifest::fromFile($this->manifestPath($root), $this->apiVersion, $this->architecture ?? self::architecture());
+                $manifest = PackageManifest::fromFile($this->manifestPath($root), $this->apiVersions, $this->architecture ?? self::architecture());
             } catch (PackageValidationError) {
                 continue;
             }
