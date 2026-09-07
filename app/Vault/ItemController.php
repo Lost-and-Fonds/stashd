@@ -89,7 +89,7 @@ final readonly class ItemController
         return new Json([
             'items' => array_map(
                 static fn(VaultItemSummary $item): array => VaultItemSummaryResource::fromRecord($item)->toArray(),
-                $this->items->listVaultSummary($limit, $offset, $search === '' ? null : $search, $kind === '' ? null : $kind),
+                $items,
             ),
             'total' => $this->items->countVaultSummary($search === '' ? null : $search, $kind === '' ? null : $kind),
             'vault_total' => $this->items->count(),

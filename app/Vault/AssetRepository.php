@@ -160,10 +160,11 @@ final class AssetRepository
             AssetRecord::select()
                 ->whereIn('itemId', $itemIds)
                 ->whereIn('role', AssetRole::preserved())
+                ->whereIn('state', [AssetState::Ready, AssetState::Stale, AssetState::Missing])
                 ->whereNull('broadcastId')
                 ->whereNull('broadcastItemId')
                 ->all(),
-            static fn(mixed $asset): bool => $asset instanceof AssetRecord,
+            static fn(mixed $asset): bool => $asset instanceof AssetRecord && $asset->participatesInPreservationHealth(),
         ));
     }
 
@@ -173,10 +174,11 @@ final class AssetRepository
         return array_values(array_filter(
             AssetRecord::select()
                 ->whereIn('role', AssetRole::preserved())
+                ->whereIn('state', [AssetState::Ready, AssetState::Stale, AssetState::Missing])
                 ->whereNull('broadcastId')
                 ->whereNull('broadcastItemId')
                 ->all(),
-            static fn(mixed $asset): bool => $asset instanceof AssetRecord,
+            static fn(mixed $asset): bool => $asset instanceof AssetRecord && $asset->participatesInPreservationHealth(),
         ));
     }
 

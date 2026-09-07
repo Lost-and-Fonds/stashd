@@ -167,6 +167,15 @@ test('ingest establishes a baseline and verification records committed-object ev
     $itemResponse = $this->http->get('/api/v1/items/' . $itemId, headers: $headers);
     expect($itemResponse->body['item']['preservation_health'])->toBe(PreservationHealth::Attention->value)
         ->and($itemResponse->body['item']['asset_fixity_counts'][FixityStatus::Verified->value])->toBe(1);
+
+    $listResponse = $this->http->get('/api/v1/items', headers: $headers);
+    $listedItem = array_values(array_filter(
+        $listResponse->body['items'],
+        static fn(array $candidate): bool => $candidate['id'] === $itemId,
+    ))[0];
+    expect($listedItem['preservation_health'])->toBe(PreservationHealth::Attention->value)
+        ->and($listedItem['asset_fixity_counts'][FixityStatus::Verified->value])->toBe(1)
+        ->and($listedItem['asset_health_counts'][PreservationHealth::Healthy->value])->toBe(1);
 });
 
 test('verification policy uses an exact boundary and item health respects the canonical asset', function (): void {
@@ -294,6 +303,62 @@ test('Vault preservation summary aggregates fixity counts and remains evidence-o
     $response = $this->http->get('/api/v1/system/health', headers: $headers);
     expect($response->body['preservation']['health'])->toBe(PreservationHealth::Unknown->value)
         ->and($response->body['preservation']['storage_unavailable'])->toBeTrue();
+});
+
+test('preservation health excludes assets that never entered the preserved lifecycle', function (): void {
+    [$headers, $stashId, $itemId] = $this->bootstrapFakeDownloadStash('fixity-health-participation');
+    $this->container->get(DownloadItem::class)->execute(
+        itemId: ItemId::parse($itemId),
+        stashId: StashId::parse($stashId),
+        jobId: $this->container->get(PrefixedUlidGenerator::class)->generate('job'),
+    );
+
+    $assets = $this->container->get(AssetRepository::class);
+    $this->container->get(VerifyVaultAssets::class)->verifyAll();
+    $before = $this->container->get(PreservationHealthService::class)->vaultSummary();
+
+    foreach ([AssetState::Pending, AssetState::Processing, AssetState::Failed] as $state) {
+        $assets->create(
+            itemId: ItemId::parse($itemId),
+            role: AssetRole::SourceThumbnail,
+            kind: AssetKind::Image,
+            state: $state,
+        );
+    }
+
+    $itemHealth = $this->container->get(PreservationHealthResolver::class)->forItem($assets->listForItem(ItemId::parse($itemId)));
+    expect($itemHealth->health)->toBe(PreservationHealth::Healthy)
+        ->and($itemHealth->fixityCounts)->toBe($before->fixityCounts)
+        ->and($itemHealth->healthCounts)->toBe($before->healthCounts);
+
+    $detail = $this->http->get('/api/v1/items/' . $itemId, headers: $headers);
+    expect($detail->body['item']['preservation_health'])->toBe(PreservationHealth::Healthy->value)
+        ->and($detail->body['item']['asset_fixity_counts'])->toBe($before->fixityCounts)
+        ->and($detail->body['item']['asset_health_counts'])->toBe($before->healthCounts);
+
+    $after = $this->container->get(PreservationHealthService::class)->vaultSummary();
+    expect($after->totalPreservedAssets)->toBe($before->totalPreservedAssets)
+        ->and($after->fixityCounts)->toBe($before->fixityCounts)
+        ->and($after->healthCounts)->toBe($before->healthCounts);
+
+    $failedItem = $this->container->get(ItemRepository::class)->create(
+        providerKey: 'test',
+        providerItemId: 'failed-preservation-' . bin2hex(random_bytes(4)),
+        canonicalUri: 'https://example.test/failed-preservation',
+        title: 'Failed preservation placeholder',
+    );
+    $failedOriginal = $assets->create(
+        itemId: ItemId::fromPrimaryKey($failedItem->id),
+        role: AssetRole::VaultOriginal,
+        kind: AssetKind::Video,
+        state: AssetState::Failed,
+    );
+    $failedHealth = $this->container->get(PreservationHealthResolver::class)->forItem([$failedOriginal]);
+
+    expect($failedHealth->fixityCounts)->toBe(array_fill_keys(array_map(
+        static fn(FixityStatus $status): string => $status->value,
+        FixityStatus::cases(),
+    ), 0));
 });
 
 test('ingest fails before finalization when the baseline checksum cannot be generated', function (): void {

@@ -50,4 +50,12 @@ final class AssetRecord
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
     ) {}
+
+    public function participatesInPreservationHealth(): bool
+    {
+        return in_array($this->role, AssetRole::preserved(), true)
+            && in_array($this->state, [AssetState::Ready, AssetState::Stale, AssetState::Missing], true)
+            && $this->broadcastId === null
+            && $this->broadcastItemId === null;
+    }
 }

@@ -22,6 +22,7 @@ final readonly class PreservationHealthResolver
      */
     public function forItems(array $assets, ?array $statuses = null): array
     {
+        $assets = self::participatingAssets($assets);
         $statuses ??= $this->fixity->forAssets($assets);
         $byItem = [];
 
@@ -47,6 +48,7 @@ final readonly class PreservationHealthResolver
      */
     public function forItem(array $assets, ?array $statuses = null): PreservationHealthSummary
     {
+        $assets = self::participatingAssets($assets);
         $statuses ??= $this->fixity->forAssets($assets);
         $fixityCounts = self::zeroCounts(FixityStatus::cases());
         $healthCounts = self::zeroCounts(PreservationHealth::cases());
@@ -70,6 +72,17 @@ final readonly class PreservationHealthResolver
         $health = self::rollup($canonicalStatuses, $healthCounts);
 
         return new PreservationHealthSummary($health, $fixityCounts, $healthCounts);
+    }
+
+    /** @param list<AssetRecord> $assets
+     * @return list<AssetRecord>
+     */
+    private static function participatingAssets(array $assets): array
+    {
+        return array_values(array_filter(
+            $assets,
+            static fn(AssetRecord $asset): bool => $asset->participatesInPreservationHealth(),
+        ));
     }
 
     public static function healthForStatus(FixityStatus $status): PreservationHealth
