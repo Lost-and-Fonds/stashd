@@ -70,12 +70,18 @@ helps a later comparison, not as a place to smuggle arbitrary Core semantics.
 #### `acquire`
 
 `acquire(item, options)` produces one or more staged artifacts. The Input host
-recognises generic roles:
+recognises generic roles and may also report a requested role as unavailable:
 
 - `primary`
 - `captions`
 - `artwork`
 - `metadata`
+
+The options may include `requested-roles`. A requested role is a capability
+request, not a promise that the provider can supply it for every Item. The
+result's unavailable entries carry a message and a `permanent` flag. Core can
+record a permanent provider limitation and stop retrying that role, while a
+temporary limitation remains eligible for a later attempt.
 
 The plugin/helper writes into its invocation staging area and then asks the host
 to stage a relative path with an optional media type. The returned reference is

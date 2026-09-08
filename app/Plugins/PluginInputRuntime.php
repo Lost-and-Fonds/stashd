@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Plugins;
 
 use App\Downloads\DownloadedFile;
+use App\Downloads\AssetAcquisitionResult;
 use App\Downloads\DownloaderInterface;
 use App\Downloads\DownloadException;
 use App\Downloads\DownloadProbeResult;
 use App\Downloads\DownloadRequest;
 use App\Downloads\DownloadResult;
+use App\Downloads\UnavailableAsset;
 use App\Providers\Core\DiscoveredItem;
 use App\Providers\Provider;
 use App\Providers\ProviderDates;
@@ -157,8 +159,19 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
 
     public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array
     {
+        return $this->acquireAssets($item, $staging, $mediaKind, $options)->files;
+    }
+
+    public function acquireAssets(array $item, string $staging, string $mediaKind, array $options = [], ?array $requestedRoles = null): AssetAcquisitionResult
+    {
         try {
-            return $this->filesFromResult($this->invoke('input.acquire', ['item' => $item, 'media_kind' => $mediaKind, 'options' => $this->wireOptions($options)], 'acquire', $staging, $this->definition->helper), $staging);
+            $params = ['item' => $item, 'media_kind' => $mediaKind, 'options' => $this->wireOptions($options)];
+
+            if ($requestedRoles !== null) {
+                $params['requested_roles'] = array_values($requestedRoles);
+            }
+
+            return $this->acquisitionFromResult($this->invoke('input.acquire', $params, 'acquire', $staging, $this->definition->helper), $staging);
         } catch (PluginInvocationFailure $failure) {
             throw DownloadException::withCode('plugin_' . $failure->errorCode, $failure->getMessage(), $failure, $failure->retryable);
         }
@@ -179,9 +192,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
                 continue;
             }
             $mime = self::nullableString($artifact['media-type'] ?? null);
-            $role = match ($artifact['role'] ?? null) {
-                'primary' => AssetRole::VaultOriginal, 'captions' => AssetRole::Subtitle, 'artwork' => AssetRole::SourceThumbnail, 'metadata' => AssetRole::MetadataJson, default => null,
-            };
+            $role = $this->roleFromWire($artifact['role'] ?? null);
 
             if ($role !== null) {
                 $files[] = new DownloadedFile($path, basename($reference), $role, $this->assetKind($mime), $mime, pathinfo($reference, PATHINFO_EXTENSION), filesize($path) ?: 0);
@@ -189,6 +200,51 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         }
 
         return $files;
+    }
+
+    /** @param array<string, mixed> $result */
+    private function acquisitionFromResult(array $result, string $staging): AssetAcquisitionResult
+    {
+        $unavailable = [];
+
+        foreach ($this->arrayOfArrays($result['unavailable'] ?? null) as $entry) {
+            $role = $this->roleFromWire($entry['role'] ?? null);
+
+            if ($role === null) {
+                continue;
+            }
+
+            $unavailable[] = new UnavailableAsset(
+                role: $role,
+                kind: $this->kindForRole($role),
+                permanent: ($entry['permanent'] ?? false) === true,
+                message: self::string($entry['message'] ?? null, 'Requested asset is unavailable.'),
+            );
+        }
+
+        return new AssetAcquisitionResult($this->filesFromResult($result, $staging), $unavailable);
+    }
+
+    private function roleFromWire(mixed $role): ?AssetRole
+    {
+        return match ($role) {
+            'primary' => AssetRole::VaultOriginal,
+            'captions' => AssetRole::Subtitle,
+            'artwork' => AssetRole::SourceThumbnail,
+            'metadata' => AssetRole::MetadataJson,
+            default => null,
+        };
+    }
+
+    private function kindForRole(AssetRole $role): AssetKind
+    {
+        return match ($role) {
+            AssetRole::VaultOriginal => AssetKind::Video,
+            AssetRole::Subtitle => AssetKind::Subtitle,
+            AssetRole::SourceThumbnail => AssetKind::Image,
+            AssetRole::MetadataJson => AssetKind::Metadata,
+            default => AssetKind::Other,
+        };
     }
     /** @param array<string, mixed> $params
      * @return array<string, mixed>

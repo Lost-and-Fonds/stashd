@@ -328,6 +328,31 @@ wrong scalar types are rejected instead of coerced.
 When introducing a new option shape/default, cover both the host integration and
 plugin DTO path in tests.
 
+### `asset_capabilities`
+
+Input plugins may declare the preserved asset roles and kinds they can try to
+provide during acquisition. For example:
+
+```json
+"asset_capabilities": [
+  {"role": "primary", "kind": "video"},
+  {"role": "artwork", "kind": "image"},
+  {"role": "metadata", "kind": "metadata"},
+  {"role": "captions", "kind": "subtitle", "option": "include_captions"}
+]
+```
+
+This is a capability declaration, not a guarantee that every Item has every
+representation. During sync Core compares these declarations with the Item's
+existing Assets and can request only missing roles. A boolean `option` names an
+`input_options` flag that must be enabled before Core requests that role.
+
+When acquisition cannot provide a requested role, the plugin returns an
+unavailable result with `permanent: true` when retrying cannot change the
+answer. Core records that observation separately from the Asset, so an existing
+Vault Asset is never removed merely because a later upstream acquisition is
+unavailable.
+
 ### `operations`
 
 Some first-party Inputs declare per-operation requirements, for example:

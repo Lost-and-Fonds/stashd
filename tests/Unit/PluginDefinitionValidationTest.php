@@ -16,6 +16,10 @@ it('keeps valid input option shapes and helper declarations', function (): void 
             'id' => 'youtube',
             'input_options' => [
                 ['key' => 'include_shorts', 'label' => 'Include Shorts', 'type' => 'bool', 'default' => false],
+                ['key' => 'include_captions', 'label' => 'Include captions', 'type' => 'bool', 'default' => true],
+            ],
+            'asset_capabilities' => [
+                ['role' => 'captions', 'kind' => 'subtitle', 'option' => 'include_captions'],
             ],
             'source_fields' => [
                 ['key' => 'account', 'label' => 'Account', 'type' => 'text', 'required' => true],
@@ -31,6 +35,8 @@ it('keeps valid input option shapes and helper declarations', function (): void 
         expect($definition?->options[0]->type)->toBe(InputOptionType::Bool)
             ->and($definition?->helper?->name)->toBe('yt-dlp')
             ->and($definition?->credentials[0]->key)->toBe('data-api')
+            ->and($definition?->assetCapabilities[0]->role)->toBe('captions')
+            ->and($definition?->assetCapabilities[0]->enabled(null, $definition->options))->toBeTrue()
             ->and($definition?->normalizeSource(['account' => 'hazel', 'collection' => 'one', 'recursive' => true]))->toBe(['account' => 'hazel', 'collection' => 'one', 'recursive' => true]);
     } finally {
         unlink($root . '/helpers/yt-dlp');

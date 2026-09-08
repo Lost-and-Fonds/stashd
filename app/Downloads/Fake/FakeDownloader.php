@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Downloads\Fake;
 
+use App\Downloads\AssetAcquisitionResult;
 use App\Downloads\DownloadedFile;
 use App\Downloads\DownloaderInterface;
 use App\Downloads\DownloadException;
@@ -91,6 +92,11 @@ final readonly class FakeDownloader implements DownloaderInterface
     public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array
     {
         throw DownloadException::withCode('captions_unavailable', 'The fake downloader has no caption acquisition.');
+    }
+
+    public function acquireAssets(array $item, string $staging, string $mediaKind, array $options = [], ?array $requestedRoles = null): AssetAcquisitionResult
+    {
+        throw DownloadException::withCode('acquisition_unavailable', 'The fake downloader has no asset acquisition.');
     }
 
     private function writeOriginal(DownloadRequest $request, string $filename, AssetKind $kind, string $mime): DownloadedFile

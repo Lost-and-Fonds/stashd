@@ -26,6 +26,12 @@ interface DownloaderInterface
 
     /** @param array<string, mixed> $item
      * @param array<string, bool|string> $options
+     * @param list<string>|null $requestedRoles
+     */
+    public function acquireAssets(array $item, string $staging, string $mediaKind, array $options = [], ?array $requestedRoles = null): AssetAcquisitionResult;
+
+    /** @param array<string, mixed> $item
+     * @param array<string, bool|string> $options
      * @return list<DownloadedFile>
      */
     public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array;

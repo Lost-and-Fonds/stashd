@@ -56,15 +56,20 @@ final readonly class DelegatingDownloader implements DownloaderInterface
         );
     }
 
-    public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array
+    public function acquireAssets(array $item, string $staging, string $mediaKind, array $options = [], ?array $requestedRoles = null): AssetAcquisitionResult
     {
         $provider = is_string($item['provider_key'] ?? null) ? $item['provider_key'] : '';
         $external = $this->externalPlugins?->findDownloader($provider);
 
         if ($external !== null) {
-            return $external->acquireArtifacts($item, $staging, $mediaKind, $options);
+            return $external->acquireAssets($item, $staging, $mediaKind, $options, $requestedRoles);
         }
 
-        throw DownloadException::withCode('captions_unavailable', "No external Input plugin is registered for provider {$provider}.");
+        throw DownloadException::withCode('acquisition_provider_unavailable', "No external Input plugin is registered for provider {$provider}.");
+    }
+
+    public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array
+    {
+        return $this->acquireAssets($item, $staging, $mediaKind, $options)->files;
     }
 }

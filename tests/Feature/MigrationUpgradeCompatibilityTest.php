@@ -139,6 +139,7 @@ function prepareLegacyBaseline(Database $database): void
     $database->execute(new Query('ALTER TABLE item_sources RENAME TO media_item_sources'));
     $database->execute(new Query('ALTER TABLE items RENAME TO media_items'));
     $database->execute(new Query('DROP TABLE IF EXISTS preservation_events'));
+    $database->execute(new Query('DROP TABLE IF EXISTS asset_availability_observations'));
     $database->execute(new Query('DROP TABLE published_resources'));
     $database->execute(new Query('DROP INDEX assets_derived_identity'));
     $database->execute(new Query('ALTER TABLE media_items DROP COLUMN IF EXISTS "sizeEstimated"'));

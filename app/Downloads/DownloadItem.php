@@ -175,6 +175,46 @@ final readonly class DownloadItem
         }
     }
 
+    /**
+     * Ingests supplementary plugin assets without changing the Item lifecycle.
+     * The checksum, move, rollback, Asset, and preservation-event semantics are
+     * shared with the normal Item download path.
+     *
+     * @param list<DownloadedFile> $files
+     */
+    public function ingestAcquiredFiles(ItemId $itemId, PrefixedUlid $jobId, array $files, string $implementation, ?string $implementationVersion): int
+    {
+        $item = $this->items->find($itemId)
+            ?? throw DownloadException::withCode('item_not_found', 'Item not found.');
+        $pendingAssets = [];
+        $result = new DownloadResult(
+            files: $files,
+            implementation: $implementation,
+            implementationVersion: $implementationVersion,
+            sourceUri: StashdUri::parse($item->canonicalUri),
+            attemptedAt: DateTime::now(Timezone::UTC),
+        );
+
+        try {
+            $this->assertStorageReady();
+            $this->assertDownloadOutputsComplete($result);
+
+            foreach ($files as $file) {
+                $pendingAssets[] = $this->createProcessingAsset($itemId, $file);
+            }
+
+            return $this->ingestAllFiles($item, $result, $pendingAssets, false, (string) $jobId);
+        } catch (\Throwable $throwable) {
+            $this->markAssetsFailed($pendingAssets);
+
+            if ($throwable instanceof DownloadException) {
+                throw $throwable;
+            }
+
+            throw DownloadException::withCode('asset_acquisition_failed', $throwable->getMessage(), $throwable);
+        }
+    }
+
     private function assertStorageReady(): void
     {
         $this->storageRoots->ensureDirectories();

@@ -39,7 +39,7 @@ final readonly class DownloadCaptions
             throw DownloadException::withCode('captions_unavailable', 'No Input plugin is available for this item.');
         }
 
-        $files = $plugin->acquireArtifacts(
+        $files = $plugin->acquireAssets(
             item: [
                 'id' => $item->providerItemId,
                 'provider_key' => $item->providerKey,
@@ -54,7 +54,8 @@ final readonly class DownloadCaptions
             staging: $temp,
             mediaKind: 'video',
             options: ['include_captions' => true, 'caption_languages' => $languages, 'include_auto' => $includeAuto],
-        );
+            requestedRoles: ['captions'],
+        )->files;
         $source = array_values(array_filter($files, static fn($file): bool => $file->role === AssetRole::Subtitle))[0] ?? null;
 
         if ($source === null) {

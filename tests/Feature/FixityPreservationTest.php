@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Downloads\DownloadItem;
+use App\Downloads\AssetAcquisitionResult;
 use App\Downloads\DownloadedFile;
 use App\Downloads\DownloaderInterface;
 use App\Downloads\DownloadException;
@@ -106,6 +107,11 @@ final readonly class FailingChecksumDownloader implements DownloaderInterface
             sourceUri: $request->canonicalUri,
             attemptedAt: DateTime::now(Timezone::UTC),
         );
+    }
+
+    public function acquireAssets(array $item, string $staging, string $mediaKind, array $options = [], ?array $requestedRoles = null): AssetAcquisitionResult
+    {
+        throw DownloadException::withCode('not_supported', 'Asset acquisition is not supported by this test downloader.');
     }
 
     public function acquireArtifacts(array $item, string $staging, string $mediaKind, array $options = []): array

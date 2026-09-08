@@ -24,10 +24,10 @@ final readonly class PluginInputDefinition
      * @param list<PluginSourceField> $sourceFields
      * @param list<PluginCredentialDefinition> $credentials
      * @param list<JobDefinition> $jobs
+     * @param list<PluginAssetCapability> $assetCapabilities
      */
-    public function __construct(public string $id, public string $providerKey, public string $name, public string $version, public string $root, public array $prefixes, public array $grants, public array $options, public array $sourceFields, public array $credentials, public ?PluginHelperGrant $helper, public array $jobs = []) {}
+    public function __construct(public string $id, public string $providerKey, public string $name, public string $version, public string $root, public array $prefixes, public array $grants, public array $options, public array $sourceFields, public array $credentials, public ?PluginHelperGrant $helper, public array $jobs = [], public array $assetCapabilities = []) {}
 
-    /** @param array<string, mixed> $manifest */
     /** @param array<string, mixed> $manifest */
     public static function from(array $manifest, string $root): ?self
     {
@@ -145,7 +145,15 @@ final readonly class PluginInputDefinition
             }
         }
 
-        return new self($id, $providerKey, $name, $version, $root, $prefixes, $grants, $options, $sourceFields, $credentials, $helper, PluginJobDefinitions::fromManifest($manifest));
+        $assetCapabilities = [];
+
+        foreach (is_array($manifest['asset_capabilities'] ?? null) ? $manifest['asset_capabilities'] : [] as $raw) {
+            if (is_array($raw) && ($capability = PluginAssetCapability::fromManifest(self::object($raw))) !== null) {
+                $assetCapabilities[] = $capability;
+            }
+        }
+
+        return new self($id, $providerKey, $name, $version, $root, $prefixes, $grants, $options, $sourceFields, $credentials, $helper, PluginJobDefinitions::fromManifest($manifest), $assetCapabilities);
     }
 
     /** @param array<string, mixed> $source

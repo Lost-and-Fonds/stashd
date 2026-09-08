@@ -35,6 +35,7 @@ final readonly class SyncStashInput
         private JobDispatcher $jobDispatcher,
         private BroadcastRepository $broadcasts,
         private Database $database,
+        private AssetAcquisitionPlanner $assetAcquisitions,
     ) {}
 
     public function execute(StashInputRecord $input): StashInputSyncResult
@@ -108,6 +109,10 @@ final readonly class SyncStashInput
                     'stash_id' => $stashId->toString(),
                 ], 'background');
             }
+        }
+
+        if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
+            $this->assetAcquisitions->dispatchMissing($stashId, $input);
         }
 
         $this->recordSuccess($input);

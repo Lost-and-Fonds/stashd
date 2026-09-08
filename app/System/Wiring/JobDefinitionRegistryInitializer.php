@@ -9,6 +9,7 @@ use App\Jobs\JobDefinitionRegistry;
 use App\Jobs\JobType;
 use App\Jobs\JobMessageHandler;
 use App\Jobs\Handlers\AddInputJobHandler;
+use App\Jobs\Handlers\AcquireItemAssetsJobHandler;
 use App\Jobs\Handlers\BroadcastJobHandler;
 use App\Jobs\Handlers\DownloadCaptionsJobHandler;
 use App\Jobs\Handlers\DownloadJobHandler;
@@ -31,6 +32,7 @@ final class JobDefinitionRegistryInitializer implements Initializer
             'core.add_input' => [AddInputJobHandler::class, 'interactive'],
             'core.sync_input' => [SyncInputJobHandler::class, 'background'],
             'core.download' => [DownloadJobHandler::class, 'background'],
+            'core.acquire_assets' => [AcquireItemAssetsJobHandler::class, 'background'],
             'core.download_captions' => [DownloadCaptionsJobHandler::class, 'background'],
             'core.storage_check' => [StorageCheckJobHandler::class, 'background'],
             'core.verify_vault' => [VerifyVaultJobHandler::class, 'background'],

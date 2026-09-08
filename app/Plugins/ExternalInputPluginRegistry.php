@@ -51,6 +51,17 @@ final class ExternalInputPluginRegistry
         return null;
     }
 
+    public function definitionForProvider(string $providerKey): ?PluginInputDefinition
+    {
+        foreach ($this->definitions as $definition) {
+            if ($definition->providerKey === $providerKey) {
+                return $definition;
+            }
+        }
+
+        return null;
+    }
+
     /** @return list<PluginInputDefinition> */
     public function definitions(): array
     {
