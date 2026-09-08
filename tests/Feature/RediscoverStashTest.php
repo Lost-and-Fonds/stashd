@@ -13,7 +13,7 @@ test('rediscover fills missing discovery metadata without overwriting saved valu
     $items = $this->container->get(ItemRepository::class);
     $item = $items->find(ItemId::parse($itemId));
     $item->description = null;
-    $item->durationSeconds = null;
+    $item->duration = null;
     $item->publishedAt = null;
     $item->title = 'Saved title';
     $items->save($item);
@@ -24,6 +24,6 @@ test('rediscover fills missing discovery metadata without overwriting saved valu
     expect($result)->toMatchArray(['inputs' => 1, 'discovered' => 3, 'matched' => 3, 'updated' => 1, 'fields' => 3])
         ->and($reloaded->title)->toBe('Saved title')
         ->and($reloaded->description)->toBe('Fake episode 1 description.')
-        ->and((int) $reloaded->durationSeconds?->getTotalSeconds())->toBe(630)
+        ->and((int) $reloaded->duration?->getTotalSeconds())->toBe(630)
         ->and($reloaded->publishedAt?->toRfc3339(useZ: true))->toBe('2026-01-01T12:00:00Z');
 });

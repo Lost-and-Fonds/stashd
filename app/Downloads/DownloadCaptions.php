@@ -48,7 +48,7 @@ final readonly class DownloadCaptions
                 'description' => $item->description,
                 'published_at' => $item->publishedAt?->toRfc3339(useZ: true),
                 'artwork_reference' => $item->thumbnailUri,
-                'duration_seconds' => $item->durationSeconds,
+                'duration_seconds' => $item->duration === null ? null : (int) $item->duration->getTotalSeconds(),
                 'kind' => $item->contentType,
             ],
             staging: $temp,

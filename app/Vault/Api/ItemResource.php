@@ -35,7 +35,7 @@ final readonly class ItemResource
             'upstreamState' => $this->item->upstreamState->value,
             'contentType' => $this->item->contentType,
             'creatorName' => $this->item->creatorName,
-            'durationSeconds' => DurationSeconds::toSeconds($this->item->durationSeconds),
+            'durationSeconds' => DurationSeconds::toSeconds($this->item->duration),
             'publishedAt' => $this->item->publishedAt,
             'thumbnailUri' => $this->item->thumbnailUri,
             'lastSeenUpstreamAt' => $this->item->lastSeenUpstreamAt,

@@ -114,8 +114,8 @@ final readonly class DiscoveredItemCommitter
                     $changed = $item->publishedAt !== null || $changed;
                 }
 
-                if ($item->durationSeconds === null && isset($discoveredItem['duration_seconds'])) {
-                    $item->durationSeconds = DurationSeconds::toDuration(ApiJson::integer($discoveredItem['duration_seconds']));
+                if ($item->duration === null && isset($discoveredItem['duration_seconds'])) {
+                    $item->duration = DurationSeconds::toDuration(ApiJson::integer($discoveredItem['duration_seconds']));
                     $changed = true;
                 }
 

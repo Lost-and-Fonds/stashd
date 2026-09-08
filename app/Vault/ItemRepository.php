@@ -47,7 +47,7 @@ final class ItemRepository
             state: $state,
             upstreamState: $upstreamState,
             description: $description,
-            durationSeconds: DurationSeconds::toDuration($durationSeconds),
+            duration: DurationSeconds::toDuration($durationSeconds),
             publishedAt: $publishedAt,
             thumbnailUri: $thumbnailUri instanceof StashdUri ? $thumbnailUri->toString() : $thumbnailUri,
             contentType: $contentType,

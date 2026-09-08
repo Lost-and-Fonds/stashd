@@ -33,7 +33,7 @@ final class ItemRecord
         public ?string $creatorProviderId = null,
         #[CastWith(DurationSecondsCaster::class)]
         #[SerializeWith(DurationSecondsSerializer::class)]
-        public ?Duration $durationSeconds = null,
+        public ?Duration $duration = null,
         public ?DateTime $publishedAt = null,
         public ?string $thumbnailUri = null,
         public ?string $contentType = null,

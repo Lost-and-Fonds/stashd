@@ -92,7 +92,7 @@ final class StashItemRepository
         match ($sort) {
             'title' => $query->orderBy('items.title', $direction),
             'published' => $query->orderBy('items.publishedAt', $direction),
-            'duration' => $query->orderBy('items.durationSeconds', $direction),
+            'duration' => $query->orderBy('items.duration', $direction),
             'status' => $query->orderBy('items.state', $direction),
             // Asset size is a per-item aggregate across `assets`, not a
             // plain column -- no join gives us that directly, so this is a
@@ -132,7 +132,7 @@ final class StashItemRepository
              JOIN "items" ON "items"."id" = "stash_items"."itemId"
              WHERE "stash_items"."stashInputId" = ?
                AND ("items"."description" IS NULL
-                    OR "items"."durationSeconds" IS NULL
+                    OR "items"."duration" IS NULL
                     OR "items"."publishedAt" IS NULL
                     OR "items"."thumbnailUri" IS NULL)
              LIMIT 1',

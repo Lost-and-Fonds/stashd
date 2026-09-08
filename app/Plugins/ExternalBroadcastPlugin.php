@@ -199,7 +199,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 'title' => $preservedItem->title ?? $stashItem->displayTitle ?? 'Untitled',
                 'description' => $preservedItem->description ?? $stashItem->displayDescription,
                 'published-at' => ($preservedItem->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
-                'duration-seconds' => $preservedItem->durationSeconds,
+                'duration-seconds' => $preservedItem->duration === null ? null : (int) $preservedItem->duration->getTotalSeconds(),
                 'resources' => $resources,
             ];
             $itemStashItemIds[(string) $item->id] = (string) $stashItem->id;
@@ -269,7 +269,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                     'title' => $preservedItem->title ?? $stashItem->displayTitle ?? 'Untitled',
                     'description' => $preservedItem->description ?? $stashItem->displayDescription,
                     'published-at' => ($preservedItem->publishedAt ?? $stashItem->firstSeenAt)?->toNativeDateTime()->format(DATE_RSS),
-                    'duration-seconds' => $preservedItem->durationSeconds,
+                    'duration-seconds' => $preservedItem->duration === null ? null : (int) $preservedItem->duration->getTotalSeconds(),
                     'resources' => $this->resources($context->broadcast, $preservedItem, $stage, $stagedAssets),
                 ];
             }

@@ -61,8 +61,8 @@ final readonly class RediscoverStash
                     $fields++;
                 }
 
-                if ($item->durationSeconds === null && is_int($discoveredItem['duration_seconds'] ?? null)) {
-                    $item->durationSeconds = DurationSeconds::toDuration($discoveredItem['duration_seconds']);
+                if ($item->duration === null && is_int($discoveredItem['duration_seconds'] ?? null)) {
+                    $item->duration = DurationSeconds::toDuration($discoveredItem['duration_seconds']);
                     $fields++;
                 }
 

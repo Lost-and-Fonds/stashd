@@ -127,7 +127,7 @@ final readonly class DownloadItem
                 downloadPolicy: $stash->downloadPolicy,
                 tempDirectory: $tempDirectory,
                 force: $force,
-                durationSeconds: DurationSeconds::toSeconds($item->durationSeconds),
+                durationSeconds: DurationSeconds::toSeconds($item->duration),
                 thumbnailUri: $item->thumbnailUri !== null ? StashdUri::parse($item->thumbnailUri) : null,
                 title: $item->title,
                 publishedAt: $item->publishedAt,

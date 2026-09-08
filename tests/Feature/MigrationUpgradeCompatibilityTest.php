@@ -32,11 +32,16 @@ test('fresh databases converge from the supported baseline', function (): void {
     $database = $this->container->get(Database::class);
     $broadcastColumns = schemaColumns($database, 'broadcasts');
     $assetColumns = schemaColumns($database, 'assets');
+    $itemColumns = schemaColumns($database, 'items');
 
     expect($broadcastColumns)
         ->not->toContain('tokenSecretId')
         ->not->toContain('tokenPreview')
         ->and($assetColumns)->toContain('derivationKey');
+
+    expect($itemColumns)
+        ->toContain('duration')
+        ->not->toContain('durationSeconds');
 
     expect(schemaTableExists($database, 'preservation_events'))->toBeTrue();
 });
@@ -91,9 +96,11 @@ test('known legacy history is adopted before post-baseline migrations run', func
         ->toContain(SupportedPostgresBaseline::NAME)
         ->toContain('2026_08_22_add_asset_derivation_key')
         ->toContain('2026_09_08_rename_media_item_to_item')
+        ->toContain('2026_09_09_rename_item_duration_seconds_to_duration')
         ->not->toContain('2026_07_15_drop_stash_slug')
         ->and(schemaColumns($database, 'broadcasts'))->not->toContain('tokenSecretId')
-        ->and(schemaTableExists($database, 'items'))->toBeTrue();
+        ->and(schemaTableExists($database, 'items'))->toBeTrue()
+        ->and(schemaColumns($database, 'items'))->toContain('duration');
 });
 
 test('unknown legacy history is refused instead of adopted', function (): void {
@@ -128,6 +135,7 @@ function prepareLegacyBaseline(Database $database): void
     $database->execute(new Query('ALTER INDEX media_timeline_entries_item_id_source_external_id RENAME TO media_timeline_entries_media_item_id_source_external_id'));
     $database->execute(new Query('ALTER INDEX stash_items_item_id RENAME TO stash_items_media_item_id'));
     $database->execute(new Query('ALTER INDEX stash_items_stash_id_item_id RENAME TO stash_items_stash_id_media_item_id'));
+    $database->execute(new Query('ALTER TABLE items RENAME COLUMN duration TO "durationSeconds"'));
     $database->execute(new Query('ALTER TABLE item_sources RENAME TO media_item_sources'));
     $database->execute(new Query('ALTER TABLE items RENAME TO media_items'));
     $database->execute(new Query('DROP TABLE IF EXISTS preservation_events'));

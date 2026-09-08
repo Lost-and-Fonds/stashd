@@ -50,7 +50,7 @@ final readonly class StashItemResource
                 'title' => $this->relatedItem->title,
                 'state' => $this->relatedItem->state->value,
                 'thumbnailUri' => $this->relatedItem->thumbnailUri,
-                'durationSeconds' => DurationSeconds::toSeconds($this->relatedItem->durationSeconds),
+                'durationSeconds' => DurationSeconds::toSeconds($this->relatedItem->duration),
                 'contentType' => $this->relatedItem->contentType,
                 'publishedAt' => $this->relatedItem->publishedAt,
                 'failureReason' => $this->downloadFailureReason,
