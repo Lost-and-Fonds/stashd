@@ -46,7 +46,12 @@ final readonly class AssetAcquisitionPlanner
         foreach ($this->stashItems->listForStash($stashId, includeIgnored: false, stashInputId: StashInputId::fromPrimaryKey($input->id)) as $stashItem) {
             $item = $stashItem->item;
 
-            if ($item === null || $item->state !== ItemState::Ready) {
+            if ($item === null || ! in_array($item->state, [
+                ItemState::Discovered,
+                ItemState::MetadataReady,
+                ItemState::Ready,
+                ItemState::Missing,
+            ], true)) {
                 continue;
             }
 
