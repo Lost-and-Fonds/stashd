@@ -14,8 +14,9 @@ final class ExternalInputPluginRegistry
 {
     /** @param list<Provider> $plugins
      * @param list<PluginInputDefinition> $definitions
+     * @param array<string, DownloaderInterface> $downloaders
      */
-    public function __construct(private array $plugins, private array $definitions) {}
+    public function __construct(private array $plugins, private array $definitions, private array $downloaders = []) {}
 
     public function get(string $id): Provider
     {
@@ -35,9 +36,27 @@ final class ExternalInputPluginRegistry
 
     public function findDownloader(string $id): ?DownloaderInterface
     {
+        if (isset($this->downloaders[$id])) {
+            return $this->downloaders[$id];
+        }
+
         $plugin = $this->find($id);
 
         return $plugin instanceof DownloaderInterface ? $plugin : null;
+    }
+
+    /** @return list<DownloaderInterface> */
+    public function downloaders(): array
+    {
+        $downloaders = $this->downloaders;
+
+        foreach ($this->plugins as $plugin) {
+            if ($plugin instanceof DownloaderInterface && ! isset($downloaders[$plugin->key()])) {
+                $downloaders[$plugin->key()] = $plugin;
+            }
+        }
+
+        return array_values($downloaders);
     }
 
     public function definition(string $id): ?PluginInputDefinition

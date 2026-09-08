@@ -7,6 +7,7 @@ namespace Tests;
 use App\Auth\AuthService;
 use App\Auth\UserRepository;
 use App\Jobs\MessengerWorkerRunner;
+use App\Downloads\Fake\FakeDownloader;
 use App\Plugins\ExternalInputPluginRegistry;
 use App\Plugins\PluginInputDefinition;
 use App\Providers\Fake\FakeProvider;
@@ -127,7 +128,9 @@ abstract class IntegrationTestCase extends IntegrationTest
 
         $this->container->singleton(ExternalInputPluginRegistry::class, new ExternalInputPluginRegistry([
             $this->container->get(FakeProvider::class),
-        ], [$definition]));
+        ], [$definition], [
+            FakeProvider::KEY => $this->container->get(FakeDownloader::class),
+        ]));
     }
 
     /**
