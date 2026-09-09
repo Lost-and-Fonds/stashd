@@ -31,7 +31,9 @@ use App\Broadcasts\UiControl;
 use App\Connections\ConnectionRepository;
 use App\Connections\ConnectionSecrets;
 use App\Stashes\DownloadPolicy;
+use App\Stashes\StashInputRecord;
 use App\Stashes\StashItemId;
+use App\Stashes\StashItemRecord;
 use App\Support\PrefixedUlid;
 use App\System\State\StateTransitionService;
 use App\Vault\AssetId;
@@ -68,6 +70,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         private ConnectionRepository $connections,
         private ConnectionSecrets $connectionSecrets,
         private HardlinkPublisher $hardlinks,
+        private BroadcastAssetRequirementEvaluator $requirements,
     ) {}
 
     public function broadcastKeys(): array
@@ -184,6 +187,26 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 continue;
             }
 
+            $requirementState = $this->requirements->state(
+                $this->definition->assetRequirements,
+                $context->settings(),
+                $preservedItem,
+                $this->inputFor($context, $stashItem),
+            );
+
+            if ($requirementState === BroadcastAssetRequirementState::Pending) {
+                $this->pendingItem($item);
+
+                continue;
+            }
+
+            if ($requirementState === BroadcastAssetRequirementState::PermanentlyUnavailable) {
+                $this->failItem($item, 'required_asset_unavailable');
+                $failed[] = (string) $stashItem->id;
+
+                continue;
+            }
+
             $resources = $this->resources($context->broadcast, $preservedItem, $stage, $stagedAssets);
 
             if ($resources === []) {
@@ -233,6 +256,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                     $validArtifacts[] = $artifact;
                 }
             }
+
             /** @var list<array<string, mixed>> $validArtifacts */
             if (is_callable($context->progress)) {
                 ($context->progress)('Finalizing prepared media', 0.5);
@@ -837,6 +861,17 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         return '';
     }
 
+    private function inputFor(BroadcastContext $context, StashItemRecord $stashItem): ?StashInputRecord
+    {
+        foreach ($context->stashInputs as $input) {
+            if ((string) $input->id === (string) $stashItem->stashInputId) {
+                return $input;
+            }
+        }
+
+        return null;
+    }
+
     private function removeStage(string $stage): void
     {
         if (! Filesystem\is_directory($stage)) {
@@ -869,8 +904,10 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         $values['stash_description'] ??= $context->stash->description;
         $values['stash_icon_uri'] ??= $context->stash->iconUri;
         $sourceSettings = $values['source_settings'] ?? null;
+
         if (is_array($sourceSettings) && count($sourceSettings) === 1) {
             $singleSourceSettings = reset($sourceSettings);
+
             if (is_array($singleSourceSettings) && isset($singleSourceSettings['season']) && is_int($singleSourceSettings['season'])) {
                 $values['season'] ??= $singleSourceSettings['season'];
             }
@@ -946,6 +983,15 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
         $item->lastError = null;
         $this->items->save($item);
         $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Ready);
+    }
+
+    private function pendingItem(BroadcastItemRecord $item): void
+    {
+        if ($item->state !== BroadcastItemState::Pending && $item->state->canTransitionTo(BroadcastItemState::Pending)) {
+            $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Pending);
+        }
+        $item->lastError = 'required_asset_pending';
+        $this->items->save($item);
     }
 
     private function failItem(BroadcastItemRecord $item, string $reason): void

@@ -17,6 +17,7 @@ use App\Jobs\JobDefinitionRegistry;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
 use App\Plugins\ExternalBroadcastPlugin;
+use App\Stashes\AssetAcquisitionPlanner;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\StashId;
 use App\Stashes\StashInputRepository;
@@ -55,6 +56,7 @@ final readonly class BroadcastController
         private JobDefinitionRegistry $jobDefinitions,
         private ConnectionRepository $connections,
         private ActivityEventService $activity,
+        private AssetAcquisitionPlanner $assetAcquisitions,
     ) {}
 
     #[Get('/api/v1/broadcast-plugins')]
@@ -215,6 +217,7 @@ final readonly class BroadcastController
             settings: $settings,
         );
         $this->activity->broadcastCreated($broadcast);
+        $this->assetAcquisitions->dispatchMissingForBroadcast($broadcast);
 
         $build = $this->jobDispatcher->dispatch(
             'core.broadcast',

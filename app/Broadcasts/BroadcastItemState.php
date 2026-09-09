@@ -18,10 +18,10 @@ enum BroadcastItemState: string
     {
         return match ($this) {
             self::Pending => [self::Processing, self::Disabled],
-            self::Processing => [self::Ready, self::Stale, self::Failed],
-            self::Ready => [self::Processing, self::Stale, self::Disabled],
-            self::Stale => [self::Processing, self::Ready, self::Failed],
-            self::Failed => [self::Processing],
+            self::Processing => [self::Pending, self::Ready, self::Stale, self::Failed],
+            self::Ready => [self::Pending, self::Processing, self::Stale, self::Disabled],
+            self::Stale => [self::Pending, self::Processing, self::Ready, self::Failed],
+            self::Failed => [self::Pending, self::Processing],
             self::Disabled => [self::Pending, self::Processing],
         };
     }

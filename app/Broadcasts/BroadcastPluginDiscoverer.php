@@ -6,6 +6,7 @@ namespace App\Broadcasts;
 
 use App\Connections\ConnectionRepository;
 use App\Connections\ConnectionSecrets;
+use App\Plugins\BroadcastAssetRequirementEvaluator;
 use App\Plugins\ExternalBroadcastPlugin;
 use App\Plugins\ExternalBroadcastPluginRegistry;
 use App\System\State\StateTransitionService;
@@ -88,6 +89,8 @@ final class BroadcastPluginDiscoverer implements Discovery
                 $connectionSecrets = $this->container->get(ConnectionSecrets::class);
                 /** @var HardlinkPublisher $hardlinks */
                 $hardlinks = $this->container->get(HardlinkPublisher::class);
+                /** @var BroadcastAssetRequirementEvaluator $requirements */
+                $requirements = $this->container->get(BroadcastAssetRequirementEvaluator::class);
                 $instance = new ExternalBroadcastPlugin(
                     definition: $definition,
                     runtimes: $runtimes,
@@ -103,6 +106,7 @@ final class BroadcastPluginDiscoverer implements Discovery
                     connections: $connections,
                     connectionSecrets: $connectionSecrets,
                     hardlinks: $hardlinks,
+                    requirements: $requirements,
                 );
             } catch (\Throwable $e) {
                 error_log("[stashd] BroadcastPluginDiscoverer: failed to resolve external {$definition->id}: {$e->getMessage()}");

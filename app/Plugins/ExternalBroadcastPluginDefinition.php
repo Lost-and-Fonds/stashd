@@ -20,6 +20,7 @@ final readonly class ExternalBroadcastPluginDefinition
      * @param  array<string, string>  $operations
      * @param  array<int, array<string, mixed>>  $sourceOptions
      * @param  list<JobDefinition> $jobs
+     * @param  list<BroadcastAssetRequirement> $assetRequirements
      */
     public function __construct(
         public string $id,
@@ -47,6 +48,7 @@ final readonly class ExternalBroadcastPluginDefinition
         public string $credentialPlacement,
         public array $sourceOptions,
         public array $jobs = [],
+        public array $assetRequirements = [],
     ) {}
 
     public static function fromManifest(mixed $raw, string $root, string $socketPath, ?string $manifestDirectory = null): ?self
@@ -158,6 +160,13 @@ final readonly class ExternalBroadcastPluginDefinition
         $sourceOptions = is_array($raw['source_options'] ?? null)
             ? array_values(array_filter($raw['source_options'], 'is_array'))
             : [];
+        $assetRequirements = [];
+
+        foreach (is_array($raw['asset_requirements'] ?? null) ? $raw['asset_requirements'] : [] as $requirement) {
+            if (is_array($requirement) && ($parsed = BroadcastAssetRequirement::fromManifest($requirement)) !== null) {
+                $assetRequirements[] = $parsed;
+            }
+        }
 
         return new self(
             id: $required('id'),
@@ -185,6 +194,7 @@ final readonly class ExternalBroadcastPluginDefinition
             credentialPlacement: is_array($raw['credential'] ?? null) && in_array($raw['credential']['placement'] ?? null, ['query', 'header'], true) ? $raw['credential']['placement'] : 'query',
             sourceOptions: $sourceOptions,
             jobs: PluginJobDefinitions::fromManifest($raw),
+            assetRequirements: $assetRequirements,
         );
     }
 

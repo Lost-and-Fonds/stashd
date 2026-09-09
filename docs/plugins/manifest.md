@@ -425,6 +425,31 @@ Configuration fields rendered/validated by Stashd for a Broadcast. The shared
 option shape supports text/textarea/url/select/number/boolean/bool and optional
 defaults, choices, descriptions, etc.
 
+### `asset_requirements`
+
+Broadcasts may declare the direct Vault assets they need for each item:
+
+```json
+"asset_requirements": [
+  {"role": "primary", "required": true},
+  {"role": "captions", "kind": "subtitle", "required": false,
+   "when": {"setting": "captions", "not_equals": "off"}}
+]
+```
+
+Supported roles are `primary`, `captions`, `artwork`, and `metadata`. `kind` is
+optional and narrows the requirement to an Asset kind such as `video` or
+`subtitle`. `required` controls whether a missing asset can prevent that item
+from being published. A `when` condition enables the requirement only when the
+named Broadcast setting strictly equals (or does not equal) the given scalar
+value.
+
+Missing required assets remain pending while an Input can still acquire them.
+If every matching Input capability has permanently failed, Core excludes only
+that item and continues publishing the rest of the Broadcast. Optional assets
+never block publication. The plugin still receives all ready direct resources,
+so it owns any transcoding or other derived output it needs.
+
 ### `source_options`, `actions`, `prepare_helper`
 
 These are current application-integration fields used by some Broadcasts:

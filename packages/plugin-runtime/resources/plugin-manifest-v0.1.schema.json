@@ -63,6 +63,10 @@
       "type": "object",
       "additionalProperties": {"$ref": "#/$defs/helper"}
     },
+    "asset_requirements": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/asset_requirement"}
+    },
     "helper": {"$ref": "#/$defs/helper"},
     "operations": {"type": "object", "additionalProperties": {"type": ["string", "array"]}},
     "requires": {
@@ -102,6 +106,30 @@
         },
         "additionalProperties": true
       }
+    },
+    "asset_requirement": {
+      "type": "object",
+      "required": ["role", "required"],
+      "properties": {
+        "role": {"enum": ["primary", "captions", "artwork", "metadata"]},
+        "kind": {"enum": ["audio", "video", "image", "subtitle", "metadata", "link", "feed", "other"]},
+        "required": {"type": "boolean"},
+        "when": {
+          "type": "object",
+          "required": ["setting"],
+          "properties": {
+            "setting": {"type": "string", "minLength": 1},
+            "equals": {"type": ["boolean", "number", "string"]},
+            "not_equals": {"type": ["boolean", "number", "string"]}
+          },
+          "oneOf": [
+            {"required": ["equals"], "not": {"required": ["not_equals"]}},
+            {"required": ["not_equals"], "not": {"required": ["equals"]}}
+          ],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": true

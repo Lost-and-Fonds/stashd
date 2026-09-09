@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
+use App\Broadcasts\BroadcastRecord;
 use App\Jobs\JobDispatcher;
 use App\Jobs\JobRepository;
 use App\Jobs\JobType;
 use App\Plugins\AssetAvailabilityRepository;
+use App\Plugins\BroadcastAssetRequirement;
+use App\Plugins\ExternalBroadcastPluginRegistry;
 use App\Plugins\ExternalInputPluginRegistry;
 use App\Plugins\PluginAssetCapability;
 use App\System\Storage\VaultStorageAvailability;
 use App\Vault\AssetRepository;
+use App\Vault\AssetRecord;
 use App\Vault\AssetState;
 use App\Vault\ItemState;
 
@@ -25,9 +29,12 @@ final readonly class AssetAcquisitionPlanner
         private JobRepository $jobs,
         private JobDispatcher $dispatch,
         private VaultStorageAvailability $storage,
+        private ExternalBroadcastPluginRegistry $broadcasts,
+        private StashInputRepository $inputs,
     ) {}
 
-    public function dispatchMissing(StashId $stashId, StashInputRecord $input): int
+    /** @param list<BroadcastAssetRequirement>|null $requirements */
+    public function dispatchMissing(StashId $stashId, StashInputRecord $input, ?array $requirements = null): int
     {
         if ($this->storage->isUnavailable()) {
             return 0;
@@ -68,9 +75,18 @@ final readonly class AssetAcquisitionPlanner
                     continue;
                 }
 
-                $existing = $this->assets->findByItemAndRole($stashItem->itemId, $capability->assetRole);
+                if ($requirements !== null && ! $this->matchesRequirement($capability, $requirements)) {
+                    continue;
+                }
 
-                if (($existing !== null && in_array($existing->state, [AssetState::Ready, AssetState::Stale], true))
+                $existing = array_filter(
+                    $this->assets->listForItem($stashItem->itemId),
+                    static fn(mixed $asset): bool => $asset instanceof AssetRecord
+                        && $asset->role === $capability->assetRole
+                        && $asset->kind === $capability->kind,
+                );
+
+                if (array_filter($existing, static fn(AssetRecord $asset): bool => in_array($asset->state, [AssetState::Ready, AssetState::Stale], true)) !== []
                     || $this->availability->isPermanentlyUnavailable($stashItem->itemId, $capability, $definition->version)) {
                     continue;
                 }
@@ -99,5 +115,45 @@ final readonly class AssetAcquisitionPlanner
         }
 
         return $dispatched;
+    }
+
+    public function dispatchMissingForBroadcast(BroadcastRecord $broadcast): int
+    {
+        $definition = $this->broadcasts->findByLogicalKey($broadcast->type);
+
+        if ($definition === null) {
+            return 0;
+        }
+
+        $requirements = array_values(array_filter(
+            $definition->assetRequirements,
+            static fn(mixed $requirement): bool => $requirement instanceof BroadcastAssetRequirement
+                && $requirement->enabled($broadcast->settings ?? []),
+        ));
+
+        if ($requirements === []) {
+            return 0;
+        }
+
+        $dispatched = 0;
+
+        foreach ($this->inputs->listForStash($broadcast->stashId) as $input) {
+            $dispatched += $this->dispatchMissing($broadcast->stashId, $input, $requirements);
+        }
+
+        return $dispatched;
+    }
+
+    /** @param list<BroadcastAssetRequirement> $requirements */
+    private function matchesRequirement(PluginAssetCapability $capability, array $requirements): bool
+    {
+        foreach ($requirements as $requirement) {
+            if ($requirement->assetRole === $capability->assetRole
+                && ($requirement->kind === null || $requirement->kind === $capability->kind)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
