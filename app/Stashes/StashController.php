@@ -260,6 +260,7 @@ final readonly class StashController
 
         $rawIncludeIgnored = $request->get('include_ignored');
         $includeIgnored = ! (is_string($rawIncludeIgnored) && $rawIncludeIgnored === 'false');
+
         if ($status === ItemState::Ignored) {
             $includeIgnored = true;
         }

@@ -39,11 +39,13 @@ final readonly class VerificationCandidateFinder
 
             if ($status === FixityStatus::Verifying) {
                 $alreadyQueued++;
+
                 continue;
             }
 
             if ($status === FixityStatus::Unverified && ($asset->checksum === null || $asset->checksum === '' || $asset->path === null)) {
                 $unverifiable++;
+
                 continue;
             }
 

@@ -169,6 +169,7 @@ final readonly class ItemController
             foreach ($stashItems as $candidate) {
                 if (($stashes[(string) $candidate->stashId] ?? null)?->downloadPolicy !== DownloadPolicy::MetadataOnly) {
                     $stashItem = $candidate;
+
                     break;
                 }
             }

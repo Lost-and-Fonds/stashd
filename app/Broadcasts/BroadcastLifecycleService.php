@@ -296,6 +296,7 @@ final readonly class BroadcastLifecycleService
     private function publishOnly(BroadcastRecord $broadcast, ?BroadcastPlan $plan = null, ?callable $onProgress = null): BroadcastPublishResult
     {
         $context = $this->contextFactory->build($broadcast);
+
         if ($onProgress !== null) {
             $context = new BroadcastContext($context->broadcast, $context->stash, $context->stashItems, $context->items, $context->vaultOriginals, $context->stashInputs, $onProgress);
         }
