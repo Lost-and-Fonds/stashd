@@ -125,19 +125,25 @@ final class FakeProvider implements Provider, SourceResolvingInputProvider
     }
 
     /** @return list<DiscoveredItem> */
-    public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = [], ?callable $onProgress = null): array
+    public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = [], ?callable $onProgress = null, ?callable $onDiscovered = null): array
     {
         if ($strategy->key !== 'fake.feed') {
             throw new InvalidArgumentException("Unsupported fake discovery strategy: {$strategy->key}");
         }
 
-        return match ($input->inputType) {
+        $items = match ($input->inputType) {
             'channel' => $this->discoverChannel($input),
             'playlist' => $this->discoverPlaylist($input),
             'fail' => throw new RuntimeException('Fake provider rate limit exceeded.', 429),
             'item' => $this->discoverSingleItem($input),
             default => throw new InvalidArgumentException("Unsupported fake input type: {$input->inputType}"),
         };
+
+        foreach ($items as $item) {
+            $onDiscovered?->__invoke($item);
+        }
+
+        return $items;
     }
 
     /** @return list<DiscoveredItem> */

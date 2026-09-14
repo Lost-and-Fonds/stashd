@@ -24,7 +24,7 @@ final readonly class DiscoverStashInput
     ) {}
 
     /** @param array<string, mixed> $payload */
-    public function execute(array $payload, ?JobType $intent = null, ?callable $onProgress = null): InputPreflightResult
+    public function execute(array $payload, ?JobType $intent = null, ?callable $onProgress = null, ?callable $onDiscovered = null): InputPreflightResult
     {
         $intent ??= JobType::core('core.preflight');
         $sourceUri = str(ApiJson::string($payload['source_uri'] ?? null))->trim()->toString();
@@ -42,11 +42,12 @@ final readonly class DiscoverStashInput
             $payload['provider_options'] ?? null,
             $intent,
             $onProgress,
+            $onDiscovered,
             ($payload['backfill_missing'] ?? false) === true,
         );
     }
 
-    public function executeResolved(ResolvedInput $resolved, string $sourceUri, ?string $sourceTitle, mixed $providerOptions, ?JobType $intent = null, ?callable $onProgress = null, bool $backfillMissing = false): InputPreflightResult
+    public function executeResolved(ResolvedInput $resolved, string $sourceUri, ?string $sourceTitle, mixed $providerOptions, ?JobType $intent = null, ?callable $onProgress = null, ?callable $onDiscovered = null, bool $backfillMissing = false): InputPreflightResult
     {
         $intent ??= JobType::core('core.preflight');
         $provider = $this->providers->get($resolved->providerKey);
@@ -80,8 +81,13 @@ final readonly class DiscoverStashInput
             default => null,
         };
         $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);
+        $inputOptions = $provider->inputOptions($resolved);
+        $reportDiscovered = $onDiscovered === null ? null : static function (DiscoveredItem $item) use ($onDiscovered, $resolved, $inputOptions): void {
+            $onDiscovered($resolved, DiscoveredItem::toArray($item), $inputOptions);
+        };
+
         /** @var list<DiscoveredItem> $discovered */
-        $discovered = $provider->discover($resolved, $strategy, self::providerOptions($providerOptions), $onProgress);
+        $discovered = $provider->discover($resolved, $strategy, self::providerOptions($providerOptions), $onProgress, $reportDiscovered);
 
         if ($sourceTitle === null && $resolved->inputType === 'playlist') {
             $inputTitle = $this->playlistTitle($discovered);
@@ -118,7 +124,7 @@ final readonly class DiscoverStashInput
             estimatedItemCount: $estimatedItemCount,
             estimatedTotalDurationSeconds: $estimatedDuration,
             discoveredItems: $discoveredItems,
-            inputOptions: $provider->inputOptions($resolved),
+            inputOptions: $inputOptions,
         );
     }
 

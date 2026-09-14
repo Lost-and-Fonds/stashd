@@ -40,7 +40,9 @@ final readonly class SyncInputJobHandler implements JobHandler
         $input = $this->stashInputs->find(StashInputId::parse($rawInputId))
             ?? throw new RuntimeException('Sync job targets an input that no longer exists.');
 
-        $result = $this->sync->execute($input);
+        $result = $this->sync->execute($input, function (string $stage, ?float $fraction) use ($context, $job): void {
+            $context->progress($job, $fraction === null ? JobProgressUpdate::indeterminate($stage) : JobProgressUpdate::ofPercent($fraction * 100, $stage));
+        });
 
         $job->progressCurrent = 1;
         $job->progressTotal = 1;

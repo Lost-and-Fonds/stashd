@@ -52,3 +52,15 @@ test('fake provider discovers twenty playlist items', function (): void {
     expect($items)->toHaveCount(20)
         ->and($items[0]->description)->toBe('Fake track 1 description.');
 });
+
+test('fake provider reports items as they are discovered', function (): void {
+    $provider = new FakeProvider();
+    $input = $provider->resolveInput(StashdUri::parse('fake://channel/demo'));
+    $reported = [];
+
+    $provider->discover($input, $provider->discoveryStrategies()[0], onDiscovered: static function ($item) use (&$reported): void {
+        $reported[] = $item->providerItemId;
+    });
+
+    expect($reported)->toBe(['demo-episode-1', 'demo-episode-2', 'demo-episode-3']);
+});

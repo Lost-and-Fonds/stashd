@@ -8,6 +8,7 @@ use App\Broadcasts\BroadcastRepository;
 use App\Downloads\DownloadPolicyEvaluator;
 use App\Jobs\JobType;
 use App\Jobs\JobDispatcher;
+use App\Providers\ResolvedInput;
 use RuntimeException;
 use Tempest\Database\Database;
 use Tempest\DateTime\DateTime;
@@ -38,7 +39,7 @@ final readonly class SyncStashInput
         private AssetAcquisitionPlanner $assetAcquisitions,
     ) {}
 
-    public function execute(StashInputRecord $input): StashInputSyncResult
+    public function execute(StashInputRecord $input, ?callable $onProgress = null): StashInputSyncResult
     {
         $stashId = $input->stashId;
         $stashInputId = StashInputId::fromPrimaryKey($input->id);
@@ -53,34 +54,44 @@ final readonly class SyncStashInput
                 $providerOptions['skip_size_enrichment'] = true;
             }
 
+            $incremental = [];
+            $commit = function (ResolvedInput $resolved, array $items, array $inputOptions) use ($stashId, $stashInputId, $input): DiscoveredItemCommitCounts {
+                return $this->database->withinTransaction(fn(): DiscoveredItemCommitCounts => $this->committer->commit(
+                    stashId: $stashId,
+                    stashInputId: $stashInputId,
+                    resolved: $resolved,
+                    discoveredItems: $items,
+                    inputOptions: $input->options,
+                    declaredInputOptions: $inputOptions,
+                ));
+            };
+            $dispatchDownloads = function (DiscoveredItemCommitCounts $counts) use ($stash, $stashId): void {
+                if (! $this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
+                    return;
+                }
+
+                foreach ($counts->downloadableItemIds as $itemId) {
+                    $this->jobDispatcher->dispatch('core.download', 'item', $itemId, $stashId->toString(), [
+                        'item_id' => $itemId,
+                        'stash_id' => $stashId->toString(),
+                    ], 'background');
+                }
+            };
+
             $discovered = $this->discovery->execute([
                 'source_uri' => $input->sourceUri,
                 'source_title' => $input->title,
                 'provider_options' => $providerOptions,
                 'backfill_missing' => $backfillMissing,
-            ], JobType::core('core.sync_input'));
-
-            $counts = new DiscoveredItemCommitCounts();
-            $committed = $this->database->withinTransaction(function () use (
-                $stashId,
-                $stashInputId,
-                $discovered,
-                $input,
-                &$counts,
-            ): void {
-                $counts = $this->committer->commit(
-                    stashId: $stashId,
-                    stashInputId: $stashInputId,
-                    resolved: $discovered->resolvedInput,
-                    discoveredItems: $discovered->discoveredItems,
-                    inputOptions: $input->options,
-                    declaredInputOptions: $discovered->inputOptions,
-                );
+            ], JobType::core('core.sync_input'), $onProgress, function (ResolvedInput $resolved, array $item, array $inputOptions) use (&$incremental, $commit, $dispatchDownloads, $onProgress): void {
+                $counts = $commit($resolved, [$item], $inputOptions);
+                $incremental[] = $counts;
+                $dispatchDownloads($counts);
+                $onProgress?->__invoke(sprintf('Discovered %d item(s)', count($incremental)), null);
             });
 
-            if (! $committed) {
-                throw new RuntimeException('Failed to commit synced items.');
-            }
+            $incremental[] = $commit($discovered->resolvedInput, $discovered->discoveredItems, $discovered->inputOptions);
+            $counts = $this->combineCounts($incremental);
         } catch (Throwable $throwable) {
             $this->recordFailure($input);
 
@@ -98,15 +109,6 @@ final readonly class SyncStashInput
                 $this->jobDispatcher->dispatch('core.broadcast', 'broadcast', (string) $broadcast->id, $stashId->toString(), [
                     'broadcast_id' => (string) $broadcast->id,
                     'action' => 'rebuild',
-                ], 'background');
-            }
-        }
-
-        if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
-            foreach ($counts->downloadableItemIds as $itemId) {
-                $this->jobDispatcher->dispatch('core.download', 'item', $itemId, $stashId->toString(), [
-                    'item_id' => $itemId,
-                    'stash_id' => $stashId->toString(),
                 ], 'background');
             }
         }
@@ -156,6 +158,17 @@ final readonly class SyncStashInput
         $input->lastSuccessAt = $now;
         $input->consecutiveFailures = 0;
         $this->stashInputs->save($input);
+    }
+
+    /** @param list<DiscoveredItemCommitCounts> $counts */
+    private function combineCounts(array $counts): DiscoveredItemCommitCounts
+    {
+        return new DiscoveredItemCommitCounts(
+            itemsCreated: array_sum(array_map(static fn(DiscoveredItemCommitCounts $count): int => $count->itemsCreated, $counts)),
+            itemsReused: array_sum(array_map(static fn(DiscoveredItemCommitCounts $count): int => $count->itemsReused, $counts)),
+            stashItemsCreated: array_sum(array_map(static fn(DiscoveredItemCommitCounts $count): int => $count->stashItemsCreated, $counts)),
+            stashItemsReused: array_sum(array_map(static fn(DiscoveredItemCommitCounts $count): int => $count->stashItemsReused, $counts)),
+        );
     }
 
     private function recordFailure(StashInputRecord $input): void

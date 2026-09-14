@@ -109,21 +109,17 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     {
         return $this->definition->options;
     }
-    public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = [], ?callable $onProgress = null): array
+    public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = [], ?callable $onProgress = null, ?callable $onDiscovered = null): array
     {
         $operation = $strategy->key === 'plugin.complete' ? 'complete' : 'refresh';
 
         try {
-            $raw = $this->invoke('input.discover', ['input_id' => $input->providerInputId, 'intent' => $operation, 'options' => $this->wireOptions($options)], $operation, helper: $this->definition->helper, onActivity: $onProgress);
+            $raw = $this->invoke('input.discover', ['input_id' => $input->providerInputId, 'intent' => $operation, 'options' => $this->wireOptions($options)], $operation, helper: $this->definition->helper, onActivity: $onProgress, onDiscovered: $onDiscovered);
         } catch (PluginInvocationFailure $failure) {
             throw new ProviderException($failure->getMessage(), 'plugin_' . $failure->errorCode, 0, $failure, $failure->retryable);
         }
 
-        return array_map(static function (array $item): DiscoveredItem {
-            $artwork = self::nullableString($item['artwork-reference'] ?? null);
-
-            return new DiscoveredItem(self::string($item['id'] ?? null), StashdUri::parse(self::string($item['reference'] ?? null)), self::string($item['title'] ?? null), self::nullableString($item['description'] ?? null), self::nullableInt($item['duration-seconds'] ?? null), ProviderDates::tryParse(self::nullableString($item['published-at'] ?? null)), $artwork === null ? null : StashdUri::parse($artwork), null, self::nullableString($item['kind'] ?? null), self::nullableInt($item['size-bytes'] ?? null), (bool) ($item['size-estimated'] ?? false), self::nullableString($item['upstream-state'] ?? null));
-        }, self::arrayOfArrays($raw));
+        return array_map(self::discoveredItem(...), self::arrayOfArrays($raw));
     }
     public function implementationName(): string
     {
@@ -249,16 +245,16 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     /** @param array<string, mixed> $params
      * @return array<string, mixed>
      */
-    private function invoke(string $method, array $params, string $operation, ?string $staging = null, ?PluginHelperGrant $helper = null, ?callable $onActivity = null): array
+    private function invoke(string $method, array $params, string $operation, ?string $staging = null, ?PluginHelperGrant $helper = null, ?callable $onActivity = null, ?callable $onDiscovered = null): array
     {
-        if ($onActivity === null && $staging === null && ($method === 'input.resolve' || $operation === 'complete')) {
+        if ($onActivity === null && $onDiscovered === null && $staging === null && ($method === 'input.resolve' || $operation === 'complete')) {
             $key = 'plugin-input.' . hash('sha256', json_encode([$this->definition->id, $this->definition->version, $method, $params], JSON_THROW_ON_ERROR));
 
             /** @var array<string, mixed> */
-            return $this->cache->resolve($key, fn(): array => $this->invokeUncached($method, $params, $operation, $staging, $helper, $onActivity), Duration::minutes(5));
+            return $this->cache->resolve($key, fn(): array => $this->invokeUncached($method, $params, $operation, $staging, $helper, $onActivity, $onDiscovered), Duration::minutes(5));
         }
 
-        return $this->invokeUncached($method, $params, $operation, $staging, $helper, $onActivity);
+        return $this->invokeUncached($method, $params, $operation, $staging, $helper, $onActivity, $onDiscovered);
     }
 
     /** @return array<string, mixed> */
@@ -266,7 +262,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
      * @param callable(string, ?float): void|null $onActivity
      * @return array<string, mixed>
      */
-    private function invokeUncached(string $method, array $params, string $operation, ?string $staging = null, ?PluginHelperGrant $helper = null, ?callable $onActivity = null): array
+    private function invokeUncached(string $method, array $params, string $operation, ?string $staging = null, ?PluginHelperGrant $helper = null, ?callable $onActivity = null, ?callable $onDiscovered = null): array
     {
         $package = $this->packages->activePath($this->definition->id) ?? throw new RuntimeException('YouTube plugin is not active');
         $stage = $staging === null ? sys_get_temp_dir() . '/stashd-plugin-' . bin2hex(random_bytes(5)) : $staging . '/.plugin-' . bin2hex(random_bytes(5));
@@ -312,11 +308,11 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
             $capabilityHandler = null;
             $capabilityHandler = /** @param array<string, mixed> $message
                 @return array<string, mixed>
-             */ function (array $message) use ($invocation, $onActivity, $process, &$capabilityHandler): array {
+             */ function (array $message) use ($invocation, $onActivity, $onDiscovered, $process, &$capabilityHandler): array {
                 $p = self::stringKeyed($message['params'] ?? null);
 
                 return match ($message['method'] ?? '') {
-                    'http.request' => $this->capabilityHttp($invocation, $p), 'resource.read' => $this->capabilityResourceRead($invocation, $p), 'staging.stage' => $this->capabilityStage($invocation, $p), 'staging.write' => $this->capabilityWrite($invocation, $p), 'helper.run' => $this->capabilityHelper($invocation, $p, $onActivity, $process, $capabilityHandler), 'event.log' => ['accepted' => true], 'event.progress' => $this->capabilityProgress($onActivity, $p), default => throw new RuntimeException('unsupported plugin capability'),
+                    'http.request' => $this->capabilityHttp($invocation, $p), 'resource.read' => $this->capabilityResourceRead($invocation, $p), 'staging.stage' => $this->capabilityStage($invocation, $p), 'staging.write' => $this->capabilityWrite($invocation, $p), 'helper.run' => $this->capabilityHelper($invocation, $p, $onActivity, $process, $capabilityHandler), 'event.log' => ['accepted' => true], 'event.progress' => $this->capabilityProgress($onActivity, $p), 'event.discovered' => $this->capabilityDiscovered($onDiscovered, $p), default => throw new RuntimeException('unsupported plugin capability'),
                 };
             };
             // This is an inactivity window, not an operation duration limit.
@@ -355,6 +351,24 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         }
 
         return ['accepted' => true];
+    }
+
+    /** @param array<string, mixed> $p */
+    private function capabilityDiscovered(?callable $onDiscovered, array $p): array
+    {
+        if ($onDiscovered !== null && is_array($p['item'] ?? null)) {
+            $onDiscovered(self::discoveredItem($p['item']));
+        }
+
+        return ['accepted' => true];
+    }
+
+    /** @param array<string, mixed> $item */
+    private static function discoveredItem(array $item): DiscoveredItem
+    {
+        $artwork = self::nullableString($item['artwork-reference'] ?? null);
+
+        return new DiscoveredItem(self::string($item['id'] ?? null), StashdUri::parse(self::string($item['reference'] ?? null)), self::string($item['title'] ?? null), self::nullableString($item['description'] ?? null), self::nullableInt($item['duration-seconds'] ?? null), ProviderDates::tryParse(self::nullableString($item['published-at'] ?? null)), $artwork === null ? null : StashdUri::parse($artwork), null, self::nullableString($item['kind'] ?? null), self::nullableInt($item['size-bytes'] ?? null), (bool) ($item['size-estimated'] ?? false), self::nullableString($item['upstream-state'] ?? null));
     }
     /** @param array<string, mixed> $p
      * @return array<string, mixed>

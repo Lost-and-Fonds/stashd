@@ -333,6 +333,7 @@ function handleLiveEvent(event: LiveEvent) {
         : null
     }
     if (matchesStash || matchesItem) jobs.value = [nextJob, ...jobs.value.filter(job => job.id !== nextJob.id)]
+    if (matchesStash && nextJob.type === 'core.sync_input' && event.event === 'job.progress') scheduleRefresh()
   }
 
   const input = inputs.value.find(candidate => candidate.id === entityId)
