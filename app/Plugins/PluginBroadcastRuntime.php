@@ -62,6 +62,12 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
         return $result;
     }
 
+    /** @param list<array{stash-name: string, broadcast-key: string, broadcast-name: string, public-url: string}> $entries */
+    public function exportCollection(string $exporter, array $entries): array
+    {
+        return $this->invokeRaw('stash.collection.export', ['exporter' => $exporter, 'entries' => $entries], sys_get_temp_dir(), null, null, null);
+    }
+
     /** @param array<string, mixed> $broadcast
      * @param  list<PluginHttpGrant>|null  $httpGrants
      */

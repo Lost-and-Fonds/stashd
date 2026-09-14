@@ -41,6 +41,17 @@ export async function fetchStashes(options: { force?: boolean } = {}): Promise<S
   return body.stashes
 }
 
+export interface StashCollectionExporter {
+  key: string
+  label: string
+  available: boolean
+}
+
+export async function fetchStashCollectionExporters(): Promise<StashCollectionExporter[]> {
+  const body = await responseBody<{ exporters?: StashCollectionExporter[] }>(await apiFetch('/api/v1/stash-collection-exporters'))
+  return body.exporters ?? []
+}
+
 export function invalidateStashesCache(): void {
   stashesCache = undefined
 }

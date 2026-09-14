@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { deleteStash, fetchStashDeleteImpact, fetchStashes, syncStash } from '../api/stashes'
+import { deleteStash, fetchStashCollectionExporters, fetchStashDeleteImpact, fetchStashes, syncStash, type StashCollectionExporter } from '../api/stashes'
 import { formatRelativeDate } from '../utils/formatDate'
 import { subscribeLiveUpdates, type LiveEvent } from '../live/mercure'
 import type { StashApiResource, StashDeleteImpact } from '../types/stash'
@@ -20,6 +20,7 @@ const deleteImpact = ref<StashDeleteImpact>()
 const deleteLoading = ref(false)
 const deleteConfirming = ref(false)
 const deleteError = ref<string>()
+const exporters = ref<StashCollectionExporter[]>([])
 let unsubscribe: (() => void) | undefined
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -97,6 +98,10 @@ function editStash(stash: StashApiResource) {
   void router.push({ name: 'stash-detail', params: { id: stash.id }, query: { edit: '1' } })
 }
 
+function downloadExporter(exporter: StashCollectionExporter) {
+  window.location.href = `/api/v1/stash-collection-exports/${encodeURIComponent(exporter.key)}`
+}
+
 async function openDelete(stash: StashApiResource) {
   deleteStashTarget.value = stash
   deleteImpact.value = undefined
@@ -142,6 +147,7 @@ function refreshFromLiveEvent(event: LiveEvent) {
 onMounted(() => {
   unsubscribe = subscribeLiveUpdates(refreshFromLiveEvent)
   void load()
+  void fetchStashCollectionExporters().then(value => { exporters.value = value }).catch(() => {})
 })
 
 onBeforeUnmount(() => {
@@ -158,6 +164,12 @@ onBeforeUnmount(() => {
         <p class="mt-1 text-sm text-muted">Everything you're preserving, at a glance.</p>
       </div>
       <div class="flex shrink-0 items-center gap-2">
+        <UDropdownMenu
+          :items="exporters.map(exporter => ({ label: exporter.label, disabled: !exporter.available, onSelect: () => downloadExporter(exporter) }))"
+          :content="{ align: 'end' }"
+        >
+          <UButton label="Export" trailing-icon="i-lucide-chevron-down" variant="ghost" color="neutral" size="sm" />
+        </UDropdownMenu>
         <UButton label="Sync all" icon="i-lucide-refresh-cw" variant="ghost" color="neutral" size="sm" :loading="syncing" :disabled="syncing || stashes.length === 0" @click="syncAll" />
         <RouterLink to="/stashes/new" class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 font-mono text-sm font-medium text-inverted transition-colors hover:bg-primary/90">
           <UIcon name="i-lucide-plus" class="size-4" />

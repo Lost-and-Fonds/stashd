@@ -6,8 +6,10 @@ namespace App\Jobs;
 
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
+use Tempest\Database\Database;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
+use Tempest\Database\Query;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
@@ -17,7 +19,35 @@ final class JobRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
+        private Database $database,
     ) {}
+
+    /**
+     * A worker can die after Messenger releases its message but before the
+     * lifecycle subscriber marks the job complete. Keep the job table aligned
+     * with the queue so released messages can be consumed again.
+     */
+    public function recoverUnleasedProcessingJobs(): void
+    {
+        $this->database->execute(new Query(
+            "UPDATE jobs
+             SET state = ?, \"startedAt\" = NULL, \"finishedAt\" = NULL,
+                 \"progressCurrent\" = NULL, \"progressTotal\" = NULL,
+                 \"progressPercent\" = NULL, \"progressLabel\" = NULL,
+                 \"progressRate\" = NULL, \"progressEtaSeconds\" = NULL,
+                 \"lastError\" = NULL,
+                 \"updatedAt\" = CURRENT_TIMESTAMP
+             WHERE state = ?
+               AND EXISTS (
+                   SELECT 1
+                   FROM messenger_messages
+                   WHERE queue_name IN (?, ?)
+                     AND delivered_at IS NULL
+                     AND body LIKE CONCAT('%', jobs.id, '%')
+               )",
+            [JobState::Pending->value, JobState::Processing->value, 'background', 'interactive'],
+        ));
+    }
 
     /** @param array<string, mixed>|null $payload */
     public function create(

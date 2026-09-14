@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Config\StashdConfig;
+use Tempest\Container\Container;
 
 /**
  * Chooses a conservative consumer count; process supervision owns the
@@ -29,7 +30,7 @@ final readonly class WorkerPoolManager
             : min($max, max($min, $queueDepth));
     }
 
-    public function run(string $workload, MessengerWorkerRunner $runner, MessengerTransportRegistry $transports): void
+    public function run(string $workload, Container $container): void
     {
         if (! function_exists('pcntl_fork')) {
             $runner->run($workload);
@@ -62,6 +63,8 @@ final readonly class WorkerPoolManager
                 }
             }
 
+            $container->get(JobRepository::class)->recoverUnleasedProcessingJobs();
+            $transports = $container->get(MessengerTransportRegistry::class);
             $depth = $transports->get($workload)->getMessageCount();
             $load = function_exists('sys_getloadavg') && is_array($loads = sys_getloadavg()) ? ($loads[0] / $this->cpuCount()) : null;
             $desired = $this->desiredWorkers($workload, $depth, count($children), $load, $this->availableMemoryMb());
@@ -74,8 +77,10 @@ final readonly class WorkerPoolManager
                 }
 
                 if ($pid === 0) {
-                    $runner->run($workload);
-                    exit(0);
+                    $environment = getenv();
+                    $environment['STASHD_WORKER_CHILD'] = '1';
+                    pcntl_exec(PHP_BINARY, [getcwd() . '/tempest', 'stashd', 'worker', $workload], $environment);
+                    exit(1);
                 }
                 $children[] = $pid;
             }
@@ -100,7 +105,7 @@ final readonly class WorkerPoolManager
             return null;
         }
 
-        return (int) $match[1] / 1024;
+        return intdiv((int) $match[1], 1024);
     }
 
     private function cpuCount(): int

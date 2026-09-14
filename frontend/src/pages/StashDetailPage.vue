@@ -145,16 +145,11 @@ function operationStatus(operation: LifecycleOperation): 'active' | 'complete' |
 
 const failedItemCount = computed(() => items.value.status_counts?.failed ?? 0)
 const pendingDownloadCount = computed(() => (items.value.status_counts?.download_pending ?? 0) + (items.value.status_counts?.downloading ?? 0))
-const activeJobs = computed(() => jobs.value.filter(job => {
-  if (job.entity_type !== 'item' || !['processing', 'pending', 'retrying'].includes(job.state)) return false
-  return job.payload?.stash_id === stash.value?.id || items.value.items.some(item => item.item_id === job.entity_id)
-}))
 const activeDownloadJobs = computed(() => jobs.value.filter(job => {
   if (job.type !== 'core.download' || !['processing', 'pending', 'retrying'].includes(job.state)) return false
   return job.payload?.stash_id === stash.value?.id || items.value.items.some(item => item.item_id === job.entity_id)
 }))
-const queuedDownloadCount = computed(() => Math.max(items.value.downloadable_count ?? 0, pendingDownloadCount.value, activeDownloadJobs.value.length))
-watch([queuedDownloadCount, () => activeJobs.value.length], ([pending, active]) => {
+watch([pendingDownloadCount, () => activeDownloadJobs.value.length], ([pending, active]) => {
   if (pending > 0) downloadBatchTotal.value = Math.max(downloadBatchTotal.value, pending)
   else if (active === 0) downloadBatchTotal.value = 0
 }, { immediate: true })
@@ -163,19 +158,19 @@ const discoveryJob = computed(() => jobs.value.find(job => {
   return job.payload?.stash_id === stash.value?.id || (job.entity_type === 'stash' && job.entity_id === stash.value?.id)
 }))
 const downloadOperation = computed(() => {
-  const pending = queuedDownloadCount.value
+  const pending = pendingDownloadCount.value
   const total = downloadBatchTotal.value || pending
-  if (activeJobs.value.length === 0 && pending === 0) return undefined
+  if (activeDownloadJobs.value.length === 0 && pending === 0) return undefined
 
-  const current = activeJobs.value.find(job => job.state === 'processing') ?? activeJobs.value[0]
+  const current = activeDownloadJobs.value.find(job => job.state === 'processing') ?? activeDownloadJobs.value[0]
   const item = current ? items.value.items.find(candidate => candidate.item_id === current.entity_id) : undefined
   const stage = current
     ? [...new Set([current.progress_label, item ? itemTitle(item) : undefined].filter((value): value is string => Boolean(value)))].join(' · ') || undefined
     : undefined
-  const activeProgress = activeJobs.value.reduce((sum, job) => sum + (job.progress_percent ?? 0) / 100, 0)
+  const activeProgress = activeDownloadJobs.value.reduce((sum, job) => sum + (job.progress_percent ?? 0) / 100, 0)
   const completed = Math.max(0, total - pending)
   const percent = total === 0 ? null : Math.min(99, Math.round(((completed + activeProgress) / total) * 100))
-  const count = `${completed} of ${total} items`
+  const count = `${pending} items remaining`
 
   return { percent, stage, count }
 })
@@ -833,7 +828,7 @@ onBeforeUnmount(() => {
         <span class="font-mono text-xs text-dimmed">{{ items.stash_item_count }}</span>
       </div>
 
-      <UAlert v-if="discoveryJob" color="primary" variant="subtle" icon="i-lucide-scan-search" :title="discoveryJob.progress_label || 'Discovering items…'" :description="discoveryJob.progress_percent !== null && discoveryJob.progress_percent !== undefined ? `${Math.round(discoveryJob.progress_percent)}% complete — items will appear here as discovery finishes.` : 'Items will appear here as discovery finishes.'" />
+      <UAlert v-if="discoveryJob" color="primary" variant="subtle" icon="i-lucide-scan-search" :title="discoveryJob.progress_label || 'Discovering items…'" :description="discoveryJob.progress_percent ? `${Math.round(discoveryJob.progress_percent)}% complete — items will appear here as discovery finishes.` : 'Discovery in progress — items will appear here as it finishes.'" />
 
       <div class="flex flex-col gap-2 sm:flex-row">
         <UInput v-model="itemSearch" placeholder="Search items" icon="i-lucide-search" class="sm:max-w-sm sm:flex-1" />

@@ -39,7 +39,7 @@ final readonly class SyncStashInput
         private AssetAcquisitionPlanner $assetAcquisitions,
     ) {}
 
-    public function execute(StashInputRecord $input, ?callable $onProgress = null): StashInputSyncResult
+    public function execute(StashInputRecord $input, ?callable $onProgress = null, string $discoveryIntent = 'refresh'): StashInputSyncResult
     {
         $stashId = $input->stashId;
         $stashInputId = StashInputId::fromPrimaryKey($input->id);
@@ -52,6 +52,10 @@ final readonly class SyncStashInput
 
             if ($backfillMissing) {
                 $providerOptions['skip_size_enrichment'] = true;
+            }
+
+            if ($discoveryIntent === 'complete') {
+                $providerOptions['skip_enrichment'] = true;
             }
 
             $incremental = [];
@@ -83,6 +87,7 @@ final readonly class SyncStashInput
                 'source_title' => $input->title,
                 'provider_options' => $providerOptions,
                 'backfill_missing' => $backfillMissing,
+                'discovery_intent' => $discoveryIntent,
             ], JobType::core('core.sync_input'), $onProgress, function (ResolvedInput $resolved, array $item, array $inputOptions) use (&$incremental, $commit, $dispatchDownloads, $onProgress): void {
                 $counts = $commit($resolved, [$item], $inputOptions);
                 $incremental[] = $counts;

@@ -112,6 +112,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     public function discover(ResolvedInput $input, ProviderStrategy $strategy, array $options = [], ?callable $onProgress = null, ?callable $onDiscovered = null): array
     {
         $operation = $strategy->key === 'plugin.complete' ? 'complete' : 'refresh';
+        $options['__stashd_complete_credential_available'] = $operation === 'complete' && $this->hasCredentialGrant('complete');
 
         try {
             $raw = $this->invoke('input.discover', ['input_id' => $input->providerInputId, 'intent' => $operation, 'options' => $this->wireOptions($options)], $operation, helper: $this->definition->helper, onActivity: $onProgress, onDiscovered: $onDiscovered);
@@ -120,6 +121,17 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         }
 
         return array_map(self::discoveredItem(...), self::arrayOfArrays($raw));
+    }
+
+    private function hasCredentialGrant(string $operation): bool
+    {
+        foreach ($this->definition->httpGrants($this->secrets, $operation) as $grant) {
+            if ($grant->credential !== null) {
+                return true;
+            }
+        }
+
+        return false;
     }
     public function implementationName(): string
     {

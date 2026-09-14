@@ -35,7 +35,8 @@ const storageClass = computed(() => {
 
 <template>
   <div class="space-y-3 rounded-md bg-elevated p-3">
-    <p class="text-sm font-medium text-highlighted">What Stashd will do</p>
+    <p class="text-sm font-medium text-highlighted">{{ state.status === 'analyzing' ? 'Analyzing complete source…' : 'What Stashd will do' }}</p>
+    <p v-if="state.status === 'analyzing'" class="text-xs text-dimmed">Enumerating all items and calculating the storage estimate. This may take a while for large sources.</p>
 
     <p v-if="state.plan.itemCountLabel" class="font-mono text-xs text-dimmed">{{ state.plan.itemCountLabel }}</p>
 

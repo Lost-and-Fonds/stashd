@@ -38,6 +38,7 @@ final class ExternalBroadcastPluginRegistryInitializer implements Initializer
         $runner = new PluginRunner($packages);
         $plugins = [];
         $runtimes = [];
+        $collectionExporters = [];
 
         foreach ($definitions as $logicalKey => $candidates) {
             $base = $candidates[0];
@@ -52,9 +53,13 @@ final class ExternalBroadcastPluginRegistryInitializer implements Initializer
             if ($available !== []) {
                 $plugins[] = $base;
                 $runtimes[$logicalKey] = $available;
+
+                foreach ($base->collectionExporters as $exporter) {
+                    $collectionExporters[] = new \App\Plugins\ExternalStashCollectionExporter($exporter, $available['plugin']);
+                }
             }
         }
 
-        return new ExternalBroadcastPluginRegistry($plugins, $runtimes);
+        return new ExternalBroadcastPluginRegistry($plugins, $runtimes, $collectionExporters);
     }
 }

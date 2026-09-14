@@ -13,6 +13,7 @@ use App\Providers\ResolvedInput;
 use App\Providers\StashdUri;
 use App\Providers\StrategyPurpose;
 use App\Providers\StrategySelectionOptions;
+use InvalidArgumentException;
 
 use function Tempest\Support\str;
 
@@ -27,6 +28,11 @@ final readonly class DiscoverStashInput
     public function execute(array $payload, ?JobType $intent = null, ?callable $onProgress = null, ?callable $onDiscovered = null): InputPreflightResult
     {
         $intent ??= JobType::core('core.preflight');
+        $discoveryIntent = ApiJson::string($payload['discovery_intent'] ?? null, 'refresh');
+
+        if (! in_array($discoveryIntent, ['refresh', 'complete'], true)) {
+            throw new \InvalidArgumentException('Unsupported discovery intent.');
+        }
         $sourceUri = str(ApiJson::string($payload['source_uri'] ?? null))->trim()->toString();
         $sourceTitle = isset($payload['source_title']) && is_string($payload['source_title']) && str($payload['source_title'])->trim()->isNotEmpty()
             ? str($payload['source_title'])->trim()->toString()
@@ -44,10 +50,11 @@ final readonly class DiscoverStashInput
             $onProgress,
             $onDiscovered,
             ($payload['backfill_missing'] ?? false) === true,
+            $discoveryIntent,
         );
     }
 
-    public function executeResolved(ResolvedInput $resolved, string $sourceUri, ?string $sourceTitle, mixed $providerOptions, ?JobType $intent = null, ?callable $onProgress = null, ?callable $onDiscovered = null, bool $backfillMissing = false): InputPreflightResult
+    public function executeResolved(ResolvedInput $resolved, string $sourceUri, ?string $sourceTitle, mixed $providerOptions, ?JobType $intent = null, ?callable $onProgress = null, ?callable $onDiscovered = null, bool $backfillMissing = false, string $discoveryIntent = 'refresh'): InputPreflightResult
     {
         $intent ??= JobType::core('core.preflight');
         $provider = $this->providers->get($resolved->providerKey);
@@ -65,22 +72,25 @@ final readonly class DiscoverStashInput
             );
         }
 
-        // Preflight must prefer the same strategy as the later initial commit
-        // (InitialBackfill) -- otherwise the items previewed here can differ
-        // from what actually gets persisted once a stronger plugin capability
-        // is available. A later sync is deliberately incremental: providers
-        // use their cheap feed/check strategy and retain the complete backfill
-        // as the initial discovery path.
-        // Strategies still gate their own availability (e.g. no key
-        // configured), so this is a no-op when only the cheap one exists.
+        // Preflight must use the complete strategy so its item count and
+        // storage estimate are meaningful. Routine sync remains incremental.
         $selectionOptions = match ($intent->value) {
             'core.preflight', 'core.initial_backfill' => new StrategySelectionOptions(preferHighestCapability: true),
-            'core.sync_input' => $backfillMissing
+            'core.sync_input' => $backfillMissing || $discoveryIntent === 'complete'
                 ? new StrategySelectionOptions(preferHighestCapability: true)
                 : new StrategySelectionOptions(preferIncremental: true),
             default => null,
         };
-        $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);
+
+        try {
+            $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);
+        } catch (InvalidArgumentException $exception) {
+            if ($intent->value !== 'core.sync_input' || $discoveryIntent !== 'complete') {
+                throw $exception;
+            }
+
+            $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, new StrategySelectionOptions(preferIncremental: true));
+        }
         $inputOptions = $provider->inputOptions($resolved);
         $reportDiscovered = $onDiscovered === null ? null : static function (DiscoveredItem $item) use ($onDiscovered, $resolved, $inputOptions): void {
             $onDiscovered($resolved, DiscoveredItem::toArray($item), $inputOptions);

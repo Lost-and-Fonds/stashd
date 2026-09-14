@@ -32,9 +32,14 @@ final readonly class SyncInputJobHandler implements JobHandler
 
         $payload = $job->payload ?? [];
         $rawInputId = $payload['stash_input_id'] ?? null;
+        $discoveryIntent = $payload['discovery_intent'] ?? 'refresh';
 
         if (! is_string($rawInputId) || ! StashInputId::isValid($rawInputId)) {
             throw new RuntimeException('Sync job is missing a valid stash_input_id.');
+        }
+
+        if (! is_string($discoveryIntent) || ! in_array($discoveryIntent, ['refresh', 'complete'], true)) {
+            throw new RuntimeException('Sync job has an invalid discovery intent.');
         }
 
         $input = $this->stashInputs->find(StashInputId::parse($rawInputId))
@@ -42,7 +47,7 @@ final readonly class SyncInputJobHandler implements JobHandler
 
         $result = $this->sync->execute($input, function (string $stage, ?float $fraction) use ($context, $job): void {
             $context->progress($job, $fraction === null ? JobProgressUpdate::indeterminate($stage) : JobProgressUpdate::ofPercent($fraction * 100, $stage));
-        });
+        }, $discoveryIntent);
 
         $job->progressCurrent = 1;
         $job->progressTotal = 1;

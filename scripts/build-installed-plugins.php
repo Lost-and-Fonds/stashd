@@ -23,7 +23,7 @@ if (count($sources) !== 4) {
 
 $umoci = new Umoci();
 $builder = new PluginBuilder($root . '/builds', $umoci);
-$manager = new PackageManager($root, '0.1', null, $umoci);
+$manager = new PackageManager($root, ['0.2', '0.1'], null, $umoci);
 $platform = match (php_uname('m')) {
     'x86_64', 'amd64' => 'linux-amd64',
     'aarch64', 'arm64' => 'linux-arm64',

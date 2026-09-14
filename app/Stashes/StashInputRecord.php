@@ -33,6 +33,7 @@ final class StashInputRecord
         public ?StashInputOptions $options = null,
         public ?DateTime $lastCheckedAt = null,
         public ?DateTime $nextCheckAt = null,
+        public ?DateTime $nextCompleteCheckAt = null,
         public ?DateTime $lastSuccessAt = null,
         public ?DateTime $lastFailureAt = null,
         public ?DateTime $createdAt = null,

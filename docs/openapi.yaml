@@ -623,10 +623,12 @@ paths:
       tags: [StashInputs]
       summary: >
         Check every input of this stash for new items now, rather than
-        waiting for the hourly scheduled check. Dispatches one
-        one sync job per input. Items already held are left
-        untouched; anything new is committed and then downloaded according
-        to the stash's download policy.
+        waiting for the scheduled check. Dispatches one lightweight refresh
+        job per input. Items already held are left untouched; anything new is
+        committed with discovery metadata and then downloaded/enriched
+        according to the stash's download policy. Automatic checks normally
+        use provider feeds; a complete reconciliation runs approximately once
+        per day when available.
       parameters:
         - $ref: "#/components/parameters/StashId"
       responses:
@@ -1390,6 +1392,48 @@ paths:
           description: Episode media file
         "404":
           description: Unknown or rotated token
+
+  /api/v1/stash-collection-exporters:
+    get:
+      operationId: listStashCollectionExporters
+      tags: [Stashes]
+      summary: List registered stash collection exporters
+      responses:
+        "200":
+          description: Registered exporters and current availability
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exporters:
+                    type: array
+                    items:
+                      type: object
+                      required: [key, label, available]
+                      properties:
+                        key: { type: string }
+                        label: { type: string }
+                        available: { type: boolean }
+
+  /api/v1/stash-collection-exports/{key}:
+    get:
+      operationId: exportStashCollection
+      tags: [Stashes]
+      summary: Download a registered stash collection export
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Export file
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404":
+          description: Unknown exporter
 
 components:
   securitySchemes:

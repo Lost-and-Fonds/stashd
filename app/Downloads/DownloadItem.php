@@ -380,8 +380,18 @@ final readonly class DownloadItem
                     $backups[$destination] = $backup;
                 }
 
-                $this->fileMover->moveIntoPlace($file->tempPath, $destination);
-                $movedDestinations[] = $destination;
+                if (Filesystem\is_file($destination)) {
+                    $existingChecksum = VaultChecksum::requiredFile($destination);
+
+                    if (! hash_equals($checksum, $existingChecksum)) {
+                        throw new \RuntimeException("Refusing to replace different Vault file: {$destination}");
+                    }
+
+                    Filesystem\delete_file($file->tempPath);
+                } else {
+                    $this->fileMover->moveIntoPlace($file->tempPath, $destination);
+                    $movedDestinations[] = $destination;
+                }
 
                 $planned[] = [
                     'asset' => $asset,

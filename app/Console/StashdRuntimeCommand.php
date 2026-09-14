@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console;
 
-use App\Jobs\MessengerWorkerRunner;
-use App\Jobs\MessengerTransportRegistry;
 use App\Jobs\WorkerPoolManager;
+use Tempest\Container\Container;
 use Tempest\Console\ConsoleArgument;
 use Tempest\Console\ConsoleCommand;
 use Tempest\Console\ExitCode;
@@ -18,9 +17,7 @@ final readonly class StashdRuntimeCommand
     use HasConsole;
 
     public function __construct(
-        private MessengerWorkerRunner $workers,
-        private WorkerPoolManager $pools,
-        private MessengerTransportRegistry $transports,
+        private Container $container,
         private ProcessExecutor $processes,
     ) {}
 
@@ -61,7 +58,14 @@ final readonly class StashdRuntimeCommand
         }
 
         $this->console->info('Messenger worker started' . ($workload !== null ? " ({$workload})" : '') . '.');
-        $this->pools->run($workload ?? 'background', $this->workers, $this->transports);
+
+        if (getenv('STASHD_WORKER_CHILD') === '1') {
+            $this->container->get(\App\Jobs\MessengerWorkerRunner::class)->run($workload ?? 'background');
+
+            return ExitCode::SUCCESS;
+        }
+
+        $this->container->get(WorkerPoolManager::class)->run($workload ?? 'background', $this->container);
 
         return ExitCode::SUCCESS;
     }

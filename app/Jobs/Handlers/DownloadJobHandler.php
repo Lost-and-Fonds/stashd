@@ -63,6 +63,10 @@ final readonly class DownloadJobHandler implements JobHandler
 
             $this->activity->downloadCompleted(null, $job, $result);
         } catch (DownloadException $exception) {
+            $job->lastError = $exception->errorCode . ': ' . $exception->getMessage();
+            $this->jobs->save($job);
+            $this->activity->downloadFailed($job, $exception->errorCode, $exception->getMessage());
+
             throw $exception;
         }
     }

@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
+use App\Stashes\StashCollectionExporter;
+
 final readonly class ExternalBroadcastPluginRegistry
 {
     /**
      * @param  list<ExternalBroadcastPluginDefinition>  $plugins
      * @param  array<string, array<string, BroadcastPluginRuntime>>  $runtimes
      */
-    public function __construct(private array $plugins, private array $runtimes = []) {}
+    /** @param list<StashCollectionExporter> $collectionExporters */
+    public function __construct(private array $plugins, private array $runtimes = [], private array $collectionExporters = []) {}
 
     public function findByLogicalKey(string $key): ?ExternalBroadcastPluginDefinition
     {
@@ -38,5 +41,11 @@ final readonly class ExternalBroadcastPluginRegistry
     public function runtimeFor(string $key): ?BroadcastPluginRuntime
     {
         return $this->runtimes[$key]['plugin'] ?? null;
+    }
+
+    /** @return list<StashCollectionExporter> */
+    public function collectionExporters(): array
+    {
+        return $this->collectionExporters;
     }
 }

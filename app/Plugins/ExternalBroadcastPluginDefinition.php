@@ -21,6 +21,7 @@ final readonly class ExternalBroadcastPluginDefinition
      * @param  array<int, array<string, mixed>>  $sourceOptions
      * @param  list<JobDefinition> $jobs
      * @param  list<BroadcastAssetRequirement> $assetRequirements
+     * @param  list<array{key: string, label: string}> $collectionExporters
      * @param  array{message: string, action_url: string}|null $configuration
      */
     public function __construct(
@@ -50,6 +51,7 @@ final readonly class ExternalBroadcastPluginDefinition
         public array $sourceOptions,
         public array $jobs = [],
         public array $assetRequirements = [],
+        public array $collectionExporters = [],
         public ?array $configuration = null,
     ) {}
 
@@ -170,6 +172,14 @@ final readonly class ExternalBroadcastPluginDefinition
             }
         }
 
+        $collectionExporters = [];
+
+        foreach (is_array($raw['collection_exporters'] ?? null) ? $raw['collection_exporters'] : [] as $exporter) {
+            if (is_array($exporter) && is_string($exporter['key'] ?? null) && is_string($exporter['label'] ?? null) && $exporter['key'] !== '' && $exporter['label'] !== '') {
+                $collectionExporters[] = ['key' => $exporter['key'], 'label' => $exporter['label']];
+            }
+        }
+
         $configuration = is_array($raw['configuration'] ?? null)
             && is_string($raw['configuration']['message'] ?? null)
             && is_string($raw['configuration']['action_url'] ?? null)
@@ -203,6 +213,7 @@ final readonly class ExternalBroadcastPluginDefinition
             sourceOptions: $sourceOptions,
             jobs: PluginJobDefinitions::fromManifest($raw),
             assetRequirements: $assetRequirements,
+            collectionExporters: $collectionExporters,
             configuration: $configuration,
         );
     }
