@@ -571,8 +571,14 @@ final readonly class BroadcastController
         }
 
         $settingKey = $plugin->connectionSettingKey();
+        $configuration = $plugin->configuration();
+
+        if ($settingKey === null || $configuration === null) {
+            return null;
+        }
+
         $settings = $broadcast->settings ?? [];
-        $connectionId = $settingKey === null ? null : ($settings[$settingKey] ?? null);
+        $connectionId = $settings[$settingKey] ?? null;
 
         if (is_string($connectionId) && PrefixedUlid::isValid($connectionId) && $this->connections->find(PrefixedUlid::parse($connectionId)) !== null) {
             return null;
@@ -580,8 +586,8 @@ final readonly class BroadcastController
 
         return [
             'state' => 'needs_configuration',
-            'message' => 'Connect a media server before rebuilding this Broadcast.',
-            'actionUrl' => '/settings/connections',
+            'message' => $configuration['message'],
+            'actionUrl' => $configuration['action_url'],
         ];
     }
 

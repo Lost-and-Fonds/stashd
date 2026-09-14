@@ -21,6 +21,7 @@ final readonly class ExternalBroadcastPluginDefinition
      * @param  array<int, array<string, mixed>>  $sourceOptions
      * @param  list<JobDefinition> $jobs
      * @param  list<BroadcastAssetRequirement> $assetRequirements
+     * @param  array{message: string, action_url: string}|null $configuration
      */
     public function __construct(
         public string $id,
@@ -49,6 +50,7 @@ final readonly class ExternalBroadcastPluginDefinition
         public array $sourceOptions,
         public array $jobs = [],
         public array $assetRequirements = [],
+        public ?array $configuration = null,
     ) {}
 
     public static function fromManifest(mixed $raw, string $root, string $socketPath, ?string $manifestDirectory = null): ?self
@@ -168,6 +170,12 @@ final readonly class ExternalBroadcastPluginDefinition
             }
         }
 
+        $configuration = is_array($raw['configuration'] ?? null)
+            && is_string($raw['configuration']['message'] ?? null)
+            && is_string($raw['configuration']['action_url'] ?? null)
+            ? ['message' => $raw['configuration']['message'], 'action_url' => $raw['configuration']['action_url']]
+            : null;
+
         return new self(
             id: $required('id'),
             logicalKey: trim($broadcastKey),
@@ -195,6 +203,7 @@ final readonly class ExternalBroadcastPluginDefinition
             sourceOptions: $sourceOptions,
             jobs: PluginJobDefinitions::fromManifest($raw),
             assetRequirements: $assetRequirements,
+            configuration: $configuration,
         );
     }
 
