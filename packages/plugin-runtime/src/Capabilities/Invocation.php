@@ -214,6 +214,23 @@ final class Invocation
             Filesystem\copy('/etc/resolv.conf', $etc . '/resolv.conf', overwrite: true);
         }
 
+        if ($grant->network) {
+            foreach (['/etc/ssl/certs/ca-certificates.crt', '/etc/pki/tls/certs/ca-bundle.crt'] as $caBundle) {
+                if (! is_file($caBundle)) {
+                    continue;
+                }
+
+                Filesystem\create_directory($etc . '/ssl/certs', 0700);
+                Filesystem\copy($caBundle, $etc . '/ssl/certs/ca-certificates.crt', overwrite: true);
+                Filesystem\copy($caBundle, $etc . '/ssl/cert.pem', overwrite: true);
+                break;
+            }
+
+            if (is_file('/etc/yt-dlp.conf')) {
+                Filesystem\copy('/etc/yt-dlp.conf', $etc . '/yt-dlp.conf', overwrite: true);
+            }
+        }
+
         $command = $this->sandboxPolicy->command($this->packageRoot, $this->stagingRoot, $relative, $etc, null, $grant->network);
         $chdir = array_search('--chdir', $command, true);
 

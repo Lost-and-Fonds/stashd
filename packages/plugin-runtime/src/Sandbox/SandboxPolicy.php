@@ -40,6 +40,14 @@ final readonly class SandboxPolicy
             $command = array_merge($command, ['--ro-bind', $sdkRoot, '/sdk']);
         }
 
+        if ($network) {
+            $command = array_merge($command, [
+                '--setenv', 'SSL_CERT_FILE', '/etc/ssl/certs/ca-certificates.crt',
+                '--setenv', 'REQUESTS_CA_BUNDLE', '/etc/ssl/certs/ca-certificates.crt',
+                '--setenv', 'CURL_CA_BUNDLE', '/etc/ssl/certs/ca-certificates.crt',
+            ]);
+        }
+
         $helperPath = '/plugin/' . trim(dirname($entrypoint), '.');
 
         return array_merge($command, $etcMount, [
