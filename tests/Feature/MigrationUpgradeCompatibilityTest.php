@@ -145,6 +145,7 @@ function prepareLegacyBaseline(Database $database): void
     $database->execute(new Query('ALTER TABLE media_items DROP COLUMN IF EXISTS "sizeEstimated"'));
     $database->execute(new Query('ALTER TABLE media_items DROP COLUMN IF EXISTS "sizeBytes"'));
     $database->execute(new Query('ALTER TABLE assets DROP COLUMN "derivationKey"'));
+    $database->execute(new Query('ALTER TABLE stash_inputs DROP COLUMN IF EXISTS "nextCompleteCheckAt"'));
     $database->execute(new Query('ALTER TABLE jobs ADD COLUMN "priority" INTEGER DEFAULT 100 NOT NULL'));
     $database->execute(new Query('CREATE INDEX jobs_pending_claim ON jobs (state, "priority", "createdAt")'));
     $database->execute(new Query('ALTER TABLE broadcasts ADD COLUMN "tokenSecretId" VARCHAR(40) NULL'));
