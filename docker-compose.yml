@@ -1,14 +1,16 @@
 services:
   stashd:
-    image: ghcr.io/lost-and-fonds/stashd:latest
-    container_name: stashd
+    image: ${STASHD_IMAGE:-ghcr.io/lost-and-fonds/stashd:latest}
+    # The shipped plugin sandbox creates a user namespace with bubblewrap.
+    security_opt:
+      - seccomp=unconfined
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "8474:8474"
+      - "${STASHD_HOST_PORT:-8474}:8474"
     environment:
-      STASHD_PUBLIC_URL: http://localhost:8474
+      STASHD_PUBLIC_URL: ${STASHD_PUBLIC_URL:-http://localhost:8474}
       STASHD_HTTP_PORT: "8474"
       STASHD_DATA_PATH: /data
       STASHD_MEDIA_PATH: /media
@@ -24,8 +26,8 @@ services:
       PGID: ${PGID:-1000}
       UMASK: ${UMASK:-0022}
     volumes:
-      - ./data:/data
-      - ./media:/media
+      - ${STASHD_DATA_DIR:-./data}:/data
+      - ${STASHD_MEDIA_DIR:-./media}:/media
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8474/health || exit 1"]
@@ -37,7 +39,6 @@ services:
   # Postgres is reachable only on the compose network -- no published ports.
   postgres:
     image: postgres:18-alpine
-    container_name: stashd-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-stashd}
       POSTGRES_USER: ${POSTGRES_USER:-stashd}

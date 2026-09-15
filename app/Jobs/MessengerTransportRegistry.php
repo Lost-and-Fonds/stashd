@@ -44,12 +44,13 @@ final class MessengerTransportRegistry
         $connection = new PostgreSqlConnection([
             'table_name' => 'messenger_messages',
             'queue_name' => $name,
-            'auto_setup' => true,
+            // The application migration owns this table. Messenger's schema
+            // diff tries to alter BIGSERIAL/identity columns on PostgreSQL 18.
+            'auto_setup' => false,
             // Long jobs stay leased while the worker sends Messenger keepalives.
             // Keep a generous recovery window for slow media/filesystem work.
             'redeliver_timeout' => 1800,
         ], $dbal);
-        $connection->setup();
 
         return new DoctrineTransport($connection, new PhpSerializer());
     }

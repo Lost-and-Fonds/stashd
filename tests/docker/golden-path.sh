@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+COMPOSE_PROJECT_NAME="stashd-golden-${RANDOM}-${RANDOM}"
+export COMPOSE_PROJECT_NAME
+export STASHD_IMAGE="${STASHD_GOLDEN_IMAGE:-stashd:golden}"
+export STASHD_HOST_PORT="${STASHD_GOLDEN_PORT:-18474}"
+export STASHD_PUBLIC_URL="http://127.0.0.1:${STASHD_HOST_PORT}"
+TMP=$(mktemp -d)
+FIXTURE_CONTAINER="${COMPOSE_PROJECT_NAME}-youtube-fixture"
+YOUTUBE_REF="${STASHD_GOLDEN_YOUTUBE_REF:-ghcr.io/lost-and-fonds/youtube:0.3.39}"
+PODCAST_REF="${STASHD_GOLDEN_PODCAST_REF:-ghcr.io/lost-and-fonds/podcast:0.3.4}"
+
+cleanup() {
+    status=$?
+    if [ "$status" -ne 0 ] && [ -n "${FIXTURE_CONTAINER:-}" ]; then
+        docker logs "$FIXTURE_CONTAINER" >&2 2>/dev/null || true
+    fi
+    docker rm -f "$FIXTURE_CONTAINER" >/dev/null 2>&1 || true
+    docker compose -f "$ROOT/docker-compose.yml" down -v --remove-orphans >/dev/null 2>&1 || true
+    docker run --rm -v "$TMP:/cleanup" python:3.12-slim sh -c 'rm -rf /cleanup/*' >/dev/null 2>&1 || true
+    rm -rf "$TMP" >/dev/null 2>&1 || true
+    rmdir "$TMP" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+
+export STASHD_DATA_DIR="$TMP/data"
+export STASHD_MEDIA_DIR="$TMP/media"
+mkdir -p "$TMP/fixture"
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=Stashd golden fixture CA' \
+    -addext 'basicConstraints=critical,CA:TRUE' -addext 'keyUsage=critical,keyCertSign,cRLSign' \
+    -keyout "$TMP/fixture/ca-key.pem" -out "$TMP/fixture/ca.pem" >/dev/null 2>&1
+openssl req -newkey rsa:2048 -nodes -subj '/CN=www.youtube.com' \
+    -keyout "$TMP/fixture/key.pem" -out "$TMP/fixture/server.csr" >/dev/null 2>&1
+openssl x509 -req -days 1 -in "$TMP/fixture/server.csr" -CA "$TMP/fixture/ca.pem" \
+    -CAkey "$TMP/fixture/ca-key.pem" -CAcreateserial \
+    -extfile <(printf '%s\n' 'basicConstraints=critical,CA:FALSE' 'keyUsage=critical,digitalSignature,keyEncipherment' 'extendedKeyUsage=serverAuth' 'subjectAltName=DNS:www.youtube.com,DNS:youtube.com,DNS:m.youtube.com,DNS:music.youtube.com,DNS:youtu.be,DNS:i.ytimg.com') \
+    -out "$TMP/fixture/cert.pem" >/dev/null 2>&1
+cp "$ROOT/tests/docker/youtube-fixture-server.py" "$TMP/fixture/server.py"
+cp "$ROOT/tests/docker/yt-dlp-fixture.conf" "$TMP/fixture/yt-dlp.conf"
+
+if [ "${STASHD_GOLDEN_SKIP_BUILD:-0}" != "1" ]; then
+    docker build -t "$STASHD_IMAGE" "$ROOT"
+fi
+docker compose -f "$ROOT/docker-compose.yml" up -d --wait
+
+network="${COMPOSE_PROJECT_NAME}_default"
+docker run -d --name "$FIXTURE_CONTAINER" --network "$network" \
+    --network-alias www.youtube.com \
+    --network-alias youtube.com \
+    --network-alias m.youtube.com \
+    --network-alias music.youtube.com \
+    --network-alias youtu.be \
+    --network-alias i.ytimg.com \
+    -v "$TMP/fixture:/fixture:ro" \
+    python:3.12-slim python /fixture/server.py >/dev/null
+
+docker compose -f "$ROOT/docker-compose.yml" cp "$TMP/fixture/ca.pem" stashd:/usr/local/share/ca-certificates/stashd-golden.crt
+docker compose -f "$ROOT/docker-compose.yml" cp "$TMP/fixture/yt-dlp.conf" stashd:/etc/yt-dlp.conf
+docker compose -f "$ROOT/docker-compose.yml" exec -T stashd update-ca-certificates >/dev/null
+docker compose -f "$ROOT/docker-compose.yml" exec -T stashd sh -c \
+    'cat /usr/local/share/ca-certificates/stashd-golden.crt >> /etc/ssl/certs/ca-certificates.crt'
+until docker compose -f "$ROOT/docker-compose.yml" exec -T stashd \
+    curl -fsS 'https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dgolden-video' >/dev/null; do
+    sleep 1
+done
+docker compose -f "$ROOT/docker-compose.yml" exec -T stashd php tempest stashd:plugin-install "$YOUTUBE_REF"
+docker compose -f "$ROOT/docker-compose.yml" exec -T stashd php tempest stashd:plugin-install "$PODCAST_REF"
+docker compose -f "$ROOT/docker-compose.yml" restart stashd >/dev/null
+
+base="http://127.0.0.1:${STASHD_HOST_PORT}"
+cookie_jar="$TMP/cookies"
+until curl -fsS "$base/health" >/dev/null; do sleep 2; done
+
+curl -fsS -X POST "$base/api/v1/auth/setup" -H 'Content-Type: application/json' \
+    -c "$cookie_jar" -b "$cookie_jar" \
+    -d '{"username":"golden","password":"golden-password"}' >/dev/null
+curl -fsS -X POST "$base/api/v1/auth/login" -H 'Content-Type: application/json' \
+    -c "$cookie_jar" -b "$cookie_jar" \
+    -d '{"username":"golden","password":"golden-password"}' >/dev/null
+token=$(curl -fsS -X POST "$base/api/v1/auth/tokens" \
+    -H 'Content-Type: application/json' \
+    -c "$cookie_jar" -b "$cookie_jar" \
+    -d '{"name":"golden"}' | jq -r '.token // empty')
+
+if [ -z "$token" ]; then
+    echo 'golden path failed: no API token' >&2
+    exit 1
+fi
+
+stash=$(curl -fsS -X POST "$base/api/v1/stashes/with-input" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
+    -d '{"name":"Golden Path","input":{"plugin":"youtube","source":{"url":"https://www.youtube.com/watch?v=goldenvid01"}},"downloadPolicy":"video"}')
+stash_id=$(printf '%s' "$stash" | jq -r '.stash.id')
+job_id=''
+for _ in $(seq 1 15); do
+    job_id=$(curl -fsS "$base/api/v1/jobs" -H "Authorization: Bearer $token" \
+        | jq -r --arg stash_id "$stash_id" '[.jobs[] | select(.type == "core.add_input" and .stash_id == $stash_id)] | .[0].id // empty')
+    [ -n "$job_id" ] && break
+    sleep 1
+done
+
+[ -n "$job_id" ] || { echo 'golden path failed: no input job' >&2; exit 1; }
+
+for _ in $(seq 1 90); do
+    items=$(curl -fsS "$base/api/v1/stashes/$stash_id/items" -H "Authorization: Bearer $token")
+    state=$(printf '%s' "$items" | jq -r '.items[0].item.state // .items[0].state // empty')
+    [ "$state" = ready ] && break
+    [ "$state" = failed ] && { echo "$items" >&2; exit 1; }
+
+    job=$(curl -fsS "$base/api/v1/jobs/$job_id" -H "Authorization: Bearer $token")
+    job_state=$(printf '%s' "$job" | jq -r '.job.state // empty')
+    [ "$job_state" = failed ] && { echo "$job" >&2; exit 1; }
+    sleep 2
+done
+
+[ "$state" = ready ] || { echo 'golden path failed: item never became ready' >&2; exit 1; }
+item_id=$(printf '%s' "$items" | jq -r '.items[0].item_id // .items[0].itemId // .items[0].id')
+assets=$(curl -fsS "$base/api/v1/items/$item_id/assets" -H "Authorization: Bearer $token")
+printf '%s' "$assets" | jq -e '.assets | any(.[]; .role == "vault_original" and .state == "ready")' >/dev/null
+
+sync=$(curl -fsS -X POST "$base/api/v1/stashes/$stash_id/sync" \
+    -H "Authorization: Bearer $token")
+sync_job_id=$(printf '%s' "$sync" | jq -r '.job_ids[0] // empty')
+[ -n "$sync_job_id" ] || { echo 'golden path failed: sync returned no job id' >&2; exit 1; }
+
+sync_state=''
+for _ in $(seq 1 90); do
+    sync_job=$(curl -fsS "$base/api/v1/jobs/$sync_job_id" -H "Authorization: Bearer $token")
+    sync_state=$(printf '%s' "$sync_job" | jq -r '.job.state // empty')
+    [ "$sync_state" = ready ] && break
+    [ "$sync_state" = failed ] && { echo "$sync_job" >&2; exit 1; }
+    sleep 2
+done
+[ "$sync_state" = ready ] || { echo "$sync_job" >&2; echo 'golden path failed: sync job never reached terminal ready state' >&2; exit 1; }
+synced_items=$(curl -fsS "$base/api/v1/stashes/$stash_id/items" -H "Authorization: Bearer $token")
+printf '%s' "$synced_items" | jq -e --arg item_id "$item_id" '.items | any(.[]; (.item_id // .itemId // .id) == $item_id)' >/dev/null
+
+broadcast=$(curl -fsS -X POST "$base/api/v1/stashes/$stash_id/broadcasts" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
+    -d '{"type":"podcast","name":"Golden Podcast","settings":{"media_kind":"video"}}')
+broadcast_id=$(printf '%s' "$broadcast" | jq -r '.broadcast.id')
+
+for _ in $(seq 1 90); do
+    current=$(curl -fsS "$base/api/v1/broadcasts/$broadcast_id" -H "Authorization: Bearer $token")
+    state=$(printf '%s' "$current" | jq -r '.broadcast.state')
+    [ "$state" = ready ] && break
+    [ "$state" = failed ] && { echo "$current" >&2; exit 1; }
+    sleep 2
+done
+
+[ "$state" = ready ] || { echo 'golden path failed: broadcast never became ready' >&2; exit 1; }
+published_url=$(printf '%s' "$current" | jq -r '.broadcast.published_url // empty')
+[ -n "$published_url" ] || { echo 'golden path failed: no published URL' >&2; exit 1; }
+curl -fsS "$published_url" | grep -q 'Golden Path Video'
+
+echo 'production golden path passed'
