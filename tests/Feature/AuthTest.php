@@ -499,52 +499,56 @@ test('concurrent login attempts cannot exceed the allowance', function (): void 
         getenv('DB_PORT') ?: '5432',
         getenv('DB_DATABASE') ?: 'stashd',
     );
+    $syncDirectory = sys_get_temp_dir() . '/stashd-auth-concurrency-' . bin2hex(random_bytes(8));
+    mkdir($syncDirectory, 0775, true);
     $children = [];
-    $channels = [];
 
     for ($index = 0; $index < 6; $index++) {
-        [$parent, $child] = stream_socket_pair(AF_UNIX, SOCK_STREAM, 0);
         $pid = pcntl_fork();
 
         if ($pid === 0) {
-            fclose($parent);
-            $pdo = new \PDO($dsn, getenv('DB_USERNAME') ?: 'postgres', getenv('DB_PASSWORD') ?: '', [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]);
-            fwrite($child, "ready\n");
-            fgets($child);
-
-            try {
-                (new LoginAttemptLimiter(new PostgresDatabase($pdo)))->consumeAttempt($username, $clientAddress);
-                fwrite($child, "allowed\n");
-            } catch (\Throwable $exception) {
-                fwrite($child, $exception instanceof \App\Auth\LoginThrottled ? "throttled\n" : "failed\n");
+            file_put_contents($syncDirectory . '/ready-' . $index, 'ready');
+            while (! is_file($syncDirectory . '/go')) {
+                usleep(1000);
             }
 
-            fclose($child);
+            try {
+                $pdo = new \PDO($dsn, getenv('DB_USERNAME') ?: 'postgres', getenv('DB_PASSWORD') ?: '', [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]);
+                (new LoginAttemptLimiter(new PostgresDatabase($pdo)))->consumeAttempt($username, $clientAddress);
+                file_put_contents($syncDirectory . '/result-' . $index, 'allowed');
+            } catch (\Throwable $exception) {
+                file_put_contents($syncDirectory . '/result-' . $index, $exception instanceof \App\Auth\LoginThrottled ? 'throttled' : 'failed');
+            }
+
             exit(0);
         }
 
-        fclose($child);
         $children[] = $pid;
-        $channels[] = $parent;
     }
 
-    foreach ($channels as $channel) {
-        expect(fgets($channel))->toBe("ready\n");
+    while (count(glob($syncDirectory . '/ready-*') ?: []) < 6) {
+        usleep(1000);
     }
 
-    foreach ($channels as $channel) {
-        fwrite($channel, "go\n");
+    file_put_contents($syncDirectory . '/go', 'go');
+
+    while (count(glob($syncDirectory . '/result-*') ?: []) < 6) {
+        usleep(1000);
     }
 
-    $results = array_map(static fn($channel): string => trim((string) fgets($channel)), $channels);
-
-    foreach ($channels as $channel) {
-        fclose($channel);
-    }
+    $results = array_map(
+        static fn(string $path): string => trim((string) file_get_contents($path)),
+        glob($syncDirectory . '/result-*') ?: [],
+    );
 
     foreach ($children as $pid) {
         pcntl_waitpid($pid, $status);
     }
+
+    foreach (glob($syncDirectory . '/*') ?: [] as $path) {
+        unlink($path);
+    }
+    rmdir($syncDirectory);
 
     expect(array_count_values($results))->toEqual(['allowed' => 5, 'throttled' => 1]);
 });
