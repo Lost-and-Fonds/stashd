@@ -60,14 +60,23 @@ final readonly class SyncStashInput
 
             $incremental = [];
             $commit = function (ResolvedInput $resolved, array $items, array $inputOptions) use ($stashId, $stashInputId, $input): DiscoveredItemCommitCounts {
-                return $this->database->withinTransaction(fn(): DiscoveredItemCommitCounts => $this->committer->commit(
-                    stashId: $stashId,
-                    stashInputId: $stashInputId,
-                    resolved: $resolved,
-                    discoveredItems: $items,
-                    inputOptions: $input->options,
-                    declaredInputOptions: $inputOptions,
-                ));
+                $counts = null;
+                $this->database->withinTransaction(function () use (&$counts, $stashId, $stashInputId, $resolved, $items, $input, $inputOptions): void {
+                    $counts = $this->committer->commit(
+                        stashId: $stashId,
+                        stashInputId: $stashInputId,
+                        resolved: $resolved,
+                        discoveredItems: $items,
+                        inputOptions: $input->options,
+                        declaredInputOptions: $inputOptions,
+                    );
+                });
+
+                if (! $counts instanceof DiscoveredItemCommitCounts) {
+                    throw new RuntimeException('Failed to commit discovered stash items.');
+                }
+
+                return $counts;
             };
             $dispatchDownloads = function (DiscoveredItemCommitCounts $counts) use ($stash, $stashId): void {
                 if (! $this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
