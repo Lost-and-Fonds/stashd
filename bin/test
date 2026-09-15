@@ -12,9 +12,21 @@ if [ "${CI:-}" = "1" ] || [ "${CI:-}" = "true" ] || [ "${GITHUB_ACTIONS:-}" = "t
     exec "$ROOT/vendor/bin/pest" "$@"
 fi
 
+# Alchemy accepts Pest options through --flags. Keep the wrapper's focused-test
+# interface consistent with the direct Pest routes above.
+if [ "$#" -eq 1 ] && [ -f "$1" ]; then
+    set -- "--flags=filter=$(basename "$1" .php)"
+elif [ "$#" -eq 2 ] && [ "$1" = "--filter" ]; then
+    set -- "--flags=filter=$2"
+elif [ "$#" -eq 1 ]; then
+    case "$1" in
+        --filter=*) set -- "--flags=filter=${1#--filter=}" ;;
+    esac
+fi
+
 if [ -f "$ROOT/.lerd.yaml" ] && grep -q '^container:' "$ROOT/.lerd.yaml" && command -v podman >/dev/null 2>&1; then
-    SITE_NAME=$(sed -n 's/^  - //p' "$ROOT/.lerd.yaml" | head -n 1)
-    exec podman exec -w "$ROOT" "lerd-custom-${SITE_NAME:-$(basename "$ROOT")}" composer test -- "$@"
+    SITE_NAME=$(awk '/^domains:/{in_domains=1; next} in_domains && /^  - /{print $2; exit} in_domains && /^[^ ]/{exit}' "$ROOT/.lerd.yaml")
+    exec podman exec --env LERD_SITE=stashd -w "$ROOT" "lerd-custom-${SITE_NAME:-$(basename "$ROOT")}" composer test -- "$@"
 fi
 
 exec lerd composer test -- "$@"

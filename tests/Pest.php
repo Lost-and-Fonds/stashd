@@ -2,8 +2,7 @@
 
 declare(strict_types=1);
 
-$runningInLerd = getenv('LERD_SITE') === 'stashd'
-    || (getenv('container') === 'podman' && is_file('/usr/local/libexec/stashd/umoci'));
+$runningInLerd = getenv('LERD_SITE') === 'stashd';
 $runningInCi = in_array(getenv('CI'), ['1', 'true'], true) || getenv('GITHUB_ACTIONS') === 'true';
 
 if (! $runningInLerd && ! $runningInCi) {
@@ -15,12 +14,12 @@ Direct host-side test execution is intentionally blocked.
 
 Use:
 
-    composer test
+    ./bin/test
 
 For focused tests:
 
-    composer test -- tests/Feature/FooTest.php
-    composer test -- --flags=filter=some_test_name
+    ./bin/test tests/Feature/FooTest.php
+    ./bin/test --filter some_test_name
 MESSAGE,
     );
     fwrite(STDERR, PHP_EOL);
@@ -219,7 +218,7 @@ pest()->extend(IntegrationTestCase::class)
         // Tempest's baseline migration is intentionally upgrade-oriented and
         // has no down migration. Drop the isolated test schema first so a
         // reset cannot replay CREATE TABLE statements over the old baseline.
-        $this->container->get(Database::class)->execute(new Query('DROP SCHEMA public CASCADE'));
+        $this->container->get(Database::class)->execute(new Query('DROP SCHEMA IF EXISTS public CASCADE'));
         $this->container->get(Database::class)->execute(new Query('CREATE SCHEMA public'));
         $this->database->reset();
 
