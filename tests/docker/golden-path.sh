@@ -97,6 +97,11 @@ until timeout 10s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd \
 done
 timeout 180s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd php tempest stashd:plugin-install "$YOUTUBE_REF"
 timeout 180s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd php tempest stashd:plugin-install "$PODCAST_REF"
+# The production image persists its dotenv file under /data and reloads it on
+# restart. Keep the smoke deployment's operator key in that authoritative copy
+# as well as in Compose's environment.
+sed -i '/^SIGNING_KEY=/d' "$STASHD_DATA_DIR/.env" 2>/dev/null || true
+printf 'SIGNING_KEY=%s\n' "$SIGNING_KEY" >> "$STASHD_DATA_DIR/.env"
 timeout 60s docker compose -f "$ROOT/docker-compose.yml" restart stashd >/dev/null
 
 base="http://127.0.0.1:${STASHD_HOST_PORT}"
