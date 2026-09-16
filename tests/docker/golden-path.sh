@@ -82,7 +82,8 @@ docker compose -f "$ROOT/docker-compose.yml" exec -T stashd update-ca-certificat
 docker compose -f "$ROOT/docker-compose.yml" exec -T stashd sh -c \
     'cat /usr/local/share/ca-certificates/stashd-golden.crt >> /etc/ssl/certs/ca-certificates.crt'
 until docker compose -f "$ROOT/docker-compose.yml" exec -T stashd \
-    curl -fsS 'https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dgolden-video' >/dev/null; do
+    curl --connect-timeout 1 --max-time 5 -fsS \
+    'https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dgolden-video' >/dev/null; do
     sleep 1
 done
 docker compose -f "$ROOT/docker-compose.yml" exec -T stashd php tempest stashd:plugin-install "$YOUTUBE_REF"
@@ -91,7 +92,7 @@ docker compose -f "$ROOT/docker-compose.yml" restart stashd >/dev/null
 
 base="http://127.0.0.1:${STASHD_HOST_PORT}"
 cookie_jar="$TMP/cookies"
-until curl -fsS "$base/health" >/dev/null; do sleep 2; done
+until curl --connect-timeout 1 --max-time 5 -fsS "$base/health" >/dev/null; do sleep 2; done
 
 curl -fsS -X POST "$base/api/v1/auth/setup" -H 'Content-Type: application/json' \
     -c "$cookie_jar" -b "$cookie_jar" \
