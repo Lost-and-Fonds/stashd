@@ -52,15 +52,16 @@ docker compose -f "$ROOT/docker-compose.yml" up -d
 # the production entrypoint is still booting and will recover. Wait for the
 # shipped entrypoint's own boot-complete signal before installing plugins,
 # then use the public health endpoint after the required plugin restart below.
+stashd_container=$(docker compose -f "$ROOT/docker-compose.yml" ps -q stashd)
+boot_log=''
 for _ in $(seq 1 180); do
-    if docker compose -f "$ROOT/docker-compose.yml" logs stashd 2>/dev/null \
-        | grep -q 'Stashd boot completed.'; then
+    boot_log=$(docker logs "$stashd_container" 2>/dev/null || true)
+    if printf '%s' "$boot_log" | grep -q 'Stashd boot completed.'; then
         break
     fi
     sleep 2
 done
-docker compose -f "$ROOT/docker-compose.yml" logs stashd 2>/dev/null \
-    | grep -q 'Stashd boot completed.'
+printf '%s' "$boot_log" | grep -q 'Stashd boot completed.'
 
 network="${COMPOSE_PROJECT_NAME}_default"
 docker run -d --name "$FIXTURE_CONTAINER" --network "$network" \
