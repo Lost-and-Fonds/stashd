@@ -7,6 +7,11 @@ export COMPOSE_PROJECT_NAME
 export STASHD_IMAGE="${STASHD_GOLDEN_IMAGE:-stashd:golden}"
 export STASHD_HOST_PORT="${STASHD_GOLDEN_PORT:-18474}"
 export STASHD_PUBLIC_URL="http://127.0.0.1:${STASHD_HOST_PORT}"
+# Keep transient deployment connection failures retryable instead of allowing
+# one host-side API request to hold the smoke job indefinitely.
+curl() {
+    command curl --connect-timeout 1 --max-time "${STASHD_GOLDEN_CURL_TIMEOUT:-15}" "$@"
+}
 TMP=$(mktemp -d)
 FIXTURE_CONTAINER="${COMPOSE_PROJECT_NAME}-youtube-fixture"
 YOUTUBE_REF="${STASHD_GOLDEN_YOUTUBE_REF:-ghcr.io/lost-and-fonds/youtube@sha256:67600e64ef420711fce8bf041a08b3dc5da308677156c8eb8ff966d66852e29d}"
