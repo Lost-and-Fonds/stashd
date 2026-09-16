@@ -50,16 +50,17 @@ docker compose -f "$ROOT/docker-compose.yml" up -d
 
 # Compose's --wait treats an early failed health probe as terminal, even when
 # the production entrypoint is still booting and will recover. Wait for the
-# production container process to be running so plugin installation can use
-# the real container, then use the public health endpoint after the required
-# plugin restart below.
+# shipped entrypoint's own boot-complete signal before installing plugins,
+# then use the public health endpoint after the required plugin restart below.
 for _ in $(seq 1 180); do
-    if [ -n "$(docker compose -f "$ROOT/docker-compose.yml" ps -q --status running stashd)" ]; then
+    if docker compose -f "$ROOT/docker-compose.yml" logs stashd 2>/dev/null \
+        | grep -q 'Stashd boot completed.'; then
         break
     fi
     sleep 2
 done
-[ -n "$(docker compose -f "$ROOT/docker-compose.yml" ps -q --status running stashd)" ]
+docker compose -f "$ROOT/docker-compose.yml" logs stashd 2>/dev/null \
+    | grep -q 'Stashd boot completed.'
 
 network="${COMPOSE_PROJECT_NAME}_default"
 docker run -d --name "$FIXTURE_CONTAINER" --network "$network" \
