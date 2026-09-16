@@ -9,13 +9,16 @@ export STASHD_HOST_PORT="${STASHD_GOLDEN_PORT:-18474}"
 export STASHD_PUBLIC_URL="http://127.0.0.1:${STASHD_HOST_PORT}"
 TMP=$(mktemp -d)
 FIXTURE_CONTAINER="${COMPOSE_PROJECT_NAME}-youtube-fixture"
-YOUTUBE_REF="${STASHD_GOLDEN_YOUTUBE_REF:-ghcr.io/lost-and-fonds/youtube:0.3.39}"
-PODCAST_REF="${STASHD_GOLDEN_PODCAST_REF:-ghcr.io/lost-and-fonds/podcast:0.3.4}"
+YOUTUBE_REF="${STASHD_GOLDEN_YOUTUBE_REF:-ghcr.io/lost-and-fonds/youtube@sha256:67600e64ef420711fce8bf041a08b3dc5da308677156c8eb8ff966d66852e29d}"
+PODCAST_REF="${STASHD_GOLDEN_PODCAST_REF:-ghcr.io/lost-and-fonds/podcast@sha256:b9660e9285b19215b287d9ac66529bcc0bbc9dc14aa1e0516d3b0cf54bcd2e46}"
 
 cleanup() {
     status=$?
     if [ "$status" -ne 0 ] && [ -n "${FIXTURE_CONTAINER:-}" ]; then
         docker logs "$FIXTURE_CONTAINER" >&2 2>/dev/null || true
+    fi
+    if [ "$status" -ne 0 ]; then
+        docker compose -f "$ROOT/docker-compose.yml" logs stashd >&2 2>/dev/null || true
     fi
     docker rm -f "$FIXTURE_CONTAINER" >/dev/null 2>&1 || true
     docker compose -f "$ROOT/docker-compose.yml" down -v --remove-orphans >/dev/null 2>&1 || true
@@ -154,5 +157,51 @@ done
 published_url=$(printf '%s' "$current" | jq -r '.broadcast.published_url // empty')
 [ -n "$published_url" ] || { echo 'golden path failed: no published URL' >&2; exit 1; }
 curl -fsS "$published_url" | grep -q 'Golden Path Video'
+
+if [ "${STASHD_GOLDEN_COLLECTION_CHECK:-0}" = "1" ]; then
+    filesystem=$(curl -fsS -X POST "$base/api/v1/stashes/$stash_id/broadcasts" \
+        -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
+        -d '{"type":"filesystem","name":"Non Podcast Filesystem"}')
+    filesystem_id=$(printf '%s' "$filesystem" | jq -r '.broadcast.id')
+    filesystem_state=''
+    for _ in $(seq 1 90); do
+        filesystem_current=$(curl -fsS "$base/api/v1/broadcasts/$filesystem_id" -H "Authorization: Bearer $token")
+        filesystem_state=$(printf '%s' "$filesystem_current" | jq -r '.broadcast.state')
+        [ "$filesystem_state" = ready ] && break
+        [ "$filesystem_state" = failed ] && { echo "$filesystem_current" >&2; exit 1; }
+        sleep 2
+    done
+    [ "$filesystem_state" = ready ] || { echo "$filesystem_current" >&2; exit 1; }
+
+    exporters=$(curl -fsS "$base/api/v1/stash-collection-exporters" -H "Authorization: Bearer $token")
+    printf 'podcast exporter discovery: %s\n' "$exporters"
+    printf '%s' "$exporters" | jq -e '.exporters | any(.[]; .key == "podcast-opml")' >/dev/null
+
+    export_headers="$TMP/podcast-export.headers"
+    export_body="$TMP/podcast-export.opml"
+    curl -fsS -D "$export_headers" -o "$export_body" \
+        "$base/api/v1/stash-collection-exports/podcast-opml" \
+        -H "Authorization: Bearer $token"
+    grep -Eiq '^Content-Type: text/(x-opml|xml)(;|$)' "$export_headers"
+    grep -Eiq '^Content-Disposition: attachment; filename="stashd-podcasts\.opml"' "$export_headers"
+    python3 - "$export_body" "$published_url" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+root = ET.parse(sys.argv[1]).getroot()
+assert root.tag == 'opml'
+assert root.attrib.get('version') == '2.0'
+outlines = root.findall('./body/outline')
+assert len(outlines) == 1
+assert outlines[0].attrib.get('xmlUrl') == sys.argv[2]
+assert outlines[0].attrib.get('title') == 'Golden Path'
+assert 'Non Podcast Filesystem' not in ET.tostring(root, encoding='unicode')
+PY
+    curl -sS -o /dev/null -w '%{http_code}' \
+        "$base/api/v1/stash-collection-exports/not-a-real-exporter" \
+        -H "Authorization: Bearer $token" | grep -qx '404'
+
+    echo 'podcast collection export path passed'
+fi
 
 echo 'production golden path passed'
