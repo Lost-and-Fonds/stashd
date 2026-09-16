@@ -46,7 +46,19 @@ cp "$ROOT/tests/docker/yt-dlp-fixture.conf" "$TMP/fixture/yt-dlp.conf"
 if [ "${STASHD_GOLDEN_SKIP_BUILD:-0}" != "1" ]; then
     docker build -t "$STASHD_IMAGE" "$ROOT"
 fi
-docker compose -f "$ROOT/docker-compose.yml" up -d --wait
+docker compose -f "$ROOT/docker-compose.yml" up -d
+
+# Compose's --wait treats an early failed health probe as terminal, even when
+# the production entrypoint is still booting and will recover. Wait on the
+# same public health endpoint the rest of this proof uses, with an explicit
+# bound so a genuinely broken deployment still fails diagnostically.
+for _ in $(seq 1 180); do
+    if curl -fsS "$STASHD_PUBLIC_URL/health" >/dev/null 2>&1; then
+        break
+    fi
+    sleep 2
+done
+curl -fsS "$STASHD_PUBLIC_URL/health" >/dev/null
 
 network="${COMPOSE_PROJECT_NAME}_default"
 docker run -d --name "$FIXTURE_CONTAINER" --network "$network" \
