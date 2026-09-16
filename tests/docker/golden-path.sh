@@ -53,12 +53,12 @@ docker compose -f "$ROOT/docker-compose.yml" up -d
 # same public health endpoint the rest of this proof uses, with an explicit
 # bound so a genuinely broken deployment still fails diagnostically.
 for _ in $(seq 1 180); do
-    if curl -fsS "$STASHD_PUBLIC_URL/health" >/dev/null 2>&1; then
+    if curl --connect-timeout 1 --max-time 5 -fsS "$STASHD_PUBLIC_URL/health" >/dev/null 2>&1; then
         break
     fi
     sleep 2
 done
-curl -fsS "$STASHD_PUBLIC_URL/health" >/dev/null
+curl --connect-timeout 1 --max-time 5 -fsS "$STASHD_PUBLIC_URL/health" >/dev/null
 
 network="${COMPOSE_PROJECT_NAME}_default"
 docker run -d --name "$FIXTURE_CONTAINER" --network "$network" \
