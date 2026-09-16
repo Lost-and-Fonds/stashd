@@ -78,17 +78,17 @@ docker run -d --name "$FIXTURE_CONTAINER" --network "$network" \
 
 docker compose -f "$ROOT/docker-compose.yml" cp "$TMP/fixture/ca.pem" stashd:/usr/local/share/ca-certificates/stashd-golden.crt
 docker compose -f "$ROOT/docker-compose.yml" cp "$TMP/fixture/yt-dlp.conf" stashd:/etc/yt-dlp.conf
-docker compose -f "$ROOT/docker-compose.yml" exec -T stashd update-ca-certificates >/dev/null
-docker compose -f "$ROOT/docker-compose.yml" exec -T stashd sh -c \
+timeout 60s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd update-ca-certificates >/dev/null
+timeout 60s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd sh -c \
     'cat /usr/local/share/ca-certificates/stashd-golden.crt >> /etc/ssl/certs/ca-certificates.crt'
-until docker compose -f "$ROOT/docker-compose.yml" exec -T stashd \
+until timeout 10s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd \
     curl --connect-timeout 1 --max-time 5 -fsS \
     'https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dgolden-video' >/dev/null; do
     sleep 1
 done
-docker compose -f "$ROOT/docker-compose.yml" exec -T stashd php tempest stashd:plugin-install "$YOUTUBE_REF"
-docker compose -f "$ROOT/docker-compose.yml" exec -T stashd php tempest stashd:plugin-install "$PODCAST_REF"
-docker compose -f "$ROOT/docker-compose.yml" restart stashd >/dev/null
+timeout 180s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd php tempest stashd:plugin-install "$YOUTUBE_REF"
+timeout 180s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd php tempest stashd:plugin-install "$PODCAST_REF"
+timeout 60s docker compose -f "$ROOT/docker-compose.yml" restart stashd >/dev/null
 
 base="http://127.0.0.1:${STASHD_HOST_PORT}"
 cookie_jar="$TMP/cookies"
