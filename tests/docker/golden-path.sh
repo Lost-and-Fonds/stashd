@@ -49,16 +49,17 @@ fi
 docker compose -f "$ROOT/docker-compose.yml" up -d
 
 # Compose's --wait treats an early failed health probe as terminal, even when
-# the production entrypoint is still booting and will recover. Wait on the
-# same public health endpoint the rest of this proof uses, with an explicit
-# bound so a genuinely broken deployment still fails diagnostically.
+# the production entrypoint is still booting and will recover. Wait for the
+# production container process to be running so plugin installation can use
+# the real container, then use the public health endpoint after the required
+# plugin restart below.
 for _ in $(seq 1 180); do
-    if curl --connect-timeout 1 --max-time 5 -fsS "$STASHD_PUBLIC_URL/health" >/dev/null 2>&1; then
+    if [ -n "$(docker compose -f "$ROOT/docker-compose.yml" ps -q --status running stashd)" ]; then
         break
     fi
     sleep 2
 done
-curl --connect-timeout 1 --max-time 5 -fsS "$STASHD_PUBLIC_URL/health" >/dev/null
+[ -n "$(docker compose -f "$ROOT/docker-compose.yml" ps -q --status running stashd)" ]
 
 network="${COMPOSE_PROJECT_NAME}_default"
 docker run -d --name "$FIXTURE_CONTAINER" --network "$network" \
