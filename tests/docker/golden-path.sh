@@ -97,7 +97,20 @@ timeout 60s docker compose -f "$ROOT/docker-compose.yml" restart stashd >/dev/nu
 
 base="http://127.0.0.1:${STASHD_HOST_PORT}"
 cookie_jar="$TMP/cookies"
-until curl --connect-timeout 1 --max-time 5 -fsS "$base/health" >/dev/null; do sleep 2; done
+health_body="$TMP/health-body"
+health_code=''
+for _ in $(seq 1 180); do
+    health_code=$(curl --connect-timeout 1 --max-time 5 -sS -o "$health_body" \
+        -w '%{http_code}' "$base/health" || true)
+    [ "$health_code" = 200 ] && break
+    sleep 2
+done
+if [ "$health_code" != 200 ]; then
+    printf 'golden path failed: health returned HTTP %s\n' "$health_code" >&2
+    cat "$health_body" >&2 2>/dev/null || true
+    docker compose -f "$ROOT/docker-compose.yml" logs stashd >&2 2>/dev/null || true
+    exit 1
+fi
 
 curl -fsS -X POST "$base/api/v1/auth/setup" -H 'Content-Type: application/json' \
     -c "$cookie_jar" -b "$cookie_jar" \
