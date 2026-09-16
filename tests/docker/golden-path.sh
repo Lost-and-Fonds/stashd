@@ -7,6 +7,10 @@ export COMPOSE_PROJECT_NAME
 export STASHD_IMAGE="${STASHD_GOLDEN_IMAGE:-stashd:golden}"
 export STASHD_HOST_PORT="${STASHD_GOLDEN_PORT:-18474}"
 export STASHD_PUBLIC_URL="http://127.0.0.1:${STASHD_HOST_PORT}"
+# The smoke deployment restarts after installing plugins. Supply a deterministic
+# operator key so this proof is independent of persisted .env generation while
+# still exercising the production signing/encryption path.
+export SIGNING_KEY="${STASHD_GOLDEN_SIGNING_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}"
 # Keep transient deployment connection failures retryable instead of allowing
 # one host-side API request to hold the smoke job indefinitely.
 curl() {
