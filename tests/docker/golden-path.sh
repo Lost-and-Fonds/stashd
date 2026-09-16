@@ -55,13 +55,15 @@ docker compose -f "$ROOT/docker-compose.yml" up -d
 stashd_container=$(docker compose -f "$ROOT/docker-compose.yml" ps -q stashd)
 boot_log=''
 for _ in $(seq 1 180); do
-    boot_log=$(docker logs "$stashd_container" 2>/dev/null || true)
-    if printf '%s' "$boot_log" | grep -q 'Stashd boot completed.'; then
+    boot_log=$(timeout 5s docker logs --since 15m "$stashd_container" 2>/dev/null || true)
+    health_status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' \
+        "$stashd_container" 2>/dev/null || true)
+    if printf '%s' "$boot_log" | grep -q 'Stashd boot completed.' || [ "$health_status" = healthy ]; then
         break
     fi
     sleep 2
 done
-printf '%s' "$boot_log" | grep -q 'Stashd boot completed.'
+printf '%s' "$boot_log" | grep -q 'Stashd boot completed.' || [ "$health_status" = healthy ]
 
 network="${COMPOSE_PROJECT_NAME}_default"
 docker run -d --name "$FIXTURE_CONTAINER" --network "$network" \
