@@ -47,7 +47,7 @@ fi
 install -D -m 0644 "$PROFILE_SOURCE" "$PROFILE_TARGET"
 apparmor_parser -r -W "$PROFILE_TARGET"
 
-if ! aa-status --profiled 2>/dev/null | awk '{print $1}' | grep -Fxq "$PROFILE_NAME"; then
+if ! aa-status 2>/dev/null | sed 's/^[[:space:]]*//' | grep -Fxq "$PROFILE_NAME"; then
     echo "AppArmor did not report the expected loaded profile: $PROFILE_NAME" >&2
     exit 1
 fi
