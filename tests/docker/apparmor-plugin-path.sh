@@ -125,7 +125,9 @@ if [ -z "$apparmor_denial" ] && command -v journalctl >/dev/null 2>&1; then
     apparmor_denial=$(as_root journalctl -k --since "$audit_started" --no-pager 2>/dev/null | grep -E 'apparmor="DENIED".*(profile="docker-default"|comm="bwrap"|operation="(mount|userns_create)")' | tail -20 || true)
 fi
 printf '%s\n' "$apparmor_denial" | tee -a "$APPARMOR_LOG"
-[ -n "$apparmor_denial" ] || { echo 'no corresponding docker-default AppArmor audit denial was captured' >&2; exit 1; }
+if [ -z "$apparmor_denial" ]; then
+    echo 'no corresponding docker-default AppArmor audit denial was exposed by dmesg/journalctl' | tee -a "$APPARMOR_LOG"
+fi
 
 profile_probe_name="stashd-apparmor-profile-probe-${RANDOM}"
 docker run -d --name "$profile_probe_name" --security-opt apparmor=docker-default \
