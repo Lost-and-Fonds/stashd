@@ -41,15 +41,15 @@ command -v apparmor_parser >/dev/null 2>&1 || { echo 'apparmor_parser is require
 
 cat /etc/os-release >&2
 uname -a >&2
-aa-status >&2
+as_root aa-status >&2
 apparmor_parser --version >&2
-sysctl kernel.apparmor_restrict_unprivileged_userns kernel.unprivileged_userns_clone >&2 2>&1 || true
+as_root sysctl kernel.apparmor_restrict_unprivileged_userns kernel.unprivileged_userns_clone >&2 2>&1 || true
 command -v bwrap >&2 && bwrap --version >&2 || true
 docker version >&2
 docker info --format '{{json .SecurityOptions}}' >&2
 docker run --rm --entrypoint sh "$IMAGE" -lc 'bwrap --version; command -v bwrap' >&2
 
-if ! aa-status --enabled >/dev/null 2>&1; then
+if ! as_root aa-status --enabled >/dev/null 2>&1; then
     echo 'authoritative AppArmor proof refused: AppArmor is not active' >&2
     exit 1
 fi
