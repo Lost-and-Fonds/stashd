@@ -86,7 +86,7 @@ PLUGIN));
             'entrypoint' => 'plugin.php',
             'requires' => ['php' => '>=8.5', 'extensions' => []],
             'architectures' => ['amd64', 'arm64'],
-            'helpers' => [],
+            'helpers' => (object) [],
         ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
         file_put_contents($source . '/stashd-plugin/helpers.lock.json', '{"helpers":[]}');
         file_put_contents($source . '/composer.json', '{"name":"stashd/lifecycle-fixture","require":{"php":">=8.5"}}');
