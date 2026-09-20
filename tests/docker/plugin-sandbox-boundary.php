@@ -215,9 +215,15 @@ try {
         $source,
         $helperStage,
         [],
-        helpers: [new HelperGrant('network-probe', 'helpers/network-probe.php', true)],
+        helpers: [
+            new HelperGrant('network-probe-denied', 'helpers/network-probe.php'),
+            new HelperGrant('network-probe', 'helpers/network-probe.php', true),
+        ],
     );
     try {
+        $deniedHelper = $invocation->runHelper('network-probe-denied', ['127.0.0.1', (string) $networkPort]);
+        boundaryAssert($deniedHelper->exitCode !== 0, 'helper without a network grant reached the local fixture');
+
         $helper = $invocation->runHelper('network-probe', ['127.0.0.1', (string) $networkPort]);
         boundaryAssert($helper->exitCode === 0, 'explicit network helper grant failed: ' . $helper->stderr);
         boundaryAssert(str_contains($helper->stdout, 'connected'), 'explicit network helper did not reach the local fixture');

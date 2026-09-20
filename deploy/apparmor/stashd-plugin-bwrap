@@ -4,7 +4,8 @@
 # deny mount. Only /usr/bin/bwrap is transitioned into the setup profile. The
 # setup profile is intentionally broad because bubblewrap constructs the
 # mount/user namespace there; its children stack the unprivileged profile,
-# which denies capabilities, user namespaces, mounts, and network access.
+# which denies capabilities, user namespaces, and mounts. Bubblewrap's
+# per-invocation network namespace remains authoritative for network access.
 #
 # Keep the base rules synchronized with Docker's current apparmor template:
 # https://github.com/moby/profiles/blob/main/apparmor/template.go
@@ -74,6 +75,7 @@ profile stashd-plugin-bwrap-setup /usr/bin/bwrap flags=(attach_disconnected,medi
 
 profile stashd-plugin-bwrap-child flags=(attach_disconnected,mediate_deleted) {
   file rwlkm /{**,},
+  network,
   unix,
   signal,
   mqueue,
@@ -81,6 +83,5 @@ profile stashd-plugin-bwrap-child flags=(attach_disconnected,mediate_deleted) {
   deny capability,
   deny userns,
   deny mount,
-  deny network,
   pix /** -> &stashd-plugin-bwrap-child,
 }
