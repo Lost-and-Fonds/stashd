@@ -90,7 +90,7 @@ runtime() {
     timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T -e STASHD_LIFECYCLE_EXPECTED="$1" \
         stashd php /tmp/plugin-lifecycle-run.php
 }
-list_plugins() { console stashd:plugin-list; }
+list_plugins() { console stashd:plugin-list | sed $'s/\\033\\[[0-9;]*m//g'; }
 package_count() {
     docker compose "${COMPOSE_FILES[@]}" exec -T stashd sh -c \
         "find /data/plugins/packages/lifecycle-fixture -mindepth 1 -maxdepth 1 -type d | wc -l" | tr -d '[:space:]'
@@ -100,13 +100,13 @@ docker compose "${COMPOSE_FILES[@]}" cp "$ROOT/tests/docker/plugin-lifecycle-run
 
 console stashd:plugin-install "$REF_A"
 list_a=$(list_plugins); printf '%s\n' "$list_a"
-printf '%s\n' "$list_a" | grep -F "lifecycle-fixture 1.0.0 php $DIGEST_A $REF_A" >/dev/null
+printf '%s\n' "$list_a" | grep -F "lifecycle-fixture" | grep -F "1.0.0 php $DIGEST_A $REF_A" >/dev/null
 runtime 'Lifecycle 1.0.0'
 count_a=$(package_count)
 
 console stashd:plugin-install "$REF_A"
 list_reinstall=$(list_plugins); printf '%s\n' "$list_reinstall"
-printf '%s\n' "$list_reinstall" | grep -F "lifecycle-fixture 1.0.0 php $DIGEST_A $REF_A" >/dev/null
+printf '%s\n' "$list_reinstall" | grep -F "lifecycle-fixture" | grep -F "1.0.0 php $DIGEST_A $REF_A" >/dev/null
 [ "$(package_count)" = "$count_a" ]
 runtime 'Lifecycle 1.0.0'
 
@@ -118,12 +118,12 @@ printf '%s\n' "$conflict_output"
 [ "$conflict_status" -ne 0 ]
 printf '%s' "$conflict_output" | grep -F 'a different plugin artifact already uses this version' >/dev/null
 list_conflict=$(list_plugins); printf '%s\n' "$list_conflict"
-printf '%s\n' "$list_conflict" | grep -F "lifecycle-fixture 1.0.0 php $DIGEST_A $REF_A" >/dev/null
+printf '%s\n' "$list_conflict" | grep -F "lifecycle-fixture" | grep -F "1.0.0 php $DIGEST_A $REF_A" >/dev/null
 runtime 'Lifecycle 1.0.0'
 
 console stashd:plugin-install "$REF_C"
 list_c=$(list_plugins); printf '%s\n' "$list_c"
-printf '%s\n' "$list_c" | grep -F "lifecycle-fixture 1.1.0 php $DIGEST_C $REF_C" >/dev/null
+printf '%s\n' "$list_c" | grep -F "lifecycle-fixture" | grep -F "1.1.0 php $DIGEST_C $REF_C" >/dev/null
 docker compose "${COMPOSE_FILES[@]}" exec -T stashd test -f /data/plugins/packages/lifecycle-fixture/1.0.0/install.json
 runtime 'Lifecycle 1.1.0'
 
@@ -136,6 +136,6 @@ for _ in $(seq 1 180); do
 done
 [ "$health" = healthy ] || { echo 'plugin lifecycle: recreated Stashd did not become healthy' >&2; exit 1; }
 list_persisted=$(list_plugins); printf '%s\n' "$list_persisted"
-printf '%s\n' "$list_persisted" | grep -F "lifecycle-fixture 1.1.0 php $DIGEST_C $REF_C" >/dev/null
+printf '%s\n' "$list_persisted" | grep -F "lifecycle-fixture" | grep -F "1.1.0 php $DIGEST_C $REF_C" >/dev/null
 runtime 'Lifecycle 1.1.0'
 echo 'plugin lifecycle proof passed'
