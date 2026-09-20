@@ -22,7 +22,7 @@ cleanup() {
         docker compose "${COMPOSE_FILES[@]}" ps >&2 2>/dev/null || true
     fi
     docker compose "${COMPOSE_FILES[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
-    rm -rf "$TMP"
+    sudo rm -rf "$TMP" 2>/dev/null || rm -rf "$TMP" 2>/dev/null || true
     exit "$status"
 }
 trap cleanup EXIT INT TERM
@@ -97,7 +97,7 @@ echo '--- candidate seccomp: unrelated namespace flag form remains denied ---'
 set +e
 reduced_output=$(docker run --rm --user "$PUID:$PGID" --security-opt "seccomp=$SECCOMP_PROFILE" \
     --security-opt apparmor=stashd-plugin-bwrap --entrypoint sh "$IMAGE" -lc \
-    'bwrap --die-with-parent --new-session --unshare-user --unshare-pid --clearenv --ro-bind /usr /usr --tmpfs /tmp --dev /dev --chdir / -- /usr/bin/true' 2>&1)
+    'bwrap --die-with-parent --new-session --unshare-user --unshare-pid --clearenv --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /lib /lib --ro-bind /lib64 /lib64 --tmpfs /tmp --dev /dev --chdir / -- /usr/bin/true' 2>&1)
 reduced_status=$?
 set -e
 printf 'exit=%s\n%s\n' "$reduced_status" "$reduced_output"
