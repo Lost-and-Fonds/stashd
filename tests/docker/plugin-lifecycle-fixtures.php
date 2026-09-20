@@ -32,11 +32,10 @@ $sourceRoot = getenv('STASHD_FIXTURE_REPO') ?: '/source';
 $outputRoot = getenv('STASHD_FIXTURE_OUTPUT') ?: '/artifacts';
 $fixture = $sourceRoot . '/packages/plugin-runtime/tests/fixtures/fixture-plugin.php';
 $frameCodec = $sourceRoot . '/packages/plugin-runtime/tests/fixtures/FrameCodec.php';
-$sdkRoot = '/var/www/html/vendor/stashd/php-sdk/src';
 $composer = sys_get_temp_dir() . '/fixture-composer-' . bin2hex(random_bytes(6));
 
-if (! is_file($fixture) || ! is_dir($sdkRoot)) {
-    throw new RuntimeException('fixture source or bundled SDK is unavailable');
+if (! is_file($frameCodec)) {
+    throw new RuntimeException('fixture frame codec is unavailable');
 }
 
 file_put_contents($composer, "#!/bin/sh\nset -eu\nmkdir -p \"\$COMPOSER_VENDOR_DIR\"\nprintf '%s\\n' '<?php' > \"\$COMPOSER_VENDOR_DIR/autoload.php\"\n");
@@ -58,13 +57,26 @@ try {
         $source = sys_get_temp_dir() . '/lifecycle-source-' . $name . '-' . bin2hex(random_bytes(6));
         $layout = $outputRoot . '/' . $name . '/layout';
         mkdir($source . '/stashd-plugin', 0755, true);
-        mkdir($source . '/sdk', 0755, true);
         mkdir($source . '/rpc', 0755, true);
-        file_put_contents($source . '/plugin.php', str_replace('Fixture choice', $artifact['label'], file_get_contents($fixture)));
+        file_put_contents($source . '/plugin.php', str_replace('__LABEL__', addslashes($artifact['label']), <<<'PLUGIN'
+<?php
+declare(strict_types=1);
+require_once __DIR__ . '/rpc/FrameCodec.php';
+FrameCodec::write(STDOUT, ['protocol' => 1, 'id' => 'hello', 'kind' => 'request', 'method' => 'hello', 'params' => ['min' => 1, 'max' => 1]]);
+$hello = FrameCodec::read(STDIN, 5.0);
+if (($hello['id'] ?? null) !== 'hello' || ($hello['result']['protocol'] ?? null) !== 1) {
+    throw new RuntimeException('RPC handshake failed');
+}
+while (($message = FrameCodec::read(STDIN, 10.0)) !== null) {
+    $id = $message['id'] ?? null;
+    if (($message['method'] ?? null) !== 'broadcast.operation') {
+        FrameCodec::write(STDOUT, ['protocol' => 1, 'id' => $id, 'kind' => 'response', 'error' => ['message' => 'unexpected method']]);
+        continue;
+    }
+    FrameCodec::write(STDOUT, ['protocol' => 1, 'id' => $id, 'kind' => 'response', 'result' => ['choices' => [['value' => 'fixture', 'label' => '__LABEL__']]]]);
+}
+PLUGIN));
         copy($frameCodec, $source . '/rpc/FrameCodec.php');
-        foreach (glob($sdkRoot . '/*.php') ?: [] as $sdkFile) {
-            copy($sdkFile, $source . '/sdk/' . basename($sdkFile));
-        }
         file_put_contents($source . '/stashd-plugin/plugin.json', json_encode([
             'id' => 'lifecycle-fixture',
             'name' => 'Lifecycle fixture',

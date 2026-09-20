@@ -32,11 +32,12 @@ $expected = getenv('STASHD_LIFECYCLE_EXPECTED') ?: throw new RuntimeException('e
 $staging = '/data/plugin-lifecycle-stage';
 lifecycleRunRemove($staging);
 mkdir($staging, 0700, true);
+mkdir('/tmp/plugin-sdk', 0755, true);
 $process = null;
 
 try {
     $packages = new PackageManager('/data/plugins', ['0.2', '0.1'], 'amd64');
-    $process = (new PluginRunner($packages))->start('lifecycle-fixture', $staging);
+    $process = (new PluginRunner($packages, sdkRoot: '/tmp/plugin-sdk'))->start('lifecycle-fixture', $staging);
     $result = $process->invoke('broadcast.operation', ['name' => 'lifecycle'], static fn (array $message): array => throw new RuntimeException('unexpected capability request: ' . ($message['method'] ?? 'unknown')));
     $label = $result['choices'][0]['label'] ?? null;
 
