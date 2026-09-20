@@ -78,6 +78,9 @@ for _ in $(seq 1 180); do
 done
 printf '%s' "$boot_log" | grep -q 'Stashd boot completed.' || [ "$health_status" = healthy ]
 
+docker compose -f "$ROOT/docker-compose.yml" cp "$ROOT/tests/docker/plugin-sandbox-boundary.php" stashd:/tmp/plugin-sandbox-boundary.php
+timeout 60s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd php /tmp/plugin-sandbox-boundary.php
+
 network="${COMPOSE_PROJECT_NAME}_default"
 docker run -d --name "$FIXTURE_CONTAINER" --network "$network" \
     --network-alias www.youtube.com \

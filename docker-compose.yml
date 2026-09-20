@@ -2,6 +2,8 @@ services:
   stashd:
     image: ${STASHD_IMAGE:-ghcr.io/lost-and-fonds/stashd:latest}
     # The shipped plugin sandbox creates a user namespace with bubblewrap.
+    # On AppArmor hosts, install deploy/apparmor/stashd-plugin-bwrap and use
+    # docker-compose.apparmor.yml; the base file stays usable without AppArmor.
     security_opt:
       - seccomp=unconfined
     depends_on:

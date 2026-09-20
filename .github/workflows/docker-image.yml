@@ -239,6 +239,14 @@ jobs:
 
       - name: Start smoke test timer
         run: echo "SMOKE_TEST_START=$(date +%s)" >> "$GITHUB_ENV"
+      - name: Run public playback boundary proof
+        run: STASHD_PLAYBACK_SKIP_BUILD=1 composer test:docker-playback
+      - name: Run public Mercure boundary proof
+        run: STASHD_MERCURE_SKIP_BUILD=1 composer test:docker-mercure
+      - name: Run published resource boundary proof
+        run: STASHD_PUBLISHED_SKIP_BUILD=1 composer test:docker-published
+      - name: Run scheduled Vault verification boundary proof
+        run: STASHD_VERIFICATION_SKIP_BUILD=1 composer test:docker-verification
       - name: Run container smoke test
         run: |
           sudo apt-get update
