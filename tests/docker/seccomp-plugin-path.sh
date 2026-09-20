@@ -147,12 +147,10 @@ import sys
 
 source, target = sys.argv[1:]
 profile = json.load(open(source, encoding='utf-8'))
-for rule in profile['syscalls']:
-    if rule.get('comment') == 'Stashd bubblewrap namespace clone flags on x86_64':
-        profile['syscalls'].remove(rule)
-        break
-else:
-    raise SystemExit('candidate bubblewrap clone rule not found')
+profile['syscalls'] = [
+    rule for rule in profile['syscalls']
+    if not str(rule.get('comment', '')).startswith('Stashd bubblewrap ')
+]
 json.dump(profile, open(target, 'w', encoding='utf-8'), indent='\t')
 PY
 set +e
