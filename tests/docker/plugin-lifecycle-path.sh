@@ -6,6 +6,7 @@ COMPOSE_PROJECT_NAME="stashd-plugin-lifecycle-${RANDOM}-${RANDOM}"
 export COMPOSE_PROJECT_NAME
 export STASHD_IMAGE="${STASHD_PLUGIN_LIFECYCLE_IMAGE:-stashd:golden}"
 export STASHD_HOST_PORT="${STASHD_PLUGIN_LIFECYCLE_PORT:-18475}"
+export SIGNING_KEY="${STASHD_PLUGIN_LIFECYCLE_SIGNING_KEY:-MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=}"
 COMPOSE_FILES=(-f "$ROOT/docker-compose.yml")
 if [ "${STASHD_GOLDEN_APPARMOR:-0}" = "1" ]; then
     COMPOSE_FILES+=(-f "$ROOT/docker-compose.apparmor.yml")
@@ -29,6 +30,9 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 mkdir -p "$TMP/registry" "$TMP/artifacts"
+export STASHD_DATA_DIR="$TMP/data"
+export STASHD_MEDIA_DIR="$TMP/media"
+mkdir -p "$STASHD_DATA_DIR" "$STASHD_MEDIA_DIR"
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=fixture-registry' \
     -addext 'subjectAltName=DNS:fixture-registry' \
     -keyout "$TMP/registry/key.pem" -out "$REGISTRY_CERT" >/dev/null 2>&1
