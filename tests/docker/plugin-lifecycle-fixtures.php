@@ -58,6 +58,9 @@ try {
         $layout = $outputRoot . '/' . $name . '/layout';
         mkdir($source . '/stashd-plugin', 0755, true);
         mkdir($source . '/rpc', 0755, true);
+        $helperPath = $source . '/helper.bin';
+        file_put_contents($helperPath, "#!/bin/sh\nexit 0\n");
+        $helperHash = hash_file('sha256', $helperPath);
         file_put_contents($source . '/plugin.php', str_replace('__LABEL__', addslashes($artifact['label']), <<<'PLUGIN'
 <?php
 declare(strict_types=1);
@@ -86,9 +89,11 @@ PLUGIN));
             'entrypoint' => 'plugin.php',
             'requires' => ['php' => '>=8.5', 'extensions' => []],
             'architectures' => ['amd64', 'arm64'],
-            'helpers' => (object) [],
+            'helpers' => ['fixture' => ['executable' => 'helpers/fixture-helper']],
         ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
-        file_put_contents($source . '/stashd-plugin/helpers.lock.json', '{"helpers":[]}');
+        file_put_contents($source . '/stashd-plugin/helpers.lock.json', json_encode([
+            'helpers' => ['fixture' => ['platforms' => ['linux-amd64' => ['url' => $helperPath, 'sha256' => $helperHash]]]],
+        ], JSON_THROW_ON_ERROR));
         file_put_contents($source . '/composer.json', '{"name":"stashd/lifecycle-fixture","require":{"php":">=8.5"}}');
         file_put_contents($source . '/composer.lock', '{}');
 
