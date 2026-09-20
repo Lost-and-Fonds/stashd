@@ -199,6 +199,14 @@ jobs:
       - name: Run authoritative AppArmor sandbox proof
         run: STASHD_APPARMOR_IMAGE=stashd:apparmor composer test:docker-apparmor
 
+      - name: Upload AppArmor proof diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: apparmor-sandbox-diagnostics
+          path: ${{ runner.temp }}/stashd-apparmor
+          if-no-files-found: warn
+
   smoke:
     needs: quality
     runs-on: ubuntu-latest

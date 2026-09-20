@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Stashd\PluginRuntime\Package\PackageManager;
+use Stashd\PluginRuntime\Capabilities\HelperGrant;
+use Stashd\PluginRuntime\Capabilities\Invocation;
 use Stashd\PluginRuntime\Runner\PluginRunner;
 
 require '/var/www/html/vendor/autoload.php';
@@ -51,6 +53,7 @@ file_put_contents($canary, 'host-only');
 mkdir($source, 0700, true);
 mkdir($stage, 0700, true);
 mkdir($root . '/sdk', 0700, true);
+mkdir($source . '/helpers', 0700, true);
 
 file_put_contents($source . '/plugin.json', json_encode([
     'id' => 'boundary',
@@ -150,6 +153,23 @@ boundaryWrite([
 ]);
 PHP
 ));
+file_put_contents($source . '/helpers/network-probe.php', <<<'PHP'
+<?php
+
+$host = $argv[1] ?? '';
+$port = (int) ($argv[2] ?? 0);
+$socket = @fsockopen($host, $port, $error, $message, 0.5);
+
+if (! is_resource($socket)) {
+    fwrite(STDERR, $message . "\n");
+    exit(31);
+}
+
+fwrite($socket, "network-grant\n");
+fclose($socket);
+echo "connected\n";
+PHP
+);
 
 try {
     $manager = new PackageManager($root, ['0.2', '0.1'], 'amd64');
@@ -169,7 +189,22 @@ try {
     boundaryAssert(! is_file($source . '/should-not-write'), 'sandbox mutated the plugin package');
     boundaryAssert($exit === 0, 'sandbox plugin did not exit cleanly');
 
-    echo "production plugin sandbox boundary passed\n";
+    $helperStage = $root . '/helper-stage';
+    $invocation = new Invocation(
+        $source,
+        $helperStage,
+        [],
+        helpers: [new HelperGrant('network-probe', 'helpers/network-probe.php', true)],
+    );
+    try {
+        $helper = $invocation->runHelper('network-probe', ['127.0.0.1', (string) $networkPort]);
+        boundaryAssert($helper->exitCode === 0, 'explicit network helper grant failed: ' . $helper->stderr);
+        boundaryAssert(str_contains($helper->stdout, 'connected'), 'explicit network helper did not reach the local fixture');
+    } finally {
+        $invocation->close();
+    }
+
+    echo "production plugin sandbox boundary and network grant passed\n";
 } finally {
     fclose($networkServer);
     boundaryRemove($canary);

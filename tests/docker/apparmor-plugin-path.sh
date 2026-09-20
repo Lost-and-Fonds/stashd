@@ -12,6 +12,8 @@ export PUID="${STASHD_APPARMOR_PUID:-1000}"
 export PGID="${STASHD_APPARMOR_PGID:-1000}"
 
 TMP=$(mktemp -d)
+DIAGNOSTIC_DIR="${STASHD_APPARMOR_DIAGNOSTIC_DIR:-${RUNNER_TEMP:-$TMP}/stashd-apparmor}"
+mkdir -p "$DIAGNOSTIC_DIR"
 PROFILE="$ROOT/deploy/apparmor/stashd-plugin-bwrap"
 INSTALLER="$ROOT/deploy/apparmor/install-stashd-plugin-bwrap.sh"
 APPARMOR_LOG="$TMP/apparmor.log"
@@ -23,6 +25,7 @@ as_root() { "${SUDO[@]}" "$@"; }
 
 cleanup() {
     status=$?
+    cp -f "$APPARMOR_LOG" "$DIAGNOSTIC_DIR/apparmor.log" 2>/dev/null || true
     if [ "$status" -ne 0 ]; then
         echo '--- AppArmor probe output ---' >&2
         cat "$APPARMOR_LOG" >&2 2>/dev/null || true
@@ -152,28 +155,46 @@ echo '--- install Stashd profile ---' | tee -a "$APPARMOR_LOG"
 as_root "$INSTALLER" --require | tee -a "$APPARMOR_LOG"
 
 echo '--- normal Core process restrictions ---' | tee -a "$APPARMOR_LOG"
-docker run --rm --user "$PUID:$PGID" --security-opt seccomp=unconfined \
+set +e
+core_restriction_output=$(docker run --rm --user "$PUID:$PGID" --security-opt seccomp=unconfined \
     --security-opt apparmor=stashd-plugin-bwrap --entrypoint sh "$IMAGE" -lc '
         mkdir -p /tmp/stashd-mount-test
         if mount -t tmpfs tmpfs /tmp/stashd-mount-test 2>/dev/null; then exit 1; fi
         php -r '\''preg_match("/^CapEff:\\s*([0-9a-f]+)/m", file_get_contents("/proc/self/status"), $m); exit(((int) hexdec($m[1] ?? "0") & (1 << 21)) === 0 ? 0 : 1);'\''
-    '
+    ' 2>&1)
+core_restriction_status=$?
+set -e
+printf 'exit=%s\n%s\n' "$core_restriction_status" "$core_restriction_output" | tee -a "$APPARMOR_LOG"
+[ "$core_restriction_status" -eq 0 ] || { echo 'normal Core process restrictions failed' >&2; exit 1; }
 
 echo '--- Stashd profile bwrap probe ---' | tee -a "$APPARMOR_LOG"
 run_bwrap stashd-plugin-bwrap | tee -a "$APPARMOR_LOG"
 
-echo '--- remove userns permission ---' | tee -a "$APPARMOR_LOG"
-negative_profile="$TMP/stashd-plugin-bwrap-no-userns"
-sed '/^[[:space:]]*userns,$/d' "$PROFILE" >"$negative_profile"
+echo '--- candidate real plugin boundary ---' | tee -a "$APPARMOR_LOG"
+export STASHD_DATA_DIR="$TMP/candidate-data" STASHD_MEDIA_DIR="$TMP/candidate-media"
+mkdir -p "$STASHD_DATA_DIR" "$STASHD_MEDIA_DIR"
+docker compose "${COMPOSE_FILES[@]}" up -d
+wait_for_stashd "${COMPOSE_FILES[@]}"
+set +e
+candidate_boundary_output=$(run_boundary "${COMPOSE_FILES[@]}" 2>&1)
+candidate_boundary_status=$?
+set -e
+printf 'exit=%s\n%s\n' "$candidate_boundary_status" "$candidate_boundary_output" | tee -a "$APPARMOR_LOG"
+[ "$candidate_boundary_status" -eq 0 ] || { echo 'candidate profile rejected the real plugin boundary' >&2; exit 1; }
+docker compose "${COMPOSE_FILES[@]}" down -v --remove-orphans >/dev/null
+
+echo '--- remove mount permission ---' | tee -a "$APPARMOR_LOG"
+negative_profile="$TMP/stashd-plugin-bwrap-no-mount"
+sed '/^[[:space:]]*mount,$/d' "$PROFILE" >"$negative_profile"
 as_root apparmor_parser -r -W "$negative_profile"
 set +e
 negative_output=$(run_bwrap stashd-plugin-bwrap 2>&1)
 negative_status=$?
 set -e
 printf 'exit=%s\n%s\n' "$negative_status" "$negative_output" | tee -a "$APPARMOR_LOG"
-[ "$negative_status" -ne 0 ] || { echo 'profile without userns unexpectedly allowed bwrap' >&2; exit 1; }
+[ "$negative_status" -ne 0 ] || { echo 'profile without setup mount unexpectedly allowed bwrap' >&2; exit 1; }
 
-echo '--- profile without userns real plugin boundary ---' | tee -a "$APPARMOR_LOG"
+echo '--- profile without mount real plugin boundary ---' | tee -a "$APPARMOR_LOG"
 export STASHD_DATA_DIR="$TMP/negative-data" STASHD_MEDIA_DIR="$TMP/negative-media"
 mkdir -p "$STASHD_DATA_DIR" "$STASHD_MEDIA_DIR"
 docker compose "${COMPOSE_FILES[@]}" up -d
@@ -183,7 +204,7 @@ negative_boundary_output=$(run_boundary "${COMPOSE_FILES[@]}" 2>&1)
 negative_boundary_status=$?
 set -e
 printf 'exit=%s\n%s\n' "$negative_boundary_status" "$negative_boundary_output" | tee -a "$APPARMOR_LOG"
-[ "$negative_boundary_status" -ne 0 ] || { echo 'profile without userns unexpectedly allowed the real plugin boundary' >&2; exit 1; }
+[ "$negative_boundary_status" -ne 0 ] || { echo 'profile without setup mount unexpectedly allowed the real plugin boundary' >&2; exit 1; }
 docker compose "${COMPOSE_FILES[@]}" down -v --remove-orphans >/dev/null
 as_root "$INSTALLER" --require | tee -a "$APPARMOR_LOG"
 
@@ -191,6 +212,11 @@ export STASHD_DATA_DIR="$TMP/data" STASHD_MEDIA_DIR="$TMP/media"
 mkdir -p "$STASHD_DATA_DIR" "$STASHD_MEDIA_DIR"
 docker compose "${COMPOSE_FILES[@]}" up -d
 wait_for_stashd "${COMPOSE_FILES[@]}"
-run_boundary "${COMPOSE_FILES[@]}"
+set +e
+restored_boundary_output=$(run_boundary "${COMPOSE_FILES[@]}" 2>&1)
+restored_boundary_status=$?
+set -e
+printf 'exit=%s\n%s\n' "$restored_boundary_status" "$restored_boundary_output" | tee -a "$APPARMOR_LOG"
+[ "$restored_boundary_status" -eq 0 ] || { echo 'restored candidate rejected the real plugin boundary' >&2; exit 1; }
 
 echo 'authoritative AppArmor plugin sandbox proof passed' | tee -a "$APPARMOR_LOG"
