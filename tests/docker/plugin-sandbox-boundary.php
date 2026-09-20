@@ -124,10 +124,6 @@ if (($hello['kind'] ?? null) !== 'response') {
 }
 
 $request = boundaryRead();
-$capEff = 0;
-if (preg_match('/^CapEff:\s*([0-9a-f]+)/m', file_get_contents('/proc/self/status'), $capMatch) === 1) {
-    $capEff = hexdec(substr($capMatch[1], -8));
-}
 
 $packageWrite = @file_put_contents('/plugin/should-not-write', 'blocked');
 $stageWrite = @file_put_contents('/staging/allowed.txt', 'allowed');
@@ -135,6 +131,25 @@ $network = @fsockopen('127.0.0.1', __BOUNDARY_NETWORK_PORT__, $networkError, $ne
 $networkVisible = is_resource($network);
 if ($networkVisible) {
     fclose($network);
+}
+$mountTarget = '/tmp/boundary-mount';
+@mkdir($mountTarget, 0700, true);
+$mountProcess = @proc_open(
+    ['mount', '-t', 'tmpfs', 'tmpfs', $mountTarget],
+    [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+    $mountPipes,
+);
+$mountSucceeded = false;
+if (is_resource($mountProcess)) {
+    if (isset($mountPipes[1])) {
+        stream_get_contents($mountPipes[1]);
+        fclose($mountPipes[1]);
+    }
+    if (isset($mountPipes[2])) {
+        stream_get_contents($mountPipes[2]);
+        fclose($mountPipes[2]);
+    }
+    $mountSucceeded = @proc_close($mountProcess) === 0;
 }
 
 boundaryWrite([
@@ -148,7 +163,7 @@ boundaryWrite([
         'stage_write' => $stageWrite === 7,
         'secret_visible' => getenv('SIGNING_KEY') !== false,
         'network_visible' => $networkVisible,
-        'cap_sys_admin' => ($capEff & (1 << 21)) !== 0,
+        'mount_succeeded' => $mountSucceeded,
     ],
 ]);
 PHP
@@ -190,7 +205,7 @@ try {
     boundaryAssert(($result['stage_write'] ?? null) === true, 'sandbox staging grant was not writable');
     boundaryAssert(($result['secret_visible'] ?? null) === false, 'sandbox inherited the host secret');
     boundaryAssert(($result['network_visible'] ?? null) === false, 'sandbox retained network access');
-    boundaryAssert(($result['cap_sys_admin'] ?? null) === false, 'sandbox retained CAP_SYS_ADMIN');
+    boundaryAssert(($result['mount_succeeded'] ?? null) === false, 'sandbox performed an ungranted mount');
     boundaryAssert(is_file($stage . '/allowed.txt'), 'sandbox staging output was not returned');
     boundaryAssert(! is_file($source . '/should-not-write'), 'sandbox mutated the plugin package');
     boundaryAssert($exit === 0, 'sandbox plugin did not exit cleanly');
