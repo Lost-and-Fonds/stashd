@@ -10,7 +10,6 @@ export STASHD_PUBLIC_URL="http://127.0.0.1:${STASHD_HOST_PORT}"
 export SIGNING_KEY="${STASHD_SECCOMP_SIGNING_KEY:-MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=}"
 export PUID="${STASHD_SECCOMP_PUID:-1000}" PGID="${STASHD_SECCOMP_PGID:-1000}"
 
-PROFILE="$ROOT/deploy/apparmor/stashd-plugin-bwrap"
 INSTALLER="$ROOT/deploy/apparmor/install-stashd-plugin-bwrap.sh"
 SECCOMP_PROFILE="$ROOT/deploy/seccomp/stashd-plugin-bwrap.json"
 COMPOSE_FILES=(-f "$ROOT/docker-compose.yml" -f "$ROOT/docker-compose.apparmor.yml")
@@ -149,11 +148,11 @@ import sys
 source, target = sys.argv[1:]
 profile = json.load(open(source, encoding='utf-8'))
 for rule in profile['syscalls']:
-    if rule.get('names') == ['clone'] and rule.get('excludes', {}).get('arches') == ['s390', 's390x']:
-        rule['args'][0]['value'] = 2114060288
+    if rule.get('comment') == 'Stashd bubblewrap namespace clone flags on x86_64':
+        profile['syscalls'].remove(rule)
         break
 else:
-    raise SystemExit('candidate clone rule not found')
+    raise SystemExit('candidate bubblewrap clone rule not found')
 json.dump(profile, open(target, 'w', encoding='utf-8'), indent='\t')
 PY
 set +e

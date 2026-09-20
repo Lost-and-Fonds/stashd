@@ -8,12 +8,11 @@ commit shipped by the authoritative Ubuntu validation environment:
 - upstream source: `profiles/seccomp/default.json`
 - upstream SHA-256: `9c1025c88ccaa517b648da571961838744ea2137f176bfe6a48b21294cae9c76`
 
-The only Stashd delta is the non-`CAP_SYS_ADMIN` `clone` argument filter. Docker
-requires the `CLONE_NEWCGROUP` bit in that filter, while Stashd's bubblewrap
-invocation creates the user, mount, PID, network, IPC, and UTS namespaces and
-does not create a cgroup namespace. The shipped rule matches the observed
-flags (`0x7c020000` after masking `SIGCHLD`) and leaves all other Docker rules
-unchanged. No mount syscall is added and no capability is added.
+The only Stashd delta is one non-`CAP_SYS_ADMIN` x86_64 `clone` argument filter.
+Docker's v28 rule filters x86_64 `clone` at argument index 0, while bubblewrap's
+namespace flags are at index 1. The Stashd rule permits the observed namespace
+flag mask (`0x7c020000`) and leaves all other Docker rules unchanged. No mount
+syscall is added and no capability is added.
 
 The profile is selected by `docker-compose.yml`; Docker resolves the relative
 path from the Compose project directory. It is a Stashd-container policy and
@@ -27,5 +26,5 @@ deploy/seccomp/check-stashd-plugin-bwrap.sh /path/to/default.json
 ```
 
 The check is structural and fails if the baseline differs anywhere besides the
-one documented `clone` argument value. Update the pinned provenance and review
-the resulting delta whenever Docker's default profile changes.
+one documented x86_64 `clone` rule. Update the pinned provenance and review the
+resulting delta whenever Docker's default profile changes.
