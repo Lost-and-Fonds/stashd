@@ -76,12 +76,20 @@ printf '%s\n' "$default_output" | grep -F 'No permissions to create new namespac
 }
 
 echo '--- unconfined investigation trace: identify the actual clone flags ---'
-docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=stashd-plugin-bwrap \
+docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=unconfined \
     --entrypoint sh "$IMAGE" -lc "apt-get update -qq && apt-get install -y -qq strace >/dev/null && gosu $PUID:$PGID strace -f -e trace=clone,clone3,unshare,setns,mount,umount2,pivot_root $bwrap_args" 2>&1 | tee "$TMP/trace.log"
 grep -E 'clone\(.*CLONE_NEWNS.*CLONE_NEWUTS.*CLONE_NEWIPC.*CLONE_NEWUSER.*CLONE_NEWPID.*CLONE_NEWNET' "$TMP/trace.log" >/dev/null || {
     echo 'investigation trace did not capture the expected bubblewrap namespace clone' >&2
     exit 1
 }
+
+echo '--- candidate seccomp trace: identify the next denied operation ---'
+set +e
+candidate_trace=$(docker run --rm --security-opt "seccomp=$SECCOMP_PROFILE" --security-opt apparmor=unconfined \
+    --entrypoint sh "$IMAGE" -lc "apt-get update -qq && apt-get install -y -qq strace >/dev/null && gosu $PUID:$PGID strace -f -e trace=clone,clone3,unshare,setns,mount,umount2,pivot_root $bwrap_args" 2>&1)
+candidate_trace_status=$?
+set -e
+printf 'exit=%s\n%s\n' "$candidate_trace_status" "$candidate_trace"
 
 echo '--- candidate seccomp: minimal bwrap must pass ---'
 run_probe "$SECCOMP_PROFILE"
