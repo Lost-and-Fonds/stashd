@@ -128,6 +128,7 @@ docker compose "${COMPOSE_FILES[@]}" exec -T stashd test -f /data/plugins/packag
 runtime 'Lifecycle 1.1.0'
 
 docker compose "${COMPOSE_FILES[@]}" up -d --force-recreate --no-deps stashd >/dev/null
+docker compose "${COMPOSE_FILES[@]}" cp "$ROOT/tests/docker/plugin-lifecycle-run.php" stashd:/tmp/plugin-lifecycle-run.php
 stashd_container=$(docker compose "${COMPOSE_FILES[@]}" ps -q stashd)
 for _ in $(seq 1 180); do
     health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$stashd_container" 2>/dev/null || true)

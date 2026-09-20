@@ -32,7 +32,9 @@ $expected = getenv('STASHD_LIFECYCLE_EXPECTED') ?: throw new RuntimeException('e
 $staging = '/data/plugin-lifecycle-stage';
 lifecycleRunRemove($staging);
 mkdir($staging, 0700, true);
-mkdir('/tmp/plugin-sdk', 0755, true);
+if (! is_dir('/tmp/plugin-sdk')) {
+    mkdir('/tmp/plugin-sdk', 0755, true);
+}
 $process = null;
 
 try {
