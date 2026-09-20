@@ -24,6 +24,8 @@ TMP=$(mktemp -d)
 FIXTURE_CONTAINER="${COMPOSE_PROJECT_NAME}-youtube-fixture"
 YOUTUBE_REF="${STASHD_GOLDEN_YOUTUBE_REF:-ghcr.io/lost-and-fonds/youtube@sha256:67600e64ef420711fce8bf041a08b3dc5da308677156c8eb8ff966d66852e29d}"
 PODCAST_REF="${STASHD_GOLDEN_PODCAST_REF:-ghcr.io/lost-and-fonds/podcast@sha256:b9660e9285b19215b287d9ac66529bcc0bbc9dc14aa1e0516d3b0cf54bcd2e46}"
+JELLYFIN_REF="${STASHD_GOLDEN_JELLYFIN_REF:-ghcr.io/lost-and-fonds/jellyfin@sha256:f6d20378365be62669f2936936498272b75431f5a557797c2c4474b27df12617}"
+PLEX_REF="${STASHD_GOLDEN_PLEX_REF:-ghcr.io/lost-and-fonds/plex@sha256:bc2c9960978494a7f81060fb28dd90471f60416465e770fc66cd3f8d89fbb1bd}"
 
 cleanup() {
     status=$?
@@ -119,6 +121,8 @@ until timeout 10s docker compose "${COMPOSE_FILES[@]}" exec -T stashd \
 done
 timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$YOUTUBE_REF"
 timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$PODCAST_REF"
+timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$JELLYFIN_REF"
+timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$PLEX_REF"
 # The production image persists its dotenv file under /data and reloads it on
 # restart. Keep the smoke deployment's operator key in that authoritative copy
 # as well as in Compose's environment.
@@ -276,6 +280,9 @@ printf '%s' "$refetched_assets" | jq -e --arg checksum "sha256:$refetch_expected
     --argjson size "$refetch_expected_size" \
     '.assets | any(.[]; .role == "vault_original" and .state == "ready" and .checksum == $checksum and .size_bytes == $size)' >/dev/null
 echo "golden refetch Vault bytes verified: path=$refetched_vault_asset_path sha256=$final_vault_sha256 job=$refetch_job_id"
+
+timeout 600s "$ROOT/tests/docker/media-server-broadcast-path.sh" \
+    "$ROOT" "$base" "$token" "$stash_id" "$final_vault_sha256"
 
 retry_stash=$(curl -fsS -X POST "$base/api/v1/stashes/with-input" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
