@@ -16,6 +16,7 @@ deltas = [
     {'names': ['mount'], 'action': 'SCMP_ACT_ALLOW', 'args': [{'index': 3, 'value': 573440, 'op': 'SCMP_CMP_EQ'}], 'comment': 'Stashd bubblewrap root MS_REC|MS_SLAVE mount', 'excludes': {'caps': ['CAP_SYS_ADMIN']}},
     {'names': ['mount'], 'action': 'SCMP_ACT_ALLOW', 'args': [{'index': 3, 'value': 6, 'op': 'SCMP_CMP_EQ'}], 'comment': 'Stashd bubblewrap tmpfs mount', 'excludes': {'caps': ['CAP_SYS_ADMIN']}},
     {'names': ['mount'], 'action': 'SCMP_ACT_ALLOW', 'args': [{'index': 3, 'value': 3236810752, 'op': 'SCMP_CMP_EQ'}], 'comment': 'Stashd bubblewrap recursive bind mount', 'excludes': {'caps': ['CAP_SYS_ADMIN']}},
+    {'names': ['mount'], 'action': 'SCMP_ACT_ALLOW', 'args': [{'index': 3, 'value': 53248, 'op': 'SCMP_CMP_EQ'}], 'comment': 'Stashd bubblewrap bind mount', 'excludes': {'caps': ['CAP_SYS_ADMIN']}},
     {'names': ['mount'], 'action': 'SCMP_ACT_ALLOW', 'args': [{'index': 3, 'value': 2134055, 'op': 'SCMP_CMP_EQ'}], 'comment': 'Stashd bubblewrap read-only bind remount', 'excludes': {'caps': ['CAP_SYS_ADMIN']}},
     {'names': ['mount'], 'action': 'SCMP_ACT_ALLOW', 'args': [{'index': 3, 'value': 10, 'op': 'SCMP_CMP_EQ'}], 'comment': 'Stashd bubblewrap devpts mount', 'excludes': {'caps': ['CAP_SYS_ADMIN']}},
     {'names': ['mount'], 'action': 'SCMP_ACT_ALLOW', 'args': [{'index': 3, 'value': 311296, 'op': 'SCMP_CMP_EQ'}], 'comment': 'Stashd bubblewrap private root mount', 'excludes': {'caps': ['CAP_SYS_ADMIN']}},
