@@ -240,7 +240,14 @@ jobs:
       - name: Start smoke test timer
         run: echo "SMOKE_TEST_START=$(date +%s)" >> "$GITHUB_ENV"
       - name: Run container smoke test
-        run: STASHD_GOLDEN_SKIP_BUILD=1 STASHD_GOLDEN_COLLECTION_CHECK=1 composer test:docker-golden
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apparmor apparmor-utils
+          if sudo aa-status --enabled >/dev/null 2>&1; then
+            sudo deploy/apparmor/install-stashd-plugin-bwrap.sh --require
+            export STASHD_GOLDEN_APPARMOR=1
+          fi
+          STASHD_GOLDEN_SKIP_BUILD=1 STASHD_GOLDEN_COLLECTION_CHECK=1 composer test:docker-golden
       - name: Record smoke test timing
         if: always()
         run: |
