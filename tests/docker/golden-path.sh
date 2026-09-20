@@ -55,6 +55,16 @@ openssl x509 -req -days 1 -in "$TMP/fixture/server.csr" -CA "$TMP/fixture/ca.pem
     -out "$TMP/fixture/cert.pem" >/dev/null 2>&1
 cp "$ROOT/tests/docker/youtube-fixture-server.py" "$TMP/fixture/server.py"
 cp "$ROOT/tests/docker/yt-dlp-fixture.conf" "$TMP/fixture/yt-dlp.conf"
+payload_a='stashd-golden-path-media-a'
+payload_b='stashd-golden-path-media-b'
+printf '%s\n' "$payload_a" > "$TMP/fixture/media.bin"
+expected_vault_sha256=$(printf '%s\n' "$payload_a" | sha256sum | awk '{print $1}')
+refetch_expected_sha256=$(printf '%s\n' "$payload_b" | sha256sum | awk '{print $1}')
+refetch_expected_size=$(printf '%s\n' "$payload_b" | wc -c | tr -d ' ')
+[ "$expected_vault_sha256" != "$refetch_expected_sha256" ] || {
+    echo 'golden path failed: refetch fixture payloads must differ' >&2
+    exit 1
+}
 
 if [ "${STASHD_GOLDEN_SKIP_BUILD:-0}" != "1" ]; then
     docker build -t "$STASHD_IMAGE" "$ROOT"
@@ -174,12 +184,12 @@ done
 item_id=$(printf '%s' "$items" | jq -r '.items[0].item_id // .items[0].itemId // .items[0].id')
 assets=$(curl -fsS "$base/api/v1/items/$item_id/assets" -H "Authorization: Bearer $token")
 printf '%s' "$assets" | jq -e '.assets | any(.[]; .role == "vault_original" and .state == "ready")' >/dev/null
+printf '%s' "$assets" | jq -e '[.assets[] | select(.role == "vault_original" and .state == "ready")] | length == 1' >/dev/null
 vault_asset_path=$(printf '%s' "$assets" | jq -r '.assets[] | select(.role == "vault_original" and .state == "ready") | .path' | head -n 1)
 [ -n "$vault_asset_path" ] && [ "$vault_asset_path" != "null" ] || {
     echo 'golden path failed: ready vault_original has no persisted path' >&2
     exit 1
 }
-expected_vault_sha256=$(printf '%s\n' 'stashd-golden-path-media' | sha256sum | awk '{print $1}')
 actual_vault_sha256=$(timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T stashd \
     sha256sum "$vault_asset_path" | awk '{print $1}')
 [ "$actual_vault_sha256" = "$expected_vault_sha256" ] || {
@@ -188,6 +198,68 @@ actual_vault_sha256=$(timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T s
     exit 1
 }
 echo "golden Vault bytes verified: path=$vault_asset_path sha256=$actual_vault_sha256"
+
+printf '%s\n' "$payload_b" > "$TMP/fixture/media.bin"
+upstream_b_sha256=$(timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T stashd \
+    curl --connect-timeout 1 --max-time 5 -fsS \
+    'https://www.youtube.com/videoplayback/goldenvid01' | sha256sum | awk '{print $1}')
+[ "$upstream_b_sha256" = "$refetch_expected_sha256" ] || {
+    echo "golden path failed: upstream fixture did not switch to payload B (expected=$refetch_expected_sha256 actual=$upstream_b_sha256)" >&2
+    exit 1
+}
+[ "$actual_vault_sha256" = "$expected_vault_sha256" ] || {
+    echo "golden path failed: Vault changed before refetch (expected payload A sha256=$expected_vault_sha256 actual=$actual_vault_sha256)" >&2
+    exit 1
+}
+echo "golden refetch source switched: sha256=$upstream_b_sha256; Vault remains payload A"
+
+refetch_headers="$TMP/refetch.headers"
+refetch=$(curl -fsS -D "$refetch_headers" -X POST "$base/api/v1/items/$item_id/refetch" \
+    -H "Authorization: Bearer $token")
+grep -Eq '^HTTP/[0-9.]+ 202([[:space:]]|$)' "$refetch_headers"
+refetch_job_id=$(printf '%s' "$refetch" | jq -r '.job.id // empty')
+[ -n "$refetch_job_id" ] || { echo 'golden path failed: refetch returned no job id' >&2; exit 1; }
+printf '%s' "$refetch" | jq -e --arg item_id "$item_id" \
+    '.job.type == "core.download" and .job.entityType == "item" and .job.entityId == $item_id and .job.payload.force == true and .job.payload.item_id == $item_id' >/dev/null
+
+refetch_state=''
+refetch_job=''
+for _ in $(seq 1 90); do
+    refetch_job=$(curl -fsS "$base/api/v1/jobs/$refetch_job_id" -H "Authorization: Bearer $token")
+    refetch_state=$(printf '%s' "$refetch_job" | jq -r '.job.state // empty')
+    [ "$refetch_state" = ready ] && break
+    [ "$refetch_state" = failed ] && { echo "$refetch_job" >&2; exit 1; }
+    sleep 2
+done
+[ "$refetch_state" = ready ] || { echo "$refetch_job" >&2; echo 'golden path failed: refetch job never reached terminal ready state' >&2; exit 1; }
+printf '%s' "$refetch_job" | jq -e --arg item_id "$item_id" \
+    '.job.type == "core.download" and .job.entityId == $item_id and (.job.attempts // 0) > 0 and .job.finishedAt != null and .job.progressPercent == 100 and .job.progressLabel != "Download skipped (already in Vault)"' >/dev/null
+
+refetched_item=$(curl -fsS "$base/api/v1/items/$item_id" -H "Authorization: Bearer $token")
+printf '%s' "$refetched_item" | jq -e '.item.state == "ready" or .state == "ready"' >/dev/null
+refetched_assets=$(curl -fsS "$base/api/v1/items/$item_id/assets" -H "Authorization: Bearer $token")
+printf '%s' "$refetched_assets" | jq -e '.assets | any(.[]; .role == "vault_original" and .state == "ready")' >/dev/null
+printf '%s' "$refetched_assets" | jq -e '[.assets[] | select(.role == "vault_original" and .state == "ready")] | length == 1' >/dev/null
+refetched_vault_asset_path=$(printf '%s' "$refetched_assets" | jq -r '.assets[] | select(.role == "vault_original" and .state == "ready") | .path' | head -n 1)
+[ -n "$refetched_vault_asset_path" ] && [ "$refetched_vault_asset_path" != "null" ] || {
+    echo 'golden path failed: refetch left no ready vault_original path' >&2
+    exit 1
+}
+final_vault_sha256=$(timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T stashd \
+    sha256sum "$refetched_vault_asset_path" | awk '{print $1}')
+[ "$final_vault_sha256" = "$refetch_expected_sha256" ] || {
+    echo "golden path failed: refetched Vault bytes mismatch for $refetched_vault_asset_path" >&2
+    echo "expected payload B sha256=$refetch_expected_sha256 actual sha256=$final_vault_sha256" >&2
+    exit 1
+}
+[ "$final_vault_sha256" != "$expected_vault_sha256" ] || {
+    echo 'golden path failed: refetch left payload A in the Vault' >&2
+    exit 1
+}
+printf '%s' "$refetched_assets" | jq -e --arg checksum "sha256:$refetch_expected_sha256" \
+    --argjson size "$refetch_expected_size" \
+    '.assets | any(.[]; .role == "vault_original" and .state == "ready" and .checksum == $checksum and .sizeBytes == $size)' >/dev/null
+echo "golden refetch Vault bytes verified: path=$refetched_vault_asset_path sha256=$final_vault_sha256 job=$refetch_job_id"
 
 sync=$(curl -fsS -X POST "$base/api/v1/stashes/$stash_id/sync" \
     -H "Authorization: Bearer $token")

@@ -1,19 +1,27 @@
 #!/usr/bin/env python3
 import json
+import os
 import ssl
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 
-MEDIA = b"stashd-golden-path-media\n"
+MEDIA_PATH = os.environ.get("STASHD_FIXTURE_MEDIA_PATH", "/fixture/media.bin")
 VIDEO_ID = "goldenvid01"
 
 
+def media():
+    with open(MEDIA_PATH, "rb") as handle:
+        return handle.read()
+
+
 def player_response():
+    value = media()
+
     return {
         "playabilityStatus": {"status": "OK"},
         "videoDetails": {"videoId": VIDEO_ID, "title": "Golden Path Video", "shortDescription": "Golden path fixture"},
-        "streamingData": {"formats": [{"url": f"https://www.youtube.com/videoplayback/{VIDEO_ID}", "mimeType": "video/mp4", "qualityLabel": "360p", "contentLength": str(len(MEDIA))}]},
+        "streamingData": {"formats": [{"url": f"https://www.youtube.com/videoplayback/{VIDEO_ID}", "mimeType": "video/mp4", "qualityLabel": "360p", "contentLength": str(len(value))}]},
     }
 
 
@@ -32,7 +40,7 @@ class Handler(BaseHTTPRequestHandler):
                 + ';</script></body></html>'
             )
         elif path.path == f"/videoplayback/{VIDEO_ID}":
-            self.send_bytes("video/mp4", MEDIA)
+            self.send_bytes("video/mp4", media())
         elif path.path == f"/vi/{VIDEO_ID}/hqdefault.jpg":
             self.send_bytes("image/jpeg", b"golden-path-thumbnail\n")
         else:
