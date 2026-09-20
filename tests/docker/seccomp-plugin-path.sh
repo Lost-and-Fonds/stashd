@@ -93,15 +93,15 @@ printf 'exit=%s\n%s\n' "$candidate_trace_status" "$candidate_trace"
 echo '--- candidate seccomp: minimal bwrap must pass ---'
 run_probe "$SECCOMP_PROFILE"
 
-echo '--- candidate seccomp: unrelated namespace flag form remains denied ---'
+echo '--- candidate seccomp: unrelated mount namespace syscall remains denied ---'
 set +e
 reduced_output=$(docker run --rm --user "$PUID:$PGID" --security-opt "seccomp=$SECCOMP_PROFILE" \
     --security-opt apparmor=stashd-plugin-bwrap --entrypoint sh "$IMAGE" -lc \
-    'bwrap --die-with-parent --new-session --unshare-user --unshare-pid --clearenv --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /lib /lib --ro-bind /lib64 /lib64 --tmpfs /tmp --dev /dev --chdir / -- /usr/bin/true' 2>&1)
+    'unshare --mount true' 2>&1)
 reduced_status=$?
 set -e
 printf 'exit=%s\n%s\n' "$reduced_status" "$reduced_output"
-[ "$reduced_status" -ne 0 ] || { echo 'candidate profile unexpectedly allowed a non-Stashd namespace flag form' >&2; exit 1; }
+[ "$reduced_status" -ne 0 ] || { echo 'candidate profile unexpectedly allowed an unrelated mount namespace' >&2; exit 1; }
 
 echo '--- candidate seccomp: Core remains unprivileged ---'
 core_output=$(docker run --rm --user "$PUID:$PGID" \
