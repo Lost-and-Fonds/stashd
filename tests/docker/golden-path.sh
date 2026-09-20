@@ -7,6 +7,10 @@ export COMPOSE_PROJECT_NAME
 export STASHD_IMAGE="${STASHD_GOLDEN_IMAGE:-stashd:golden}"
 export STASHD_HOST_PORT="${STASHD_GOLDEN_PORT:-18474}"
 export STASHD_PUBLIC_URL="http://127.0.0.1:${STASHD_HOST_PORT}"
+COMPOSE_FILES=(-f "$ROOT/docker-compose.yml")
+if [ "${STASHD_GOLDEN_APPARMOR:-0}" = "1" ]; then
+    COMPOSE_FILES+=(-f "$ROOT/docker-compose.apparmor.yml")
+fi
 # The smoke deployment restarts after installing plugins. Supply a deterministic
 # operator key so this proof is independent of persisted .env generation while
 # still exercising the production signing/encryption path.
@@ -27,10 +31,10 @@ cleanup() {
         docker logs "$FIXTURE_CONTAINER" >&2 2>/dev/null || true
     fi
     if [ "$status" -ne 0 ]; then
-        docker compose -f "$ROOT/docker-compose.yml" logs stashd >&2 2>/dev/null || true
+        docker compose "${COMPOSE_FILES[@]}" logs stashd >&2 2>/dev/null || true
     fi
     docker rm -f "$FIXTURE_CONTAINER" >/dev/null 2>&1 || true
-    docker compose -f "$ROOT/docker-compose.yml" down -v --remove-orphans >/dev/null 2>&1 || true
+    docker compose "${COMPOSE_FILES[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
     docker run --rm -v "$TMP:/cleanup" python:3.12-slim sh -c 'rm -rf /cleanup/*' >/dev/null 2>&1 || true
     rm -rf "$TMP" >/dev/null 2>&1 || true
     rmdir "$TMP" >/dev/null 2>&1 || true
@@ -55,13 +59,13 @@ cp "$ROOT/tests/docker/yt-dlp-fixture.conf" "$TMP/fixture/yt-dlp.conf"
 if [ "${STASHD_GOLDEN_SKIP_BUILD:-0}" != "1" ]; then
     docker build -t "$STASHD_IMAGE" "$ROOT"
 fi
-docker compose -f "$ROOT/docker-compose.yml" up -d
+docker compose "${COMPOSE_FILES[@]}" up -d
 
 # Compose's --wait treats an early failed health probe as terminal, even when
 # the production entrypoint is still booting and will recover. Wait for the
 # shipped entrypoint's own boot-complete signal before installing plugins,
 # then use the public health endpoint after the required plugin restart below.
-stashd_container=$(docker compose -f "$ROOT/docker-compose.yml" ps -q stashd)
+stashd_container=$(docker compose "${COMPOSE_FILES[@]}" ps -q stashd)
 boot_log=''
 for _ in $(seq 1 180); do
     boot_log=$(timeout 5s docker logs --since 15m "$stashd_container" 2>/dev/null || true)
@@ -85,24 +89,24 @@ docker run -d --name "$FIXTURE_CONTAINER" --network "$network" \
     -v "$TMP/fixture:/fixture:ro" \
     python:3.12-slim python /fixture/server.py >/dev/null
 
-docker compose -f "$ROOT/docker-compose.yml" cp "$TMP/fixture/ca.pem" stashd:/usr/local/share/ca-certificates/stashd-golden.crt
-docker compose -f "$ROOT/docker-compose.yml" cp "$TMP/fixture/yt-dlp.conf" stashd:/etc/yt-dlp.conf
-timeout 60s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd update-ca-certificates >/dev/null
-timeout 60s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd sh -c \
+docker compose "${COMPOSE_FILES[@]}" cp "$TMP/fixture/ca.pem" stashd:/usr/local/share/ca-certificates/stashd-golden.crt
+docker compose "${COMPOSE_FILES[@]}" cp "$TMP/fixture/yt-dlp.conf" stashd:/etc/yt-dlp.conf
+timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T stashd update-ca-certificates >/dev/null
+timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T stashd sh -c \
     'cat /usr/local/share/ca-certificates/stashd-golden.crt >> /etc/ssl/certs/ca-certificates.crt'
-until timeout 10s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd \
+until timeout 10s docker compose "${COMPOSE_FILES[@]}" exec -T stashd \
     curl --connect-timeout 1 --max-time 5 -fsS \
     'https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dgolden-video' >/dev/null; do
     sleep 1
 done
-timeout 180s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd php tempest stashd:plugin-install "$YOUTUBE_REF"
-timeout 180s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd php tempest stashd:plugin-install "$PODCAST_REF"
+timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$YOUTUBE_REF"
+timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$PODCAST_REF"
 # The production image persists its dotenv file under /data and reloads it on
 # restart. Keep the smoke deployment's operator key in that authoritative copy
 # as well as in Compose's environment.
-timeout 60s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd sh -c \
+timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T stashd sh -c \
     "sed -i '/^SIGNING_KEY=/d' /data/.env 2>/dev/null || true; printf 'SIGNING_KEY=%s\\n' \"\$SIGNING_KEY\" >> /data/.env"
-timeout 60s docker compose -f "$ROOT/docker-compose.yml" restart stashd >/dev/null
+timeout 60s docker compose "${COMPOSE_FILES[@]}" restart stashd >/dev/null
 
 base="http://127.0.0.1:${STASHD_HOST_PORT}"
 cookie_jar="$TMP/cookies"
@@ -117,7 +121,7 @@ done
 if [ "$health_code" != 200 ]; then
     printf 'golden path failed: health returned HTTP %s\n' "$health_code" >&2
     cat "$health_body" >&2 2>/dev/null || true
-    docker compose -f "$ROOT/docker-compose.yml" logs stashd >&2 2>/dev/null || true
+    docker compose "${COMPOSE_FILES[@]}" logs stashd >&2 2>/dev/null || true
     exit 1
 fi
 

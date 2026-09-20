@@ -165,6 +165,48 @@ jobs:
       - name: Run plugin runtime conformance
         run: packages/plugin-runtime/tests/run.sh
 
+  apparmor-sandbox:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Verify AppArmor enforcement
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apparmor apparmor-utils
+          sudo aa-status
+          sudo aa-status --enabled
+          test -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+          test "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = 1
+          docker info --format '{{json .SecurityOptions}}' | grep -F 'apparmor'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build AppArmor proof image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: prod
+          load: true
+          tags: stashd:apparmor
+          cache-from: type=gha,scope=prod-amd64
+          cache-to: type=gha,mode=max
+        env:
+          BUILDKIT_PROGRESS: plain
+
+      - name: Run authoritative AppArmor sandbox proof
+        run: STASHD_APPARMOR_IMAGE=stashd:apparmor composer test:docker-apparmor
+
+      - name: Upload AppArmor proof diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: apparmor-sandbox-diagnostics
+          path: ${{ runner.temp }}/stashd-apparmor
+          if-no-files-found: warn
+
   smoke:
     needs: quality
     runs-on: ubuntu-latest
@@ -198,7 +240,14 @@ jobs:
       - name: Start smoke test timer
         run: echo "SMOKE_TEST_START=$(date +%s)" >> "$GITHUB_ENV"
       - name: Run container smoke test
-        run: STASHD_GOLDEN_SKIP_BUILD=1 STASHD_GOLDEN_COLLECTION_CHECK=1 composer test:docker-golden
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apparmor apparmor-utils
+          if sudo aa-status --enabled >/dev/null 2>&1; then
+            sudo deploy/apparmor/install-stashd-plugin-bwrap.sh --require
+            export STASHD_GOLDEN_APPARMOR=1
+          fi
+          STASHD_GOLDEN_SKIP_BUILD=1 STASHD_GOLDEN_COLLECTION_CHECK=1 composer test:docker-golden
       - name: Record smoke test timing
         if: always()
         run: |

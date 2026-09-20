@@ -1,0 +1,87 @@
+# Stashd's container profile, based on Docker's docker-default profile.
+#
+# The parent profile keeps Docker's normal container restrictions, including
+# deny mount. Only /usr/bin/bwrap is transitioned into the setup profile. The
+# setup profile is intentionally broad because bubblewrap constructs the
+# mount/user namespace there; its children stack the unprivileged profile,
+# which denies capabilities, user namespaces, and mounts. Bubblewrap's
+# per-invocation network namespace remains authoritative for network access.
+#
+# Keep the base rules synchronized with Docker's current apparmor template:
+# https://github.com/moby/profiles/blob/main/apparmor/template.go
+
+abi <abi/3.0>,
+
+include <tunables/global>
+
+profile stashd-plugin-bwrap flags=(attach_disconnected,mediate_deleted) {
+  include <abstractions/base>
+
+  network,
+  deny network alg,
+  deny network vsock,
+  capability,
+  file,
+  umount,
+
+  signal (receive) peer=unconfined,
+  signal (receive) peer=runc,
+  signal (receive) peer=crun,
+  signal (send,receive) peer=stashd-plugin-bwrap,
+
+  deny @{PROC}/* w,
+  deny @{PROC}/{[^1-9/],[^1-9/][^0-9/],[^1-9s/][^0-9y/][^0-9s/],[^1-9/][^0-9/][^0-9/][^0-9/]*}/** w,
+  deny @{PROC}/sys/[^k]** w,
+  deny @{PROC}/sys/kernel/{?,??,[^s][^h][^m]**} w,
+  deny @{PROC}/sysrq-trigger rwklx,
+  deny @{PROC}/kcore rwklx,
+
+  deny mount,
+
+  deny /sys/[^f]*/** wklx,
+  deny /sys/f[^s]*/** wklx,
+  deny /sys/fs/[^c]*/** wklx,
+  deny /sys/fs/c[^g]*/** wklx,
+  deny /sys/fs/cg[^r]*/** wklx,
+  deny /sys/firmware/** rwklx,
+  deny /sys/devices/virtual/powercap/** rwklx,
+  deny /sys/kernel/security/** rwklx,
+
+  ptrace (trace,tracedby,read,readby) peer=stashd-plugin-bwrap,
+
+  /usr/bin/bwrap Px -> stashd-plugin-bwrap-setup,
+  /usr/local/bin/bwrap Px -> stashd-plugin-bwrap-setup,
+}
+
+profile stashd-plugin-bwrap-setup /usr/bin/bwrap flags=(attach_disconnected,mediate_deleted) {
+  capability,
+  file rwlkm /{**,},
+  network,
+  unix,
+  ptrace,
+  signal,
+  mqueue,
+  userns,
+  mount,
+  umount,
+  pivot_root,
+  dbus,
+
+  # bwrap sets no_new_privs before starting the plugin. Stack the child
+  # profile so the plugin loses capabilities without requiring a privileged
+  # transition, following the upstream bwrap-userns-restrict design.
+  pix /** -> &stashd-plugin-bwrap-child,
+}
+
+profile stashd-plugin-bwrap-child flags=(attach_disconnected,mediate_deleted) {
+  file rwlkm /{**,},
+  network,
+  unix,
+  signal,
+  mqueue,
+  ptrace,
+  deny capability,
+  deny userns,
+  deny mount,
+  pix /** -> &stashd-plugin-bwrap-child,
+}

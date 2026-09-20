@@ -53,6 +53,7 @@
         "test:postgres": "@php vendor/bin/alchemy test",
         "test:docker-smoke": "tests/docker/smoke.sh",
         "test:docker-smoke:no-build": "STASHD_SMOKE_SKIP_BUILD=1 tests/docker/smoke.sh",
+        "test:docker-apparmor": "bash tests/docker/apparmor-plugin-path.sh",
         "test:docker-golden": "tests/docker/golden-path.sh",
         "lint": "@php vendor/bin/alchemy lint",
         "format": "@php vendor/bin/alchemy fmt",
