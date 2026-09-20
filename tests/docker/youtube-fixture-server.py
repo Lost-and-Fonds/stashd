@@ -9,8 +9,10 @@ from urllib.parse import parse_qs, urlparse
 MEDIA_PATH = os.environ.get("STASHD_FIXTURE_MEDIA_PATH", "/fixture/media.bin")
 RETRY_MEDIA_PATH = os.environ.get("STASHD_FIXTURE_RETRY_MEDIA_PATH", "/fixture/retry-media.bin")
 RETRY_MODE_PATH = os.environ.get("STASHD_FIXTURE_RETRY_MODE_PATH", "/fixture/retry-mode")
+CAPTION_MODE_PATH = os.environ.get("STASHD_FIXTURE_CAPTION_MODE_PATH", "/fixture/caption-mode")
 VIDEO_ID = "goldenvid01"
 RETRY_VIDEO_ID = "retryfail01"
+CAPTION = b"WEBVTT\n\n00:00.000 --> 00:01.000\nDeterministic fixture caption\n"
 
 
 def media(path=MEDIA_PATH):
@@ -23,16 +25,32 @@ def retry_is_healthy():
         return handle.read().strip() == "healthy"
 
 
+def caption_is_healthy():
+    try:
+        with open(CAPTION_MODE_PATH, "r", encoding="utf-8") as handle:
+            return handle.read().strip() == "healthy"
+    except FileNotFoundError:
+        return True
+
+
 def player_response(video_id=VIDEO_ID, title="Golden Path Video", value=None):
     value = media() if value is None and video_id == VIDEO_ID else value
     if value is None:
         value = media(RETRY_MEDIA_PATH)
 
-    return {
+    response = {
         "playabilityStatus": {"status": "OK"},
         "videoDetails": {"videoId": video_id, "title": title, "shortDescription": "Golden path fixture"},
         "streamingData": {"formats": [{"url": f"https://www.youtube.com/videoplayback/{video_id}", "mimeType": "video/mp4", "qualityLabel": "360p", "contentLength": str(len(value))}]},
     }
+    if video_id == VIDEO_ID and caption_is_healthy():
+        response["captions"] = {"playerCaptionsTracklistRenderer": {"captionTracks": [{
+            "baseUrl": "https://www.youtube.com/api/timedtext?v=goldenvid01&lang=en&fmt=vtt",
+            "languageCode": "en",
+            "name": {"simpleText": "English"},
+            "kind": "",
+        }]}}
+    return response
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -52,6 +70,11 @@ class Handler(BaseHTTPRequestHandler):
             )
         elif path.path == f"/videoplayback/{VIDEO_ID}":
             self.send_bytes("video/mp4", media())
+        elif path.path == "/api/timedtext" and query.get("v") == [VIDEO_ID] and query.get("lang") == ["en"] and query.get("fmt") == ["vtt"]:
+            if not caption_is_healthy():
+                self.send_error(503, "captions are deliberately unavailable")
+                return
+            self.send_bytes("text/vtt", CAPTION)
         elif path.path == f"/videoplayback/{RETRY_VIDEO_ID}":
             if not retry_is_healthy():
                 self.send_error(503, "retry fixture is deliberately broken")

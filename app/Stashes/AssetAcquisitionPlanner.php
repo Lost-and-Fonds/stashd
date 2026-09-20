@@ -64,7 +64,8 @@ final readonly class AssetAcquisitionPlanner
 
             $itemId = (string) $item->id;
 
-            if (isset($activeAcquisitions[$itemId]) || isset($activeDownloads[$itemId])) {
+            if (isset($activeAcquisitions[$itemId])
+                || (isset($activeDownloads[$itemId]) && $item->state !== ItemState::Ready)) {
                 continue;
             }
 

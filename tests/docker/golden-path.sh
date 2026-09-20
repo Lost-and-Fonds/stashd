@@ -60,14 +60,21 @@ cp "$ROOT/tests/docker/yt-dlp-fixture.conf" "$TMP/fixture/yt-dlp.conf"
 payload_a='stashd-golden-path-media-a'
 payload_b='stashd-golden-path-media-b'
 retry_payload='stashd-golden-path-retry-media'
+caption_payload='WEBVTT
+
+00:00.000 --> 00:01.000
+Deterministic fixture caption
+'
 printf '%s\n' "$payload_a" > "$TMP/fixture/media.bin"
 printf '%s\n' "$retry_payload" > "$TMP/fixture/retry-media.bin"
 printf 'broken\n' > "$TMP/fixture/retry-mode"
+printf 'broken\n' > "$TMP/fixture/caption-mode"
 expected_vault_sha256=$(printf '%s\n' "$payload_a" | sha256sum | awk '{print $1}')
 refetch_expected_sha256=$(printf '%s\n' "$payload_b" | sha256sum | awk '{print $1}')
 refetch_expected_size=$(printf '%s\n' "$payload_b" | wc -c | tr -d ' ')
 retry_expected_sha256=$(printf '%s\n' "$retry_payload" | sha256sum | awk '{print $1}')
 retry_expected_size=$(printf '%s\n' "$retry_payload" | wc -c | tr -d ' ')
+caption_expected_sha256=$(printf '%s' "$caption_payload" | sha256sum | awk '{print $1}')
 [ "$expected_vault_sha256" != "$refetch_expected_sha256" ] || {
     echo 'golden path failed: refetch fixture payloads must differ' >&2
     exit 1
@@ -405,10 +412,55 @@ done
 synced_items=$(curl -fsS "$base/api/v1/stashes/$stash_id/items" -H "Authorization: Bearer $token")
 printf '%s' "$synced_items" | jq -e --arg item_id "$item_id" '.items | any(.[]; (.item_id // .itemId // .id) == $item_id)' >/dev/null
 
+printf 'healthy\n' > "$TMP/fixture/caption-mode"
 broadcast=$(curl -fsS -X POST "$base/api/v1/stashes/$stash_id/broadcasts" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
-    -d '{"type":"podcast","name":"Golden Podcast","settings":{"media_kind":"video"}}')
+    -d '{"type":"podcast","name":"Golden Podcast","settings":{"media_kind":"video","captions":"creator_only","caption_languages":"en"}}')
 broadcast_id=$(printf '%s' "$broadcast" | jq -r '.broadcast.id')
+
+caption_job_id=''
+caption_job=''
+for _ in $(seq 1 90); do
+    caption_job_id=$(curl -fsS "$base/api/v1/jobs" -H "Authorization: Bearer $token" \
+        | jq -r --arg item_id "$item_id" --arg stash_id "$stash_id" '[.jobs[] | select(.type == "core.acquire_assets" and .entity_id == $item_id and .stash_id == $stash_id)] | .[0].id // empty')
+    [ -n "$caption_job_id" ] && break
+    sleep 1
+done
+[ -n "$caption_job_id" ] || { echo 'golden path failed: caption broadcast dispatched no core.acquire_assets job' >&2; exit 1; }
+caption_job=$(curl -fsS "$base/api/v1/jobs/$caption_job_id" -H "Authorization: Bearer $token")
+printf '%s' "$caption_job" | jq -e --arg item_id "$item_id" \
+    '.job.type == "core.acquire_assets" and .job.entity_id == $item_id and .job.payload.roles == ["captions"] and .job.payload.provider_options.include_captions == true and .job.payload.provider_options.include_auto_captions == false and .job.payload.provider_options.caption_languages == "en"' >/dev/null || {
+    echo 'golden path failed: caption acquisition job payload was wrong' >&2
+    printf '%s\n' "$caption_job" >&2
+    exit 1
+}
+echo "golden caption acquisition dispatched: job=$caption_job_id"
+
+caption_state=''
+for _ in $(seq 1 90); do
+    caption_job=$(curl -fsS "$base/api/v1/jobs/$caption_job_id" -H "Authorization: Bearer $token")
+    caption_state=$(printf '%s' "$caption_job" | jq -r '.job.state // empty')
+    [ "$caption_state" = ready ] && break
+    [ "$caption_state" = failed ] && { echo "$caption_job" >&2; exit 1; }
+    sleep 2
+done
+[ "$caption_state" = ready ] || { echo "$caption_job" >&2; echo 'golden path failed: caption acquisition job never reached ready' >&2; exit 1; }
+printf '%s' "$caption_job" | jq -e '.job.attempts > 0 and .job.finished_at != null and .job.progress_percent == 100 and .job.progress_label == "Asset acquisition complete"' >/dev/null
+echo "golden caption acquisition completed: job=$caption_job_id"
+docker logs "$FIXTURE_CONTAINER" 2>&1 | grep -F '"GET /api/timedtext?v=goldenvid01&lang=en&fmt=vtt HTTP/' >/dev/null || {
+    echo 'golden path failed: YouTube timed-text endpoint was not requested' >&2
+    docker logs "$FIXTURE_CONTAINER" >&2 || true
+    exit 1
+}
+echo 'golden caption source request verified: /api/timedtext?v=goldenvid01&lang=en&fmt=vtt'
+
+caption_assets=$(curl -fsS "$base/api/v1/items/$item_id/assets" -H "Authorization: Bearer $token")
+caption_path=$(printf '%s' "$caption_assets" | jq -r '.assets[] | select(.role == "subtitle" and .kind == "subtitle" and .state == "ready" and .language == "en") | .path' | head -n 1)
+[ -n "$caption_path" ] && [ "$caption_path" != "null" ] || { echo 'golden path failed: no ready English subtitle asset' >&2; printf '%s\n' "$caption_assets" >&2; exit 1; }
+caption_sha256=$(timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T stashd sha256sum "$caption_path" | awk '{print $1}')
+[ "$caption_sha256" = "$caption_expected_sha256" ] || { echo "golden path failed: caption Vault checksum mismatch expected=$caption_expected_sha256 actual=$caption_sha256" >&2; exit 1; }
+printf '%s' "$caption_assets" | jq -e --arg checksum "sha256:$caption_expected_sha256" '.assets | any(.[]; .role == "subtitle" and .kind == "subtitle" and .state == "ready" and .language == "en" and .mime_type == "text/vtt" and .checksum == $checksum)' >/dev/null
+echo "golden caption Vault bytes verified: path=$caption_path sha256=$caption_sha256"
 
 for _ in $(seq 1 90); do
     current=$(curl -fsS "$base/api/v1/broadcasts/$broadcast_id" -H "Authorization: Bearer $token")
@@ -421,7 +473,11 @@ done
 [ "$state" = ready ] || { echo 'golden path failed: broadcast never became ready' >&2; exit 1; }
 published_url=$(printf '%s' "$current" | jq -r '.broadcast.published_url // empty')
 [ -n "$published_url" ] || { echo 'golden path failed: no published URL' >&2; exit 1; }
-curl -fsS "$published_url" | grep -q 'Golden Path Video'
+feed=$(curl -fsS "$published_url")
+printf '%s' "$feed" | grep -q 'Golden Path Video'
+printf '%s' "$feed" | grep -q 'podcast:transcript'
+printf '%s' "$feed" | grep -q 'Deterministic fixture caption'
+echo "golden Podcast caption output verified: broadcast=$broadcast_id"
 
 if [ "${STASHD_GOLDEN_COLLECTION_CHECK:-0}" = "1" ]; then
     filesystem=$(curl -fsS -X POST "$base/api/v1/stashes/$stash_id/broadcasts" \
