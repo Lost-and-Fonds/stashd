@@ -174,6 +174,20 @@ done
 item_id=$(printf '%s' "$items" | jq -r '.items[0].item_id // .items[0].itemId // .items[0].id')
 assets=$(curl -fsS "$base/api/v1/items/$item_id/assets" -H "Authorization: Bearer $token")
 printf '%s' "$assets" | jq -e '.assets | any(.[]; .role == "vault_original" and .state == "ready")' >/dev/null
+vault_asset_path=$(printf '%s' "$assets" | jq -r '.assets[] | select(.role == "vault_original" and .state == "ready") | .path' | head -n 1)
+[ -n "$vault_asset_path" ] && [ "$vault_asset_path" != "null" ] || {
+    echo 'golden path failed: ready vault_original has no persisted path' >&2
+    exit 1
+}
+expected_vault_sha256=$(printf '%s\n' 'stashd-golden-path-media' | sha256sum | awk '{print $1}')
+actual_vault_sha256=$(timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T stashd \
+    sha256sum "$vault_asset_path" | awk '{print $1}')
+[ "$actual_vault_sha256" = "$expected_vault_sha256" ] || {
+    echo "golden path failed: Vault bytes mismatch for $vault_asset_path" >&2
+    echo "expected sha256=$expected_vault_sha256 actual sha256=$actual_vault_sha256" >&2
+    exit 1
+}
+echo "golden Vault bytes verified: path=$vault_asset_path sha256=$actual_vault_sha256"
 
 sync=$(curl -fsS -X POST "$base/api/v1/stashes/$stash_id/sync" \
     -H "Authorization: Bearer $token")
