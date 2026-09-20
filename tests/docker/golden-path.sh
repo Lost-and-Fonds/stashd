@@ -57,10 +57,15 @@ cp "$ROOT/tests/docker/youtube-fixture-server.py" "$TMP/fixture/server.py"
 cp "$ROOT/tests/docker/yt-dlp-fixture.conf" "$TMP/fixture/yt-dlp.conf"
 payload_a='stashd-golden-path-media-a'
 payload_b='stashd-golden-path-media-b'
+retry_payload='stashd-golden-path-retry-media'
 printf '%s\n' "$payload_a" > "$TMP/fixture/media.bin"
+printf '%s\n' "$retry_payload" > "$TMP/fixture/retry-media.bin"
+printf 'broken\n' > "$TMP/fixture/retry-mode"
 expected_vault_sha256=$(printf '%s\n' "$payload_a" | sha256sum | awk '{print $1}')
 refetch_expected_sha256=$(printf '%s\n' "$payload_b" | sha256sum | awk '{print $1}')
 refetch_expected_size=$(printf '%s\n' "$payload_b" | wc -c | tr -d ' ')
+retry_expected_sha256=$(printf '%s\n' "$retry_payload" | sha256sum | awk '{print $1}')
+retry_expected_size=$(printf '%s\n' "$retry_payload" | wc -c | tr -d ' ')
 [ "$expected_vault_sha256" != "$refetch_expected_sha256" ] || {
     echo 'golden path failed: refetch fixture payloads must differ' >&2
     exit 1
@@ -271,6 +276,109 @@ printf '%s' "$refetched_assets" | jq -e --arg checksum "sha256:$refetch_expected
     --argjson size "$refetch_expected_size" \
     '.assets | any(.[]; .role == "vault_original" and .state == "ready" and .checksum == $checksum and .size_bytes == $size)' >/dev/null
 echo "golden refetch Vault bytes verified: path=$refetched_vault_asset_path sha256=$final_vault_sha256 job=$refetch_job_id"
+
+retry_stash=$(curl -fsS -X POST "$base/api/v1/stashes/with-input" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
+    -d '{"name":"Golden Retry Failure","input":{"plugin":"youtube","source":{"url":"https://www.youtube.com/watch?v=retryfail01"}},"downloadPolicy":"video"}')
+retry_stash_id=$(printf '%s' "$retry_stash" | jq -r '.stash.id // empty')
+[ -n "$retry_stash_id" ] || { echo 'golden path failed: retry fixture stash was not created' >&2; exit 1; }
+
+retry_input_job_id=''
+for _ in $(seq 1 15); do
+    retry_input_job_id=$(curl -fsS "$base/api/v1/jobs" -H "Authorization: Bearer $token" \
+        | jq -r --arg stash_id "$retry_stash_id" '[.jobs[] | select(.type == "core.add_input" and .stash_id == $stash_id)] | .[0].id // empty')
+    [ -n "$retry_input_job_id" ] && break
+    sleep 1
+done
+[ -n "$retry_input_job_id" ] || { echo 'golden path failed: no retry fixture input job' >&2; exit 1; }
+
+retry_item_id=''
+retry_state=''
+retry_items=''
+retry_download_job_id=''
+retry_download_job=''
+for _ in $(seq 1 90); do
+    retry_items=$(curl -fsS "$base/api/v1/stashes/$retry_stash_id/items" -H "Authorization: Bearer $token")
+    retry_item_id=$(printf '%s' "$retry_items" | jq -r '.items[0].item_id // .items[0].itemId // .items[0].id // empty')
+    retry_state=$(printf '%s' "$retry_items" | jq -r '.items[0].item.state // .items[0].state // empty')
+    retry_download_job_id=$(curl -fsS "$base/api/v1/jobs" -H "Authorization: Bearer $token" \
+        | jq -r --arg stash_id "$retry_stash_id" '[.jobs[] | select(.type == "core.download" and .stash_id == $stash_id and .state == "failed")] | .[0].id // empty')
+    if [ "$retry_state" = failed ] && [ -n "$retry_download_job_id" ]; then
+        retry_download_job=$(curl -fsS "$base/api/v1/jobs/$retry_download_job_id" -H "Authorization: Bearer $token")
+        break
+    fi
+    sleep 2
+done
+[ -n "$retry_item_id" ] && [ "$retry_state" = failed ] && [ -n "$retry_download_job_id" ] || {
+    echo 'golden path failed: retry fixture did not produce a failed item/download job' >&2
+    printf '%s\n' "$retry_items" >&2
+    exit 1
+}
+printf '%s' "$retry_download_job" | jq -e --arg item_id "$retry_item_id" \
+    '.job.type == "core.download" and .job.entity_id == $item_id and (.job.attempts // 0) > 0 and .job.last_error != null' >/dev/null
+retry_assets_before=$(curl -fsS "$base/api/v1/items/$retry_item_id/assets" -H "Authorization: Bearer $token")
+printf '%s' "$retry_assets_before" | jq -e '(.assets // []) | all(.[]; .role != "vault_original" or .state != "ready")' >/dev/null
+echo "golden retry initial failure: item=$retry_item_id job=$retry_download_job_id state=failed"
+
+printf 'healthy\n' > "$TMP/fixture/retry-mode"
+retry_upstream_sha256=$(timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T stashd \
+    curl --connect-timeout 1 --max-time 5 -fsS \
+    'https://www.youtube.com/videoplayback/retryfail01' | sha256sum | awk '{print $1}')
+[ "$retry_upstream_sha256" = "$retry_expected_sha256" ] || {
+    echo "golden path failed: retry fixture did not switch to payload R (expected=$retry_expected_sha256 actual=$retry_upstream_sha256)" >&2
+    exit 1
+}
+retry_items_after_repair=$(curl -fsS "$base/api/v1/stashes/$retry_stash_id/items" -H "Authorization: Bearer $token")
+printf '%s' "$retry_items_after_repair" | jq -e --arg item_id "$retry_item_id" \
+    '.items | length == 1 and .[0].item_id == $item_id and (.[0].item.state // .[0].state) == "failed"' >/dev/null
+echo "golden retry source repaired: sha256=$retry_upstream_sha256; item remains failed"
+
+retry_response_headers="$TMP/retry-failed.headers"
+retry_response=$(curl -fsS -D "$retry_response_headers" -X POST \
+    "$base/api/v1/stashes/$retry_stash_id/retry-failed" -H "Authorization: Bearer $token")
+awk '$2 == 202 { found = 1 } END { exit !found }' "$retry_response_headers"
+printf 'golden retry-failed response: %s\n' "$retry_response"
+printf '%s' "$retry_response" | jq -e --arg stash_id "$retry_stash_id" --arg item_id "$retry_item_id" \
+    '.created_count == 1 and (.jobs | length) == 1 and .jobs[0].type == "core.download" and .jobs[0].entity_type == "item" and .jobs[0].entity_id == $item_id and .jobs[0].stash_id == $stash_id and .jobs[0].payload.item_id == $item_id and .jobs[0].payload.stash_id == $stash_id and .jobs[0].payload.force == false' >/dev/null
+retry_job_id=$(printf '%s' "$retry_response" | jq -r '.jobs[0].id // empty')
+[ -n "$retry_job_id" ] || { echo 'golden path failed: retry-failed returned no job id' >&2; exit 1; }
+
+retry_state=''
+retry_job=''
+for _ in $(seq 1 90); do
+    retry_job=$(curl -fsS "$base/api/v1/jobs/$retry_job_id" -H "Authorization: Bearer $token")
+    retry_state=$(printf '%s' "$retry_job" | jq -r '.job.state // empty')
+    [ "$retry_state" = ready ] && break
+    [ "$retry_state" = failed ] && { echo "$retry_job" >&2; exit 1; }
+    sleep 2
+done
+[ "$retry_state" = ready ] || { echo "$retry_job" >&2; echo 'golden path failed: retry job never reached terminal ready state' >&2; exit 1; }
+printf '%s' "$retry_job" | jq -e --arg item_id "$retry_item_id" \
+    '.job.type == "core.download" and .job.entity_id == $item_id and (.job.attempts // 0) > 0 and .job.last_error == null and .job.finished_at != null and .job.progress_percent == 100 and .job.progress_label != "Download skipped (already in Vault)"' >/dev/null
+echo "golden retry job completed: job=$retry_job_id state=ready"
+
+retry_final_items=$(curl -fsS "$base/api/v1/stashes/$retry_stash_id/items" -H "Authorization: Bearer $token")
+printf '%s' "$retry_final_items" | jq -e --arg item_id "$retry_item_id" \
+    '.items | length == 1 and .[0].item_id == $item_id and (.[0].item.state // .[0].state) == "ready"' >/dev/null
+retry_assets=$(curl -fsS "$base/api/v1/items/$retry_item_id/assets" -H "Authorization: Bearer $token")
+printf '%s' "$retry_assets" | jq -e '.assets | any(.[]; .role == "vault_original" and .state == "ready")' >/dev/null
+printf '%s' "$retry_assets" | jq -e '[.assets[] | select(.role == "vault_original" and .state == "ready")] | length == 1' >/dev/null
+retry_vault_asset_path=$(printf '%s' "$retry_assets" | jq -r '.assets[] | select(.role == "vault_original" and .state == "ready") | .path' | head -n 1)
+[ -n "$retry_vault_asset_path" ] && [ "$retry_vault_asset_path" != "null" ] || {
+    echo 'golden path failed: retry left no ready vault_original path' >&2
+    exit 1
+}
+retry_final_sha256=$(timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T stashd \
+    sha256sum "$retry_vault_asset_path" | awk '{print $1}')
+[ "$retry_final_sha256" = "$retry_expected_sha256" ] || {
+    echo "golden path failed: retry Vault bytes mismatch for $retry_vault_asset_path" >&2
+    echo "expected sha256=$retry_expected_sha256 actual sha256=$retry_final_sha256" >&2
+    exit 1
+}
+printf '%s' "$retry_assets" | jq -e --arg checksum "sha256:$retry_expected_sha256" \
+    --argjson size "$retry_expected_size" \
+    '.assets | any(.[]; .role == "vault_original" and .state == "ready" and .checksum == $checksum and .size_bytes == $size)' >/dev/null
+echo "golden retry Vault bytes verified: item=$retry_item_id path=$retry_vault_asset_path sha256=$retry_final_sha256 job=$retry_job_id"
 
 sync=$(curl -fsS -X POST "$base/api/v1/stashes/$stash_id/sync" \
     -H "Authorization: Bearer $token")
