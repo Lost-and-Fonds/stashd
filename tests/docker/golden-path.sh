@@ -216,11 +216,17 @@ echo "golden refetch source switched: sha256=$upstream_b_sha256; Vault remains p
 refetch_headers="$TMP/refetch.headers"
 refetch=$(curl -fsS -D "$refetch_headers" -X POST "$base/api/v1/items/$item_id/refetch" \
     -H "Authorization: Bearer $token")
-grep -Eq '^HTTP/[0-9.]+ 202([[:space:]]|$)' "$refetch_headers"
+printf 'golden refetch response: %s\n' "$refetch"
+awk '$2 == 202 { found = 1 } END { exit !found }' "$refetch_headers"
 refetch_job_id=$(printf '%s' "$refetch" | jq -r '.job.id // empty')
 [ -n "$refetch_job_id" ] || { echo 'golden path failed: refetch returned no job id' >&2; exit 1; }
-printf '%s' "$refetch" | jq -e --arg item_id "$item_id" \
-    '.job.type == "core.download" and .job.entityType == "item" and .job.entityId == $item_id and .job.payload.force == true and .job.payload.item_id == $item_id' >/dev/null
+if ! printf '%s' "$refetch" | jq -e --arg item_id "$item_id" \
+    '.job.type == "core.download" and .job.entityType == "item" and .job.entityId == $item_id and .job.payload.force == true and .job.payload.item_id == $item_id' >/dev/null; then
+    echo 'golden path failed: refetch job did not expose the expected forced core.download payload' >&2
+    printf '%s\n' "$refetch" >&2
+    exit 1
+fi
+echo "golden refetch accepted: job=$refetch_job_id"
 
 refetch_state=''
 refetch_job=''
@@ -232,8 +238,13 @@ for _ in $(seq 1 90); do
     sleep 2
 done
 [ "$refetch_state" = ready ] || { echo "$refetch_job" >&2; echo 'golden path failed: refetch job never reached terminal ready state' >&2; exit 1; }
-printf '%s' "$refetch_job" | jq -e --arg item_id "$item_id" \
-    '.job.type == "core.download" and .job.entityId == $item_id and (.job.attempts // 0) > 0 and .job.finishedAt != null and .job.progressPercent == 100 and .job.progressLabel != "Download skipped (already in Vault)"' >/dev/null
+if ! printf '%s' "$refetch_job" | jq -e --arg item_id "$item_id" \
+    '.job.type == "core.download" and .job.entityId == $item_id and (.job.attempts // 0) > 0 and .job.finishedAt != null and .job.progressPercent == 100 and .job.progressLabel != "Download skipped (already in Vault)"' >/dev/null; then
+    echo 'golden path failed: refetch job completed without proving a non-skipped worker download' >&2
+    printf '%s\n' "$refetch_job" >&2
+    exit 1
+fi
+printf 'golden refetch job completed: %s\n' "$refetch_job"
 
 refetched_item=$(curl -fsS "$base/api/v1/items/$item_id" -H "Authorization: Bearer $token")
 printf '%s' "$refetched_item" | jq -e '.item.state == "ready" or .state == "ready"' >/dev/null
