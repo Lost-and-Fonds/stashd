@@ -175,8 +175,14 @@ try {
     $manager = new PackageManager($root, ['0.2', '0.1'], 'amd64');
     $manager->link('boundary', $source);
     $process = (new PluginRunner($manager, sdkRoot: $root . '/sdk'))->start('boundary', $stage);
-    $result = $process->invoke('boundary.probe', [], static fn (array $message): array => []);
-    $exit = $process->close();
+    try {
+        $result = $process->invoke('boundary.probe', [], static fn (array $message): array => []);
+        $exit = $process->close();
+    } catch (Throwable $exception) {
+        $stderr = $process->stderr();
+        $process->terminate();
+        throw new RuntimeException($exception->getMessage() . ($stderr === '' ? '' : "\nplugin stderr:\n" . $stderr), 0, $exception);
+    }
 
     boundaryAssert(($result['data_visible'] ?? null) === false, 'sandbox exposed an ungranted data path');
     boundaryAssert(($result['app_visible'] ?? null) === false, 'sandbox exposed the application root');
