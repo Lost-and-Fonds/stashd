@@ -34,6 +34,19 @@ if ! aa-status --enabled >/dev/null 2>&1; then
     exit 0
 fi
 
+parser_version=$(apparmor_parser --version 2>&1 || true)
+parser_major=$(printf '%s\n' "$parser_version" | sed -n 's/.*version \([0-9][0-9]*\)\..*/\1/p' | head -n 1)
+if [ -z "$parser_major" ] || [ "$parser_major" -lt 4 ]; then
+    message="Stashd's AppArmor profile requires AppArmor 4.x; detected: ${parser_version:-unknown}"
+    if [ "$require_active" -eq 1 ]; then
+        echo "$message" >&2
+        exit 1
+    fi
+
+    echo "$message; leaving the installed profile unchanged."
+    exit 0
+fi
+
 if [ "$(id -u)" -ne 0 ]; then
     echo "AppArmor is active; root is required to install $PROFILE_TARGET. Re-run with sudo." >&2
     exit 1
@@ -44,8 +57,33 @@ if [ ! -r "$PROFILE_SOURCE" ]; then
     exit 1
 fi
 
-install -D -m 0644 "$PROFILE_SOURCE" "$PROFILE_TARGET"
-apparmor_parser -r -W "$PROFILE_TARGET"
+staged_profile=$(mktemp "/etc/apparmor.d/.${PROFILE_NAME}.XXXXXX")
+previous_profile=$(mktemp "/etc/apparmor.d/.${PROFILE_NAME}.previous.XXXXXX")
+had_previous=0
+cleanup() {
+    rm -f "$staged_profile" "$previous_profile"
+}
+trap cleanup EXIT
+
+install -m 0644 "$PROFILE_SOURCE" "$staged_profile"
+apparmor_parser --skip-kernel-load -r -W "$staged_profile"
+
+if [ -e "$PROFILE_TARGET" ]; then
+    install -m 0644 "$PROFILE_TARGET" "$previous_profile"
+    had_previous=1
+fi
+
+install -m 0644 "$staged_profile" "$PROFILE_TARGET"
+if ! apparmor_parser -r -W "$PROFILE_TARGET"; then
+    if [ "$had_previous" -eq 1 ]; then
+        install -m 0644 "$previous_profile" "$PROFILE_TARGET"
+        apparmor_parser -r -W "$PROFILE_TARGET" >/dev/null 2>&1 || true
+    else
+        rm -f "$PROFILE_TARGET"
+    fi
+    echo "Failed to load $PROFILE_TARGET; the previous profile was restored where possible." >&2
+    exit 1
+fi
 
 if ! aa-status 2>/dev/null | sed 's/^[[:space:]]*//' | grep -Fxq "$PROFILE_NAME"; then
     echo "AppArmor did not report the expected loaded profile: $PROFILE_NAME" >&2
@@ -58,4 +96,5 @@ if [ -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
 fi
 
 echo "Loaded AppArmor profile: $PROFILE_NAME"
+echo "AppArmor parser version: $parser_version"
 echo "kernel.apparmor_restrict_unprivileged_userns: $sysctl_value"
