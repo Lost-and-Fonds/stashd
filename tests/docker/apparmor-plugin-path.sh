@@ -16,9 +16,17 @@ DIAGNOSTIC_DIR="${STASHD_APPARMOR_DIAGNOSTIC_DIR:-${RUNNER_TEMP:-$TMP}/stashd-ap
 mkdir -p "$DIAGNOSTIC_DIR"
 PROFILE="$ROOT/deploy/apparmor/stashd-plugin-bwrap"
 INSTALLER="$ROOT/deploy/apparmor/install-stashd-plugin-bwrap.sh"
+SECCOMP_PROFILE="$ROOT/deploy/seccomp/stashd-plugin-bwrap.json"
 APPARMOR_LOG="$TMP/apparmor.log"
-DEFAULT_COMPOSE_FILES=(-f "$ROOT/docker-compose.yml")
 COMPOSE_FILES=(-f "$ROOT/docker-compose.yml" -f "$ROOT/docker-compose.apparmor.yml")
+
+cat >"$TMP/seccomp-unconfined.yml" <<'YAML'
+services:
+  stashd:
+    security_opt: !override
+      - seccomp=unconfined
+YAML
+DEFAULT_COMPOSE_FILES=(-f "$ROOT/docker-compose.yml" -f "$TMP/seccomp-unconfined.yml")
 
 if [ "$(id -u)" -eq 0 ]; then SUDO=(); else SUDO=(sudo); fi
 as_root() { "${SUDO[@]}" "$@"; }
@@ -66,9 +74,10 @@ fi
 
 run_bwrap() {
     local apparmor_profile=$1
+    local seccomp_profile=${2:-$SECCOMP_PROFILE}
 
     docker run --rm --user "$PUID:$PGID" \
-        --security-opt seccomp=unconfined \
+        --security-opt "seccomp=$seccomp_profile" \
         --security-opt "apparmor=$apparmor_profile" \
         --entrypoint sh "$IMAGE" -lc '
             exec bwrap --die-with-parent --new-session \
@@ -117,7 +126,7 @@ before_dmesg="$TMP/dmesg.before"
 after_dmesg="$TMP/dmesg.after"
 as_root dmesg -T >"$before_dmesg" 2>/dev/null || true
 set +e
-stock_output=$(run_bwrap docker-default 2>&1)
+stock_output=$(run_bwrap docker-default unconfined 2>&1)
 stock_status=$?
 set -e
 printf 'exit=%s\n%s\n' "$stock_status" "$stock_output" | tee -a "$APPARMOR_LOG"
@@ -156,7 +165,7 @@ as_root "$INSTALLER" --require | tee -a "$APPARMOR_LOG"
 
 echo '--- normal Core process restrictions ---' | tee -a "$APPARMOR_LOG"
 set +e
-core_restriction_output=$(docker run --rm --user "$PUID:$PGID" --security-opt seccomp=unconfined \
+core_restriction_output=$(docker run --rm --user "$PUID:$PGID" --security-opt "seccomp=$SECCOMP_PROFILE" \
     --security-opt apparmor=stashd-plugin-bwrap --entrypoint sh "$IMAGE" -lc '
         mkdir -p /tmp/stashd-mount-test
         if mount -t tmpfs tmpfs /tmp/stashd-mount-test 2>/dev/null; then exit 1; fi
@@ -168,7 +177,7 @@ printf 'exit=%s\n%s\n' "$core_restriction_status" "$core_restriction_output" | t
 [ "$core_restriction_status" -eq 0 ] || { echo 'normal Core process restrictions failed' >&2; exit 1; }
 
 echo '--- Stashd profile bwrap probe ---' | tee -a "$APPARMOR_LOG"
-run_bwrap stashd-plugin-bwrap | tee -a "$APPARMOR_LOG"
+run_bwrap stashd-plugin-bwrap "$SECCOMP_PROFILE" | tee -a "$APPARMOR_LOG"
 
 echo '--- candidate real plugin boundary ---' | tee -a "$APPARMOR_LOG"
 export STASHD_DATA_DIR="$TMP/candidate-data" STASHD_MEDIA_DIR="$TMP/candidate-media"
@@ -188,7 +197,7 @@ negative_profile="$TMP/stashd-plugin-bwrap-no-mount"
 sed '/^[[:space:]]*mount,$/d' "$PROFILE" >"$negative_profile"
 as_root apparmor_parser -r -W "$negative_profile"
 set +e
-negative_output=$(run_bwrap stashd-plugin-bwrap 2>&1)
+negative_output=$(run_bwrap stashd-plugin-bwrap "$SECCOMP_PROFILE" 2>&1)
 negative_status=$?
 set -e
 printf 'exit=%s\n%s\n' "$negative_status" "$negative_output" | tee -a "$APPARMOR_LOG"

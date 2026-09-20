@@ -207,6 +207,48 @@ jobs:
           path: ${{ runner.temp }}/stashd-apparmor
           if-no-files-found: warn
 
+  seccomp-sandbox:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Verify AppArmor enforcement
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apparmor apparmor-utils
+          sudo aa-status --enabled
+          test -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+          test "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = 1
+          docker info --format '{{json .SecurityOptions}}' | grep -F 'apparmor'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build seccomp proof image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: prod
+          load: true
+          tags: stashd:seccomp
+          cache-from: type=gha,scope=prod-amd64
+          cache-to: type=gha,mode=max,scope=prod-amd64
+        env:
+          BUILDKIT_PROGRESS: plain
+
+      - name: Check Docker baseline provenance
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/moby/moby/v28.0.4/profiles/seccomp/default.json \
+            -o /tmp/docker-default-seccomp.json
+          echo '9c1025c88ccaa517b648da571961838744ea2137f176bfe6a48b21294cae9c76  /tmp/docker-default-seccomp.json' | sha256sum -c -
+          deploy/seccomp/check-stashd-plugin-bwrap.sh /tmp/docker-default-seccomp.json
+
+      - name: Run seccomp plugin sandbox proof
+        run: |
+          sudo deploy/apparmor/install-stashd-plugin-bwrap.sh --require
+          STASHD_SECCOMP_IMAGE=stashd:seccomp composer test:docker-seccomp
+
   smoke:
     needs: quality
     runs-on: ubuntu-latest

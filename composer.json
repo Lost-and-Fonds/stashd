@@ -54,6 +54,7 @@
         "test:docker-smoke": "tests/docker/smoke.sh",
         "test:docker-smoke:no-build": "STASHD_SMOKE_SKIP_BUILD=1 tests/docker/smoke.sh",
         "test:docker-apparmor": "bash tests/docker/apparmor-plugin-path.sh",
+        "test:docker-seccomp": "bash tests/docker/seccomp-plugin-path.sh",
         "test:docker-plugin-lifecycle": "bash tests/docker/plugin-lifecycle-path.sh",
         "test:docker-playback": "bash tests/docker/playback-path.sh",
         "test:docker-mercure": "bash tests/docker/mercure-path.sh",
