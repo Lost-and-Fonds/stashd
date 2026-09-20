@@ -318,6 +318,7 @@ printf '%s' "$retry_download_job" | jq -e --arg item_id "$retry_item_id" \
     '.job.type == "core.download" and .job.entity_id == $item_id and (.job.attempts // 0) > 0 and .job.last_error != null' >/dev/null
 retry_assets_before=$(curl -fsS "$base/api/v1/items/$retry_item_id/assets" -H "Authorization: Bearer $token")
 printf '%s' "$retry_assets_before" | jq -e '(.assets // []) | all(.[]; .role != "vault_original" or .state != "ready")' >/dev/null
+printf 'golden retry failed job: %s\n' "$retry_download_job"
 echo "golden retry initial failure: item=$retry_item_id job=$retry_download_job_id state=failed"
 
 printf 'healthy\n' > "$TMP/fixture/retry-mode"
