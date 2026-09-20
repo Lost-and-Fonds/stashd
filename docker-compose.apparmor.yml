@@ -1,5 +1,4 @@
 services:
   stashd:
     security_opt:
-      - seccomp=unconfined
       - apparmor=stashd-plugin-bwrap
