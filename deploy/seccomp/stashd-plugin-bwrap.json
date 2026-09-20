@@ -707,7 +707,7 @@
 			],
 			"action": "SCMP_ACT_ALLOW",
 			"args": [
-				{"index": 3, "value": 2134063, "op": "SCMP_CMP_EQ"}
+				{"index": 3, "value": 2134054, "op": "SCMP_CMP_EQ"}
 			],
 			"comment": "Stashd bubblewrap writable bind remount",
 			"excludes": {"caps": ["CAP_SYS_ADMIN"]}
