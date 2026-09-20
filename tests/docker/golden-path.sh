@@ -221,7 +221,7 @@ awk '$2 == 202 { found = 1 } END { exit !found }' "$refetch_headers"
 refetch_job_id=$(printf '%s' "$refetch" | jq -r '.job.id // empty')
 [ -n "$refetch_job_id" ] || { echo 'golden path failed: refetch returned no job id' >&2; exit 1; }
 if ! printf '%s' "$refetch" | jq -e --arg item_id "$item_id" \
-    '.job.type == "core.download" and .job.entityType == "item" and .job.entityId == $item_id and .job.payload.force == true and .job.payload.item_id == $item_id' >/dev/null; then
+    '.job.type == "core.download" and .job.entity_type == "item" and .job.entity_id == $item_id and .job.payload.force == true and .job.payload.item_id == $item_id' >/dev/null; then
     echo 'golden path failed: refetch job did not expose the expected forced core.download payload' >&2
     printf '%s\n' "$refetch" >&2
     exit 1
@@ -239,7 +239,7 @@ for _ in $(seq 1 90); do
 done
 [ "$refetch_state" = ready ] || { echo "$refetch_job" >&2; echo 'golden path failed: refetch job never reached terminal ready state' >&2; exit 1; }
 if ! printf '%s' "$refetch_job" | jq -e --arg item_id "$item_id" \
-    '.job.type == "core.download" and .job.entityId == $item_id and (.job.attempts // 0) > 0 and .job.finishedAt != null and .job.progressPercent == 100 and .job.progressLabel != "Download skipped (already in Vault)"' >/dev/null; then
+    '.job.type == "core.download" and .job.entity_id == $item_id and (.job.attempts // 0) > 0 and .job.finished_at != null and .job.progress_percent == 100 and .job.progress_label != "Download skipped (already in Vault)"' >/dev/null; then
     echo 'golden path failed: refetch job completed without proving a non-skipped worker download' >&2
     printf '%s\n' "$refetch_job" >&2
     exit 1
@@ -269,7 +269,7 @@ final_vault_sha256=$(timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T st
 }
 printf '%s' "$refetched_assets" | jq -e --arg checksum "sha256:$refetch_expected_sha256" \
     --argjson size "$refetch_expected_size" \
-    '.assets | any(.[]; .role == "vault_original" and .state == "ready" and .checksum == $checksum and .sizeBytes == $size)' >/dev/null
+    '.assets | any(.[]; .role == "vault_original" and .state == "ready" and .checksum == $checksum and .size_bytes == $size)' >/dev/null
 echo "golden refetch Vault bytes verified: path=$refetched_vault_asset_path sha256=$final_vault_sha256 job=$refetch_job_id"
 
 sync=$(curl -fsS -X POST "$base/api/v1/stashes/$stash_id/sync" \
