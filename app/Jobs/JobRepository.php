@@ -133,6 +133,15 @@ final class JobRepository
             ->first() !== null;
     }
 
+    public function hasPendingOrProcessingInStash(JobType $intent, string $stashId): bool
+    {
+        return JobRecord::select()
+            ->where('intent', $intent->value)
+            ->where('stashId', $stashId)
+            ->whereIn('state', [JobState::Pending, JobState::Processing, JobState::Retrying])
+            ->first() !== null;
+    }
+
     /** @return array<string, true> */
     public function pendingOrProcessingEntityIds(JobType $intent, string $entityType): array
     {

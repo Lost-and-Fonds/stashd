@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace App\Jobs\Handlers;
 
-use App\Broadcasts\BroadcastItemRepository;
 use App\Downloads\DownloadCaptions;
 use App\Jobs\JobHandler;
 use App\Jobs\JobProgressReporter;
 use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
-use App\Jobs\JobDispatcher;
 use App\Support\PrefixedUlid;
 use App\Vault\ItemId;
 use Tempest\DateTime\DateTime;
@@ -19,7 +17,7 @@ use Tempest\DateTime\Timezone;
 
 final readonly class DownloadCaptionsJobHandler implements JobHandler
 {
-    public function __construct(private DownloadCaptions $captions, private JobRepository $jobs, private BroadcastItemRepository $broadcastItems, private JobDispatcher $dispatch) {}
+    public function __construct(private DownloadCaptions $captions, private JobRepository $jobs) {}
 
     public function handle(JobRecord $job, JobProgressReporter $context): void
     {
@@ -36,16 +34,5 @@ final readonly class DownloadCaptionsJobHandler implements JobHandler
         $job->finishedAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
         $context->progress($job, JobProgressUpdate::ofSteps(1, 1, $job->progressLabel));
-
-
-        foreach ($this->broadcastItems->listForItem(ItemId::parse($itemId)) as $item) {
-            $this->dispatch->dispatch(
-                'core.broadcast',
-                entityType: 'broadcast',
-                entityId: (string) $item->broadcast->id,
-                payload: ['broadcast_id' => (string) $item->broadcast->id, 'action' => 'rebuild'],
-                workload: 'background',
-            );
-        }
     }
 }
