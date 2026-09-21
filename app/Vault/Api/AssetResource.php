@@ -42,6 +42,7 @@ final readonly class AssetResource
             'relativePath' => $this->asset->relativePath,
             'mimeType' => $this->asset->mimeType,
             'container' => $this->asset->container,
+            'language' => $this->asset->language,
             'sizeBytes' => $this->asset->sizeBytes,
             'checksum' => $this->asset->checksum,
             'fixityStatus' => $this->fixityStatus?->value,

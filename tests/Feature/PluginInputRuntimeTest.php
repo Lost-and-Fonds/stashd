@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use AppPlugins\PluginInputRuntime;
+use App\Plugins\PluginInputRuntime;
 use App\Vault\AssetKind;
 use App\Vault\AssetRole;
 

@@ -185,7 +185,7 @@ test('ingest establishes a baseline and verification records committed-object ev
 });
 
 test('supplementary ingest persists downloaded-file language', function (): void {
-    [, , $itemId] = $this->bootstrapFakeDownloadStash('language-ingest');
+    [$headers, , $itemId] = $this->bootstrapFakeDownloadStash('language-ingest');
     $path = tempnam(sys_get_temp_dir(), 'stashd-language-');
     file_put_contents($path, "WEBVTT\n");
 
@@ -211,6 +211,13 @@ test('supplementary ingest persists downloaded-file language', function (): void
     expect($asset)->not->toBeNull()
         ->and($asset->state)->toBe(AssetState::Ready)
         ->and($asset->language)->toBe('en');
+
+    $response = $this->http->get('/api/v1/items/' . $itemId . '/assets', headers: $headers);
+    $subtitle = array_values(array_filter(
+        $response->body['assets'],
+        static fn(array $candidate): bool => $candidate['role'] === AssetRole::Subtitle->value,
+    ))[0];
+    expect($subtitle['language'])->toBe('en');
 });
 
 test('verification policy uses an exact boundary and item health respects the canonical asset', function (): void {
