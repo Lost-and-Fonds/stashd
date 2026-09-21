@@ -722,7 +722,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
     }
 
     /** @param array<string, AssetRecord> $stagedAssets
-     * @return list<array{reference: string, kind: string, derivation-key: ?string, url: string, media-type: ?string, size-bytes: int}>
+     * @return list<array{reference: string, kind: string, derivation-key: ?string, url: string, media-type: ?string, size-bytes: int, language: ?string}>
      */
     private function resources(BroadcastRecord $broadcast, ItemRecord $preservedItem, ?string $stage = null, array &$stagedAssets = []): array
     {
@@ -771,6 +771,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 'url' => $this->publications->url($publication),
                 'media-type' => $asset->mimeType,
                 'size-bytes' => (int) ($asset->sizeBytes ?? 0),
+                'language' => $asset->language,
             ];
         }
 
