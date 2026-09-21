@@ -22,7 +22,7 @@ curl() {
 }
 TMP=$(mktemp -d)
 FIXTURE_CONTAINER="${COMPOSE_PROJECT_NAME}-youtube-fixture"
-YOUTUBE_REF="${STASHD_GOLDEN_YOUTUBE_REF:-ghcr.io/lost-and-fonds/youtube@sha256:119a74fe1b9e9cf6f9443937d161cf9350a3424e3935cfb59b94d465f05cd248}"
+YOUTUBE_REF="${STASHD_GOLDEN_YOUTUBE_REF:-ghcr.io/lost-and-fonds/youtube@sha256:d9167bb8c78c3b167333f0544880d88f302799cd01d07b6194738de8c350fe4a}"
 PODCAST_REF="${STASHD_GOLDEN_PODCAST_REF:-ghcr.io/lost-and-fonds/podcast@sha256:b9660e9285b19215b287d9ac66529bcc0bbc9dc14aa1e0516d3b0cf54bcd2e46}"
 JELLYFIN_REF="${STASHD_GOLDEN_JELLYFIN_REF:-ghcr.io/lost-and-fonds/jellyfin@sha256:f6d20378365be62669f2936936498272b75431f5a557797c2c4474b27df12617}"
 PLEX_REF="${STASHD_GOLDEN_PLEX_REF:-ghcr.io/lost-and-fonds/plex@sha256:bc2c9960978494a7f81060fb28dd90471f60416465e770fc66cd3f8d89fbb1bd}"
@@ -314,7 +314,7 @@ printf '%s' "$refetched_assets" | jq -e --arg checksum "sha256:$refetch_expected
     '.assets | any(.[]; .role == "vault_original" and .state == "ready" and .checksum == $checksum and .size_bytes == $size)' >/dev/null
 echo "golden refetch Vault bytes verified: path=$refetched_vault_asset_path sha256=$final_vault_sha256 job=$refetch_job_id"
 
-timeout 1200s "$ROOT/tests/docker/media-server-broadcast-path.sh" \
+timeout 600s "$ROOT/tests/docker/media-server-broadcast-path.sh" \
     "$ROOT" "$base" "$token" "$stash_id" "$final_vault_sha256"
 
 retry_stash=$(curl -fsS -X POST "$base/api/v1/stashes/with-input" \
