@@ -8,6 +8,7 @@ use App\Broadcasts\BroadcastRepository;
 use App\Downloads\DownloadPolicyEvaluator;
 use App\Jobs\JobType;
 use App\Jobs\JobDispatcher;
+use App\Jobs\JobRepository;
 use App\Providers\ResolvedInput;
 use RuntimeException;
 use Tempest\Database\Database;
@@ -34,6 +35,7 @@ final readonly class SyncStashInput
         private DiscoveredItemCommitter $committer,
         private DownloadPolicyEvaluator $downloadPolicy,
         private JobDispatcher $jobDispatcher,
+        private JobRepository $jobs,
         private BroadcastRepository $broadcasts,
         private Database $database,
         private AssetAcquisitionPlanner $assetAcquisitions,
@@ -118,17 +120,24 @@ final readonly class SyncStashInput
             // sort for the stash list. Realigning to the current discovery order
             // keeps that list stable, and only runs on the rare changed sync.
             $this->realignPositions($stashId, $stashInputId, $discovered->discoveredItems);
+        }
 
+        $acquisitions = $this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)
+            ? $this->assetAcquisitions->dispatchMissing($stashId, $input)
+            : 0;
+
+        $waitingForAcquisitions = $acquisitions > 0
+            || $this->jobs->hasPendingOrProcessingInStash(JobType::core('core.download'), $stashId->toString())
+            || $this->jobs->hasPendingOrProcessingInStash(JobType::core('core.acquire_assets'), $stashId->toString())
+            || $this->jobs->hasPendingOrProcessingInStash(JobType::core('core.download_captions'), $stashId->toString());
+
+        if ($counts->stashItemsCreated > 0 && ! $waitingForAcquisitions) {
             foreach ($this->broadcasts->listForStash($stashId) as $broadcast) {
                 $this->jobDispatcher->dispatch('core.broadcast', 'broadcast', (string) $broadcast->id, $stashId->toString(), [
                     'broadcast_id' => (string) $broadcast->id,
                     'action' => 'rebuild',
                 ], 'background');
             }
-        }
-
-        if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
-            $this->assetAcquisitions->dispatchMissing($stashId, $input);
         }
 
         $this->recordSuccess($input);

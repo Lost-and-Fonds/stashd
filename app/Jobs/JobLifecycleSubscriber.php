@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Broadcasts\BroadcastItemRepository;
 use App\Support\PrefixedUlid;
+use App\Stashes\AssetAcquisitionPlanner;
 use App\Vault\ItemId;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
@@ -23,6 +24,7 @@ final readonly class JobLifecycleSubscriber implements EventSubscriberInterface
     public function __construct(
         private JobRepository $jobs,
         private BroadcastItemRepository $broadcastItems,
+        private AssetAcquisitionPlanner $assetAcquisitions,
         private JobDispatcher $dispatch,
     ) {}
 
@@ -54,7 +56,11 @@ final readonly class JobLifecycleSubscriber implements EventSubscriberInterface
         $this->jobs->save($job);
         event(new JobLifecycleChanged($job, 'completed'));
 
-        if (in_array($job->intent, ['core.acquire_assets', 'core.download_captions'], true)) {
+        if (in_array($job->intent, ['core.download', 'core.acquire_assets', 'core.download_captions'], true)) {
+            if ($job->intent === 'core.download') {
+                $this->dispatchMissingBroadcastAssets($job);
+            }
+
             $this->scheduleSettledBroadcasts($job);
         } elseif ($job->intent === 'core.broadcast' && ($job->payload['rebuild_after_asset_acquisition'] ?? false) === true) {
             $this->scheduleMarkedBroadcast($job);
@@ -138,6 +144,20 @@ final readonly class JobLifecycleSubscriber implements EventSubscriberInterface
         }
     }
 
+    private function dispatchMissingBroadcastAssets(JobRecord $job): void
+    {
+        $payload = $job->payload ?? [];
+        $rawItemId = $payload['item_id'] ?? $payload['media_item_id'] ?? $job->entityId;
+
+        if (! is_string($rawItemId) || $rawItemId === '') {
+            return;
+        }
+
+        foreach ($this->broadcastItems->listForItem(ItemId::parse($rawItemId)) as $item) {
+            $this->assetAcquisitions->dispatchMissingForBroadcast($item->broadcast);
+        }
+    }
+
     private function scheduleMarkedBroadcast(JobRecord $job): void
     {
         $payload = $job->payload ?? [];
@@ -173,7 +193,8 @@ final readonly class JobLifecycleSubscriber implements EventSubscriberInterface
 
     private function hasActiveAssetAcquisitions(string $stashId): bool
     {
-        return $this->jobs->hasPendingOrProcessingInStash(JobType::core('core.acquire_assets'), $stashId)
+        return $this->jobs->hasPendingOrProcessingInStash(JobType::core('core.download'), $stashId)
+            || $this->jobs->hasPendingOrProcessingInStash(JobType::core('core.acquire_assets'), $stashId)
             || $this->jobs->hasPendingOrProcessingInStash(JobType::core('core.download_captions'), $stashId);
     }
 }
