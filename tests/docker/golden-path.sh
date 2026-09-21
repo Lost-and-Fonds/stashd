@@ -172,7 +172,7 @@ fi
 
 stash=$(curl -fsS -X POST "$base/api/v1/stashes/with-input" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
-    -d '{"name":"Golden Path","input":{"plugin":"youtube","source":{"url":"https://www.youtube.com/watch?v=goldenvid01"},"options":{"provider":{"include_captions":true,"include_auto_captions":false,"caption_languages":"en"}}},"downloadPolicy":"video"}')
+    -d '{"name":"Golden Path","input":{"plugin":"youtube","source":{"url":"https://www.youtube.com/watch?v=goldenvid01"},"options":{"provider":{"include_captions":true,"include_auto_captions":false,"caption_languages":"en"}}},"downloadPolicy":"manual_download"}')
 stash_id=$(printf '%s' "$stash" | jq -r '.stash.id')
 job_id=''
 for _ in $(seq 1 15); do
@@ -187,17 +187,35 @@ done
 for _ in $(seq 1 90); do
     items=$(curl -fsS "$base/api/v1/stashes/$stash_id/items" -H "Authorization: Bearer $token")
     state=$(printf '%s' "$items" | jq -r '.items[0].item.state // .items[0].state // empty')
-    [ "$state" = ready ] && break
     [ "$state" = failed ] && { echo "$items" >&2; exit 1; }
 
     job=$(curl -fsS "$base/api/v1/jobs/$job_id" -H "Authorization: Bearer $token")
     job_state=$(printf '%s' "$job" | jq -r '.job.state // empty')
     [ "$job_state" = failed ] && { echo "$job" >&2; exit 1; }
+    [ "$job_state" = ready ] && [ "$state" != "" ] && break
     sleep 2
 done
 
-[ "$state" = ready ] || { echo 'golden path failed: item never became ready' >&2; exit 1; }
+[ "$state" != "" ] || { echo 'golden path failed: item was not discovered' >&2; exit 1; }
 item_id=$(printf '%s' "$items" | jq -r '.items[0].item_id // .items[0].itemId // .items[0].id')
+[ -n "$item_id" ] && [ "$item_id" != "null" ] || { echo 'golden path failed: discovered item has no id' >&2; exit 1; }
+
+initial_refetch=$(curl -fsS -X POST "$base/api/v1/items/$item_id/refetch" \
+    -H "Authorization: Bearer $token")
+initial_refetch_job_id=$(printf '%s' "$initial_refetch" | jq -r '.job.id // empty')
+[ -n "$initial_refetch_job_id" ] || { echo 'golden path failed: initial public download returned no job id' >&2; exit 1; }
+initial_refetch_state=''
+for _ in $(seq 1 90); do
+    initial_refetch_job=$(curl -fsS "$base/api/v1/jobs/$initial_refetch_job_id" -H "Authorization: Bearer $token")
+    initial_refetch_state=$(printf '%s' "$initial_refetch_job" | jq -r '.job.state // empty')
+    [ "$initial_refetch_state" = ready ] && break
+    [ "$initial_refetch_state" = failed ] && { echo "$initial_refetch_job" >&2; exit 1; }
+    sleep 2
+done
+[ "$initial_refetch_state" = ready ] || { echo 'golden path failed: initial public download never reached ready' >&2; exit 1; }
+items=$(curl -fsS "$base/api/v1/stashes/$stash_id/items" -H "Authorization: Bearer $token")
+state=$(printf '%s' "$items" | jq -r '.items[0].item.state // .items[0].state // empty')
+[ "$state" = ready ] || { echo 'golden path failed: item never became ready' >&2; exit 1; }
 inputs=$(curl -fsS "$base/api/v1/stashes/$stash_id/inputs" -H "Authorization: Bearer $token")
 printf '%s' "$inputs" | jq -e \
     '.inputs | any(.[]; .provider_key == "youtube" and .options.provider.include_captions == true and .options.provider.include_auto_captions == false and .options.provider.caption_languages == "en")' >/dev/null || {
