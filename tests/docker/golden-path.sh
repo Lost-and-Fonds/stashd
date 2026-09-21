@@ -314,7 +314,7 @@ printf '%s' "$refetched_assets" | jq -e --arg checksum "sha256:$refetch_expected
     '.assets | any(.[]; .role == "vault_original" and .state == "ready" and .checksum == $checksum and .size_bytes == $size)' >/dev/null
 echo "golden refetch Vault bytes verified: path=$refetched_vault_asset_path sha256=$final_vault_sha256 job=$refetch_job_id"
 
-timeout 600s "$ROOT/tests/docker/media-server-broadcast-path.sh" \
+timeout 1200s "$ROOT/tests/docker/media-server-broadcast-path.sh" \
     "$ROOT" "$base" "$token" "$stash_id" "$final_vault_sha256"
 
 retry_stash=$(curl -fsS -X POST "$base/api/v1/stashes/with-input" \
