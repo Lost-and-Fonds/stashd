@@ -319,6 +319,7 @@ final readonly class DownloadItem
             mimeType: $file->mimeType,
             container: $file->container,
             durationSeconds: $file->durationSeconds,
+            language: $file->language,
         );
 
         return $this->transitions->transitionAsset($asset, AssetState::Processing);
@@ -488,6 +489,7 @@ final readonly class DownloadItem
         $asset->sizeBytes = $sizeBytes;
         $asset->checksum = $checksum;
         $asset->durationSeconds = DurationSeconds::toDuration($file->durationSeconds);
+        $asset->language = $file->language;
         $asset->lastVerifiedAt = null;
         $asset->missingAt = null;
         $asset->missingReason = null;

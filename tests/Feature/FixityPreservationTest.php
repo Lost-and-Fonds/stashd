@@ -184,6 +184,35 @@ test('ingest establishes a baseline and verification records committed-object ev
         ->and($listedItem['asset_health_counts'][PreservationHealth::Healthy->value])->toBe(1);
 });
 
+test('supplementary ingest persists downloaded-file language', function (): void {
+    [, , $itemId] = $this->bootstrapFakeDownloadStash('language-ingest');
+    $path = tempnam(sys_get_temp_dir(), 'stashd-language-');
+    file_put_contents($path, "WEBVTT\n");
+
+    $this->container->get(DownloadItem::class)->ingestAcquiredFiles(
+        itemId: ItemId::parse($itemId),
+        jobId: $this->container->get(PrefixedUlidGenerator::class)->generate('job'),
+        files: [new DownloadedFile(
+            tempPath: $path,
+            filename: 'youtube-video.en.vtt',
+            role: AssetRole::Subtitle,
+            kind: AssetKind::Subtitle,
+            mimeType: 'text/vtt',
+            container: 'vtt',
+            sizeBytes: 8,
+            language: 'en',
+        )],
+        implementation: 'language-test',
+        implementationVersion: '1',
+    );
+
+    $asset = $this->container->get(AssetRepository::class)->findByItemAndRole(ItemId::parse($itemId), AssetRole::Subtitle);
+
+    expect($asset)->not->toBeNull()
+        ->and($asset->state)->toBe(AssetState::Ready)
+        ->and($asset->language)->toBe('en');
+});
+
 test('verification policy uses an exact boundary and item health respects the canonical asset', function (): void {
     [, $stashId, $itemId] = $this->bootstrapFakeDownloadStash('fixity-health-policy');
     $this->container->get(DownloadItem::class)->execute(

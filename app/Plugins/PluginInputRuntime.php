@@ -200,10 +200,11 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
                 continue;
             }
             $mime = self::nullableString($artifact['media-type'] ?? null);
+            $language = self::nullableString($artifact['language'] ?? null);
             $role = $this->roleFromWire($artifact['role'] ?? null);
 
             if ($role !== null) {
-                $files[] = new DownloadedFile($path, basename($reference), $role, $this->assetKind($mime), $mime, pathinfo($reference, PATHINFO_EXTENSION), filesize($path) ?: 0);
+                $files[] = new DownloadedFile($path, basename($reference), $role, $this->assetKind($mime), $mime, pathinfo($reference, PATHINFO_EXTENSION), filesize($path) ?: 0, language: $language);
             }
         }
 
