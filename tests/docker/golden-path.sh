@@ -172,7 +172,7 @@ fi
 
 stash=$(curl -fsS -X POST "$base/api/v1/stashes/with-input" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
-    -d '{"name":"Golden Path","input":{"plugin":"youtube","source":{"url":"https://www.youtube.com/watch?v=goldenvid01"}},"downloadPolicy":"video"}')
+    -d '{"name":"Golden Path","input":{"plugin":"youtube","source":{"url":"https://www.youtube.com/watch?v=goldenvid01"},"options":{"provider":{"include_captions":true,"include_auto_captions":false,"caption_languages":"en"}}},"downloadPolicy":"video"}')
 stash_id=$(printf '%s' "$stash" | jq -r '.stash.id')
 job_id=''
 for _ in $(seq 1 15); do
@@ -198,6 +198,14 @@ done
 
 [ "$state" = ready ] || { echo 'golden path failed: item never became ready' >&2; exit 1; }
 item_id=$(printf '%s' "$items" | jq -r '.items[0].item_id // .items[0].itemId // .items[0].id')
+inputs=$(curl -fsS "$base/api/v1/stashes/$stash_id/inputs" -H "Authorization: Bearer $token")
+printf '%s' "$inputs" | jq -e \
+    '.inputs | any(.[]; .provider_key == "youtube" and .options.provider.include_captions == true and .options.provider.include_auto_captions == false and .options.provider.caption_languages == "en")' >/dev/null || {
+    echo 'golden path failed: explicit YouTube caption options were not persisted' >&2
+    printf '%s\n' "$inputs" >&2
+    exit 1
+}
+echo 'golden YouTube caption options persisted: creator captions enabled, auto captions disabled, language=en'
 assets=$(curl -fsS "$base/api/v1/items/$item_id/assets" -H "Authorization: Bearer $token")
 printf '%s' "$assets" | jq -e '.assets | any(.[]; .role == "vault_original" and .state == "ready")' >/dev/null
 printf '%s' "$assets" | jq -e '[.assets[] | select(.role == "vault_original" and .state == "ready")] | length == 1' >/dev/null
@@ -413,6 +421,12 @@ synced_items=$(curl -fsS "$base/api/v1/stashes/$stash_id/items" -H "Authorizatio
 printf '%s' "$synced_items" | jq -e --arg item_id "$item_id" '.items | any(.[]; (.item_id // .itemId // .id) == $item_id)' >/dev/null
 
 printf 'healthy\n' > "$TMP/fixture/caption-mode"
+primary_download=$(curl -fsS "$base/api/v1/jobs" -H "Authorization: Bearer $token" \
+    | jq -c --arg item_id "$item_id" --arg stash_id "$stash_id" '[.jobs[] | select(.type == "core.download" and .entity_id == $item_id and .stash_id == $stash_id)] | sort_by(.created_at // .createdAt) | last // null')
+echo "golden pre-broadcast state: item=$item_id item_state=ready primary_download=$primary_download"
+caption_baseline_ids=$(curl -fsS "$base/api/v1/jobs" -H "Authorization: Bearer $token" \
+    | jq --arg item_id "$item_id" --arg stash_id "$stash_id" '[.jobs[] | select(.type == "core.acquire_assets" and .entity_id == $item_id and .stash_id == $stash_id) | .id]')
+echo "golden caption acquisition baseline: $caption_baseline_ids"
 broadcast=$(curl -fsS -X POST "$base/api/v1/stashes/$stash_id/broadcasts" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
     -d '{"type":"podcast","name":"Golden Podcast","settings":{"media_kind":"video","captions":"creator_only","caption_languages":"en"}}')
@@ -422,7 +436,8 @@ caption_job_id=''
 caption_job=''
 for _ in $(seq 1 90); do
     caption_job_id=$(curl -fsS "$base/api/v1/jobs" -H "Authorization: Bearer $token" \
-        | jq -r --arg item_id "$item_id" --arg stash_id "$stash_id" '[.jobs[] | select(.type == "core.acquire_assets" and .entity_id == $item_id and .stash_id == $stash_id)] | .[0].id // empty')
+        | jq -r --arg item_id "$item_id" --arg stash_id "$stash_id" --argjson baseline "$caption_baseline_ids" \
+            '[.jobs[] | select(.type == "core.acquire_assets" and .entity_id == $item_id and .stash_id == $stash_id) as $job | select(($baseline | index($job.id)) == null) | select(($job.payload.roles // []) | index("captions") != null) | $job] | .[0].id // empty')
     [ -n "$caption_job_id" ] && break
     sleep 1
 done
@@ -475,9 +490,11 @@ published_url=$(printf '%s' "$current" | jq -r '.broadcast.published_url // empt
 [ -n "$published_url" ] || { echo 'golden path failed: no published URL' >&2; exit 1; }
 feed=$(curl -fsS "$published_url")
 printf '%s' "$feed" | grep -q 'Golden Path Video'
-printf '%s' "$feed" | grep -q 'podcast:transcript'
-printf '%s' "$feed" | grep -q 'Deterministic fixture caption'
-echo "golden Podcast caption output verified: broadcast=$broadcast_id"
+transcript_url=$(printf '%s' "$feed" | sed -n 's/.*<podcast:transcript[^>]*url="\([^"]*\)".*/\1/p' | head -n 1)
+[ -n "$transcript_url" ] || { echo 'golden path failed: Podcast feed has no transcript URL' >&2; printf '%s\n' "$feed" >&2; exit 1; }
+transcript=$(curl -fsS "$transcript_url")
+printf '%s' "$transcript" | grep -q 'Deterministic fixture caption'
+echo "golden Podcast caption output verified: broadcast=$broadcast_id transcript=$transcript_url"
 
 if [ "${STASHD_GOLDEN_COLLECTION_CHECK:-0}" = "1" ]; then
     filesystem=$(curl -fsS -X POST "$base/api/v1/stashes/$stash_id/broadcasts" \
