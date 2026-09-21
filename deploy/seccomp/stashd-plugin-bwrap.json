@@ -707,6 +707,17 @@
 			],
 			"action": "SCMP_ACT_ALLOW",
 			"args": [
+				{"index": 3, "value": 37927, "op": "SCMP_CMP_EQ"}
+			],
+			"comment": "Stashd bubblewrap read-only bind remount with MS_NOATIME",
+			"excludes": {"caps": ["CAP_SYS_ADMIN"]}
+		},
+		{
+			"names": [
+				"mount"
+			],
+			"action": "SCMP_ACT_ALLOW",
+			"args": [
 				{"index": 3, "value": 2134054, "op": "SCMP_CMP_EQ"}
 			],
 			"comment": "Stashd bubblewrap writable bind remount",
