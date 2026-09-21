@@ -42,7 +42,7 @@ final class AssetAvailabilityRepository
 
         if ($record === null) {
             $record = new AssetAvailabilityRecord($itemId, $capability->assetRole, $capability->kind, $providerVersion, $permanent, $message, $now, $now, $now);
-            $record->id = new PrimaryKey($this->ids->generate('asset_availability')->toString());
+            $record->id = new PrimaryKey($this->ids->generate('asset_avail')->toString());
             query(AssetAvailabilityRecord::class)->insert($record)->execute();
 
             return $record;
