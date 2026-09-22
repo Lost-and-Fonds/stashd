@@ -13,9 +13,9 @@ the authoritative production probe, all excluded for containers without
 `CAP_SYS_ADMIN`:
 
 - x86_64 `clone` argument 1 with namespace flags `0x7c020000`;
-- `mount` argument 3 with the eight observed flag combinations for root slave,
-  tmpfs, recursive bind, bind, read-only and writable bind remounts, devpts,
-  and private root;
+- `mount` argument 3 with the ten observed flag combinations for root slave,
+  tmpfs, recursive bind, bind, read-only and writable bind remounts (including
+  `MS_NOATIME`), devpts, and private root;
 - `umount2` argument 1 equal to `MNT_DETACH`;
 - `pivot_root`;
 - `unshare` argument 0 equal to `CLONE_NEWUSER`.
