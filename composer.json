@@ -64,12 +64,12 @@
         "test:docker-golden": "tests/docker/golden-path.sh",
         "lint": "@php vendor/bin/alchemy lint",
         "format": "@php vendor/bin/alchemy fmt",
-        "test:static": "@php -d memory_limit=1G vendor/bin/alchemy analyse",
+        "test:static": "@php -d memory_limit=1G vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --memory-limit=1G --no-progress",
         "test:plugin-runtime": "packages/plugin-runtime/tests/run.sh",
         "test:packaged": "scripts/test-packaged.sh",
         "test:naked-core": "scripts/test-naked-core.sh",
         "alchemy": "@php vendor/bin/alchemy all",
-        "analyse": "@php -d memory_limit=1G vendor/bin/alchemy analyse"
+        "analyse": "@php -d memory_limit=1G vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --memory-limit=1G --no-progress"
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
