@@ -38,7 +38,7 @@ docker compose up -d
 
 The normal base Compose file does not install or mutate AppArmor policy.
 
-Compose still selects `seccomp=unconfined` because the current bubblewrap
-probe has not yet been reduced to a safe repository-shipped seccomp delta. A
-minimal seccomp profile is a separate follow-up; this prerequisite does not
-weaken AppArmor or grant container capabilities.
+Compose selects the checked-in `deploy/seccomp/stashd-plugin-bwrap.json`
+profile. It allows only the additional bubblewrap namespace and mount
+operations documented in `deploy/seccomp/README.md`; AppArmor remains enabled,
+and no container capabilities are added.
