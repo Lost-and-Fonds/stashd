@@ -88,7 +88,6 @@ if ($command === 'seed') {
         title: 'Published resource boundary fixture',
         state: ItemState::Ready,
         contentType: 'video/mp4',
-        sizeBytes: strlen($bytes),
         upstreamState: UpstreamState::Available,
     );
     $stashItem = $stashItems->create(

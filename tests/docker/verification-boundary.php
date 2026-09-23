@@ -78,7 +78,6 @@ if (in_array($command, ['seed-success', 'seed-mismatch'], true)) {
         title: "Verification boundary {$label}",
         state: ItemState::Ready,
         contentType: 'application/octet-stream',
-        sizeBytes: strlen($originalBytes),
         upstreamState: UpstreamState::Available,
     );
     $asset = $assets->create(
