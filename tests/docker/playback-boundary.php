@@ -42,7 +42,6 @@ if ($command === 'create') {
         title: 'Playback boundary fixture',
         state: ItemState::Ready,
         contentType: 'video/mp4',
-        sizeBytes: $size,
         upstreamState: UpstreamState::Available,
     );
     $asset = $assets->create(
