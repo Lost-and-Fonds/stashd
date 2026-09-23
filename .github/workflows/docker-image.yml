@@ -118,6 +118,7 @@ jobs:
       - name: Run quality checks in Lerd
         run: |
           start=$(date +%s)
+          mkdir -p "$GITHUB_WORKSPACE/.stashd/plugin-packages/golden-ci"
           docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=unconfined --cap-add SYS_ADMIN --entrypoint sh --network stashd-ci \
             -e CI=true \
             -e STASHD_RESET_TEST_DATABASE=1 \
@@ -132,6 +133,7 @@ jobs:
             -e DB_PASSWORD=stashd-ci \
             -e DB_ADMIN_DATABASE=postgres \
             -v "$GITHUB_WORKSPACE:/var/www/html" \
+            -v "$GITHUB_WORKSPACE/.stashd/plugin-packages/golden-ci:/tmp/stashd-golden-plugin-packages" \
             -v "$GITHUB_WORKSPACE/plugin-api:/var/www/plugin-api:ro" \
             -v "$GITHUB_WORKSPACE/stashd-php-sdk:/var/www/stashd-php-sdk:ro" \
             -v "$GITHUB_WORKSPACE/plugins:/var/www/plugins:ro" \
@@ -153,8 +155,20 @@ jobs:
               COMPOSER_PROCESS_TIMEOUT=0 composer test:parallel
               composer test:naked-core
               composer test:packaged
+              STASHD_PLUGIN_PACKAGE_ROOT=/tmp/stashd-golden-plugin-packages \
+                STASHD_YOUTUBE_HELPER_FIXTURE=/var/www/html/tests/fixtures/providers/youtube/golden-yt-dlp.sh \
+                php scripts/build-installed-plugins.php
+              chmod -R a+rX /tmp/stashd-golden-plugin-packages
             '
+          tar -C "$GITHUB_WORKSPACE/.stashd/plugin-packages/golden-ci" \
+            -czf "$GITHUB_WORKSPACE/golden-plugin-packages.tar.gz" .
           echo "quality dependency setup and test suite elapsed: $(( $(date +%s) - start )) seconds" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload deterministic golden plugin packages
+        uses: actions/upload-artifact@v6
+        with:
+          name: golden-plugin-packages
+          path: golden-plugin-packages.tar.gz
+          if-no-files-found: error
 
   plugin-runtime:
     runs-on: ubuntu-latest
@@ -256,6 +270,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Download deterministic golden plugin packages
+        uses: actions/download-artifact@v7
+        with:
+          name: golden-plugin-packages
+          path: ${{ runner.temp }}/golden-plugin-packages
+      - name: Extract golden plugin packages
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.stashd/plugin-packages/golden-ci"
+          tar -xzf "$RUNNER_TEMP/golden-plugin-packages/golden-plugin-packages.tar.gz" \
+            -C "$GITHUB_WORKSPACE/.stashd/plugin-packages/golden-ci"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -297,7 +322,10 @@ jobs:
             sudo deploy/apparmor/install-stashd-plugin-bwrap.sh --require
             export STASHD_GOLDEN_APPARMOR=1
           fi
-          STASHD_GOLDEN_SKIP_BUILD=1 STASHD_GOLDEN_COLLECTION_CHECK=1 composer test:docker-golden
+          STASHD_GOLDEN_SKIP_BUILD=1 STASHD_GOLDEN_COLLECTION_CHECK=1 \
+            STASHD_GOLDEN_REQUIRE_LOCAL=1 \
+            STASHD_GOLDEN_LOCAL_PACKAGE_ROOT="$GITHUB_WORKSPACE/.stashd/plugin-packages/golden-ci" \
+            composer test:docker-golden
           STASHD_PLUGIN_LIFECYCLE_IMAGE=stashd:golden composer test:docker-plugin-lifecycle
       - name: Record smoke test timing
         if: always()
