@@ -87,7 +87,7 @@ REF_C="fixture-registry:5000/stashd/lifecycle-fixture@${DIGEST_C}"
 
 console() { timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest "$@"; }
 runtime() {
-    timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T -e STASHD_LIFECYCLE_EXPECTED="$1" \
+    timeout 60s docker compose "${COMPOSE_FILES[@]}" exec -T --user "${PUID:-1000}:${PGID:-1000}" -e STASHD_LIFECYCLE_EXPECTED="$1" \
         stashd php /tmp/plugin-lifecycle-run.php
 }
 list_plugins() { console stashd:plugin-list | sed $'s/\\033\\[[0-9;]*m//g'; }
