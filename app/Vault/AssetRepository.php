@@ -69,6 +69,13 @@ final class AssetRepository
 
     public function save(AssetRecord $record): AssetRecord
     {
+        if ($record->language === null && $record->role->value === 'subtitle') {
+            $path = $record->path ?? $record->relativePath ?? '';
+
+            if (preg_match('/\.([a-z]{2,3}(?:-[A-Za-z0-9]+)?)\.vtt$/i', basename($path), $matches) === 1) {
+                $record->language = strtolower($matches[1]);
+            }
+        }
         $record->updatedAt = DateTime::now(Timezone::UTC);
         $record->save();
 

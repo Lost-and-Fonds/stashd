@@ -62,7 +62,7 @@ final readonly class DownloadCaptions
             throw DownloadException::withCode('captions_unavailable', 'No requested caption track is available.');
         }
 
-        $language = explode('.', $source->filename)[1] ?? null;
+        $language = $source->language ?? (explode('.', $source->filename)[1] ?? null);
         $asset = $this->assets->findByItemAndRole($itemId, AssetRole::Subtitle);
 
         if ($asset !== null && $asset->state === AssetState::Ready) {

@@ -38,6 +38,8 @@ final readonly class JobResource
             'progressLabel' => $this->job->progressLabel,
             'progressEtaSeconds' => DurationSeconds::toSeconds($this->job->progressEtaSeconds),
             'progressRate' => $this->job->progressRate,
+            'progressSizeBytes' => $this->job->progressSizeBytes,
+            'progressSizeEstimated' => $this->job->progressSizeEstimated,
             'lastError' => $this->job->lastError,
             'payload' => $this->encodeForApi($this->job->payload),
             'createdAt' => $this->job->createdAt,

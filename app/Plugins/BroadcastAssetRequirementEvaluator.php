@@ -35,8 +35,7 @@ final readonly class BroadcastAssetRequirementEvaluator
             $assets = $this->assets->listForItem(ItemId::fromPrimaryKey($item->id));
             $ready = array_filter(
                 $assets,
-                static fn(mixed $asset): bool => $asset instanceof AssetRecord
-                    && $asset->state === AssetState::Ready
+                static fn(AssetRecord $asset): bool => $asset->state === AssetState::Ready
                     && $asset->path !== null
                     && $requirement->matches($asset),
             );
@@ -70,8 +69,7 @@ final readonly class BroadcastAssetRequirementEvaluator
         }
 
         foreach ($definition->assetCapabilities as $capability) {
-            if (! $capability instanceof PluginAssetCapability
-                || $capability->assetRole !== $requirement->assetRole
+            if ($capability->assetRole !== $requirement->assetRole
                 || $requirement->kind !== null && $capability->kind !== $requirement->kind
                 || ! $capability->enabled($input->options, $definition->options)) {
                 continue;

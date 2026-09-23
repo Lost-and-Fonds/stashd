@@ -12,8 +12,6 @@ export interface InputPreflight {
       provider_key?: string | null
       title?: string | null
       estimated_item_count?: number | null
-      size_bytes?: number | null
-      size_estimated?: boolean
     }
     discovery?: {
       strategy_key?: string | null

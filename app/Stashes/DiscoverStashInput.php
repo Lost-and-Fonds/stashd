@@ -7,6 +7,7 @@ namespace App\Stashes;
 use App\Http\Api\ApiJson;
 use App\Jobs\JobType;
 use App\Providers\Core\DiscoveredItem;
+use App\Providers\InputOption;
 use App\Providers\ProviderRegistry;
 use App\Providers\ProviderStrategySelector;
 use App\Providers\ResolvedInput;
@@ -24,7 +25,10 @@ final readonly class DiscoverStashInput
         private ProviderStrategySelector $strategySelector,
     ) {}
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param array<string, mixed> $payload
+     * @param callable(ResolvedInput, array<string, mixed>, list<InputOption>): void|null $onDiscovered
+     */
     public function execute(array $payload, ?JobType $intent = null, ?callable $onProgress = null, ?callable $onDiscovered = null): InputPreflightResult
     {
         $intent ??= JobType::core('core.preflight');
@@ -69,6 +73,8 @@ final readonly class DiscoverStashInput
                 sourceTitle: $resolved->sourceTitle,
                 sourceAvatarUri: $resolved->sourceAvatarUri,
                 estimatedItemCount: $resolved->estimatedItemCount,
+                sizeBytes: $resolved->sizeBytes,
+                sizeEstimated: $resolved->sizeEstimated,
             );
         }
 

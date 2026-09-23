@@ -36,6 +36,8 @@ final class JobRecord
         public ?float $progressPercent = null,
         public ?string $progressLabel = null,
         public ?float $progressRate = null,
+        public ?int $progressSizeBytes = null,
+        public bool $progressSizeEstimated = false,
         #[CastWith(DurationSecondsCaster::class)]
         #[SerializeWith(DurationSecondsSerializer::class)]
         public ?Duration $progressEtaSeconds = null,

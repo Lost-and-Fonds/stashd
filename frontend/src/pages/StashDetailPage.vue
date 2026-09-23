@@ -275,6 +275,18 @@ function operationFromEvent(event: LiveEvent): LifecycleOperation | undefined {
   }
 }
 
+function expectedSize(job?: JobApiResource) {
+  if (job?.progress_size_bytes == null) return undefined
+
+  const size = job.progress_size_bytes < 1024 * 1024
+    ? `${Math.round(job.progress_size_bytes / 1024)} KB`
+    : job.progress_size_bytes < 1024 * 1024 * 1024
+      ? `${(job.progress_size_bytes / (1024 * 1024)).toFixed(1)} MB`
+      : `${(job.progress_size_bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+
+  return `${job.progress_size_estimated ? '~' : ''}${size} expected`
+}
+
 function scheduleRefresh() {
   if (refreshTimer) return
   refreshTimer = setTimeout(() => {
@@ -319,6 +331,8 @@ function handleLiveEvent(event: LiveEvent) {
       progress_total: event.payload.progressTotal ?? event.payload.progress_total,
       progress_percent: event.payload.progressPercent ?? event.payload.progress_percent,
       progress_label: event.payload.progressLabel ?? event.payload.progress_label,
+      progress_size_bytes: event.payload.progressSizeBytes ?? event.payload.progress_size_bytes,
+      progress_size_estimated: event.payload.progressSizeEstimated ?? event.payload.progress_size_estimated,
       last_error: event.payload.lastError ?? event.payload.last_error,
       payload: typeof eventItemId === 'string' || typeof eventStashId === 'string'
         ? {
@@ -413,13 +427,7 @@ function itemDuration(item: StashItemApiResource) {
 
 function itemSize(item: StashItemApiResource) {
   const bytes = item.total_asset_size_bytes
-  if (bytes === null || bytes === undefined || bytes <= 0) {
-    const estimate = item.item?.size_bytes
-    if (estimate === null || estimate === undefined || estimate <= 0) return '—'
-    if (estimate < 1024 * 1024) return `${item.item?.size_estimated ? '~' : ''}${Math.round(estimate / 1024)} KB`
-    if (estimate < 1024 * 1024 * 1024) return `${item.item?.size_estimated ? '~' : ''}${(estimate / (1024 * 1024)).toFixed(1)} MB`
-    return `${item.item?.size_estimated ? '~' : ''}${(estimate / (1024 * 1024 * 1024)).toFixed(1)} GB`
-  }
+  if (bytes === null || bytes === undefined || bytes <= 0) return '—'
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
@@ -480,7 +488,7 @@ const itemColumns: TableColumn<StashItemApiResource>[] = [
   },
   { id: 'duration', header: () => sortHeader('Duration', 'duration'), cell: ({ row }) => h('span', { class: 'font-mono text-xs text-muted' }, itemDuration(row.original)) },
   { id: 'size', header: () => sortHeader('Size', 'size'), cell: ({ row }) => h('span', { class: 'font-mono text-xs text-muted' }, itemSize(row.original)) },
-  { id: 'status', header: () => sortHeader('Status', 'status'), cell: ({ row }) => h('div', { class: 'space-y-1' }, [itemStatusCell(row.original), ...(activeJobFor(row.original) ? [h(OperationProgress, { variant: 'compact', percent: activeJobFor(row.original)?.progress_percent ?? null, status: 'active', class: 'w-24' })] : [])]) }
+  { id: 'status', header: () => sortHeader('Status', 'status'), cell: ({ row }) => h('div', { class: 'space-y-1' }, [itemStatusCell(row.original), ...(activeJobFor(row.original) ? [h(OperationProgress, { variant: 'compact', percent: activeJobFor(row.original)?.progress_percent ?? null, count: expectedSize(activeJobFor(row.original)), status: 'active', class: 'w-24' })] : [])]) }
 ]
 
 const itemTableUi = {

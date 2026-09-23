@@ -270,7 +270,7 @@ final readonly class ItemController
 
         return new Json([
             'assets' => array_map(
-                fn($asset): array => AssetResource::fromRecord(
+                fn($asset): array => array_replace(AssetResource::fromRecord(
                     $asset,
                     AssetRegenerationGuidance::forAsset(
                         asset: $asset,
@@ -281,10 +281,19 @@ final readonly class ItemController
                     $fixityStatuses[(string) $asset->id] ?? null,
                     $this->preservationHealth->forAsset($asset, $fixityStatuses[(string) $asset->id] ?? null),
                     $this->fixityStatus->verificationDueAt($asset),
-                )->toArray(),
+                )->toArray(), [
+                    'language' => $asset->language ?? self::languageFromPath($asset->path ?? $asset->relativePath),
+                ]),
                 $assets,
             ),
         ]);
+    }
+
+    private static function languageFromPath(?string $path): ?string
+    {
+        return preg_match('/\.([a-z]{2,3}(?:-[A-Za-z0-9]+)?)\.vtt$/i', basename($path ?? ''), $matches) === 1
+            ? strtolower($matches[1])
+            : null;
     }
 
     /** Which stashes contain this item — no back-reference existed before T12. */

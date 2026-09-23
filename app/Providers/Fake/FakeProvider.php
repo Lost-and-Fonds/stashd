@@ -140,7 +140,9 @@ final class FakeProvider implements Provider, SourceResolvingInputProvider
         };
 
         foreach ($items as $item) {
-            $onDiscovered?->__invoke($item);
+            if ($onDiscovered !== null) {
+                $onDiscovered($item);
+            }
         }
 
         return $items;

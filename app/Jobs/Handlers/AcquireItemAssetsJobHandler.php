@@ -25,7 +25,13 @@ final readonly class AcquireItemAssetsJobHandler implements JobHandler
         $payload = $job->payload ?? [];
         $itemId = ItemId::parse(ApiJson::string($payload['item_id'] ?? null));
         $roles = is_array($payload['roles'] ?? null) ? array_values(array_filter($payload['roles'], 'is_string')) : null;
-        $options = is_array($payload['provider_options'] ?? null) ? array_filter($payload['provider_options'], static fn(mixed $value): bool => is_bool($value) || is_string($value)) : [];
+        $options = [];
+
+        foreach (is_array($payload['provider_options'] ?? null) ? $payload['provider_options'] : [] as $key => $value) {
+            if (is_string($key) && (is_bool($value) || is_string($value))) {
+                $options[$key] = $value;
+            }
+        }
         $context->progress($job, JobProgressUpdate::indeterminate('Acquiring available assets'));
 
         $this->acquisition->execute($itemId, PrefixedUlid::parse((string) $job->id), $roles, $options);

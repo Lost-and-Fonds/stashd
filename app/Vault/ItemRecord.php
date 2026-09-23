@@ -37,8 +37,6 @@ final class ItemRecord
         public ?DateTime $publishedAt = null,
         public ?string $thumbnailUri = null,
         public ?string $contentType = null,
-        public ?int $sizeBytes = null,
-        public bool $sizeEstimated = false,
         public ?DateTime $metadataCapturedAt = null,
         public ?DateTime $metadataRefreshedAt = null,
         public ?DateTime $lastSeenUpstreamAt = null,

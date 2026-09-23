@@ -130,8 +130,10 @@ function jobPercent(job: JobApiResource) {
 }
 
 function jobCount(job: JobApiResource) {
-  if (job.progress_current === null || job.progress_current === undefined || job.progress_total === null || job.progress_total === undefined) return undefined
-  return `${job.progress_current} / ${job.progress_total}`
+  if (job.progress_current !== null && job.progress_current !== undefined && job.progress_total !== null && job.progress_total !== undefined) return `${job.progress_current} / ${job.progress_total}`
+  if (job.progress_size_bytes == null) return undefined
+
+  return `${job.progress_size_estimated ? '~' : ''}${formatBytes(job.progress_size_bytes)} expected`
 }
 
 async function loadHealth() {

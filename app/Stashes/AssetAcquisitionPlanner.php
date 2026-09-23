@@ -53,7 +53,7 @@ final readonly class AssetAcquisitionPlanner
         foreach ($this->stashItems->listForStash($stashId, includeIgnored: false, stashInputId: StashInputId::fromPrimaryKey($input->id)) as $stashItem) {
             $item = $stashItem->item;
 
-            if ($item === null || ! in_array($item->state, [
+            if (! in_array($item->state, [
                 ItemState::Discovered,
                 ItemState::MetadataReady,
                 ItemState::Ready,
@@ -72,7 +72,7 @@ final readonly class AssetAcquisitionPlanner
             $roles = [];
 
             foreach ($definition->assetCapabilities as $capability) {
-                if (! $capability instanceof PluginAssetCapability || ! $capability->enabled($input->options, $definition->options)) {
+                if (! $capability->enabled($input->options, $definition->options)) {
                     continue;
                 }
 
@@ -82,8 +82,7 @@ final readonly class AssetAcquisitionPlanner
 
                 $existing = array_filter(
                     $this->assets->listForItem($stashItem->itemId),
-                    static fn(mixed $asset): bool => $asset instanceof AssetRecord
-                        && $asset->role === $capability->assetRole
+                    static fn(AssetRecord $asset): bool => $asset->role === $capability->assetRole
                         && $asset->kind === $capability->kind,
                 );
 
@@ -107,7 +106,7 @@ final readonly class AssetAcquisitionPlanner
                 payload: [
                     'item_id' => $itemId,
                     'roles' => array_values(array_unique($roles)),
-                    'provider_options' => $input->options?->provider ?? [],
+                    'provider_options' => $input->options->provider ?? [],
                 ],
                 workload: 'background',
             );
@@ -128,8 +127,7 @@ final readonly class AssetAcquisitionPlanner
 
         $requirements = array_values(array_filter(
             $definition->assetRequirements,
-            static fn(mixed $requirement): bool => $requirement instanceof BroadcastAssetRequirement
-                && $requirement->enabled($broadcast->settings ?? []),
+            static fn(BroadcastAssetRequirement $requirement): bool => $requirement->enabled($broadcast->settings ?? []),
         ));
 
         if ($requirements === []) {

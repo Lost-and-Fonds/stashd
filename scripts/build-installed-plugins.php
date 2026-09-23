@@ -47,8 +47,14 @@ foreach ($sources as $source) {
         $helper = $declaration['helpers']['yt-dlp']['executable'] ?? null;
 
         if (is_string($helper)) {
-            copy($youtubeHelperFixture, $active . '/' . ltrim($helper, '/'));
-            chmod($active . '/' . ltrim($helper, '/'), 0755);
+            $helperPath = $active . '/' . ltrim($helper, '/');
+
+            if (! copy($helperPath, $helperPath . '-real') || ! copy($youtubeHelperFixture, $helperPath)) {
+                throw new RuntimeException('could not install the YouTube yt-dlp fixture wrapper');
+            }
+
+            chmod($helperPath . '-real', 0755);
+            chmod($helperPath, 0755);
         }
     }
 

@@ -86,8 +86,6 @@ final readonly class DiscoveredItemCommitter
                     ? StashdUri::parse(str($discoveredItem['thumbnail_uri'])->trim()->toString())
                     : null,
                     contentType: is_string($discoveredItem['content_type'] ?? null) ? $discoveredItem['content_type'] : null,
-                    sizeBytes: ApiJson::integer($discoveredItem['size_bytes'] ?? null),
-                    sizeEstimated: (bool) ($discoveredItem['size_estimated'] ?? false),
                     upstreamState: UpstreamState::tryFrom(ApiJson::string($discoveredItem['upstream_state'] ?? null)) ?? UpstreamState::Available,
                 );
                 $itemsCreated++;
@@ -100,12 +98,6 @@ final readonly class DiscoveredItemCommitter
 
                 if ($upstreamState !== null && $item->upstreamState !== $upstreamState) {
                     $item->upstreamState = $upstreamState;
-                    $changed = true;
-                }
-
-                if ($item->sizeBytes === null && isset($discoveredItem['size_bytes'])) {
-                    $item->sizeBytes = ApiJson::integer($discoveredItem['size_bytes']);
-                    $item->sizeEstimated = (bool) ($discoveredItem['size_estimated'] ?? false);
                     $changed = true;
                 }
 

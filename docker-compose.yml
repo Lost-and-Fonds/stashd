@@ -4,6 +4,8 @@ services:
     # The shipped plugin sandbox creates a user namespace with bubblewrap.
     # AppArmor hosts additionally need deploy/apparmor/stashd-plugin-bwrap and
     # docker-compose.apparmor.yml; the base file remains usable without AppArmor.
+    # The seccomp profile grants only the bubblewrap namespace and mount flag
+    # combinations used by SandboxPolicy; do not replace it with unconfined.
     security_opt:
       - seccomp=./deploy/seccomp/stashd-plugin-bwrap.json
     depends_on:

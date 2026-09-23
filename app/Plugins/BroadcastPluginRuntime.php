@@ -28,6 +28,9 @@ interface BroadcastPluginRuntime
      */
     public function operation(string $stagingDirectory, array $broadcast, string $operation, ?array $httpGrants, ?string $fixtureDirectory): array;
 
-    /** @param list<array{stash-name: string, broadcast-key: string, broadcast-name: string, public-url: string}> $entries */
+    /**
+     * @param list<array{stash-name: string, broadcast-key: string, broadcast-name: string, public-url: string}> $entries
+     * @return array<string, mixed>
+     */
     public function exportCollection(string $exporter, array $entries): array;
 }

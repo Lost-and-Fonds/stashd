@@ -10,9 +10,12 @@ MEDIA_PATH = os.environ.get("STASHD_FIXTURE_MEDIA_PATH", "/fixture/media.bin")
 RETRY_MEDIA_PATH = os.environ.get("STASHD_FIXTURE_RETRY_MEDIA_PATH", "/fixture/retry-media.bin")
 RETRY_MODE_PATH = os.environ.get("STASHD_FIXTURE_RETRY_MODE_PATH", "/fixture/retry-mode")
 CAPTION_MODE_PATH = os.environ.get("STASHD_FIXTURE_CAPTION_MODE_PATH", "/fixture/caption-mode")
+ESTIMATE_MEDIA_PATH = os.environ.get("STASHD_FIXTURE_ESTIMATE_MEDIA_PATH", "/fixture/estimate-media.bin")
 VIDEO_ID = "goldenvid01"
 RETRY_VIDEO_ID = "retryfail01"
+ESTIMATE_VIDEO_IDS = {"estimate001", "estimate002"}
 CAPTION = b"WEBVTT\n\n00:00.000 --> 00:01.000\nDeterministic fixture caption\n"
+HELPER_INVOCATIONS = 0
 
 
 def media(path=MEDIA_PATH):
@@ -34,6 +37,7 @@ def caption_is_healthy():
 
 
 def player_response(video_id=VIDEO_ID, title="Golden Path Video", value=None):
+    value = media(ESTIMATE_MEDIA_PATH) if value is None and video_id in ESTIMATE_VIDEO_IDS else value
     value = media() if value is None and video_id == VIDEO_ID else value
     if value is None:
         value = media(RETRY_MEDIA_PATH)
@@ -60,6 +64,20 @@ class Handler(BaseHTTPRequestHandler):
 
         if path.path == "/oembed":
             self.send_json({"title": "Golden Path Video"})
+        elif path.path == "/playlist":
+            self.send_html('<meta property="og:title" content="Estimator Playlist">')
+        elif path.path == "/youtube/v3/playlistItems":
+            video_id = "estimate001" if query.get("playlistId") == ["PLSizeBootstrap"] else "estimate002"
+            self.send_json({"items": [{"snippet": {"resourceId": {"videoId": video_id}, "title": "Estimator proof " + video_id}}], "nextPageToken": None})
+        elif path.path == "/youtube/v3/videos":
+            requested = query.get("id", [""])[0].split(",")
+            self.send_json({"items": [{
+                "id": video_id,
+                "snippet": {"title": "Estimator proof " + video_id, "publishedAt": "2026-01-01T00:00:00Z"},
+                "contentDetails": {"duration": "PT181S", "definition": "hd"},
+            } for video_id in requested if video_id in ESTIMATE_VIDEO_IDS]})
+        elif path.path == "/fixture/yt-dlp-count":
+            self.send_json({"count": HELPER_INVOCATIONS})
         elif path.path == "/watch":
             video_id = query.get("v", [VIDEO_ID])[0]
             self.send_html(
@@ -80,12 +98,20 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_error(503, "retry fixture is deliberately broken")
                 return
             self.send_bytes("video/mp4", media(RETRY_MEDIA_PATH))
+        elif path.path.startswith("/videoplayback/") and path.path.rsplit("/", 1)[-1] in ESTIMATE_VIDEO_IDS:
+            self.send_bytes("video/mp4", media(ESTIMATE_MEDIA_PATH))
         elif path.path == f"/vi/{VIDEO_ID}/hqdefault.jpg":
             self.send_bytes("image/jpeg", b"golden-path-thumbnail\n")
         else:
             self.send_error(404)
 
     def do_POST(self):
+        global HELPER_INVOCATIONS
+        if urlparse(self.path).path == "/fixture/yt-dlp-invoked":
+            HELPER_INVOCATIONS += 1
+            self.send_json({"count": HELPER_INVOCATIONS})
+            return
+
         if urlparse(self.path).path.startswith("/youtubei/v1/"):
             body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
             try:

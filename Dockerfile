@@ -62,7 +62,7 @@ RUN apt-get update \
         gosu supervisor curl bubblewrap \
     && rm -rf /var/lib/apt/lists/*
 
-RUN install-php-extensions pdo_pgsql intl pcntl
+RUN install-php-extensions pdo_pgsql pdo_sqlite intl pcntl
 COPY --from=oci-tools /usr/local/libexec/stashd /usr/local/libexec/stashd
 
 WORKDIR /var/www/html

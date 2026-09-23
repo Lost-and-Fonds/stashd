@@ -41,6 +41,8 @@ final readonly class JobRealtimeResource
             'progressLabel' => $this->job->progressLabel,
             'progressEtaSeconds' => DurationSeconds::toSeconds($this->job->progressEtaSeconds),
             'progressRate' => $this->job->progressRate,
+            'progressSizeBytes' => $this->job->progressSizeBytes,
+            'progressSizeEstimated' => $this->job->progressSizeEstimated,
             'lastError' => $this->job->lastError,
             'startedAt' => $this->job->startedAt,
             'finishedAt' => $this->job->finishedAt,

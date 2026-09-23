@@ -18,6 +18,8 @@ export interface JobLiveEvent {
   progressTotal?: number | null
   progressPercent?: number | null
   progressLabel?: string | null
+  progressSizeBytes?: number | null
+  progressSizeEstimated?: boolean
   lastError?: string | null
   type?: string
   entity_type?: string | null
@@ -27,6 +29,8 @@ export interface JobLiveEvent {
   progress_total?: number | null
   progress_percent?: number | null
   progress_label?: string | null
+  progress_size_bytes?: number | null
+  progress_size_estimated?: boolean
   last_error?: string | null
   [key: string]: unknown
 }

@@ -28,8 +28,9 @@ final class PluginProcess
         string $entrypoint = 'plugin.php',
         ?SandboxPolicy $policy = null,
         ?string $sdkRoot = null,
+        ?string $pluginDataRoot = null,
     ) {
-        $command = ($policy ?? new SandboxPolicy())->command($packageRoot, $stagingRoot, $entrypoint, null, $sdkRoot);
+        $command = ($policy ?? new SandboxPolicy())->command($packageRoot, $stagingRoot, $entrypoint, null, $sdkRoot, false, $pluginDataRoot);
         $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $this->pipes);
 
         if (! is_resource($process)) {

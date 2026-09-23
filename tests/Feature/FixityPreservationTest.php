@@ -200,7 +200,7 @@ test('supplementary ingest persists downloaded-file language', function (): void
             mimeType: 'text/vtt',
             container: 'vtt',
             sizeBytes: 8,
-            language: 'en',
+            language: null,
         )],
         implementation: 'language-test',
         implementationVersion: '1',

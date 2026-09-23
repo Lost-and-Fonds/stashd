@@ -241,6 +241,18 @@ final class PackageManager
         return $this->active;
     }
 
+    public function pluginDataPath(string $id): string
+    {
+        $this->validateId($id);
+        $path = $this->root . '/plugin-data/' . $id;
+
+        if (! is_dir($path) && ! mkdir($path, 0700, true) && ! is_dir($path)) {
+            throw new RuntimeException('plugin data directory could not be created');
+        }
+
+        return $path;
+    }
+
     /** @return list<array{id: string, version: string, runtime: string, api_version: string, reference: ?string, digest: ?string}> */
     public function installed(): array
     {

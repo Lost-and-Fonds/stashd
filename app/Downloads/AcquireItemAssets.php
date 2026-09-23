@@ -43,8 +43,8 @@ final readonly class AcquireItemAssets
 
         $capabilities = array_values(array_filter(
             $definition->assetCapabilities,
-            static fn(mixed $capability): bool => $capability instanceof PluginAssetCapability
-                && ($requestedRoles === null || in_array($capability->role, $requestedRoles, true)),
+            static fn(PluginAssetCapability $capability): bool => $requestedRoles === null
+                || in_array($capability->role, $requestedRoles, true),
         ));
 
         if ($capabilities === []) {

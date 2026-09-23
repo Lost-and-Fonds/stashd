@@ -154,9 +154,15 @@ final readonly class PluginContext
         public HttpClient $http = new UnavailableHttpClient(),
         public ?StagingArea $staging = null,
         public ?HelperRunner $helpers = null,
+        public string $pluginDataPath = '/plugin-data',
     ) {}
 }
 ```
+
+`pluginDataPath` is a persistent, plugin-private writable directory mounted at
+`/plugin-data`. It survives invocations, restarts, and package replacement. It is
+separate from the read-only package and transient staging; Core does not inspect
+or copy its contents. Plugins own any files or schemas stored there.
 
 The concrete runtime versions of these objects are RPC proxies back to the host.
 They are not direct handles to host services.

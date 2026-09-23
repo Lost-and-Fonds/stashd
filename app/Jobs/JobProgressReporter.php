@@ -20,6 +20,8 @@ final readonly class JobProgressReporter
         $job->progressLabel = $update->label;
         $job->progressEtaSeconds = DurationSeconds::toDuration($update->etaSeconds);
         $job->progressRate = $update->rate;
+        $job->progressSizeBytes = $update->sizeBytes;
+        $job->progressSizeEstimated = $update->sizeEstimated;
         $this->jobs->save($job);
         event(new JobLifecycleChanged($job, 'progress'));
     }

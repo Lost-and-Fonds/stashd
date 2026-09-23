@@ -170,13 +170,14 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         return $this->acquireAssets($item, $staging, $mediaKind, $options)->files;
     }
 
+    /** @param list<string>|null $requestedRoles */
     public function acquireAssets(array $item, string $staging, string $mediaKind, array $options = [], ?array $requestedRoles = null): AssetAcquisitionResult
     {
         try {
             $params = ['item' => $item, 'media_kind' => $mediaKind, 'options' => $this->wireOptions($options)];
 
             if ($requestedRoles !== null) {
-                $params['requested_roles'] = array_values($requestedRoles);
+                $params['requested_roles'] = $requestedRoles;
             }
 
             return $this->acquisitionFromResult($this->invoke('input.acquire', $params, 'acquire', $staging, $this->definition->helper), $staging);
@@ -272,7 +273,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
 
     /** @return array<string, mixed> */
     /** @param array<string, mixed> $params
-     * @param callable(string, ?float): void|null $onActivity
+     * @param callable(string, ?float, ?int, bool): void|null $onActivity
      * @return array<string, mixed>
      */
     private function invokeUncached(string $method, array $params, string $operation, ?string $staging = null, ?PluginHelperGrant $helper = null, ?callable $onActivity = null, ?callable $onDiscovered = null): array
@@ -318,10 +319,11 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         $process = $this->runner->start($this->definition->id, $stage);
 
         try {
-            $capabilityHandler = null;
-            $capabilityHandler = /** @param array<string, mixed> $message
-                @return array<string, mixed>
-             */ function (array $message) use ($invocation, $onActivity, $onDiscovered, $process, &$capabilityHandler): array {
+            /**
+             * @param array<string, mixed> $message
+             * @return array<string, mixed>
+             */
+            $capabilityHandler = function (array $message) use ($invocation, $onActivity, $onDiscovered, $process, &$capabilityHandler): array {
                 $p = self::stringKeyed($message['params'] ?? null);
 
                 return match ($message['method'] ?? '') {
@@ -360,17 +362,22 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         if ($onActivity !== null && is_string($p['stage'] ?? null)) {
             $fraction = is_numeric($p['fraction'] ?? null) ? (float) $p['fraction'] : null;
             $fraction = $fraction !== null && $fraction >= 0.0 && $fraction <= 1.0 ? $fraction : null;
-            $onActivity($p['stage'], $fraction);
+            $sizeBytes = self::nullableInt($p['size_bytes'] ?? null);
+            $sizeEstimated = ($p['size_estimated'] ?? false) === true;
+            $onActivity($p['stage'], $fraction, $sizeBytes, $sizeEstimated);
         }
 
         return ['accepted' => true];
     }
 
-    /** @param array<string, mixed> $p */
+    /**
+     * @param array<string, mixed> $p
+     * @return array<string, mixed>
+     */
     private function capabilityDiscovered(?callable $onDiscovered, array $p): array
     {
         if ($onDiscovered !== null && is_array($p['item'] ?? null)) {
-            $onDiscovered(self::discoveredItem($p['item']));
+            $onDiscovered(self::discoveredItem(self::stringKeyed($p['item'])));
         }
 
         return ['accepted' => true];

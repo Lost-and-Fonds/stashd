@@ -34,8 +34,6 @@ final class ItemRepository
         ?DateTime $publishedAt = null,
         StashdUri|string|null $thumbnailUri = null,
         ?string $contentType = null,
-        ?int $sizeBytes = null,
-        bool $sizeEstimated = false,
         UpstreamState $upstreamState = UpstreamState::Available,
     ): ItemRecord {
         $id = $this->ids->generate('media')->toString();
@@ -51,8 +49,6 @@ final class ItemRepository
             publishedAt: $publishedAt,
             thumbnailUri: $thumbnailUri instanceof StashdUri ? $thumbnailUri->toString() : $thumbnailUri,
             contentType: $contentType,
-            sizeBytes: $sizeBytes,
-            sizeEstimated: $sizeEstimated,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);

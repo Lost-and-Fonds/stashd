@@ -319,10 +319,17 @@ final readonly class DownloadItem
             mimeType: $file->mimeType,
             container: $file->container,
             durationSeconds: $file->durationSeconds,
-            language: $file->language,
+            language: $file->language ?? ($file->role === AssetRole::Subtitle ? self::languageFromFilename($file->filename) : null),
         );
 
         return $this->transitions->transitionAsset($asset, AssetState::Processing);
+    }
+
+    private static function languageFromFilename(string $filename): ?string
+    {
+        return preg_match('/\.([a-z]{2,3}(?:-[A-Za-z0-9]+)?)\.vtt$/i', basename($filename), $matches) === 1
+            ? strtolower($matches[1])
+            : null;
     }
 
     /**
@@ -489,7 +496,7 @@ final readonly class DownloadItem
         $asset->sizeBytes = $sizeBytes;
         $asset->checksum = $checksum;
         $asset->durationSeconds = DurationSeconds::toDuration($file->durationSeconds);
-        $asset->language = $file->language;
+        $asset->language = $file->language ?? self::languageFromFilename(basename($destination));
         $asset->lastVerifiedAt = null;
         $asset->missingAt = null;
         $asset->missingReason = null;

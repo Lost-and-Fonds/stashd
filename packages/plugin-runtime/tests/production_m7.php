@@ -384,6 +384,14 @@ try {
     m7Assert(preg_match('/^sha256:[a-f0-9]{64}$/', $built['digest']) === 1, 'builder did not return a manifest digest');
     $repeat = (new PluginBuilder($root . '/repeat-builds', $umoci))->materialize($source, 'linux-amd64');
     m7Assert($repeat['digest'] === $built['digest'], 'deterministic plugin input changed the manifest digest');
+    $pluginSource = $source . '/plugin.php';
+    $pluginSourceContents = file_get_contents($pluginSource) ?: throw new RuntimeException('plugin source could not be read');
+    chmod($pluginSource, 0644);
+    file_put_contents($pluginSource, $pluginSourceContents . "\n// cache invalidation fixture\n");
+    $changedSourceBuild = $builder->materialize($source, 'linux-amd64');
+    file_put_contents($pluginSource, $pluginSourceContents);
+    chmod($pluginSource, 0555);
+    m7Assert(! $changedSourceBuild['reused'] && $changedSourceBuild['digest'] !== $built['digest'], 'plugin source changes reused a stale OCI package');
     $arm = (new PluginBuilder($root . '/arm-builds', $umoci))->materialize($source, 'linux-arm64');
     m7Assert($arm['digest'] !== $built['digest'] && $arm['platform'] === 'linux-arm64', 'arm64 package metadata was not distinct');
     $manager = new PackageManager($root . '/plugins', '0.1', 'amd64', $umoci);
@@ -394,6 +402,8 @@ try {
     m7Assert($manager->activeVersion('m7-example') === '1.0.0', 'package was not activated');
     $package = $manager->activePath('m7-example');
     m7Assert($package !== null, 'active package path is missing');
+    $packagePluginHash = hash_file('sha256', $package . '/plugin.php');
+    $pluginData = $manager->pluginDataPath('m7-example');
     m7Assert(is_link($package . '/plugin-link.php'), 'package symlink was not preserved');
     m7Assert((fileperms($package . '/plugin.php') & 0111) !== 0, 'plugin executable mode was not preserved');
 
@@ -424,10 +434,58 @@ try {
     $runnerSmokeStage = m7Temp('stashd-production-runner');
     $productionRunner = new PluginRunner($manager, sdkRoot: $sdkRoot);
     $productionProcess = $productionRunner->start('m7-example', $runnerSmokeStage);
+    $firstResolve = $productionProcess->invoke('input.resolve', ['source' => 'fixture:source'], static fn(array $message): array => []);
+    m7Assert(($firstResolve['title'] ?? null) === 'Fixture input', 'fresh plugin data was not empty');
+    m7Assert(is_file($pluginData . '/estimator.sqlite'), 'plugin SQLite data was not written to its private directory');
+    m7Assert(! is_file($package . '/estimator.sqlite'), 'plugin data leaked into the package');
+    $productionProcess->close();
+    m7Remove($runnerSmokeStage);
+
+    $restartStage = m7Temp('stashd-production-runner-restart');
+    $productionProcess = $productionRunner->start('m7-example', $restartStage);
+    $secondResolve = $productionProcess->invoke('input.resolve', ['source' => 'fixture:source'], static fn(array $message): array => []);
+    m7Assert(($secondResolve['title'] ?? null) === 'Persisted fixture', 'plugin data did not survive process restart');
+    m7Assert(hash_file('sha256', $package . '/plugin.php') === $packagePluginHash, 'plugin package changed during sandbox invocation');
+    m7Assert($manager->pluginDataPath('m7-example') === $pluginData, 'plugin data path changed across invocations');
     $operation = $productionProcess->invoke('broadcast.operation', ['name' => 'runner-smoke'], static fn(array $message): array => []);
     m7Assert(($operation['choices'][0]['value'] ?? null) === 'fixture', 'production runner invocation failed');
     $productionProcess->close();
-    m7Remove($runnerSmokeStage);
+    m7Remove($restartStage);
+
+    $upgradeSource = $root . '/upgrade-source';
+    m7CopyTree($source, $upgradeSource);
+    $upgradeManifest = json_decode((string) file_get_contents($upgradeSource . '/stashd-plugin/plugin.json'), true, 512, JSON_THROW_ON_ERROR);
+    $upgradeManifest['version'] = '1.0.1';
+    file_put_contents($upgradeSource . '/stashd-plugin/plugin.json', json_encode($upgradeManifest, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+    $upgradeBuilt = $builder->materialize($upgradeSource, 'linux-amd64');
+    $upgrade = $manager->installOciLayout($upgradeBuilt['layout'], $upgradeBuilt['digest'], 'example.test/m7-example:1.0.1');
+    $manager->activate($upgrade->id, $upgrade->version);
+    $upgradedPackage = $manager->activePath('m7-example');
+    m7Assert($upgradedPackage !== null && $upgradedPackage !== $package, 'replacement package was not activated');
+    m7Assert($manager->pluginDataPath('m7-example') === $pluginData && is_file($pluginData . '/estimator.sqlite'), 'plugin data did not survive package replacement');
+    $upgradeStage = m7Temp('stashd-production-runner-upgrade');
+    $productionProcess = (new PluginRunner($manager, sdkRoot: $sdkRoot))->start('m7-example', $upgradeStage);
+    $upgradeResolve = $productionProcess->invoke('input.resolve', ['source' => 'fixture:source'], static fn(array $message): array => []);
+    m7Assert(($upgradeResolve['title'] ?? null) === 'Persisted fixture', 'upgraded plugin process could not read persistent data');
+    $productionProcess->close();
+    m7Remove($upgradeStage);
+
+    $isolatedSource = $root . '/isolated-source';
+    m7CopyTree($source, $isolatedSource);
+    $isolatedManifest = json_decode((string) file_get_contents($isolatedSource . '/stashd-plugin/plugin.json'), true, 512, JSON_THROW_ON_ERROR);
+    $isolatedManifest['id'] = 'm7-isolated';
+    file_put_contents($isolatedSource . '/stashd-plugin/plugin.json', json_encode($isolatedManifest, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+    $isolatedBuilt = $builder->materialize($isolatedSource, 'linux-amd64');
+    $isolated = $manager->installOciLayout($isolatedBuilt['layout'], $isolatedBuilt['digest']);
+    $manager->activate($isolated->id, $isolated->version);
+    $isolatedData = $manager->pluginDataPath('m7-isolated');
+    m7Assert($isolatedData !== $pluginData && ! is_file($isolatedData . '/estimator.sqlite'), 'plugin data was shared with another plugin');
+    $isolatedStage = m7Temp('stashd-production-runner-isolated');
+    $isolatedProcess = (new PluginRunner($manager, sdkRoot: $sdkRoot))->start('m7-isolated', $isolatedStage);
+    $isolatedResolve = $isolatedProcess->invoke('input.resolve', ['source' => 'fixture:source'], static fn(array $message): array => []);
+    m7Assert(($isolatedResolve['title'] ?? null) === 'Fixture input', 'isolated plugin could read another plugin data');
+    $isolatedProcess->close();
+    m7Remove($isolatedStage);
 
     $assetRoot = $root . '/assets';
     mkdir($assetRoot, 0700, true);

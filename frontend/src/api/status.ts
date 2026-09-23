@@ -33,6 +33,8 @@ export interface JobApiResource {
   progress_total?: number | null
   progress_percent?: number | null
   progress_label?: string | null
+  progress_size_bytes?: number | null
+  progress_size_estimated?: boolean
   last_error?: string | null
   created_at?: string | null
   started_at?: string | null

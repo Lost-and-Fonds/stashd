@@ -44,10 +44,13 @@ const color = {
 
   <!-- Compact, no label: bare bar + percent, for a table/row cell where the
        row itself already identifies what the progress belongs to. -->
-  <div v-else-if="variant === 'compact'" class="flex w-20 items-center gap-1.5">
-    <UProgress :model-value="percent" :color="color[status]" size="sm" class="flex-1" />
-    <UIcon v-if="status === 'complete'" name="i-lucide-check" class="size-3.5 shrink-0 text-success" />
-    <span v-else class="w-8 shrink-0 text-right font-mono text-xs text-dimmed">{{ percent === null ? '—' : `${Math.round(percent)}%` }}</span>
+  <div v-else-if="variant === 'compact'" class="w-24 space-y-1">
+    <div class="flex items-center gap-1.5">
+      <UProgress :model-value="percent" :color="color[status]" size="sm" class="flex-1" />
+      <UIcon v-if="status === 'complete'" name="i-lucide-check" class="size-3.5 shrink-0 text-success" />
+      <span v-else class="w-8 shrink-0 text-right font-mono text-xs text-dimmed">{{ percent === null ? '—' : `${Math.round(percent)}%` }}</span>
+    </div>
+    <p v-if="count" class="truncate text-right font-mono text-[10px] text-muted">{{ count }}</p>
   </div>
 
   <div v-else class="space-y-1.5">

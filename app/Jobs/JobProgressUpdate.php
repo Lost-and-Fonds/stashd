@@ -13,6 +13,8 @@ final readonly class JobProgressUpdate
         public string $label,
         public ?int $etaSeconds = null,
         public ?float $rate = null,
+        public ?int $sizeBytes = null,
+        public bool $sizeEstimated = false,
     ) {}
 
     public static function ofSteps(int $current, int $total, string $label): self
@@ -25,7 +27,7 @@ final readonly class JobProgressUpdate
         );
     }
 
-    public static function ofPercent(float $percent, string $label, ?int $etaSeconds = null, ?float $rate = null): self
+    public static function ofPercent(float $percent, string $label, ?int $etaSeconds = null, ?float $rate = null, ?int $sizeBytes = null, bool $sizeEstimated = false): self
     {
         return new self(
             current: null,
@@ -34,16 +36,20 @@ final readonly class JobProgressUpdate
             label: $label,
             etaSeconds: $etaSeconds,
             rate: $rate,
+            sizeBytes: $sizeBytes,
+            sizeEstimated: $sizeEstimated,
         );
     }
 
-    public static function indeterminate(string $label): self
+    public static function indeterminate(string $label, ?int $sizeBytes = null, bool $sizeEstimated = false): self
     {
         return new self(
             current: null,
             total: null,
             percent: null,
             label: $label,
+            sizeBytes: $sizeBytes,
+            sizeEstimated: $sizeEstimated,
         );
     }
 }

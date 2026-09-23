@@ -9,10 +9,10 @@ use App\Stashes\StashCollectionExporter;
 final readonly class ExternalBroadcastPluginRegistry
 {
     /**
-     * @param  list<ExternalBroadcastPluginDefinition>  $plugins
-     * @param  array<string, array<string, BroadcastPluginRuntime>>  $runtimes
+     * @param list<ExternalBroadcastPluginDefinition> $plugins
+     * @param array<string, array<string, BroadcastPluginRuntime>> $runtimes
+     * @param list<StashCollectionExporter> $collectionExporters
      */
-    /** @param list<StashCollectionExporter> $collectionExporters */
     public function __construct(private array $plugins, private array $runtimes = [], private array $collectionExporters = []) {}
 
     public function findByLogicalKey(string $key): ?ExternalBroadcastPluginDefinition

@@ -39,6 +39,7 @@ final readonly class PluginAssetCapability
         return new self($role, $assetRole, $kind, $option);
     }
 
+    /** @param list<InputOption> $declaredOptions */
     public function enabled(?StashInputOptions $options, array $declaredOptions): bool
     {
         if ($this->option === null) {
@@ -46,7 +47,7 @@ final readonly class PluginAssetCapability
         }
 
         foreach ($declaredOptions as $declared) {
-            if ($declared instanceof InputOption && $declared->key === $this->option) {
+            if ($declared->key === $this->option) {
                 return ($options === null ? $declared->default : $options->providerValue($declared)) === true;
             }
         }

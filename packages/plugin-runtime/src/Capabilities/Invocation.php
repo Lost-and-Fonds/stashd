@@ -223,6 +223,7 @@ final class Invocation
                 Filesystem\create_directory($etc . '/ssl/certs', 0700);
                 Filesystem\copy($caBundle, $etc . '/ssl/certs/ca-certificates.crt', overwrite: true);
                 Filesystem\copy($caBundle, $etc . '/ssl/cert.pem', overwrite: true);
+
                 break;
             }
 

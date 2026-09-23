@@ -10,6 +10,7 @@ use App\Jobs\JobType;
 use App\Jobs\JobDispatcher;
 use App\Jobs\JobRepository;
 use App\Providers\ResolvedInput;
+use App\Providers\InputOption;
 use RuntimeException;
 use Tempest\Database\Database;
 use Tempest\DateTime\DateTime;
@@ -52,34 +53,11 @@ final readonly class SyncStashInput
             $backfillMissing = $this->stashItems->hasMissingDiscoveryMetadata($stashInputId);
             $providerOptions = $input->options === null ? [] : $input->options->provider;
 
-            if ($backfillMissing) {
-                $providerOptions['skip_size_enrichment'] = true;
-            }
-
             if ($discoveryIntent === 'complete') {
                 $providerOptions['skip_enrichment'] = true;
             }
 
             $incremental = [];
-            $commit = function (ResolvedInput $resolved, array $items, array $inputOptions) use ($stashId, $stashInputId, $input): DiscoveredItemCommitCounts {
-                $counts = null;
-                $this->database->withinTransaction(function () use (&$counts, $stashId, $stashInputId, $resolved, $items, $input, $inputOptions): void {
-                    $counts = $this->committer->commit(
-                        stashId: $stashId,
-                        stashInputId: $stashInputId,
-                        resolved: $resolved,
-                        discoveredItems: $items,
-                        inputOptions: $input->options,
-                        declaredInputOptions: $inputOptions,
-                    );
-                });
-
-                if (! $counts instanceof DiscoveredItemCommitCounts) {
-                    throw new RuntimeException('Failed to commit discovered stash items.');
-                }
-
-                return $counts;
-            };
             $dispatchDownloads = function (DiscoveredItemCommitCounts $counts) use ($stash, $stashId): void {
                 if (! $this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
                     return;
@@ -99,14 +77,17 @@ final readonly class SyncStashInput
                 'provider_options' => $providerOptions,
                 'backfill_missing' => $backfillMissing,
                 'discovery_intent' => $discoveryIntent,
-            ], JobType::core('core.sync_input'), $onProgress, function (ResolvedInput $resolved, array $item, array $inputOptions) use (&$incremental, $commit, $dispatchDownloads, $onProgress): void {
-                $counts = $commit($resolved, [$item], $inputOptions);
+            ], JobType::core('core.sync_input'), $onProgress, function (ResolvedInput $resolved, array $item, array $inputOptions) use (&$incremental, $stashId, $stashInputId, $input, $dispatchDownloads, $onProgress): void {
+                $counts = $this->commit($stashId, $stashInputId, $resolved, [$item], $input->options, $inputOptions);
                 $incremental[] = $counts;
                 $dispatchDownloads($counts);
-                $onProgress?->__invoke(sprintf('Discovered %d item(s)', count($incremental)), null);
+
+                if ($onProgress !== null) {
+                    $onProgress(sprintf('Discovered %d item(s)', count($incremental)), null);
+                }
             });
 
-            $incremental[] = $commit($discovered->resolvedInput, $discovered->discoveredItems, $discovered->inputOptions);
+            $incremental[] = $this->commit($stashId, $stashInputId, $discovered->resolvedInput, $discovered->discoveredItems, $input->options, $discovered->inputOptions);
             $counts = $this->combineCounts($incremental);
         } catch (Throwable $throwable) {
             $this->recordFailure($input);
@@ -149,6 +130,31 @@ final readonly class SyncStashInput
             itemsCreated: $counts->itemsCreated,
             stashItemsCreated: $counts->stashItemsCreated,
         );
+    }
+
+    /**
+     * @param list<array<string, mixed>> $items
+     * @param list<InputOption> $inputOptions
+     */
+    private function commit(StashId $stashId, StashInputId $stashInputId, ResolvedInput $resolved, array $items, ?StashInputOptions $options, array $inputOptions): DiscoveredItemCommitCounts
+    {
+        $counts = null;
+        $this->database->withinTransaction(function () use (&$counts, $stashId, $stashInputId, $resolved, $items, $options, $inputOptions): void {
+            $counts = $this->committer->commit(
+                stashId: $stashId,
+                stashInputId: $stashInputId,
+                resolved: $resolved,
+                discoveredItems: $items,
+                inputOptions: $options,
+                declaredInputOptions: $inputOptions,
+            );
+        });
+
+        if (! $counts instanceof DiscoveredItemCommitCounts) {
+            throw new RuntimeException('Failed to commit discovered stash items.');
+        }
+
+        return $counts;
     }
 
     /** @param list<array<string, mixed>> $discoveredItems */

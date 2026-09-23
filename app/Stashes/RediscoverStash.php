@@ -31,7 +31,6 @@ final readonly class RediscoverStash
         foreach ($this->inputs->listForStash(StashId::parse($stashId)) as $input) {
             $result['inputs']++;
             $providerOptions = $input->options->provider ?? [];
-            $providerOptions['skip_size_enrichment'] = true;
             $discovered = $this->discovery->execute([
                 'source_uri' => $input->sourceUri,
                 'source_title' => $input->title,

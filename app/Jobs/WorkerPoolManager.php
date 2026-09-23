@@ -33,7 +33,7 @@ final readonly class WorkerPoolManager
     public function run(string $workload, Container $container): void
     {
         if (! function_exists('pcntl_fork')) {
-            $runner->run($workload);
+            $container->get(MessengerWorkerRunner::class)->run($workload);
 
             return;
         }

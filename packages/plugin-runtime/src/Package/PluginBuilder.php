@@ -39,7 +39,7 @@ final class PluginBuilder
         $manifest = $this->jsonFile($manifestPath);
         $lock = $this->jsonFile($lockPath);
         $composerLock = Filesystem\is_file($source . '/composer.lock') ? Filesystem\read_file($source . '/composer.lock') : '';
-        $input = hash('sha256', Filesystem\read_file($manifestPath) . Filesystem\read_file($lockPath) . $composerLock . $platform);
+        $input = hash('sha256', Filesystem\read_file($manifestPath) . Filesystem\read_file($lockPath) . $composerLock . $this->sourceHash($source) . $platform);
         $layout = $this->store . '/' . $input;
 
         if (Filesystem\is_file($layout . '/index.json')) {
@@ -203,6 +203,29 @@ final class PluginBuilder
                 chmod($target, $item->getPerms() & 0777);
             }
         }
+    }
+
+    private function sourceHash(string $source): string
+    {
+        $files = [];
+
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::SELF_FIRST) as $item) {
+            if (! $item instanceof \SplFileInfo) {
+                continue;
+            }
+            $relative = substr($item->getPathname(), strlen($source) + 1);
+            $topLevel = strtok($relative, '/');
+
+            if (in_array($topLevel, ['.git', 'tests', 'tools', 'vendor'], true)) {
+                continue;
+            }
+            $files[$relative] = $item->isLink()
+                ? 'link:' . (readlink($item->getPathname()) ?: '')
+                : (($item->isDir() ? 'dir:' : 'file:') . ($item->getPerms() & 0777) . ':' . ($item->isFile() ? hash_file('sha256', $item->getPathname()) : ''));
+        }
+        ksort($files);
+
+        return hash('sha256', json_encode($files, JSON_THROW_ON_ERROR));
     }
 
     private function remove(string $path): void

@@ -42,3 +42,11 @@ test('indeterminate progress has a label but no made-up percentage', function ()
         ->and($update->percent)->toBeNull()
         ->and($update->label)->toBe('Publishing broadcast');
 });
+
+test('indeterminate progress preserves a known approximate byte total', function (): void {
+    $update = JobProgressUpdate::indeterminate('Downloading', 123456, true);
+
+    expect($update->percent)->toBeNull()
+        ->and($update->sizeBytes)->toBe(123456)
+        ->and($update->sizeEstimated)->toBeTrue();
+});

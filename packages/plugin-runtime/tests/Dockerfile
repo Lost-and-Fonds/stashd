@@ -10,7 +10,8 @@ ARG SDK_COMMIT=111c922b950b3a56a38b87f62e9ee3fb28b054ef
 ARG SDK_ARCHIVE_SHA256=e8e7e1dcf3bf8c191f48f7a7aefe3caff91fd3e388dc72770900b04113520ef2
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bubblewrap ca-certificates curl gnupg tar \
+    && apt-get install -y --no-install-recommends bubblewrap ca-certificates curl gnupg libsqlite3-dev tar \
+    && docker-php-ext-install pdo_sqlite \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 1000 --shell /bin/sh plugin
 

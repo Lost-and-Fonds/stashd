@@ -1,0 +1,6 @@
+parameters:
+    level: max
+    reportUnmatchedIgnoredErrors: false
+    paths:
+        - app
+    tmpDir: .alchemy/phpstan

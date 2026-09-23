@@ -223,6 +223,8 @@ CREATE TABLE public.jobs (
     "progressLabel" character varying(255),
     "progressRate" double precision,
     "progressEtaSeconds" integer,
+    "progressSizeBytes" bigint,
+    "progressSizeEstimated" boolean DEFAULT false NOT NULL,
     "lastError" text,
     payload text,
     "ownerToken" text

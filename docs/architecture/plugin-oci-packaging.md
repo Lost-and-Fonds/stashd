@@ -36,6 +36,13 @@ path or its capability.
 Local edits may still use the documented sibling Composer workflow. OCI builds
 are the production-like path and require helper payloads explicitly.
 
+The Core container must permit the checked-in bubblewrap seccomp profile to
+create user/mount namespaces and the exact bind/remount operations used by
+`SandboxPolicy`. The profile is intentionally narrower than `seccomp=unconfined`
+and requires no added Linux capability. Hosts must also allow the existing
+`stashd-plugin-bwrap` AppArmor profile when it is enabled; the production
+Compose configuration supplies both policies.
+
 ## Schema audit
 
 | Area | Classification | Action |

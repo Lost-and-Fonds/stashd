@@ -152,7 +152,7 @@ final class M7Progress implements ProgressReporter
 {
     public function __construct(private M7Rpc $rpc) {}
 
-    public function report(string $stage, ?float $fraction = null): void
+    public function report(string $stage, ?float $fraction = null, ?int $sizeBytes = null, bool $sizeEstimated = false): void
     {
         $this->rpc->call('event.progress', ['stage' => $stage, 'fraction' => $fraction]);
     }
@@ -282,7 +282,19 @@ while (($message = FrameCodec::read(STDIN, 10.0)) !== null) {
             'broadcast.prepare' => ['artifacts' => []],
             'broadcast.finalize' => WireMapper::publication((new M7ExampleBroadcast($context, $rpc))->finalize(new FinalizationRequest(new PublishRequest('fixture'), new Publication(new Artifact('example:publication'))), $context)),
             'broadcast.operation' => ['choices' => [['value' => 'fixture', 'label' => 'Fixture choice']], 'values' => [['key' => 'echo', 'value' => ['tag' => 'text', 'value' => 'fixture']]]],
-            'input.resolve' => ['id' => 'input-1', 'canonical-reference' => 'fixture:source', 'kind' => 'fixture', 'title' => 'Fixture input', 'artwork-reference' => null, 'estimated-item-count' => 1],
+            'input.resolve' => (static function (): array {
+                $databasePath = is_dir('/plugin-data') ? '/plugin-data/estimator.sqlite' : null;
+                $database = $databasePath === null ? null : new PDO('sqlite:' . $databasePath);
+                $persisted = false;
+
+                if ($database !== null) {
+                    $database->exec('CREATE TABLE IF NOT EXISTS observations (value TEXT NOT NULL)');
+                    $persisted = (int) $database->query('SELECT COUNT(*) FROM observations')->fetchColumn() > 0;
+                    $database->exec("INSERT INTO observations (value) VALUES ('persisted')");
+                }
+
+                return ['id' => 'input-1', 'canonical-reference' => 'fixture:source', 'kind' => 'fixture', 'title' => $persisted ? 'Persisted fixture' : 'Fixture input', 'artwork-reference' => null, 'estimated-item-count' => 1];
+            })(),
             'input.discover' => [['id' => 'item-1', 'reference' => 'fixture:item-1', 'title' => 'Fixture item', 'description' => null, 'published-at' => null, 'artwork-reference' => null, 'duration-seconds' => null, 'kind' => 'binary']],
             'input.acquire' => ['artifacts' => [WireMapper::stagedArtifact($context->staging?->write('inputs/item-1.bin', 'input fixture', 'application/octet-stream'))]],
             default => throw new RuntimeException('unknown invocation method'),

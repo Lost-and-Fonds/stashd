@@ -50,10 +50,10 @@ if (! is_resource($networkServer)) {
 
 boundaryRemove($root);
 file_put_contents($canary, 'host-only');
-mkdir($source, 0700, true);
-mkdir($stage, 0700, true);
-mkdir($root . '/sdk', 0700, true);
-mkdir($source . '/helpers', 0700, true);
+mkdir($source, 0755, true);
+mkdir($stage, 0777, true);
+mkdir($root . '/sdk', 0755, true);
+mkdir($source . '/helpers', 0755, true);
 
 file_put_contents($source . '/plugin.json', json_encode([
     'id' => 'boundary',

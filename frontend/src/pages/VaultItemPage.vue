@@ -124,6 +124,8 @@ function handleLiveEvent(event: LiveEvent) {
         state: event.event === 'job.completed' ? 'completed' : event.event === 'job.failed' ? 'failed' : payload.state ?? 'processing',
         progress_percent: payload.progressPercent ?? payload.progress_percent ?? refetchJob.value?.progress_percent ?? null,
         progress_label: payload.progressLabel ?? payload.progress_label ?? refetchJob.value?.progress_label ?? null,
+        progress_size_bytes: payload.progressSizeBytes ?? payload.progress_size_bytes ?? refetchJob.value?.progress_size_bytes ?? null,
+        progress_size_estimated: payload.progressSizeEstimated ?? payload.progress_size_estimated ?? refetchJob.value?.progress_size_estimated ?? false,
         last_error: payload.lastError ?? payload.last_error ?? refetchJob.value?.last_error ?? null,
       }
     }
@@ -183,6 +185,7 @@ onBeforeUnmount(() => {
         label="Refetching item"
         :stage="refetchJob.progress_label ?? undefined"
         :percent="refetchJob.progress_percent ?? null"
+        :count="refetchJob.progress_size_bytes == null ? undefined : `${refetchJob.progress_size_estimated ? '~' : ''}${formatBytes(refetchJob.progress_size_bytes)} expected`"
         :status="refetchJob.state === 'completed' ? 'complete' : ['failed', 'cancelled'].includes(refetchJob.state) ? 'failed' : ['pending', 'retrying'].includes(refetchJob.state) ? 'queued' : 'active'"
       />
 

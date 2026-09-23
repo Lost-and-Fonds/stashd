@@ -167,7 +167,7 @@ final readonly class ExternalBroadcastPluginDefinition
         $assetRequirements = [];
 
         foreach (is_array($raw['asset_requirements'] ?? null) ? $raw['asset_requirements'] : [] as $requirement) {
-            if (is_array($requirement) && ($parsed = BroadcastAssetRequirement::fromManifest($requirement)) !== null) {
+            if (is_array($requirement) && ($parsed = BroadcastAssetRequirement::fromManifest(self::stringKeyed($requirement))) !== null) {
                 $assetRequirements[] = $parsed;
             }
         }
@@ -221,6 +221,22 @@ final readonly class ExternalBroadcastPluginDefinition
     public function available(): bool
     {
         return $this->runtime === 'plugin';
+    }
+
+    /** @param array<mixed, mixed> $values
+     * @return array<string, mixed>
+     */
+    private static function stringKeyed(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $value) {
+            if (is_string($key)) {
+                $result[$key] = $value;
+            }
+        }
+
+        return $result;
     }
 
     public function helperGrant(string $name): ?PluginHelperGrant

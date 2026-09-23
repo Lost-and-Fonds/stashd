@@ -20,9 +20,31 @@ export SIGNING_KEY="${STASHD_GOLDEN_SIGNING_KEY:-MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI
 curl() {
     command curl --connect-timeout 1 --max-time "${STASHD_GOLDEN_CURL_TIMEOUT:-15}" "$@"
 }
+YOUTUBE_REF="${STASHD_GOLDEN_YOUTUBE_REF:-ghcr.io/lost-and-fonds/youtube@sha256:10be57ad69c494cec3ee1be377470d1be2f0bde6c598388e9ff79921400afab9}"
+LOCAL_PACKAGE_ROOT="${STASHD_GOLDEN_LOCAL_PACKAGE_ROOT:-}"
+YOUTUBE_PACKAGE_VERSION="${STASHD_GOLDEN_YOUTUBE_VERSION:-0.3.48}"
+if [ "${STASHD_GOLDEN_REQUIRE_LOCAL:-0}" = "1" ]; then
+    if [ -z "$LOCAL_PACKAGE_ROOT" ]; then
+        echo 'golden path requires local plugin packages, but STASHD_GOLDEN_LOCAL_PACKAGE_ROOT is empty' >&2
+        exit 1
+    fi
+    for plugin in youtube podcast jellyfin plex; do
+        if [ ! -f "$LOCAL_PACKAGE_ROOT/active/$plugin/stashd-plugin/plugin.json" ]; then
+            echo "golden path requires a locally installed $plugin package: $LOCAL_PACKAGE_ROOT" >&2
+            exit 1
+        fi
+    done
+    youtube_package="$LOCAL_PACKAGE_ROOT/active/youtube"
+    YOUTUBE_PACKAGE_VERSION=$(jq -r '.version' "$youtube_package/stashd-plugin/plugin.json")
+    if [ ! -f "$youtube_package/vendor/stashd/php-sdk/src/PluginContext.php" ] \
+        || ! grep -q 'pluginDataPath' "$youtube_package/vendor/stashd/php-sdk/src/PluginContext.php" \
+        || ! grep -q 'estimator.sqlite' "$youtube_package/src/YouTubeInput.php"; then
+        echo 'golden path local YouTube package is stale: SDK plugin-data capability or estimator code is missing' >&2
+        exit 1
+    fi
+fi
 TMP=$(mktemp -d)
 FIXTURE_CONTAINER="${COMPOSE_PROJECT_NAME}-youtube-fixture"
-YOUTUBE_REF="${STASHD_GOLDEN_YOUTUBE_REF:-ghcr.io/lost-and-fonds/youtube@sha256:10be57ad69c494cec3ee1be377470d1be2f0bde6c598388e9ff79921400afab9}"
 PODCAST_REF="${STASHD_GOLDEN_PODCAST_REF:-ghcr.io/lost-and-fonds/podcast@sha256:3156a43271d8b574fe9cef60ce2ace980191581fb9665bedd3c880ea94f4f5b6}"
 JELLYFIN_REF="${STASHD_GOLDEN_JELLYFIN_REF:-ghcr.io/lost-and-fonds/jellyfin@sha256:f6d20378365be62669f2936936498272b75431f5a557797c2c4474b27df12617}"
 PLEX_REF="${STASHD_GOLDEN_PLEX_REF:-ghcr.io/lost-and-fonds/plex@sha256:bc2c9960978494a7f81060fb28dd90471f60416465e770fc66cd3f8d89fbb1bd}"
@@ -46,6 +68,10 @@ trap cleanup EXIT INT TERM
 export STASHD_DATA_DIR="$TMP/data"
 export STASHD_MEDIA_DIR="$TMP/media"
 mkdir -p "$TMP/fixture"
+if [ -n "$LOCAL_PACKAGE_ROOT" ]; then
+    mkdir -p "$STASHD_DATA_DIR/plugins"
+    cp -a "$LOCAL_PACKAGE_ROOT"/. "$STASHD_DATA_DIR/plugins/"
+fi
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=Stashd golden fixture CA' \
     -addext 'basicConstraints=critical,CA:TRUE' -addext 'keyUsage=critical,keyCertSign,cRLSign' \
     -keyout "$TMP/fixture/ca-key.pem" -out "$TMP/fixture/ca.pem" >/dev/null 2>&1
@@ -53,7 +79,7 @@ openssl req -newkey rsa:2048 -nodes -subj '/CN=www.youtube.com' \
     -keyout "$TMP/fixture/key.pem" -out "$TMP/fixture/server.csr" >/dev/null 2>&1
 openssl x509 -req -days 1 -in "$TMP/fixture/server.csr" -CA "$TMP/fixture/ca.pem" \
     -CAkey "$TMP/fixture/ca-key.pem" -CAcreateserial \
-    -extfile <(printf '%s\n' 'basicConstraints=critical,CA:FALSE' 'keyUsage=critical,digitalSignature,keyEncipherment' 'extendedKeyUsage=serverAuth' 'subjectAltName=DNS:www.youtube.com,DNS:youtube.com,DNS:m.youtube.com,DNS:music.youtube.com,DNS:youtu.be,DNS:i.ytimg.com') \
+    -extfile <(printf '%s\n' 'basicConstraints=critical,CA:FALSE' 'keyUsage=critical,digitalSignature,keyEncipherment' 'extendedKeyUsage=serverAuth' 'subjectAltName=DNS:www.youtube.com,DNS:youtube.com,DNS:m.youtube.com,DNS:music.youtube.com,DNS:youtu.be,DNS:i.ytimg.com,DNS:www.googleapis.com') \
     -out "$TMP/fixture/cert.pem" >/dev/null 2>&1
 cp "$ROOT/tests/docker/youtube-fixture-server.py" "$TMP/fixture/server.py"
 cp "$ROOT/tests/docker/yt-dlp-fixture.conf" "$TMP/fixture/yt-dlp.conf"
@@ -67,6 +93,8 @@ Deterministic fixture caption
 '
 printf '%s\n' "$payload_a" > "$TMP/fixture/media.bin"
 printf '%s\n' "$retry_payload" > "$TMP/fixture/retry-media.bin"
+head -c 1048576 /dev/zero | tr '\000' 'e' > "$TMP/fixture/estimate-media.bin"
+estimate_expected_size=1048576
 printf 'broken\n' > "$TMP/fixture/retry-mode"
 printf 'broken\n' > "$TMP/fixture/caption-mode"
 expected_vault_sha256=$(printf '%s\n' "$payload_a" | sha256sum | awk '{print $1}')
@@ -103,7 +131,7 @@ done
 printf '%s' "$boot_log" | grep -q 'Stashd boot completed.' || [ "$health_status" = healthy ]
 
 docker compose -f "$ROOT/docker-compose.yml" cp "$ROOT/tests/docker/plugin-sandbox-boundary.php" stashd:/tmp/plugin-sandbox-boundary.php
-timeout 60s docker compose -f "$ROOT/docker-compose.yml" exec -T stashd php /tmp/plugin-sandbox-boundary.php
+timeout 60s docker compose -f "$ROOT/docker-compose.yml" exec -T --user 1000:1000 stashd php /tmp/plugin-sandbox-boundary.php
 
 network="${COMPOSE_PROJECT_NAME}_default"
 docker run -d --name "$FIXTURE_CONTAINER" --network "$network" \
@@ -113,6 +141,7 @@ docker run -d --name "$FIXTURE_CONTAINER" --network "$network" \
     --network-alias music.youtube.com \
     --network-alias youtu.be \
     --network-alias i.ytimg.com \
+    --network-alias www.googleapis.com \
     -v "$TMP/fixture:/fixture:ro" \
     python:3.12-slim python /fixture/server.py >/dev/null
 
@@ -126,10 +155,20 @@ until timeout 10s docker compose "${COMPOSE_FILES[@]}" exec -T stashd \
     'https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dgolden-video' >/dev/null; do
     sleep 1
 done
-timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$YOUTUBE_REF"
-timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$PODCAST_REF"
-timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$JELLYFIN_REF"
-timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$PLEX_REF"
+docker compose "${COMPOSE_FILES[@]}" exec -T stashd curl --connect-timeout 1 --max-time 5 -fsS \
+    'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=PLSizeBootstrap' \
+    | jq -e '.items[0].snippet.resourceId.videoId == "estimate001"' >/dev/null
+docker compose "${COMPOSE_FILES[@]}" exec -T stashd curl --connect-timeout 1 --max-time 5 -fsS \
+    'https://www.googleapis.com/youtube/v3/videos?part=snippet%2CcontentDetails%2CliveStreamingDetails&id=estimate001' \
+    | jq -e '.items[0].contentDetails.duration == "PT181S"' >/dev/null
+if [ -z "$LOCAL_PACKAGE_ROOT" ]; then
+    timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$YOUTUBE_REF"
+    timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$PODCAST_REF"
+    timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$JELLYFIN_REF"
+    timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$PLEX_REF"
+else
+    echo "golden local plugin package root installed: $LOCAL_PACKAGE_ROOT"
+fi
 # The production image persists its dotenv file under /data and reloads it on
 # restart. Keep the smoke deployment's operator key in that authoritative copy
 # as well as in Compose's environment.
@@ -169,6 +208,93 @@ if [ -z "$token" ]; then
     echo 'golden path failed: no API token' >&2
     exit 1
 fi
+
+curl -fsS -X PUT "$base/api/v1/plugin-credentials/youtube/youtube-data-api" -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"value":"golden-fixture-key"}' >/dev/null
+helper_count_before=$(docker compose "${COMPOSE_FILES[@]}" exec -T stashd curl --connect-timeout 1 --max-time 5 -fsS 'https://www.youtube.com/fixture/yt-dlp-count' | jq -r '.count')
+[ "$helper_count_before" = 0 ] || { echo 'golden estimator fixture did not start with a clean yt-dlp invocation count' >&2; exit 1; }
+bootstrap_preflight=$(curl -sS -X POST "$base/api/v1/stashes/preflight" -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"source_uri":"https://www.youtube.com/playlist?list=PLSizeBootstrap","provider_options":{"include_shorts":true}}')
+printf '%s' "$bootstrap_preflight" | jq -e '.preflight.discovery.discovered_items[0].size_estimated == true and .preflight.discovery.discovered_items[0].duration_seconds == 181' >/dev/null || {
+    echo 'golden estimator bootstrap preflight did not return an estimated 181-second item' >&2
+    printf '%s\n' "$bootstrap_preflight" >&2
+    exit 1
+}
+bootstrap_size=$(printf '%s' "$bootstrap_preflight" | jq -r '.preflight.discovery.discovered_items[0].size_bytes // empty')
+[ "$bootstrap_size" = 27150000 ] || { echo "golden bootstrap estimate mismatch: $bootstrap_size" >&2; exit 1; }
+helper_count_after_discovery=$(docker compose "${COMPOSE_FILES[@]}" exec -T stashd curl --connect-timeout 1 --max-time 5 -fsS 'https://www.youtube.com/fixture/yt-dlp-count' | jq -r '.count')
+[ "$helper_count_after_discovery" = 0 ] || { echo 'API-backed size discovery invoked yt-dlp' >&2; exit 1; }
+echo "golden YouTube API bootstrap estimate passed: size=$bootstrap_size; yt-dlp discovery invocations=0"
+
+estimator_stash=$(curl -fsS -X POST "$base/api/v1/stashes/with-input" -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"name":"Estimator Proof","input":{"plugin":"youtube","source":{"url":"https://www.youtube.com/playlist?list=PLSizeBootstrap"},"options":{"provider":{"include_shorts":true,"include_captions":false}}},"downloadPolicy":"manual_download"}')
+estimator_stash_id=$(printf '%s' "$estimator_stash" | jq -r '.stash.id')
+estimator_add_job_id=''
+for _ in $(seq 1 15); do
+    estimator_add_job_id=$(curl -fsS "$base/api/v1/jobs" -H "Authorization: Bearer $token" | jq -r --arg stash_id "$estimator_stash_id" '[.jobs[] | select(.type == "core.add_input" and .stash_id == $stash_id)] | .[0].id // empty')
+    [ -n "$estimator_add_job_id" ] && break
+    sleep 1
+done
+[ -n "$estimator_add_job_id" ] || { echo 'golden estimator stash returned no discovery job' >&2; exit 1; }
+estimator_add_state=''
+for _ in $(seq 1 60); do
+    estimator_add_job=$(curl -fsS "$base/api/v1/jobs/$estimator_add_job_id" -H "Authorization: Bearer $token")
+    estimator_add_state=$(printf '%s' "$estimator_add_job" | jq -r '.job.state // empty')
+    [ "$estimator_add_state" = ready ] && break
+    [ "$estimator_add_state" = failed ] && { echo "$estimator_add_job" >&2; exit 1; }
+    sleep 1
+done
+[ "$estimator_add_state" = ready ] || { echo 'golden estimator discovery did not finish' >&2; exit 1; }
+estimator_items=$(curl -fsS "$base/api/v1/stashes/$estimator_stash_id/items" -H "Authorization: Bearer $token")
+printf '%s' "$estimator_items" | jq -e '.items[0].total_asset_size_bytes == null and (.items[0].item | has("size_bytes") == false)' >/dev/null || {
+    echo 'golden path exposed a persisted Item estimate before acquisition' >&2
+    printf '%s\n' "$estimator_items" >&2
+    exit 1
+}
+estimator_item_id=$(printf '%s' "$estimator_items" | jq -r '.items[0].item_id')
+helper_count_before_acquire=$(docker compose "${COMPOSE_FILES[@]}" exec -T stashd curl --connect-timeout 1 --max-time 5 -fsS 'https://www.youtube.com/fixture/yt-dlp-count' | jq -r '.count')
+[ "$helper_count_before_acquire" = 0 ] || { echo 'complete API discovery invoked the yt-dlp helper' >&2; exit 1; }
+estimator_refetch=$(curl -fsS -X POST "$base/api/v1/items/$estimator_item_id/refetch" -H "Authorization: Bearer $token")
+estimator_job_id=$(printf '%s' "$estimator_refetch" | jq -r '.job.id // empty')
+[ -n "$estimator_job_id" ] || { echo 'golden estimator acquisition returned no job' >&2; exit 1; }
+approximate_seen=0
+exact_seen=0
+estimator_job_state=''
+for _ in $(seq 1 90); do
+    estimator_job=$(curl -fsS "$base/api/v1/jobs/$estimator_job_id" -H "Authorization: Bearer $token")
+    estimator_job_state=$(printf '%s' "$estimator_job" | jq -r '.job.state // empty')
+    progress_size=$(printf '%s' "$estimator_job" | jq -r '.job.progress_size_bytes // empty')
+    progress_estimated=$(printf '%s' "$estimator_job" | jq -r '.job.progress_size_estimated')
+    if [ "$progress_size" = 1048576 ] && [ "$progress_estimated" = true ] && [ "$estimator_job_state" != ready ]; then approximate_seen=1; fi
+    if [ "$progress_size" = "$estimate_expected_size" ] && [ "$progress_estimated" = false ] && [ "$estimator_job_state" != ready ]; then exact_seen=1; fi
+    [ "$estimator_job_state" = ready ] && break
+    [ "$estimator_job_state" = failed ] && { echo "$estimator_job" >&2; exit 1; }
+    sleep 0.25
+done
+[ "$approximate_seen" = 1 ] || { echo 'approximate helper size was not observed before acquisition completion' >&2; exit 1; }
+[ "$exact_seen" = 1 ] || { echo 'exact helper size was not observed before acquisition completion' >&2; exit 1; }
+[ "$estimator_job_state" = ready ] || { echo 'golden estimator acquisition did not complete' >&2; exit 1; }
+estimator_assets=$(curl -fsS "$base/api/v1/items/$estimator_item_id/assets" -H "Authorization: Bearer $token")
+actual_estimator_size=$(printf '%s' "$estimator_assets" | jq -r '[.assets[] | select(.role == "vault_original" and .state == "ready") | .size_bytes][0] // empty')
+[ "$actual_estimator_size" = "$estimate_expected_size" ] || { echo "Asset byte size mismatch: expected=$estimate_expected_size actual=$actual_estimator_size" >&2; exit 1; }
+estimator_items_after=$(curl -fsS "$base/api/v1/stashes/$estimator_stash_id/items" -H "Authorization: Bearer $token")
+printf '%s' "$estimator_items_after" | jq -e '.items[0].total_asset_size_bytes == 1048576' >/dev/null
+estimator_data_file=$(docker compose "${COMPOSE_FILES[@]}" exec -T stashd sh -c "test -f /data/plugins/plugin-data/youtube/estimator.sqlite && test ! -e /data/plugins/packages/youtube/$YOUTUBE_PACKAGE_VERSION/estimator.sqlite && if find /data/plugins/staging -name estimator.sqlite -print -quit 2>/dev/null | grep -q .; then exit 1; fi && echo /data/plugins/plugin-data/youtube/estimator.sqlite")
+echo "golden acquisition progress passed: approximate and exact totals preceded completion; factual Asset bytes=$actual_estimator_size; database=$estimator_data_file"
+helper_count_after_acquire=$(docker compose "${COMPOSE_FILES[@]}" exec -T stashd curl --connect-timeout 1 --max-time 5 -fsS 'https://www.youtube.com/fixture/yt-dlp-count' | jq -r '.count')
+[ "$helper_count_after_acquire" = 1 ] || { echo "golden primary acquisition helper count mismatch: $helper_count_after_acquire" >&2; exit 1; }
+
+docker compose "${COMPOSE_FILES[@]}" restart stashd >/dev/null
+for _ in $(seq 1 90); do
+    health_code=$(curl --connect-timeout 1 --max-time 5 -sS -o "$health_body" -w '%{http_code}' "$base/health" || true)
+    [ "$health_code" = 200 ] && break
+    sleep 2
+done
+[ "$health_code" = 200 ] || { echo 'golden estimator Core restart did not become healthy' >&2; exit 1; }
+learned_preflight=$(curl -fsS -X POST "$base/api/v1/stashes/preflight" -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"source_uri":"https://www.youtube.com/playlist?list=PLSizeLearned","provider_options":{"include_shorts":true}}')
+learned_size=$(printf '%s' "$learned_preflight" | jq -r '.preflight.discovery.discovered_items[0].size_bytes // empty')
+[ "$learned_size" = "$estimate_expected_size" ] || { echo "fresh-process learned estimate mismatch: expected=$estimate_expected_size actual=$learned_size" >&2; exit 1; }
+printf '%s' "$learned_preflight" | jq -e '.preflight.discovery.discovered_items[0].size_estimated == true' >/dev/null
+helper_count_after_learning=$(docker compose "${COMPOSE_FILES[@]}" exec -T stashd curl --connect-timeout 1 --max-time 5 -fsS 'https://www.youtube.com/fixture/yt-dlp-count' | jq -r '.count')
+[ "$helper_count_after_learning" = "$helper_count_after_acquire" ] || { echo 'learned API discovery invoked yt-dlp' >&2; exit 1; }
+echo "golden learned estimate survived a fresh plugin process and Core restart: size=$learned_size"
 
 stash=$(curl -fsS -X POST "$base/api/v1/stashes/with-input" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
@@ -449,6 +575,7 @@ broadcast=$(curl -fsS -X POST "$base/api/v1/stashes/$stash_id/broadcasts" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
     -d '{"type":"podcast","name":"Golden Podcast","settings":{"media_kind":"video","captions":"creator_only","caption_languages":"en"}}')
 broadcast_id=$(printf '%s' "$broadcast" | jq -r '.broadcast.id')
+initial_broadcast_job_id=$(printf '%s' "$broadcast" | jq -r '.build_job_id')
 
 caption_job_id=''
 caption_job=''
@@ -508,6 +635,30 @@ published_url=$(printf '%s' "$current" | jq -r '.broadcast.published_url // empt
 [ -n "$published_url" ] || { echo 'golden path failed: no published URL' >&2; exit 1; }
 feed=$(curl -fsS "$published_url")
 printf '%s' "$feed" | grep -q 'Golden Path Video'
+if ! printf '%s' "$feed" | grep -q '<podcast:transcript'; then
+    settled_broadcast_job_id=''
+    settled_broadcast_job=''
+
+    for _ in $(seq 1 90); do
+        settled_broadcast_job_id=$(curl -fsS "$base/api/v1/jobs" -H "Authorization: Bearer $token" \
+            | jq -r --arg broadcast_id "$broadcast_id" --arg initial_job_id "$initial_broadcast_job_id" \
+                '[.jobs[] | select(.type == "core.broadcast" and .entity_id == $broadcast_id and .id != $initial_job_id)] | sort_by(.created_at // .createdAt) | last | .id // empty')
+
+        if [ -n "$settled_broadcast_job_id" ]; then
+            settled_broadcast_job=$(curl -fsS "$base/api/v1/jobs/$settled_broadcast_job_id" -H "Authorization: Bearer $token")
+            settled_broadcast_state=$(printf '%s' "$settled_broadcast_job" | jq -r '.job.state // empty')
+
+            [ "$settled_broadcast_state" = failed ] && { echo "$settled_broadcast_job" >&2; exit 1; }
+
+            if [ "$settled_broadcast_state" = ready ]; then
+                feed=$(curl -fsS "$published_url")
+                printf '%s' "$feed" | grep -q '<podcast:transcript' && break
+            fi
+        fi
+
+        sleep 1
+    done
+fi
 transcript_url=$(printf '%s' "$feed" | sed -n 's/.*<podcast:transcript[^>]*url="\([^"]*\)".*/\1/p' | head -n 1)
 [ -n "$transcript_url" ] || { echo 'golden path failed: Podcast feed has no transcript URL' >&2; printf '%s\n' "$feed" >&2; exit 1; }
 transcript=$(curl -fsS "$transcript_url")

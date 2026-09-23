@@ -10,7 +10,7 @@ use Tempest\Support\Filesystem;
 final readonly class SandboxPolicy
 {
     /** @return list<string> */
-    public function command(string $packageRoot, string $stagingRoot, string $entrypoint, ?string $etcPath = null, ?string $sdkRoot = null, bool $network = false): array
+    public function command(string $packageRoot, string $stagingRoot, string $entrypoint, ?string $etcPath = null, ?string $sdkRoot = null, bool $network = false, ?string $pluginDataRoot = null): array
     {
         $this->assertRelative($entrypoint);
         $etcMount = $etcPath === null ? ['--dir', '/etc'] : ['--ro-bind', $etcPath, '/etc'];
@@ -20,6 +20,13 @@ final readonly class SandboxPolicy
             '--ro-bind', $packageRoot, '/plugin', '--bind', $stagingRoot, '/staging',
             '--tmpfs', '/tmp', '--dev', '/dev', '--dir', '/home', '--dir', '/root',
         ];
+
+        if ($pluginDataRoot !== null) {
+            if (! Filesystem\is_directory($pluginDataRoot)) {
+                Filesystem\create_directory($pluginDataRoot, 0700);
+            }
+            $command = array_merge($command, ['--bind', $pluginDataRoot, '/plugin-data']);
+        }
 
         if (! $network) {
             array_splice($command, 5, 0, ['--unshare-net']);

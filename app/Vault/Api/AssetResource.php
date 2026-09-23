@@ -42,7 +42,7 @@ final readonly class AssetResource
             'relativePath' => $this->asset->relativePath,
             'mimeType' => $this->asset->mimeType,
             'container' => $this->asset->container,
-            'language' => $this->asset->language,
+            'language' => $this->asset->language ?? self::languageFromPath($this->asset->path ?? $this->asset->relativePath),
             'sizeBytes' => $this->asset->sizeBytes,
             'checksum' => $this->asset->checksum,
             'fixityStatus' => $this->fixityStatus?->value,
@@ -58,5 +58,12 @@ final readonly class AssetResource
             'canRegenerate' => $this->guidance?->canRegenerate,
             'safeToDelete' => $this->guidance?->safeToDelete,
         ]);
+    }
+
+    private static function languageFromPath(?string $path): ?string
+    {
+        return preg_match('/\.([a-z]{2,3}(?:-[A-Za-z0-9]+)?)\.vtt$/i', basename($path ?? ''), $matches) === 1
+            ? strtolower($matches[1])
+            : null;
     }
 }

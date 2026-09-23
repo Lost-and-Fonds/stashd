@@ -736,6 +736,7 @@ final readonly class ExternalBroadcastPlugin implements BroadcastPlugin, Broadca
                 'url' => $preservedItem->thumbnailUri,
                 'media-type' => 'image/jpeg',
                 'size-bytes' => 0,
+                'language' => null,
             ];
         }
 
