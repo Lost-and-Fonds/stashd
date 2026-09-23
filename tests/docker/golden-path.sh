@@ -20,9 +20,9 @@ export SIGNING_KEY="${STASHD_GOLDEN_SIGNING_KEY:-MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI
 curl() {
     command curl --connect-timeout 1 --max-time "${STASHD_GOLDEN_CURL_TIMEOUT:-15}" "$@"
 }
-YOUTUBE_REF="${STASHD_GOLDEN_YOUTUBE_REF:-ghcr.io/lost-and-fonds/youtube@sha256:10be57ad69c494cec3ee1be377470d1be2f0bde6c598388e9ff79921400afab9}"
+YOUTUBE_REF="${STASHD_GOLDEN_YOUTUBE_REF:-ghcr.io/lost-and-fonds/youtube@sha256:cfc335a37b25e1ee7bc5519e6a8a93a8c0f3e1aaa333d3f94bd92b8e84071787}"
 LOCAL_PACKAGE_ROOT="${STASHD_GOLDEN_LOCAL_PACKAGE_ROOT:-}"
-YOUTUBE_PACKAGE_VERSION="${STASHD_GOLDEN_YOUTUBE_VERSION:-0.3.48}"
+YOUTUBE_PACKAGE_VERSION="${STASHD_GOLDEN_YOUTUBE_VERSION:-0.3.49}"
 if [ "${STASHD_GOLDEN_REQUIRE_LOCAL:-0}" = "1" ]; then
     if [ -z "$LOCAL_PACKAGE_ROOT" ]; then
         echo 'golden path requires local plugin packages, but STASHD_GOLDEN_LOCAL_PACKAGE_ROOT is empty' >&2
