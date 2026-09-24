@@ -26,7 +26,7 @@ capability, persistence, and security behavior.
 
 ## Core releases
 
-Core uses `v0.1.N` tags. The renumbered history ends at `v0.1.64`; the next
-release is `v0.1.65`. Stable tags publish the matching `v0.1.N` GHCR image and
+Core uses `v0.1.N` tags. The renumbered history ends at `v0.1.65`; the next
+release is `v0.1.66`. Stable tags publish the matching `v0.1.N` GHCR image and
 the `v0.1`, `v0`, and `latest` aliases. Do not use the independent version
 numbers of plugin, plugin-api, or SDK releases for Core.
