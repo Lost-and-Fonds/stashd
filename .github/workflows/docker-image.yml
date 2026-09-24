@@ -156,7 +156,7 @@ jobs:
               composer test:naked-core
               composer test:packaged
               STASHD_PLUGIN_PACKAGE_ROOT=/tmp/stashd-golden-plugin-packages \
-                STASHD_YOUTUBE_HELPER_FIXTURE=/var/www/html/tests/fixtures/providers/youtube/golden-yt-dlp.sh \
+                STASHD_YOUTUBE_HELPER_FIXTURE=/var/www/html/tests/docker/yt-dlp-credential-fixture.sh \
                 php scripts/build-installed-plugins.php
               chmod -R a+rX /tmp/stashd-golden-plugin-packages
             '
