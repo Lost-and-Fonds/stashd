@@ -28,7 +28,9 @@
           "description": {"type": "string"},
           "required": {"type": "boolean"},
           "secret_key": {"type": "string", "minLength": 1},
-          "secret_type": {"enum": ["api_key", "oauth_token", "password", "generic"]}
+          "secret_type": {"enum": ["api_key", "oauth_token", "password", "generic"]},
+          "input_type": {"enum": ["password", "file"]},
+          "raw_access": {"type": "boolean"}
         },
         "additionalProperties": false
       }

@@ -30,6 +30,20 @@ it('accepts a valid manifest and current provider manifests', function (): void 
     expect(true)->toBeTrue();
 });
 
+it('accepts plugin-declared file credentials with acquisition-only raw access', function (): void {
+    $manifest = array_replace(validPluginManifest(), ['credentials' => [[
+        'key' => 'youtube-cookies',
+        'label' => 'YouTube cookies.txt',
+        'secret_key' => 'youtube_cookies_txt',
+        'input_type' => 'file',
+        'raw_access' => true,
+    ]]]);
+
+    PackageManifest::validateData($manifest);
+
+    expect(true)->toBeTrue();
+});
+
 it('reports the path for missing or wrongly typed structural fields', function (array $manifest, string $path): void {
     expect(fn(): mixed => PackageManifest::validateData($manifest))
         ->toThrow(PackageValidationError::class, $path);
@@ -38,6 +52,8 @@ it('reports the path for missing or wrongly typed structural fields', function (
     'wrong id type' => [array_replace(validPluginManifest(), ['id' => 12]), '/id'],
     'malformed helper' => [array_replace(validPluginManifest(), ['helpers' => ['helper' => ['executable' => false]]]), '/helpers/helper/executable'],
     'invalid credential placement' => [array_replace(validPluginManifest(), ['http_grants' => [['allowed_prefixes' => ['https://example.test/'], 'credential' => ['name' => 'token', 'parameter' => 'key', 'placement' => 'cookie']]]]), '/http_grants/0/credential/placement'],
+    'invalid credential input type' => [array_replace(validPluginManifest(), ['credentials' => [['key' => 'cookies', 'label' => 'Cookies', 'secret_key' => 'cookies', 'input_type' => 'text']]]), '/credentials/0/input_type'],
+    'invalid raw access type' => [array_replace(validPluginManifest(), ['credentials' => [['key' => 'cookies', 'label' => 'Cookies', 'secret_key' => 'cookies', 'raw_access' => 'yes']]]), '/credentials/0/raw_access'],
 ]);
 
 it('keeps path containment and PHP compatibility as semantic checks', function (string $field, mixed $value, string $message): void {

@@ -168,6 +168,11 @@ if [ -z "$LOCAL_PACKAGE_ROOT" ]; then
     timeout 180s docker compose "${COMPOSE_FILES[@]}" exec -T stashd php tempest stashd:plugin-install "$PLEX_REF"
 else
     echo "golden local plugin package root installed: $LOCAL_PACKAGE_ROOT"
+    docker compose "${COMPOSE_FILES[@]}" exec -T stashd sh -c \
+        "grep -Fq 'web.gvs+golden-po-token' '/data/plugins/packages/youtube/$YOUTUBE_PACKAGE_VERSION/stashd-plugin/helpers/yt-dlp'" || {
+        echo 'golden local YouTube helper fixture was not copied into the production package path' >&2
+        exit 1
+    }
 fi
 # The production image persists its dotenv file under /data and reloads it on
 # restart. Keep the smoke deployment's operator key in that authoritative copy
@@ -210,6 +215,20 @@ if [ -z "$token" ]; then
 fi
 
 curl -fsS -X PUT "$base/api/v1/plugin-credentials/youtube/youtube-data-api" -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"value":"golden-fixture-key"}' >/dev/null
+credential_schema=$(curl -fsS "$base/api/v1/plugin-credentials" -H "Authorization: Bearer $token")
+printf '%s' "$credential_schema" | jq -e '[.plugins[] | select(.key == "youtube") | .credentials[]] | any(.key == "youtube-cookies" and .input_type == "file") and any(.key == "youtube-po-token" and .input_type == "password")' >/dev/null || {
+    echo 'golden path failed: YouTube credential settings were not declared with file/password inputs' >&2
+    printf '%s\n' "$credential_schema" >&2
+    exit 1
+}
+youtube_cookie_file="$TMP/youtube-cookies.txt"
+printf '# Netscape HTTP Cookie File\nyoutube-golden-cookie-fixture\n' > "$youtube_cookie_file"
+curl -fsS -X PUT "$base/api/v1/plugin-credentials/youtube/youtube-cookies" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
+    --data-binary "$(jq -n --rawfile value "$youtube_cookie_file" '{value:$value}')" >/dev/null
+curl -fsS -X PUT "$base/api/v1/plugin-credentials/youtube/youtube-po-token" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
+    -d '{"value":"golden-po-token"}' >/dev/null
 helper_count_before=$(docker compose "${COMPOSE_FILES[@]}" exec -T stashd curl --connect-timeout 1 --max-time 5 -fsS 'https://www.youtube.com/fixture/yt-dlp-count' | jq -r '.count')
 [ "$helper_count_before" = 0 ] || { echo 'golden estimator fixture did not start with a clean yt-dlp invocation count' >&2; exit 1; }
 bootstrap_preflight=$(curl -sS -X POST "$base/api/v1/stashes/preflight" -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"source_uri":"https://www.youtube.com/playlist?list=PLSizeBootstrap","provider_options":{"include_shorts":true}}')
@@ -268,14 +287,29 @@ for _ in $(seq 1 90); do
     [ "$estimator_job_state" = failed ] && { echo "$estimator_job" >&2; exit 1; }
     sleep 0.25
 done
-[ "$approximate_seen" = 1 ] || { echo 'approximate helper size was not observed before acquisition completion' >&2; exit 1; }
-[ "$exact_seen" = 1 ] || { echo 'exact helper size was not observed before acquisition completion' >&2; exit 1; }
+[ "$approximate_seen" = 1 ] || {
+    echo 'approximate helper size was not observed before acquisition completion' >&2
+    printf '%s\n' "$estimator_job" >&2
+    docker compose "${COMPOSE_FILES[@]}" exec -T stashd curl --connect-timeout 1 --max-time 5 -fsS 'https://www.youtube.com/fixture/yt-dlp-count' >&2 || true
+    exit 1
+}
+[ "$exact_seen" = 1 ] || {
+    echo 'exact helper size was not observed before acquisition completion' >&2
+    printf '%s\n' "$estimator_job" >&2
+    docker compose "${COMPOSE_FILES[@]}" exec -T stashd curl --connect-timeout 1 --max-time 5 -fsS 'https://www.youtube.com/fixture/yt-dlp-count' >&2 || true
+    exit 1
+}
 [ "$estimator_job_state" = ready ] || { echo 'golden estimator acquisition did not complete' >&2; exit 1; }
 estimator_assets=$(curl -fsS "$base/api/v1/items/$estimator_item_id/assets" -H "Authorization: Bearer $token")
 actual_estimator_size=$(printf '%s' "$estimator_assets" | jq -r '[.assets[] | select(.role == "vault_original" and .state == "ready") | .size_bytes][0] // empty')
 [ "$actual_estimator_size" = "$estimate_expected_size" ] || { echo "Asset byte size mismatch: expected=$estimate_expected_size actual=$actual_estimator_size" >&2; exit 1; }
 estimator_items_after=$(curl -fsS "$base/api/v1/stashes/$estimator_stash_id/items" -H "Authorization: Bearer $token")
-printf '%s' "$estimator_items_after" | jq -e '.items[0].total_asset_size_bytes == 1048576' >/dev/null
+asset_total=$(printf '%s' "$estimator_assets" | jq '[.assets[] | select(.state == "ready") | .size_bytes] | add')
+printf '%s' "$estimator_items_after" | jq -e --argjson asset_total "$asset_total" '.items[0].total_asset_size_bytes == $asset_total' >/dev/null || {
+    echo 'golden item size did not equal the total of its ready assets' >&2
+    printf '%s\n' "$estimator_items_after" >&2
+    exit 1
+}
 estimator_data_file=$(docker compose "${COMPOSE_FILES[@]}" exec -T stashd sh -c "test -f /data/plugins/plugin-data/youtube/estimator.sqlite && test ! -e /data/plugins/packages/youtube/$YOUTUBE_PACKAGE_VERSION/estimator.sqlite && if find /data/plugins/staging -name estimator.sqlite -print -quit 2>/dev/null | grep -q .; then exit 1; fi && echo /data/plugins/plugin-data/youtube/estimator.sqlite")
 echo "golden acquisition progress passed: approximate and exact totals preceded completion; factual Asset bytes=$actual_estimator_size; database=$estimator_data_file"
 helper_count_after_acquire=$(docker compose "${COMPOSE_FILES[@]}" exec -T stashd curl --connect-timeout 1 --max-time 5 -fsS 'https://www.youtube.com/fixture/yt-dlp-count' | jq -r '.count')
@@ -296,6 +330,7 @@ helper_count_after_learning=$(docker compose "${COMPOSE_FILES[@]}" exec -T stash
 [ "$helper_count_after_learning" = "$helper_count_after_acquire" ] || { echo 'learned API discovery invoked yt-dlp' >&2; exit 1; }
 echo "golden learned estimate survived a fresh plugin process and Core restart: size=$learned_size"
 
+printf 'healthy\n' > "$TMP/fixture/caption-mode"
 stash=$(curl -fsS -X POST "$base/api/v1/stashes/with-input" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
     -d '{"name":"Golden Path","input":{"plugin":"youtube","source":{"url":"https://www.youtube.com/watch?v=goldenvid01"},"options":{"provider":{"include_captions":true,"include_auto_captions":false,"caption_languages":"en"}}},"downloadPolicy":"manual_download"}')
@@ -335,7 +370,11 @@ for _ in $(seq 1 90); do
     initial_refetch_job=$(curl -fsS "$base/api/v1/jobs/$initial_refetch_job_id" -H "Authorization: Bearer $token")
     initial_refetch_state=$(printf '%s' "$initial_refetch_job" | jq -r '.job.state // empty')
     [ "$initial_refetch_state" = ready ] && break
-    [ "$initial_refetch_state" = failed ] && { echo "$initial_refetch_job" >&2; exit 1; }
+    [ "$initial_refetch_state" = failed ] && {
+        echo "$initial_refetch_job" >&2
+        docker compose "${COMPOSE_FILES[@]}" exec -T stashd curl --connect-timeout 1 --max-time 5 -fsS 'https://www.youtube.com/fixture/yt-dlp-count' >&2 || true
+        exit 1
+    }
     sleep 2
 done
 [ "$initial_refetch_state" = ready ] || { echo 'golden path failed: initial public download never reached ready' >&2; exit 1; }
@@ -571,6 +610,8 @@ echo "golden pre-broadcast state: item=$item_id item_state=ready primary_downloa
 caption_baseline_ids=$(curl -fsS "$base/api/v1/jobs" -H "Authorization: Bearer $token" \
     | jq --arg item_id "$item_id" --arg stash_id "$stash_id" '[.jobs[] | select(.type == "core.acquire_assets" and .entity_id == $item_id and .stash_id == $stash_id) | .id]')
 echo "golden caption acquisition baseline: $caption_baseline_ids"
+caption_assets_before=$(curl -fsS "$base/api/v1/items/$item_id/assets" -H "Authorization: Bearer $token")
+caption_already_ready=$(printf '%s' "$caption_assets_before" | jq '[.assets[] | select(.role == "subtitle" and .kind == "subtitle" and .state == "ready" and .language == "en")] | length > 0')
 broadcast=$(curl -fsS -X POST "$base/api/v1/stashes/$stash_id/broadcasts" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
     -d '{"type":"podcast","name":"Golden Podcast","settings":{"media_kind":"video","captions":"creator_only","caption_languages":"en"}}')
@@ -586,27 +627,31 @@ for _ in $(seq 1 90); do
     [ -n "$caption_job_id" ] && break
     sleep 1
 done
-[ -n "$caption_job_id" ] || { echo 'golden path failed: caption broadcast dispatched no core.acquire_assets job' >&2; exit 1; }
-caption_job=$(curl -fsS "$base/api/v1/jobs/$caption_job_id" -H "Authorization: Bearer $token")
-printf '%s' "$caption_job" | jq -e --arg item_id "$item_id" \
-    '.job.type == "core.acquire_assets" and .job.entity_id == $item_id and .job.payload.roles == ["captions"] and .job.payload.provider_options.include_captions == true and .job.payload.provider_options.include_auto_captions == false and .job.payload.provider_options.caption_languages == "en"' >/dev/null || {
-    echo 'golden path failed: caption acquisition job payload was wrong' >&2
-    printf '%s\n' "$caption_job" >&2
-    exit 1
-}
-echo "golden caption acquisition dispatched: job=$caption_job_id"
-
-caption_state=''
-for _ in $(seq 1 90); do
+if [ -z "$caption_job_id" ]; then
+    [ "$caption_already_ready" = true ] || { echo 'golden path failed: no caption acquisition job and no ready English subtitle' >&2; exit 1; }
+    echo 'golden caption was already acquired with the primary video; no duplicate acquisition job expected'
+else
     caption_job=$(curl -fsS "$base/api/v1/jobs/$caption_job_id" -H "Authorization: Bearer $token")
-    caption_state=$(printf '%s' "$caption_job" | jq -r '.job.state // empty')
-    [ "$caption_state" = ready ] && break
-    [ "$caption_state" = failed ] && { echo "$caption_job" >&2; exit 1; }
-    sleep 2
-done
-[ "$caption_state" = ready ] || { echo "$caption_job" >&2; echo 'golden path failed: caption acquisition job never reached ready' >&2; exit 1; }
-printf '%s' "$caption_job" | jq -e '.job.attempts > 0 and .job.finished_at != null and .job.progress_percent == 100 and .job.progress_label == "Asset acquisition complete"' >/dev/null
-echo "golden caption acquisition completed: job=$caption_job_id"
+    printf '%s' "$caption_job" | jq -e --arg item_id "$item_id" \
+        '.job.type == "core.acquire_assets" and .job.entity_id == $item_id and .job.payload.roles == ["captions"] and .job.payload.provider_options.include_captions == true and .job.payload.provider_options.include_auto_captions == false and .job.payload.provider_options.caption_languages == "en"' >/dev/null || {
+        echo 'golden path failed: caption acquisition job payload was wrong' >&2
+        printf '%s\n' "$caption_job" >&2
+        exit 1
+    }
+    echo "golden caption acquisition dispatched: job=$caption_job_id"
+
+    caption_state=''
+    for _ in $(seq 1 90); do
+        caption_job=$(curl -fsS "$base/api/v1/jobs/$caption_job_id" -H "Authorization: Bearer $token")
+        caption_state=$(printf '%s' "$caption_job" | jq -r '.job.state // empty')
+        [ "$caption_state" = ready ] && break
+        [ "$caption_state" = failed ] && { echo "$caption_job" >&2; exit 1; }
+        sleep 2
+    done
+    [ "$caption_state" = ready ] || { echo "$caption_job" >&2; echo 'golden caption acquisition job never reached ready' >&2; exit 1; }
+    printf '%s' "$caption_job" | jq -e '.job.attempts > 0 and .job.finished_at != null and .job.progress_percent == 100 and .job.progress_label == "Asset acquisition complete"' >/dev/null
+    echo "golden caption acquisition completed: job=$caption_job_id"
+fi
 docker logs "$FIXTURE_CONTAINER" 2>&1 | grep -F '"GET /api/timedtext?v=goldenvid01&lang=en&fmt=vtt HTTP/' >/dev/null || {
     echo 'golden path failed: YouTube timed-text endpoint was not requested' >&2
     docker logs "$FIXTURE_CONTAINER" >&2 || true

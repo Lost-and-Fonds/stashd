@@ -16,6 +16,7 @@ RETRY_VIDEO_ID = "retryfail01"
 ESTIMATE_VIDEO_IDS = {"estimate001", "estimate002"}
 CAPTION = b"WEBVTT\n\n00:00.000 --> 00:01.000\nDeterministic fixture caption\n"
 HELPER_INVOCATIONS = 0
+HELPER_ERROR = ""
 
 
 def media(path=MEDIA_PATH):
@@ -77,7 +78,7 @@ class Handler(BaseHTTPRequestHandler):
                 "contentDetails": {"duration": "PT181S", "definition": "hd"},
             } for video_id in requested if video_id in ESTIMATE_VIDEO_IDS]})
         elif path.path == "/fixture/yt-dlp-count":
-            self.send_json({"count": HELPER_INVOCATIONS})
+            self.send_json({"count": HELPER_INVOCATIONS, "error": HELPER_ERROR})
         elif path.path == "/watch":
             video_id = query.get("v", [VIDEO_ID])[0]
             self.send_html(
@@ -88,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
             )
         elif path.path == f"/videoplayback/{VIDEO_ID}":
             self.send_bytes("video/mp4", media())
-        elif path.path == "/api/timedtext" and query.get("v") == [VIDEO_ID] and query.get("lang") == ["en"] and query.get("fmt") == ["vtt"]:
+        elif path.path == "/api/timedtext" and query.get("lang") == ["en"] and query.get("fmt") == ["vtt"]:
             if not caption_is_healthy():
                 self.send_error(503, "captions are deliberately unavailable")
                 return
@@ -106,10 +107,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self):
-        global HELPER_INVOCATIONS
+        global HELPER_INVOCATIONS, HELPER_ERROR
         if urlparse(self.path).path == "/fixture/yt-dlp-invoked":
             HELPER_INVOCATIONS += 1
             self.send_json({"count": HELPER_INVOCATIONS})
+            return
+
+        if urlparse(self.path).path == "/fixture/yt-dlp-error":
+            HELPER_ERROR = self.rfile.read(int(self.headers.get("Content-Length", "0"))).decode("utf-8", "replace")
+            self.send_json({"error": HELPER_ERROR})
             return
 
         if urlparse(self.path).path.startswith("/youtubei/v1/"):
