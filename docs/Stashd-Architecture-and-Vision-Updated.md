@@ -324,7 +324,7 @@ Integrate with existing tools instead of replacing them.
 -   podcast feeds
 -   Plex/Jellyfin
 
-## v1.0
+## v0.1
 
 -   webhooks
 -   REST API

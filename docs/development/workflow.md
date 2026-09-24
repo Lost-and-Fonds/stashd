@@ -23,3 +23,10 @@ not mix independent feature work with cleanup.
 Provider behavior and protocol fixtures belong to provider packages. Core
 tests should use provider-neutral fixtures and assert generic lifecycle,
 capability, persistence, and security behavior.
+
+## Core releases
+
+Core uses `v0.1.N` tags. The renumbered history ends at `v0.1.64`; the next
+release is `v0.1.65`. Stable tags publish the matching `v0.1.N` GHCR image and
+the `v0.1`, `v0`, and `latest` aliases. Do not use the independent version
+numbers of plugin, plugin-api, or SDK releases for Core.

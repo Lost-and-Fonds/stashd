@@ -3,7 +3,7 @@ name: Docker image
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    tags: ["v0.1.*"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -13,7 +13,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ startsWith(github.ref, 'refs/tags/v') && 'release' || github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ startsWith(github.ref, 'refs/tags/v0.1.') && 'release' || github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -381,7 +381,7 @@ jobs:
           echo "E2E test elapsed: $(( $(date +%s) - start )) seconds" | tee -a "$GITHUB_STEP_SUMMARY"
 
   build:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (startsWith(github.ref, 'refs/tags/v0.1.') && contains(github.ref_name, '-') == false)
     needs: [quality, smoke, e2e, plugin-runtime]
     strategy:
       matrix:
@@ -403,7 +403,7 @@ jobs:
       # Skipped on pull_request: forked PRs don't have package-write access,
       # and this job only validates the build there (push: false below).
       - name: Log in to GHCR
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v0.1.') && contains(github.ref_name, '-') == false
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -422,7 +422,7 @@ jobs:
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern=v{{major}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v0.1.') && !contains(github.ref_name, '-') }}
 
       - name: Start ${{ matrix.architecture }} build timer
         run: echo "PLATFORM_BUILD_START=$(date +%s)" >> "$GITHUB_ENV"
@@ -439,8 +439,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: TARGETARCH=${{ matrix.architecture }}
           provenance: false
-          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          outputs: ${{ startsWith(github.ref, 'refs/tags/v') && 'type=image,name=ghcr.io/lost-and-fonds/stashd,name-canonical=true,push-by-digest=true,push=true' || '' }}
+          push: ${{ startsWith(github.ref, 'refs/tags/v0.1.') && !contains(github.ref_name, '-') }}
+          outputs: ${{ startsWith(github.ref, 'refs/tags/v0.1.') && !contains(github.ref_name, '-') && 'type=image,name=ghcr.io/lost-and-fonds/stashd,name-canonical=true,push-by-digest=true,push=true' || '' }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=prod-${{ matrix.architecture }}
           cache-to: type=gha,mode=max,scope=prod-${{ matrix.architecture }}
@@ -453,20 +453,20 @@ jobs:
           echo "${{ matrix.architecture }} image build elapsed: $(( $(date +%s) - PLATFORM_BUILD_START )) seconds" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Save release digest
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v0.1.') && contains(github.ref_name, '-') == false
         run: |
           mkdir -p digest
           echo "${{ steps.platform-build.outputs.digest }}" > digest/${{ matrix.architecture }}
 
       - name: Upload release digest
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v0.1.') && contains(github.ref_name, '-') == false
         uses: actions/upload-artifact@v6
         with:
           name: digest-${{ matrix.architecture }}
           path: digest/${{ matrix.architecture }}
 
   manifest:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v0.1.') && contains(github.ref_name, '-') == false
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -492,7 +492,7 @@ jobs:
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern=v{{major}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v0.1.') && !contains(github.ref_name, '-') }}
 
       - name: Download release digests
         uses: actions/download-artifact@v7
