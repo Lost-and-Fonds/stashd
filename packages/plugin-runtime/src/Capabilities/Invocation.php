@@ -42,6 +42,7 @@ final class Invocation
      * @param  list<string>  $allowedPrefixes
      * @param  list<CredentialGrant>  $credentials
      * @param  list<HelperGrant>  $helpers
+     * @param  list<string>  $sensitiveValues
      */
     public function __construct(
         private string $packageRoot,
@@ -55,6 +56,7 @@ final class Invocation
         private int $maxRedirects = 3,
         private SandboxPolicy $sandboxPolicy = new SandboxPolicy(),
         private bool $removeStagingRoot = true,
+        private array $sensitiveValues = [],
     ) {
         $this->packageRoot = $this->withinRoot($packageRoot, 'package');
 
@@ -249,13 +251,13 @@ final class Invocation
         // recovery is the stall detector; yt-dlp can legitimately be silent
         // while resolving formats or starting a large transfer.
         $process = (new GenericProcessExecutor())->start(new PendingProcess($command));
-        $result = $process->wait($onOutput === null ? null : static function (OutputChannel $channel, string $buffer) use ($onOutput): void {
+        $result = $process->wait($onOutput === null ? null : function (OutputChannel $channel, string $buffer) use ($onOutput): void {
             if ($buffer !== '') {
-                $onOutput($channel->value, $buffer);
+                $onOutput($channel->value, $this->redact($buffer));
             }
         });
 
-        return new HelperResult($result->exitCode, $result->output, $result->errorOutput);
+        return new HelperResult($result->exitCode, $this->redact($result->output), $this->redact($result->errorOutput));
     }
 
     public function log(string $message): void
@@ -317,7 +319,24 @@ final class Invocation
             $value = str_replace($credential->secret, '[REDACTED]', $value);
         }
 
+        foreach ($this->sensitiveValues as $secret) {
+            if ($secret !== '') {
+                $value = str_replace($secret, '[REDACTED]', $value);
+
+                foreach (preg_split('/\R/', $secret) ?: [] as $line) {
+                    if ($line !== '') {
+                        $value = str_replace($line, '[REDACTED]', $value);
+                    }
+                }
+            }
+        }
+
         return $value;
+    }
+
+    public function redactSensitive(string $value): string
+    {
+        return $this->redact($value);
     }
 
     /**

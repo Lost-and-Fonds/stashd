@@ -151,7 +151,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         $kind = $request->downloadPolicy === DownloadPolicy::AudioOnly ? 'audio' : 'video';
 
         try {
-            $result = $this->invoke('input.acquire', ['item' => $item, 'media_kind' => $kind, 'options' => $this->wireOptions($request->providerOptions)], 'acquire', $request->tempDirectory, $this->definition->helper, $onProgress);
+            $result = $this->invoke('input.acquire', ['item' => $item, 'media_kind' => $kind, 'options' => $this->wireOptions($request->providerOptions), 'credentials' => $this->wireCredentials()], 'acquire', $request->tempDirectory, $this->definition->helper, $onProgress);
         } catch (PluginInvocationFailure $failure) {
             throw DownloadException::withCode('plugin_' . $failure->errorCode, $failure->getMessage(), $failure, $failure->retryable);
         }
@@ -174,7 +174,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     public function acquireAssets(array $item, string $staging, string $mediaKind, array $options = [], ?array $requestedRoles = null): AssetAcquisitionResult
     {
         try {
-            $params = ['item' => $item, 'media_kind' => $mediaKind, 'options' => $this->wireOptions($options)];
+            $params = ['item' => $item, 'media_kind' => $mediaKind, 'options' => $this->wireOptions($options), 'credentials' => $this->wireCredentials()];
 
             if ($requestedRoles !== null) {
                 $params['requested_roles'] = $requestedRoles;
@@ -315,7 +315,8 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
             $helperGrant = new \Stashd\PluginRuntime\Capabilities\HelperGrant($helper->name, substr($executable, strlen($root) + 1), $helper->network);
         }
 
-        $invocation = new Invocation($package, $stage, array_values(array_unique($prefixes)), $credentials, helpers: $helperGrant === null ? [] : [$helperGrant], transport: new PluginBroadcastHttpTransport(getenv('STASHD_PLUGIN_HTTP_FIXTURE_DIR') ?: null));
+        $sensitiveValues = array_values(array_filter(array_map(static fn(mixed $credential): mixed => is_array($credential) ? ($credential['value'] ?? null) : null, is_array($params['credentials'] ?? null) ? $params['credentials'] : []), static fn(mixed $value): bool => is_string($value) && $value !== ''));
+        $invocation = new Invocation($package, $stage, array_values(array_unique($prefixes)), $credentials, helpers: $helperGrant === null ? [] : [$helperGrant], transport: new PluginBroadcastHttpTransport(getenv('STASHD_PLUGIN_HTTP_FIXTURE_DIR') ?: null), sensitiveValues: $sensitiveValues);
         $process = $this->runner->start($this->definition->id, $stage);
 
         try {
@@ -344,6 +345,8 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
             }
 
             return $result;
+        } catch (PluginInvocationFailure $failure) {
+            throw new PluginInvocationFailure($failure->errorCode, $invocation->redactSensitive($failure->getMessage()), $failure->retryable);
         } finally {
             $process->close();
             $invocation->close();
@@ -489,6 +492,14 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
     private function wireOptions(array $options): array
     {
         return array_map(static fn($key, $value): array => ['key' => $key, 'value' => is_bool($value) ? ['tag' => 'boolean', 'value' => $value] : ['tag' => 'text', 'value' => (string) $value]], array_keys($options), array_values($options));
+    }
+
+    /** @return list<array{key: string, value: string}> */
+    private function wireCredentials(): array
+    {
+        $credentials = $this->definition->rawCredentials($this->secrets);
+
+        return array_map(static fn(string $key, string $value): array => ['key' => $key, 'value' => $value], array_keys($credentials), array_values($credentials));
     }
     /** @param array<string, bool|int|string> $source
      * @return list<array{key: string, value: array{tag: string, value: bool|int|string}}>

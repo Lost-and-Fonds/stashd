@@ -16,6 +16,8 @@ final readonly class PluginCredentialDefinition
         public SecretType $secretType = SecretType::Generic,
         public bool $required = false,
         public ?string $description = null,
+        public string $inputType = 'password',
+        public bool $rawAccess = false,
     ) {}
 
     /** @return array<string, bool|string|null> */
@@ -26,6 +28,7 @@ final readonly class PluginCredentialDefinition
             'label' => $this->label,
             'description' => $this->description,
             'required' => $this->required,
+            'input_type' => $this->inputType,
             'configured' => $configured,
         ];
     }

@@ -215,6 +215,12 @@ Fields:
 - `secret_key` — host secret-store key;
 - `secret_type` — `api_key`, `oauth_token`, `password`, or `generic`;
 - `required` — whether configuration is required for normal use.
+- `input_type` — generic settings control: `password` (default) or `file` for
+  uploading a UTF-8 text file whose contents are stored as the secret;
+- `raw_access` — when `true`, the decrypted value is sent to the plugin only
+  for acquisition. Use this only when the provider helper must construct a
+  local credential file or argument. The value must not be logged or persisted
+  by the plugin.
 
 A credential being optional does not mean every operation works without it. An
 Input can, for example, use public feeds for `refresh` and require an API key

@@ -19,6 +19,17 @@ beforeEach(function (): void {
             'description' => 'Improves complete channel discovery.',
             'secret_key' => 'youtube_data_api_key',
             'secret_type' => 'api_key',
+        ], [
+            'key' => 'youtube-cookies',
+            'label' => 'YouTube cookies.txt',
+            'secret_key' => 'youtube_cookies_txt',
+            'input_type' => 'file',
+            'raw_access' => true,
+        ], [
+            'key' => 'youtube-po-token',
+            'label' => 'YouTube PO token',
+            'secret_key' => 'youtube_po_token',
+            'raw_access' => true,
         ]],
         'http_grants' => [[
             'allowed_prefixes' => ['https://www.googleapis.com/youtube/v3/'],
@@ -42,6 +53,21 @@ test('declared credentials expose safe configured state', function (): void {
                 'label' => 'YouTube Data API key',
                 'description' => 'Improves complete channel discovery.',
                 'required' => false,
+                'input_type' => 'password',
+                'configured' => false,
+            ], [
+                'key' => 'youtube-cookies',
+                'label' => 'YouTube cookies.txt',
+                'description' => null,
+                'required' => false,
+                'input_type' => 'file',
+                'configured' => false,
+            ], [
+                'key' => 'youtube-po-token',
+                'label' => 'YouTube PO token',
+                'description' => null,
+                'required' => false,
+                'input_type' => 'password',
                 'configured' => false,
             ]],
         ]],
@@ -72,6 +98,35 @@ test('a declared credential is replaced through encrypted secret storage without
 
     $definition = $this->container->get(ExternalInputPluginRegistry::class)->definition('youtube');
     expect($definition?->httpGrants($this->container->get(SecretsService::class), 'complete')[0]->credential?->value)->toBe($value);
+});
+
+test('plugin-declared raw credentials are encrypted and granted only when requested', function (): void {
+    $definition = PluginInputDefinition::from([
+        'kind' => 'input',
+        'id' => 'youtube',
+        'name' => 'YouTube',
+        'credentials' => [
+            ['key' => 'youtube-cookies', 'label' => 'YouTube cookies.txt', 'secret_key' => 'youtube_cookies_txt', 'input_type' => 'file', 'raw_access' => true],
+            ['key' => 'youtube-po-token', 'label' => 'YouTube PO token', 'secret_key' => 'youtube_po_token', 'raw_access' => true],
+            ['key' => 'youtube-data-api', 'label' => 'API key', 'secret_key' => 'youtube_data_api_key'],
+        ],
+    ], __DIR__) ?? throw new RuntimeException('Failed to create plugin definition.');
+    $cookieJar = "# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t0\tSID\tfixture-session\n";
+    $this->http->put('/api/v1/plugin-credentials/youtube/youtube-cookies', ['value' => $cookieJar], headers: $this->authHeaders())->assertOk();
+    $this->http->put('/api/v1/plugin-credentials/youtube/youtube-po-token', ['value' => 'fixture-po-token'], headers: $this->authHeaders())->assertOk();
+
+    expect($definition->rawCredentials($this->container->get(SecretsService::class)))->toBe([
+        'youtube-cookies' => $cookieJar,
+        'youtube-po-token' => 'fixture-po-token',
+    ])->and($definition->credential('youtube-cookies')?->toArray(true))->toMatchArray([
+        'input_type' => 'file',
+        'configured' => true,
+    ]);
+});
+
+test('plugin credentials are limited to 256 KiB', function (): void {
+    $this->http->put('/api/v1/plugin-credentials/youtube/youtube-data-api', ['value' => str_repeat('x', 262145)], headers: $this->authHeaders())
+        ->assertStatus(Status::BAD_REQUEST);
 });
 
 test('undeclared credentials cannot be written', function (): void {

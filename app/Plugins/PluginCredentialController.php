@@ -34,6 +34,10 @@ final readonly class PluginCredentialController
             return $this->validationError('value is required.');
         }
 
+        if (strlen($value) > 262144) {
+            return $this->validationError('credential value exceeds the 256 KiB limit.');
+        }
+
         $credential = $this->credentials->replace($pluginKey, $credentialKey, $value);
 
         if ($credential === null) {

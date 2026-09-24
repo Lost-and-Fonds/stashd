@@ -6,6 +6,7 @@ export interface PluginCredentialResource {
   description?: string | null
   required: boolean
   configured: boolean
+  input_type: 'password' | 'file'
 }
 
 export interface PluginCredentialPluginResource {

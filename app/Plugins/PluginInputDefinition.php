@@ -100,7 +100,8 @@ final readonly class PluginInputDefinition
                 continue;
             }
 
-            $credentials[] = new PluginCredentialDefinition(trim($key), trim($label), trim($secretKey), $secretType, ($raw['required'] ?? false) === true, $description);
+            $inputType = is_string($raw['input_type'] ?? null) && in_array($raw['input_type'], ['password', 'file'], true) ? $raw['input_type'] : 'password';
+            $credentials[] = new PluginCredentialDefinition(trim($key), trim($label), trim($secretKey), $secretType, ($raw['required'] ?? false) === true, $description, $inputType, ($raw['raw_access'] ?? false) === true);
         }
         $helper = null;
         $declared = is_array($manifest['helpers'] ?? null) ? $manifest['helpers'] : [];
@@ -244,6 +245,25 @@ final readonly class PluginInputDefinition
         }
 
         return null;
+    }
+
+    /** @return array<string, string> */
+    public function rawCredentials(SecretsService $secrets): array
+    {
+        $values = [];
+
+        foreach ($this->credentials as $credential) {
+            if (! $credential->rawAccess) {
+                continue;
+            }
+            $value = $secrets->get($credential->secretKey);
+
+            if ($value !== null && $value !== '') {
+                $values[$credential->key] = $value;
+            }
+        }
+
+        return $values;
     }
 
     private static function scalarString(mixed $value, string $default): string

@@ -63,6 +63,27 @@ async function savePluginCredential(pluginKey: string, credentialKey: string) {
   }
 }
 
+async function loadPluginCredentialFile(event: Event, pluginKey: string, credentialKey: string) {
+  if (!(event.target instanceof HTMLInputElement)) return
+  const input = event.target
+  const file = input.files?.[0]
+  if (!file) return
+  if (file.size > 262144) {
+    error.value = 'Credential file must be 256 KiB or smaller.'
+    input.value = ''
+    return
+  }
+
+  error.value = undefined
+
+  try {
+    credentialValues.value = { ...credentialValues.value, [credentialFormKey(pluginKey, credentialKey)]: await file.text() }
+  } catch {
+    error.value = 'Could not read credential file.'
+    input.value = ''
+  }
+}
+
 async function createToken() {
   const name = tokenName.value.trim()
   if (!name) return
@@ -152,7 +173,14 @@ onMounted(load)
               </div>
             </div>
             <div class="mt-3 flex flex-col gap-2 sm:flex-row">
-              <UInput v-model="credentialValues[credentialFormKey(plugin.key, credential.key)]" type="password" autocomplete="new-password" :placeholder="credential.configured ? 'Enter a replacement value' : 'Enter a value'" class="flex-1" />
+              <input
+                v-if="credential.input_type === 'file'"
+                type="file"
+                accept=".txt,text/plain"
+                class="block min-w-0 flex-1 rounded-md border border-default bg-default px-3 py-2 text-sm text-highlighted file:mr-3 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1"
+                @change="loadPluginCredentialFile($event, plugin.key, credential.key)"
+              />
+              <UInput v-else v-model="credentialValues[credentialFormKey(plugin.key, credential.key)]" type="password" autocomplete="new-password" :placeholder="credential.configured ? 'Enter a replacement value' : 'Enter a value'" class="flex-1" />
               <UButton type="submit" :label="credential.configured ? 'Replace' : 'Save'" :loading="savingCredential === credentialFormKey(plugin.key, credential.key)" :disabled="!credentialValues[credentialFormKey(plugin.key, credential.key)]?.trim()" />
             </div>
           </form>
