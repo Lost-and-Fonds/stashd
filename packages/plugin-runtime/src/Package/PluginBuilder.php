@@ -140,13 +140,22 @@ final class PluginBuilder
             if (is_string($artifact['archive_binary'] ?? null)) {
                 $extract = $root . '/.helper-extract-' . bin2hex(random_bytes(4));
                 Filesystem\create_directory($extract, 0700);
-                $command = ['tar', '-xJf', $download, '-C', $extract, $artifact['archive_binary']];
+                $archiveBinary = $artifact['archive_binary'];
+                $archiveFormat = $artifact['archive_format'] ?? 'tar.xz';
+                $command = match ($archiveFormat) {
+                    'tar.xz' => ['tar', '-xJf', $download, '-C', $extract, $archiveBinary],
+                    'zip' => preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $archiveBinary) === 1
+                        ? ['unzip', '-q', $download, $archiveBinary, '-d', $extract]
+                        : throw new PackageValidationError('zip helper member must be a safe filename'),
+                    default => throw new PackageValidationError('helper archive format is unsupported'),
+                };
                 $result = (new GenericProcessExecutor())->run(new PendingProcess($command, Duration::seconds(60)));
                 $error = $result->errorOutput;
                 $exit = $result->exitCode;
-                $extracted = $extract . '/' . $artifact['archive_binary'];
+                $extracted = realpath($extract . '/' . $archiveBinary);
+                $extractRoot = realpath($extract);
 
-                if ($exit !== 0 || ! Filesystem\is_file($extracted)) {
+                if ($exit !== 0 || $extracted === false || $extractRoot === false || is_link($extract . '/' . $archiveBinary) || ! str_starts_with($extracted, $extractRoot . DIRECTORY_SEPARATOR) || ! Filesystem\is_file($extracted)) {
                     throw new PackageValidationError('helper archive extraction failed: ' . trim((string) $error));
                 }
                 Filesystem\copy($extracted, $destination, overwrite: true);

@@ -59,7 +59,7 @@ ARG PGID=1000
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        gosu supervisor curl bubblewrap \
+        gosu supervisor curl bubblewrap unzip \
     && rm -rf /var/lib/apt/lists/*
 
 RUN install-php-extensions pdo_pgsql pdo_sqlite intl pcntl

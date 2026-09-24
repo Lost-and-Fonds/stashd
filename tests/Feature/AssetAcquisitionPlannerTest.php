@@ -22,7 +22,10 @@ use App\Vault\ItemState;
 use App\Vault\UpstreamState;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
+use App\Jobs\JobState;
 use App\Config\StashdConfig;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 test('caption broadcast dispatches supplementary acquisition for an enabled input capability', function (): void {
     $inputDefinition = PluginInputDefinition::from([
@@ -124,4 +127,14 @@ test('caption broadcast dispatches supplementary acquisition for an enabled inpu
         ->and($job)->not->toBeNull()
         ->and($job->payload['roles'] ?? null)->toBe(['captions'])
         ->and($job->payload['provider_options'] ?? null)->toBe($input->options->provider);
+
+    $job->state = JobState::Failed;
+    $this->container->get(JobRepository::class)->save($job);
+
+    expect($this->container->get(AssetAcquisitionPlanner::class)->dispatchMissingForBroadcast($broadcast))->toBe(0);
+
+    $job->updatedAt = DateTime::now(Timezone::UTC)->minusSeconds(86401);
+    $job->save();
+
+    expect($this->container->get(AssetAcquisitionPlanner::class)->dispatchMissingForBroadcast($broadcast))->toBe(1);
 });

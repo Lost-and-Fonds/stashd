@@ -18,9 +18,13 @@ use App\Vault\AssetRepository;
 use App\Vault\AssetRecord;
 use App\Vault\AssetState;
 use App\Vault\ItemState;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final readonly class AssetAcquisitionPlanner
 {
+    private const int FAILED_ACQUISITION_COOLDOWN_SECONDS = 86400;
+
     public function __construct(
         private StashItemRepository $stashItems,
         private AssetRepository $assets,
@@ -48,6 +52,10 @@ final readonly class AssetAcquisitionPlanner
 
         $activeAcquisitions = $this->jobs->pendingOrProcessingEntityIds(JobType::core('core.acquire_assets'), 'item');
         $activeDownloads = $this->jobs->pendingOrProcessingEntityIds(JobType::core('core.download'), 'item');
+        $recentlyFailedAcquisitions = $this->jobs->recentlyFailedAssetAcquisitionItemIds(
+            $stashId->toString(),
+            DateTime::now(Timezone::UTC)->minusSeconds(self::FAILED_ACQUISITION_COOLDOWN_SECONDS),
+        );
         $dispatched = 0;
 
         foreach ($this->stashItems->listForStash($stashId, includeIgnored: false, stashInputId: StashInputId::fromPrimaryKey($input->id)) as $stashItem) {
@@ -65,6 +73,7 @@ final readonly class AssetAcquisitionPlanner
             $itemId = (string) $item->id;
 
             if (isset($activeAcquisitions[$itemId])
+                || isset($recentlyFailedAcquisitions[$itemId])
                 || (isset($activeDownloads[$itemId]) && $item->state !== ItemState::Ready)) {
                 continue;
             }

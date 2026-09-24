@@ -358,6 +358,8 @@ try {
     mkdir($source . '/stashd-plugin', 0700, true);
     copy(__DIR__ . '/fixtures/fixture-plugin.php', $source . '/plugin.php');
     copy(__DIR__ . '/fixtures/fixture-helper.php', $source . '/helpers/fixture-helper.php');
+    $zipHelper = __DIR__ . '/fixtures/helper.zip';
+    $zipHelperHash = hash_file('sha256', $zipHelper) ?: throw new RuntimeException('zip helper fixture could not be hashed');
 
     foreach (glob($sdkRoot . '/src/*.php') ?: [] as $sdkFile) {
         copy($sdkFile, $source . '/sdk/' . basename($sdkFile));
@@ -367,8 +369,14 @@ try {
         'id' => 'm7-example', 'name' => 'M7 Example', 'version' => '1.0.0', 'runtime' => 'php',
         'api_version' => '0.1', 'entrypoint' => 'plugin.php',
         'requires' => ['php' => '>=8.5', 'extensions' => []], 'architectures' => ['amd64', 'arm64'],
+        'helpers' => ['zip-fixture' => ['executable' => 'helpers/deno', 'network' => false]],
     ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
-    file_put_contents($source . '/stashd-plugin/helpers.lock.json', '{"helpers":[]}');
+    file_put_contents($source . '/stashd-plugin/helpers.lock.json', json_encode([
+        'helpers' => ['zip-fixture' => ['platforms' => [
+            'linux-amd64' => ['url' => $zipHelper, 'sha256' => $zipHelperHash, 'archive_binary' => 'deno', 'archive_format' => 'zip'],
+            'linux-arm64' => ['url' => $zipHelper, 'sha256' => $zipHelperHash, 'archive_binary' => 'deno', 'archive_format' => 'zip'],
+        ]]],
+    ], JSON_THROW_ON_ERROR));
     file_put_contents($source . '/composer.json', '{"name":"stashd/m7-example","require":{"php":">=8.5"}}');
     $composer = proc_open(['composer', 'update', '--working-dir=' . $source, '--no-install', '--no-interaction'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
 
@@ -403,6 +411,8 @@ try {
     $package = $manager->activePath('m7-example');
     m7Assert($package !== null, 'active package path is missing');
     $packagePluginHash = hash_file('sha256', $package . '/plugin.php');
+    m7Assert(file_get_contents($package . '/helpers/deno') === "#!/bin/sh\nexit 0\n", 'zip helper archive was not extracted into the package');
+    m7Assert((fileperms($package . '/helpers/deno') & 0111) !== 0, 'zip helper was not materialized as executable');
     $pluginData = $manager->pluginDataPath('m7-example');
     m7Assert(is_link($package . '/plugin-link.php'), 'package symlink was not preserved');
     m7Assert((fileperms($package . '/plugin.php') & 0111) !== 0, 'plugin executable mode was not preserved');

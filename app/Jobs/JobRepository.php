@@ -160,6 +160,26 @@ final class JobRepository
         return $ids;
     }
 
+    /** @return array<string, true> */
+    public function recentlyFailedAssetAcquisitionItemIds(string $stashId, DateTime $after): array
+    {
+        $ids = [];
+
+        foreach (JobRecord::select()
+            ->where('intent', 'core.acquire_assets')
+            ->where('entityType', 'item')
+            ->where('stashId', $stashId)
+            ->where('state', JobState::Failed)
+            ->where('updatedAt', $after, '>')
+            ->all() as $job) {
+            if ($job instanceof JobRecord && is_string($job->entityId)) {
+                $ids[$job->entityId] = true;
+            }
+        }
+
+        return $ids;
+    }
+
     public function latestForEntity(JobType $intent, string $entityType, string $entityId): ?JobRecord
     {
         $job = JobRecord::select()
