@@ -59,12 +59,6 @@ def versioned_tags():
     return mapping
 
 
-def retag_git(mapping):
-    targets = [new for new, _ in mapping.values()]
-    if targets:
-        run('git', 'push', 'origin', *[f'refs/tags/{tag}' for tag in targets])
-
-
 def update_releases(mapping):
     releases = request('GET', f'{API}/releases?per_page=100')
     for release in releases:
@@ -142,22 +136,7 @@ def retag_images():
     print(f'Verified {len(images)} version tags and new aliases; removed old aliases and version tags')
 
 
-def delete_old_git_tags(mapping):
-    old = list(mapping)
-    if old:
-        run('git', 'push', 'origin', *[f':refs/tags/{tag}' for tag in old])
-
-    remaining = subprocess.check_output(['git', 'ls-remote', '--tags', 'origin'], text=True)
-    remote = {line.split('refs/tags/', 1)[1] for line in remaining.splitlines() if 'refs/tags/' in line and not line.endswith('^{}')}
-    stale = sorted(tag for tag in old if tag in remote)
-    if stale:
-        raise RuntimeError(f'Old Git tags remain on origin: {stale}')
-    print(f'Removed {len(old)} old Git tags from origin')
-
-
 if __name__ == '__main__':
     mapping = versioned_tags()
-    retag_git(mapping)
     update_releases(mapping)
     retag_images()
-    delete_old_git_tags(mapping)
