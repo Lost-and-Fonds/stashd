@@ -170,10 +170,10 @@ They are not direct handles to host services.
 Use them rather than Guzzle/cURL/process/filesystem work that attempts to bypass
 the plugin boundary.
 
-The defaults are useful in focused tests, but production capability availability
+The defaults are useful when a capability is not available in an invocation, while production capability availability
 is still determined by Core and the invocation/manifest grants.
 
-## Repository skeleton
+## Repository layout
 
 For a new PHP plugin, begin with:
 
@@ -190,10 +190,7 @@ example/
 │   ├── helpers.lock.json
 │   ├── plugin.json
 │   └── plugin.php
-└── tests/
-    ├── Pest.php
-    └── Feature/
-        └── ContractTest.php
+
 ```
 
 For a Broadcast substitute an appropriate implementation class.
@@ -324,7 +321,7 @@ Core still accepts legacy flat error objects for migration compatibility with
 
 The SDK wraps WIT option-value variants in PHP types. Prefer SDK conversion
 helpers/value objects rather than passing loose arrays inside plugin business
-logic. Loose arrays belong at the wire/fixture boundary.
+logic. Loose arrays belong at the wire boundary.
 
 PHP SDK 0.3 decodes contract values strictly. It rejects malformed required
 fields, lists, option variants, nullable fields with the wrong type, and invalid
@@ -335,7 +332,7 @@ turn the string `"7"` into `7` for you.
 
 The same rule applies to `DiscoveredItem`, `ResolvedInput`, `PublishRequest`,
 `Publication`, `StagedArtifact`, and the other DTOs: construct contract values
-explicitly so tests catch drift.
+explicitly to reject drift.
 
 ## Capabilities in PHP
 
@@ -417,40 +414,6 @@ capability payloads. Chunks returned by `resource.read` use base64.
 Do not make RPC v1 the semantic authority. If transport and WIT disagree, fix
 the transport/mapper or deliberately version/reconcile the contract.
 
-## Conformance fixtures
-
-`plugin-api/tests/contract/fixtures/` contains language-neutral JSON fixtures for
-representative Input/Broadcast lifecycle messages, capability traffic, and typed
-retryable failures.
-
-Use these when changing SDK mapping. A future SDK should be able to replay the
-same fixtures without depending on PHP classes.
-
-## Tests and verification
-
-Run the PHP SDK's own checks with:
-
-```bash
-composer test
-```
-
-A plugin repository should normally expose its own:
-
-```bash
-composer test
-composer test:static
-composer lint
-```
-
-(or whatever scripts that repository actually defines).
-
-Contract-focused tests should construct DTOs/capability fakes and exercise the
-provider behaviour directly. Keep the majority of plugin tests independent of
-a running Stashd Core; add packaged/integration smoke tests for the boundary,
-not for every provider branch.
-
-When the PHP SDK changes contract mapping, verify it against `plugin-api` and
-the shared conformance fixtures, not just against first-party plugins.
 
 ## Current implementation facts to remember
 

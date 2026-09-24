@@ -12,16 +12,12 @@
 /media/
 /rr
 /.idea/
-.phpunit.result.cache
 composer.phar
-/test-results/
 /target/
 __pycache__/
-/playwright-report/
 /.env.lerd_override
 /.pi-lens/
 /.stashd/
 
 # Alchemy
-.alchemy
 .env.lerd_override

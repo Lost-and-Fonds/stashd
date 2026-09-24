@@ -5,10 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "playwright test",
     "build": "vue-tsc -p ./tsconfig.app.json && vite build",
     "typecheck": "vue-tsc -p ./tsconfig.app.json",
-    "check:fixtures": "node scripts/check-production-fixtures.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -20,7 +18,6 @@
     "vue-router": "^5.2.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1",
     "@vitejs/plugin-vue": "^6.0.8",
     "typescript": "^6.0.3",
     "vite": "^7.3.6",

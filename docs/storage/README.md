@@ -2,12 +2,11 @@
 
 Stashd separates **canonical Vault archives** from **Broadcast presentation assets**.
 
-The download → temp → Vault pipeline is provider-neutral. **Fake downloader** is used for tests, dev, and Docker smoke. Bundled external plugins may use helper software such as `yt-dlp`; core only validates and preserves their staged artifacts.
+The download → temp → Vault pipeline is provider-neutral. External plugins may use declared helper software such as `yt-dlp`; Core validates and preserves their staged artifacts.
 
 ## Layout
 
 ```text
-/media/vault/{providerKey}/items/{providerItemId}/original.fake   # fake provider
 /media/vault/{providerKey}/items/{providerItemId}/metadata.json
 /media/vault/{providerKey}/items/{providerItemId}/source.json
 /media/vault/{providerKey}/items/{providerItemId}/source-thumbnail.jpg  # when available
@@ -27,7 +26,7 @@ POST item.download (async command)
        2. Storage root checks (vault + temp writable — DB state and filesystem)
        3. Idempotency: skip when ready Vault original exists on disk (force=false)
        4. TempStagingService creates /media/temp/downloads/{jobId} (cleans stale dirs)
-       5. Downloader/plugin writes to temp only (`FakeDownloader` or an external plugin adapter)
+       5. Downloader/plugin writes to temp only (an external plugin adapter)
        6. Verify all temp outputs exist before any Vault write
        7. SHA-256 checksum (`sha256:{hex}`) + AtomicFileMover into Vault (no overwrite)
        8. Mark all assets ready only after full batch ingest; rollback partial Vault files on failure
@@ -40,9 +39,8 @@ POST item.download (async command)
 | Type | Role |
 |---|---|
 | `DownloaderInterface` | Service boundary for all downloads |
-| `FakeDownloader` | Phase 4A implementation (tests/dev/CI/smoke) |
 | External plugin adapter | Provider-specific acquisition and staged artifacts |
-| `DelegatingDownloader` | Routes fake provider → fake; other logical providers → registered plugin |
+| `DelegatingDownloader` | Routes each logical provider to its registered plugin |
 
 Core must not call provider helpers directly. A plugin may receive a generic helper grant and is responsible for its own helper invocation and interpretation. The core process only validates staged output before Vault ingest.
 
@@ -51,7 +49,7 @@ Core must not call provider helpers directly. A plugin may receive a generic hel
 | File | Contents |
 |---|---|
 | `metadata.json` | Normalized Stashd metadata (`schema_version`, provider identity, title, timestamps as RFC3339 `Z`) |
-| `source.json` | Provenance + downloader implementation/version + fake/raw result summary |
+| `source.json` | Provenance and acquisition implementation/version summary |
 
 Secrets are redacted in sidecar JSON (same rules as `SecretsService`).
 
@@ -93,8 +91,8 @@ Stash `downloadPolicy` is enforced at download time:
 
 | Policy | Phase 4A behavior |
 |---|---|
-| `video` | Fake original media downloaded |
-| `audio_only` | Fake audio original (`.fake-audio`) |
+| `video` | Primary video asset acquired |
+| `audio_only` | Audio asset acquired |
 | `metadata_only` | Rejects `item.download` with stable error |
 | `manual_download` | No automatic scheduling; explicit download allowed with warning |
 
@@ -118,7 +116,7 @@ Broadcast presentation files live under `/media/broadcasts/` and are **regenerat
 | Rule | Behavior |
 |---|---|
 | Default publish | Hardlink from Vault original → broadcast path |
-| Hardlink probe | Cross-root vault→broadcasts tested at storage check / health |
+| Hardlink probe | Cross-root Vault-to-Broadcast capability reported by storage health |
 | Hardlink failure | Stable `broadcast_hardlink_unavailable` — **no silent copy** |
 | Symlink/copy | Not implemented in Phase 5A; require explicit future policy |
 | Prune | Removes stale generated broadcast files only; never Vault files |

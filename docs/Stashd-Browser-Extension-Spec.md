@@ -118,7 +118,7 @@ The extension only validates its configured URL and current-page URL. Once it op
 
 Teach the `/stashes/new` UI to consume the `#stashd-source=` fragment as described above. Reuse the existing URL validation and create-stash preflight path; do not add a new API endpoint or an extension-specific server session.
 
-Minimum coverage:
+Minimum behavior:
 
 - a valid fragment pre-fills the New Stash link;
 - the fragment is removed after it is consumed;
@@ -127,7 +127,7 @@ Minimum coverage:
 
 ## Delivery order
 
-1. Add and test the Stashd fragment handoff.
+1. Add the Stashd fragment handoff.
 2. Build the minimal Chromium popup and options page.
 3. Manually verify a channel, playlist, video, unsupported page, logged-out handoff, and local HTTP warning.
 4. Package Firefox only if the Chromium extension proves useful.

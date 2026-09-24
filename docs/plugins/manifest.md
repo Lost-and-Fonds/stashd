@@ -332,7 +332,7 @@ PHP SDK 0.3 now decodes contract DTOs strictly: malformed option variants and
 wrong scalar types are rejected instead of coerced.
 
 When introducing a new option shape/default, cover both the host integration and
-plugin DTO path in tests.
+plugin DTO path.
 
 ### `asset_capabilities`
 
@@ -510,7 +510,7 @@ When adding or changing manifest surface:
 2. keep provider-specific behaviour in the plugin;
 3. update the schema when a generic field is meant to become supported public
    surface;
-4. update this reference and host tests at the same time.
+4. update this reference and the host integration at the same time.
 
 ## Worked Input manifest
 

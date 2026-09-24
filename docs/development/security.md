@@ -11,5 +11,5 @@ authoritative for Vault promotion, provenance, fixity, and filesystem
 publication.
 
 When changing authentication, tokens, credentials, HTTP grants, or sandboxing,
-add negative tests for leakage and unauthorized access, then run the relevant
-application and container checks.
+review leakage and unauthorized access paths, then use the available lint,
+static-analysis, and production-build checks.

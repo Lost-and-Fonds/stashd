@@ -7,9 +7,8 @@ Stashd follows applicable [PHP-FIG](https://www.php-fig.org/psr/) standards. Enf
 | PSR | Scope | How we comply |
 |-----|--------|----------------|
 | **PSR-1** | Basic coding | `declare(strict_types=1);`, namespaces, **one class/enum/interface/trait per file** |
-| **PSR-4** | Autoloading | `App\` → `app/`, `Tests\` → `tests/` (`composer.json`) |
+| **PSR-4** | Autoloading | `App\` → `app/` (`composer.json`) |
 | **PER Coding Style 3.0** | Code style | PHP CS Fixer `@PER-CS3x0` ruleset (`.php-cs-fixer.dist.php`) |
-| **PSR-1 / PSR-4** | File structure | PHPCS structural rules (`phpcs.xml.dist`) |
 | **PSR-3** | Logging | Via Tempest log package when used (not custom loggers in domain) |
 | **PSR-7 / 17** | HTTP messages | Tempest handles request/response internally (classic-mode SAPI; no PSR-7 bridge) |
 | **PSR-11** | Container | Tempest `Container` / DI; prefer constructor injection |
@@ -21,14 +20,12 @@ PSRs we do **not** implement directly today: PSR-6/16 (cache), PSR-18 (HTTP clie
 
 ```bash
 composer lint        # strict PSR-4, PHP CS Fixer/PER-CS 3.0, PHPCS
-composer test:static # PHPStan
+composer analyse     # PHPStan
 composer format      # auto-fix style
 ```
 
-`composer lint` runs Composer's strict PSR-4 check, PHP CS Fixer with PER
-Coding Style 3.0, and PHPCS structural checks. `composer test:static` runs
-PHPStan. PHPCS covers the PSR-1 structural rules, including one named type per
-file; Composer checks the actual PSR-4 namespace-to-path mappings.
+`composer lint` runs Composer's strict PSR-4 check and PHP CS Fixer with PER
+Coding Style 3.0. `composer analyse` runs PHPStan.
 
 ## Non-negotiables
 

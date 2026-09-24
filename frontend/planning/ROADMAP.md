@@ -46,7 +46,7 @@ Finalize:
 
 ## Phase 4 — Pages, one slice at a time
 
-Build each page iteratively with fixtures/local state.
+Build each page iteratively with API-backed state where available.
 
 Typical order inside a page:
 
@@ -74,7 +74,7 @@ Do not redesign approved pages wholesale.
 
 ## Phase 6 — Integration inventory
 
-For every fixture/local action:
+For every action without backend support:
 
 - map it to an existing backend capability;
 - identify missing fields/endpoints/actions;
@@ -85,7 +85,7 @@ This is where `planning/INTEGRATION-GAPS.md` becomes actionable.
 
 ## Phase 7 — Backend integration
 
-Replace fixtures with real data, page-by-page.
+Integrate backend support page-by-page.
 
 Keep already-approved visual behavior stable unless real constraints force a change.
 

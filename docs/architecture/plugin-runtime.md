@@ -9,7 +9,6 @@ plugin boundary after the M8/M9 provider ports.
 ```text
 stashd/plugin-sdk/             Composer-installed authoring SDK
   src/                        handwritten PHP authoring API and mapping
-  tests/                      SDK/conformance checks
 
 stashd/plugin-api/             canonical language-neutral contract and schema
 
@@ -19,7 +18,6 @@ packages/plugin-runtime/
   src/Sandbox/                one authoritative bubblewrap policy
   src/Capabilities/           invocation-scoped host capability broker
   src/Package/                 validation, activation, rollback, linking
-  tests/                      provider-neutral assembled conformance smoke
 ```
 
 The SDK is the only package a PHP plugin author should need. It hides framing,
@@ -106,7 +104,7 @@ the spike code.
 ## Spike disposition
 
 The executable M4–M7 PHP/runtime copies were removed after the equivalent
-production-package conformance test passed. Their README files remain under
+production package is available. Their README files remain under
 `reference/wasmtime/` as historical milestone evidence. Production behavior
 does not load that directory.
 

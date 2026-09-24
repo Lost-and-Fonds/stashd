@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Plugins\ExternalInputPluginRegistry;
-use App\Providers\Fake\FakeProvider;
 use InvalidArgumentException;
 use Tempest\Container\Singleton;
 
@@ -16,12 +15,9 @@ final class ProviderRegistry
     private array $providers = [];
     private ExternalInputPluginRegistry $externalPlugins;
 
-    public function __construct(
-        FakeProvider $fakeProvider,
-        ExternalInputPluginRegistry $externalPlugins,
-    ) {
+    public function __construct(ExternalInputPluginRegistry $externalPlugins)
+    {
         $this->externalPlugins = $externalPlugins;
-        $this->register($fakeProvider);
 
         foreach ($externalPlugins->providers() as $plugin) {
             $this->register($plugin);

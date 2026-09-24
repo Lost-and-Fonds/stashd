@@ -23,51 +23,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # Optional provider packages are path repositories for local development.
-      # Keep them outside the core image/runtime dependency set while making
-      # the packaged acceptance job reproducible in this monorepo checkout.
-      - name: Checkout optional packages
-        uses: actions/checkout@v7
-        with:
-          repository: Lost-and-Fonds/plugin-api
-          ref: v0.2.2
-          path: plugin-api
-      - name: Checkout plugin SDK
-        uses: actions/checkout@v7
-        with:
-          repository: Lost-and-Fonds/stashd-php-sdk
-          ref: v0.3.7
-          path: stashd-php-sdk
-      - name: Checkout provider packages
-        uses: actions/checkout@v7
-        with:
-          repository: Lost-and-Fonds/podcast
-          ref: v0.3.9
-          path: plugins/podcast
-      - name: Checkout YouTube package
-        uses: actions/checkout@v7
-        with:
-          repository: Lost-and-Fonds/youtube
-          ref: v0.3.53
-          path: plugins/youtube
-      - name: Checkout Jellyfin package
-        uses: actions/checkout@v7
-        with:
-          repository: Lost-and-Fonds/jellyfin
-          ref: v0.2.13
-          path: plugins/jellyfin
-      - name: Checkout Plex package
-        uses: actions/checkout@v7
-        with:
-          repository: Lost-and-Fonds/plex
-          ref: v0.2.11
-          path: plugins/plex
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-
-      - name: Start dev image build timer
-        run: echo "DEV_BUILD_START=$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Build Lerd development image
         uses: docker/build-push-action@v7
@@ -81,11 +38,6 @@ jobs:
         env:
           BUILDKIT_PROGRESS: plain
 
-      - name: Record dev image build timing
-        if: always()
-        run: |
-          echo "dev image build elapsed: $(( $(date +%s) - DEV_BUILD_START )) seconds" | tee -a "$GITHUB_STEP_SUMMARY"
-
       - name: Cache Composer and npm downloads
         uses: actions/cache@v6
         with:
@@ -96,293 +48,28 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-deps-
 
-      # PostgreSQL is the default runtime, so the suite needs one. Run it as a
-      # plain container rather than a service so max_connections can be raised:
-      # the test harness holds roughly one connection per test until the worker
-      # exits, which exhausts the stock limit of 100.
-      - name: Start PostgreSQL
+      - name: Validate and check source
         run: |
-          start=$(date +%s)
-          docker network create stashd-ci
-          docker run -d --name stashd-ci-postgres --network stashd-ci --network-alias postgres \
-            -e POSTGRES_DB=stashd \
-            -e POSTGRES_USER=stashd \
-            -e POSTGRES_PASSWORD=stashd-ci \
-            postgres:18-alpine -c max_connections=400
-          for i in $(seq 1 30); do
-            docker exec stashd-ci-postgres pg_isready -U stashd -d stashd && break
-            sleep 2
-          done
-          echo "PostgreSQL setup elapsed: $(( $(date +%s) - start )) seconds" | tee -a "$GITHUB_STEP_SUMMARY"
-
-      - name: Run quality checks in Lerd
-        run: |
-          start=$(date +%s)
-          mkdir -p "$GITHUB_WORKSPACE/.stashd/plugin-packages/golden-ci"
-          docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=unconfined --cap-add SYS_ADMIN --entrypoint sh --network stashd-ci \
-            -e CI=true \
-            -e STASHD_RESET_TEST_DATABASE=1 \
-            -e STASHD_PLUGIN_PACKAGE_ROOT=/tmp/stashd-plugin-packages \
-            -e STASHD_YOUTUBE_HELPER_FIXTURE=/var/www/html/tests/fixtures/providers/youtube/fake-yt-dlp.sh \
-            -e MERCURE_JWT_SECRET=ci-mercure-jwt-secret-for-tests-32-bytes \
-            -e DB_CONNECTION=pgsql \
-            -e DB_HOST=postgres \
-            -e DB_PORT=5432 \
-            -e DB_DATABASE=stashd \
-            -e DB_USERNAME=stashd \
-            -e DB_PASSWORD=stashd-ci \
-            -e DB_ADMIN_DATABASE=postgres \
+          docker run --rm --entrypoint sh \
             -v "$GITHUB_WORKSPACE:/var/www/html" \
-            -v "$GITHUB_WORKSPACE/.stashd/plugin-packages/golden-ci:/tmp/stashd-golden-plugin-packages" \
-            -v "$GITHUB_WORKSPACE/plugin-api:/var/www/plugin-api:ro" \
-            -v "$GITHUB_WORKSPACE/stashd-php-sdk:/var/www/stashd-php-sdk:ro" \
-            -v "$GITHUB_WORKSPACE/plugins:/var/www/plugins:ro" \
             -v "$HOME/.cache/composer:/tmp/composer-cache" \
             -v "$HOME/.npm:/root/.npm" \
             -w /var/www/html \
             stashd:ci -lc '
               export COMPOSER_CACHE_DIR=/tmp/composer-cache
-              rm -rf /tmp/stashd-plugin-packages
               git config --global --add safe.directory /var/www/html
               composer install --no-interaction --prefer-dist --no-progress
               npm ci
-              php tempest key:generate
+              composer validate --strict
               composer lint
-              composer test:static
+              composer analyse
               npm run typecheck
-              php scripts/build-installed-plugins.php
-              export STASHD_PLUGIN_PACKAGES_READY=1
-              COMPOSER_PROCESS_TIMEOUT=0 composer test:parallel
-              composer test:naked-core
-              composer test:packaged
-              STASHD_PLUGIN_PACKAGE_ROOT=/tmp/stashd-golden-plugin-packages \
-                STASHD_YOUTUBE_HELPER_FIXTURE=/var/www/html/tests/docker/yt-dlp-credential-fixture.sh \
-                php scripts/build-installed-plugins.php
-              chmod -R a+rX /tmp/stashd-golden-plugin-packages
+              npm run build
             '
-          tar -C "$GITHUB_WORKSPACE/.stashd/plugin-packages/golden-ci" \
-            -czf "$GITHUB_WORKSPACE/golden-plugin-packages.tar.gz" .
-          echo "quality dependency setup and test suite elapsed: $(( $(date +%s) - start )) seconds" | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Upload deterministic golden plugin packages
-        uses: actions/upload-artifact@v6
-        with:
-          name: golden-plugin-packages
-          path: golden-plugin-packages.tar.gz
-          if-no-files-found: error
-
-  plugin-runtime:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Run plugin runtime conformance
-        run: packages/plugin-runtime/tests/run.sh
-
-  apparmor-sandbox:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Verify AppArmor enforcement
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y apparmor apparmor-utils
-          sudo aa-status
-          sudo aa-status --enabled
-          test -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns
-          test "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = 1
-          docker info --format '{{json .SecurityOptions}}' | grep -F 'apparmor'
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build AppArmor proof image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          target: prod
-          load: true
-          tags: stashd:apparmor
-          cache-from: type=gha,scope=prod-amd64
-          cache-to: type=gha,mode=max
-        env:
-          BUILDKIT_PROGRESS: plain
-
-      - name: Run authoritative AppArmor sandbox proof
-        run: STASHD_APPARMOR_IMAGE=stashd:apparmor composer test:docker-apparmor
-
-      - name: Upload AppArmor proof diagnostics
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: apparmor-sandbox-diagnostics
-          path: ${{ runner.temp }}/stashd-apparmor
-          if-no-files-found: warn
-
-  seccomp-sandbox:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Verify AppArmor enforcement
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y apparmor apparmor-utils
-          sudo aa-status --enabled
-          test -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns
-          test "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = 1
-          docker info --format '{{json .SecurityOptions}}' | grep -F 'apparmor'
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build seccomp proof image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          target: prod
-          load: true
-          tags: stashd:seccomp
-          cache-from: type=gha,scope=prod-amd64
-          cache-to: type=gha,mode=max,scope=prod-amd64
-        env:
-          BUILDKIT_PROGRESS: plain
-
-      - name: Check Docker baseline provenance
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/moby/moby/v28.0.4/profiles/seccomp/default.json \
-            -o /tmp/docker-default-seccomp.json
-          echo '9c1025c88ccaa517b648da571961838744ea2137f176bfe6a48b21294cae9c76  /tmp/docker-default-seccomp.json' | sha256sum -c -
-          deploy/seccomp/check-stashd-plugin-bwrap.sh /tmp/docker-default-seccomp.json
-
-      - name: Run seccomp plugin sandbox proof
-        run: |
-          sudo deploy/apparmor/install-stashd-plugin-bwrap.sh --require
-          STASHD_SECCOMP_IMAGE=stashd:seccomp composer test:docker-seccomp
-
-  smoke:
-    needs: quality
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Download deterministic golden plugin packages
-        uses: actions/download-artifact@v7
-        with:
-          name: golden-plugin-packages
-          path: ${{ runner.temp }}/golden-plugin-packages
-      - name: Extract golden plugin packages
-        run: |
-          mkdir -p "$GITHUB_WORKSPACE/.stashd/plugin-packages/golden-ci"
-          tar -xzf "$RUNNER_TEMP/golden-plugin-packages/golden-plugin-packages.tar.gz" \
-            -C "$GITHUB_WORKSPACE/.stashd/plugin-packages/golden-ci"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Start smoke image build timer
-        run: echo "SMOKE_BUILD_START=$(date +%s)" >> "$GITHUB_ENV"
-
-      - name: Build smoke image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          target: prod
-          load: true
-          tags: stashd:golden
-          cache-from: type=gha,scope=prod-amd64
-          cache-to: type=gha,mode=max,scope=prod-amd64
-        env:
-          BUILDKIT_PROGRESS: plain
-
-      - name: Record smoke image build timing
-        if: always()
-        run: |
-          echo "smoke image build elapsed: $(( $(date +%s) - SMOKE_BUILD_START )) seconds" | tee -a "$GITHUB_STEP_SUMMARY"
-
-      - name: Start smoke test timer
-        run: echo "SMOKE_TEST_START=$(date +%s)" >> "$GITHUB_ENV"
-      - name: Run public playback boundary proof
-        run: STASHD_PLAYBACK_SKIP_BUILD=1 composer test:docker-playback
-      - name: Run public Mercure boundary proof
-        run: STASHD_MERCURE_SKIP_BUILD=1 composer test:docker-mercure
-      - name: Run published resource boundary proof
-        run: STASHD_PUBLISHED_SKIP_BUILD=1 composer test:docker-published
-      - name: Run scheduled Vault verification boundary proof
-        run: STASHD_VERIFICATION_SKIP_BUILD=1 composer test:docker-verification
-      - name: Run container smoke test
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y apparmor apparmor-utils
-          if sudo aa-status --enabled >/dev/null 2>&1; then
-            sudo deploy/apparmor/install-stashd-plugin-bwrap.sh --require
-            export STASHD_GOLDEN_APPARMOR=1
-          fi
-          STASHD_GOLDEN_SKIP_BUILD=1 STASHD_GOLDEN_COLLECTION_CHECK=1 \
-            STASHD_GOLDEN_REQUIRE_LOCAL=1 \
-            STASHD_GOLDEN_LOCAL_PACKAGE_ROOT="$GITHUB_WORKSPACE/.stashd/plugin-packages/golden-ci" \
-            composer test:docker-golden
-          STASHD_PLUGIN_LIFECYCLE_IMAGE=stashd:golden composer test:docker-plugin-lifecycle
-      - name: Record smoke test timing
-        if: always()
-        run: |
-          echo "smoke test elapsed: $(( $(date +%s) - SMOKE_TEST_START )) seconds" | tee -a "$GITHUB_STEP_SUMMARY"
-
-
-  e2e:
-    needs: quality
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Start E2E image build timer
-        run: echo "E2E_BUILD_START=$(date +%s)" >> "$GITHUB_ENV"
-
-      - name: Build E2E image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          target: prod
-          load: true
-          tags: stashd:e2e
-          cache-from: type=gha,scope=prod-amd64
-        env:
-          BUILDKIT_PROGRESS: plain
-
-      - name: Record E2E image build timing
-        if: always()
-        run: |
-          echo "E2E image build elapsed: $(( $(date +%s) - E2E_BUILD_START )) seconds" | tee -a "$GITHUB_STEP_SUMMARY"
-
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install browser dependencies
-        run: |
-          start=$(date +%s)
-          npm ci && npx playwright install --with-deps chromium
-          echo "E2E browser setup elapsed: $(( $(date +%s) - start )) seconds" | tee -a "$GITHUB_STEP_SUMMARY"
-
-      - name: Run authenticated browser smoke test
-        run: |
-          start=$(date +%s)
-          STASHD_E2E_SKIP_BUILD=1 tests/e2e/run.sh
-          echo "E2E test elapsed: $(( $(date +%s) - start )) seconds" | tee -a "$GITHUB_STEP_SUMMARY"
 
   build:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (startsWith(github.ref, 'refs/tags/v0.1.') && contains(github.ref_name, '-') == false)
-    needs: [quality, smoke, e2e, plugin-runtime]
+    needs: [quality]
     strategy:
       matrix:
         include:

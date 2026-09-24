@@ -432,11 +432,6 @@ Decide:
 -   log levels
 -   audit log
 
-## Testing Strategy
-
--   unit tests
--   integration tests
--   end-to-end Docker environment
 
 ## Packaging
 

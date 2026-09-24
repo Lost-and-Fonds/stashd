@@ -67,8 +67,8 @@ Plugins own integration-specific behaviour:
 - declared helper programs such as `yt-dlp` or `ffmpeg` when the integration
   needs them.
 
-A good test is: **would Core need to know this fact if the provider disappeared
-tomorrow?** If not, it probably belongs in the plugin.
+A useful boundary question is: **would Core need to know this fact if the
+provider disappeared tomorrow?** If not, it probably belongs in the plugin.
 
 Plugins do not get unrestricted access to the Stashd database, Vault, host
 filesystem, environment, credentials, or network. They run behind a capability
@@ -138,7 +138,6 @@ for plugin authors are now explicit:
 - DTO decoding is strict: malformed required fields or variant values are
   rejected rather than silently coerced;
 - RPC v1 remains the transport, including an explicit hello/version handshake;
-- cross-language JSON conformance fixtures live in `plugin-api/tests/contract/fixtures`.
 
 RPC v1 frames remain a four-byte unsigned big-endian length followed by a UTF-8
 JSON object. Inline byte values use the host's current JSON string
@@ -148,7 +147,7 @@ base64-encoded.
 ## Documentation map
 
 - [Authoring plugins](plugins/authoring.md) — architecture, lifecycles,
-  capabilities, packaging, testing, and worked patterns.
+  capabilities, packaging, and worked patterns.
 - [Manifest reference](plugins/manifest.md) — `plugin.json`, helpers, credentials,
   grants, Input fields, and Broadcast fields.
 - [PHP SDK](plugins/php-sdk.md) — the current PHP 0.3 binding, exact interfaces,
@@ -212,7 +211,9 @@ migration allowance. That is compatibility support, not a recommendation to
 start new work on `0.1`. First-party YouTube and Podcast plugins have moved to
 `0.2`.
 
-The API is still evolving, so treat contract changes deliberately and run the
-contract/conformance suites when changing a boundary. The WIT files, not PHP
-DTOs, first-party plugin code, generated reports, or this prose, remain the
-canonical language-neutral contract once a reconciliation has landed.
+The API is still evolving, so treat contract changes deliberately. The WIT
+files, not PHP DTOs, first-party plugin code, generated reports, or this prose,
+remain the canonical language-neutral contract once a reconciliation has landed.
+
+The Stashd repositories currently have no automated tests or test harnesses; a
+new testing system will be designed separately from first principles.

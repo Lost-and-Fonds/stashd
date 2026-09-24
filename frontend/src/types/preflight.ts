@@ -14,8 +14,8 @@ export type StorageEstimate =
 
 /**
  * One aggregate row in the plan — deliberately NOT typed around hardlink/
- * transcode/download specifically. A future operation kind needs nothing
- * more than one more fixture row with these same fields.
+ * transcode/download specifically. A future operation kind needs only a row
+ * with these same fields.
  */
 export interface PreflightOperation {
   key: string

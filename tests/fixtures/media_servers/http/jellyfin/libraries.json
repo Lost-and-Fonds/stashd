@@ -1,9 +1,0 @@
-{
-  "Items": [
-    {
-      "Id": "shows-lib",
-      "Name": "TV Shows",
-      "CollectionType": "tvshows"
-    }
-  ]
-}

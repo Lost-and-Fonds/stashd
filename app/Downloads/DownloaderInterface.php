@@ -4,12 +4,7 @@ declare(strict_types=1);
 
 namespace App\Downloads;
 
-/**
- * Download service boundary — all media acquisition must go through this interface.
- *
- * The fake implementation remains for deterministic tests; real providers
- * acquire through registered external Input plugins.
- */
+/** Download service boundary — all media acquisition must go through this interface. */
 interface DownloaderInterface
 {
     public function implementationName(): string;

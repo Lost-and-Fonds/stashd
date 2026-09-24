@@ -48,9 +48,7 @@ JSON uses snake_case. Secrets are redacted from errors, activity, and command re
 | External Broadcast Component | The installed plugin performs its protocol calls through the bounded host HTTP capability |
 | external Plex Component | `GET /identity`, `GET /library/sections`, `GET /library/sections/{id}/refresh` |
 
-Both implement `MediaServerClient` and use `MediaServerHttpClient` (`CurlMediaServerHttpClient` in production; `FixtureMediaServerHttpClient` when `ENVIRONMENT=testing`).
-
-Optional live tests: `STASHD_LIVE_MEDIA_SERVER_TESTS=1`.
+The installed plugins perform protocol requests through the bounded host HTTP capability.
 
 ## Scan triggers (separate from publish validity)
 

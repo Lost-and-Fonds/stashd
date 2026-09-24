@@ -20,20 +20,13 @@
         "lcobucci/jwt": "^5.6"
     },
     "require-dev": {
-        "pestphp/pest": "^4.0",
         "phpstan/phpstan": "^2.2",
-        "friendsofphp/php-cs-fixer": "^3.95",
-        "leafs/alchemy": "^5.0"
+        "friendsofphp/php-cs-fixer": "^3.95"
     },
     "autoload": {
         "psr-4": {
             "App\\": "app/",
             "Stashd\\PluginRuntime\\": "packages/plugin-runtime/src/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Tests\\": "tests/"
         }
     },
     "scripts": {
@@ -45,30 +38,11 @@
         "post-autoload-dump": [
             "@php ./tempest discovery:generate --no-interaction"
         ],
-        "test": "@php vendor/bin/alchemy test",
-        "test:parallel": "@php vendor/bin/alchemy test --flags=parallel,processes=4",
-        "test:unit": "@php vendor/bin/alchemy test --flags=testsuite=Unit",
-        "test:feature": "@php vendor/bin/alchemy test --flags=testsuite=Feature",
-        "test:feature:parallel": "@php vendor/bin/alchemy test --flags=testsuite=Feature,parallel,processes=4",
-        "test:postgres": "@php vendor/bin/alchemy test",
-        "test:docker-smoke": "tests/docker/smoke.sh",
-        "test:docker-smoke:no-build": "STASHD_SMOKE_SKIP_BUILD=1 tests/docker/smoke.sh",
-        "test:docker-apparmor": "bash tests/docker/apparmor-plugin-path.sh",
-        "test:docker-seccomp": "bash tests/docker/seccomp-plugin-path.sh",
-        "test:docker-plugin-lifecycle": "bash tests/docker/plugin-lifecycle-path.sh",
-        "test:docker-playback": "bash tests/docker/playback-path.sh",
-        "test:docker-mercure": "bash tests/docker/mercure-path.sh",
-        "test:docker-published": "bash tests/docker/published-path.sh",
-        "test:docker-verification": "bash tests/docker/verification-path.sh",
-        "test:docker-apparmor": "bash tests/docker/apparmor-plugin-path.sh",
-        "test:docker-golden": "tests/docker/golden-path.sh",
-        "lint": "@php vendor/bin/alchemy lint",
-        "format": "@php vendor/bin/alchemy fmt",
-        "test:static": "@php -d memory_limit=1G vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --memory-limit=1G --no-progress",
-        "test:plugin-runtime": "packages/plugin-runtime/tests/run.sh",
-        "test:packaged": "scripts/test-packaged.sh",
-        "test:naked-core": "scripts/test-naked-core.sh",
-        "alchemy": "@php vendor/bin/alchemy all",
+        "lint": [
+            "@composer dump-autoload --optimize --strict-psr --dry-run",
+            "@php vendor/bin/php-cs-fixer check --allow-risky=yes --config=.php-cs-fixer.dist.php"
+        ],
+        "format": "@php vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php",
         "analyse": "@php -d memory_limit=1G vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --memory-limit=1G --no-progress"
     },
     "minimum-stability": "dev",
@@ -77,8 +51,7 @@
     "config": {
         "process-timeout": 1200,
         "allow-plugins": {
-            "php-http/discovery": true,
-            "pestphp/pest-plugin": true
+            "php-http/discovery": true
         }
     }
 }

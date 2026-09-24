@@ -1,6 +1,6 @@
 /**
  * The canonical Vault Item's preservation record — richer than
- * `VaultItemFixture` (the lean row shown on the Vault overview table).
+ * the lean item summary shown on the Vault overview table.
  * Looked up by the same `id`. See planning/DECISIONS.md, "Preservation
  * confidence is a primary user-facing property of a canonical Vault Item."
  */
@@ -36,7 +36,7 @@ export interface PreservationStatus {
 }
 
 export interface VaultItemRecord {
-  /** Matches VaultItemFixture.id */
+  /** Matches the Vault item summary id. */
   id: string
   title: string
   typeLabel: string

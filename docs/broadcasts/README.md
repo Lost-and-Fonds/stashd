@@ -78,7 +78,6 @@ GET /b/{broadcastToken}/items/{itemToken}/episode.{ext}      (public, unauthenti
   - A range starting beyond the end of the file → `416 Range Not Satisfiable` with `Content-Range: bytes */{total}`. This discloses nothing new: `{total}` is already disclosed via `Content-Length` on every successful response and the feed's enclosure `length` attribute.
   - A `Range` header naming more than one range (e.g. `bytes=0-1,3-4`), or one that's syntactically invalid per RFC 7233 (e.g. a reversed `start-end`), is treated the same as no header at all — the full file is served with 200. Stashd does not implement `multipart/byteranges`; real podcast clients only ever request a single range for seeking.
   - A read failure after the file was already validated as readable (e.g. the file changed mid-request) falls back to the same non-revealing 404 as a missing asset.
-- Covered by `tests/Feature/Phase5CPodcastEpisodeRouteTest.php`.
 
 Video remux/transcode at request time remain future work, a v1 non-goal — this route only ever serves an already-selected, already-ready Vault asset, never generating or converting media itself. Audio derivation is performed by the external Podcast Component before publication.
 
@@ -126,7 +125,6 @@ Deferred (per the engineering spec's full funding-link section, not yet implemen
 - Substack / Open Collective
 - the "first plausible support link" fallback
 
-Covered by `tests/Unit/Broadcasts/Podcasts/PodcastFundingLinkDetectorTest.php` and `tests/Feature/Phase5CPodcastFeedTest.php`.
 
 ## Destination path
 

@@ -1,75 +1,28 @@
 # Providers
 
-Stashd's bundled providers resolve inputs and discover items. External Input plugins own provider-specific mechanisms and return facts or staged artifacts to the normal Stashd pipeline.
+Stashd routes inputs through registered external plugins. Plugins own provider
+protocols, URL handling, discovery semantics, and acquisition behavior; Core
+provides the generic lifecycle, storage, and Vault pipeline.
 
-| Capability | Interface / adapter | Phase |
-|---|---|---|
-| Discovery | External Input Component or test provider | current |
-| Acquisition | `DownloaderInterface` and plugin staging adapter | current |
-
-Provider-specific mechanism selection happens inside the external plugin. Core only selects the registered logical provider implementation.
-
-## Fake provider
-
-Key: `fake`
-
-URIs: `fake://channel/{name}`, `fake://playlist/{name}`, `fake://item/{id}`
-
-| Strategy | Key | Cost |
-|---|---|---|
-| Discovery | `fake.feed` | Low |
-
-Used for tests, local development, and Docker smoke. Downloads use `FakeDownloader`.
-
-Fixtures: `tests/fixtures/providers/fake/`
-
-## YouTube Input plugin (complete)
-
-Key: `youtube`
-
-`Lost-and-Fonds/youtube` is an optional installed OCI package. Its PostgreSQL
-input lifecycle, helper resolution, brokered HTTP behavior, and bubblewrap
-execution are covered by packaged acceptance tests. Provider-specific
-discovery and acquisition remain in the YouTube package while core supplies
-generic capabilities. The retired Wasm design is reference material under
-`reference/wasmtime/`.
-
-## Download service
-
-All stash downloads go through `App\Domain\Download\DownloaderInterface`:
-
-| Implementation | When |
+| Capability | Owner |
 |---|---|
-| `FakeDownloader` | `providerKey=fake` (tests, dev, Docker smoke) |
-| External plugin adapter | Registered non-fake provider implementation |
-| `DelegatingDownloader` | Default binding; selects fake or external implementation |
+| Discovery | External Input plugin |
+| Acquisition | External Input plugin through staged artifacts |
 
-- Command: `item.download` → temp staging → Vault ingest → asset rows
-- Vault originals are not overwritten by default; `force=true` returns `download_force_not_supported`
-- Opt-in live tests: `STASHD_LIVE_DOWNLOAD_TESTS=1`
+Provider-specific strategy selection happens inside the plugin. Core selects
+the registered logical provider implementation and commits discovered facts.
 
-See `docs/storage/README.md` for idempotency, drift detection, and sidecar JSON rules.
+## First-party providers
 
-## Fixtures
+`Lost-and-Fonds/youtube` is the YouTube Input package. Its protocol behavior
+lives in the plugin; Core supplies invocation-scoped HTTP, helper, credential,
+and staging capabilities.
 
-HTTP fixtures for CI live under:
+Jellyfin, Plex, and Podcast are Broadcast packages. Core materializes Vault
+assets and invokes their generic Broadcast lifecycle; each package owns its
+provider-specific protocol or output format.
 
-```text
-tests/fixtures/providers/youtube/http/
-tests/fixtures/providers/fake/
-```
-
-Map URLs to fixture bodies in `map.json`. The plugin host consumes these
-fixture mappings during deterministic Component tests.
-
-Optional live provider tests:
-
-```env
-STASHD_LIVE_PROVIDER_TESTS=1
-STASHD_LIVE_DOWNLOAD_TESTS=1
-```
-
-## End-to-end flow (preflight → stash)
+## End-to-end flow
 
 ```text
 POST /api/v1/commands  type=stash.preflight  source_uri=<url>
@@ -82,24 +35,17 @@ POST /api/v1/commands  type=stash.create_from_preflight
   → stash, stash_input, items, item_sources, stash_items
 ```
 
-Items deduplicate globally by `(providerKey, providerItemId)`.
-
-Downloads (when enabled):
-
-```text
-POST /api/v1/commands  type=item.download
-  → temp staging → Vault → assets ready
-```
+Items deduplicate globally by `(providerKey, providerItemId)`. When acquisition
+is enabled, staged artifacts pass through the normal Vault ingest pipeline.
 
 ## Typed domain boundaries
 
-Per the engineering spec, provider domain types are typed internally; raw strings appear only at HTTP/DB/JSON edges.
-
 | Type | Role |
 |---|---|
-| `StashdUri` | Wraps `Tempest\Support\Uri\Uri` — parse, fake URIs, path/query helpers |
-| `ProviderDates` | Parses/constructs `Tempest\DateTime\DateTime` (`tryParse()`, `utc()`) |
-| `DiscoveredItem` / `ResolvedInput` | Hold `StashdUri` + `DateTime`; serializers emit `toString()` / RFC3339 `Z` |
-| `Tempest\Support\str()` | String helpers (not raw PHP string functions) |
+| `StashdUri` | Wraps `Tempest\Support\Uri\Uri` for URL parsing and path/query helpers |
+| `ProviderDates` | Parses and constructs `Tempest\DateTime\DateTime` values |
+| `DiscoveredItem` / `ResolvedInput` | Hold typed source identity and serialize at API/storage boundaries |
+| `Tempest\Support\str()` | String helpers |
 
-Do not pass raw URL or date strings through provider strategy handlers when a typed wrapper exists.
+Do not pass raw URL or date strings through provider strategy handlers when a
+typed wrapper exists.

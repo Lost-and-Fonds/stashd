@@ -4,7 +4,7 @@ Record states as they are discovered. **Recording a state does not authorize imp
 
 | Surface | State | Needed? | Built? | Notes |
 | --- | --- | ---: | ---: | --- |
-| Stashes list | populated | yes | no | fixture data is fine |
+| Stashes list | populated | yes | no | backed by the Stash API |
 | Stashes list | empty | yes | no | design later |
 | Stashes list | loading | likely | no | integration-era behavior may inform this |
 | Stashes list | error | likely | no | keep calm/non-alarming |
@@ -12,7 +12,7 @@ Record states as they are discovered. **Recording a state does not authorize imp
 | Vault | empty | yes | no | |
 | Broadcasts | populated | yes | no | |
 | Broadcasts | empty | yes | no | |
-| Stash detail · Items | populated (paginated) | yes | yes | fixture-backed, 20/page, `UPagination` desktop / Prev-Next mobile |
+| Stash detail · Items | populated (paginated) | yes | yes | API-backed, 20/page, `UPagination` desktop / Prev-Next mobile |
 | Stash detail · Items | filtered/no-results | yes | yes | search+status filter produced zero rows; distinct from the true empty state below |
 | Stash detail · Items | true empty (zero Items in Stash) | yes | no | Stash has no preserved media yet — no Inputs synced anything; design later |
 | Stash detail · Items | loading | likely | no | integration-era behavior may inform this |

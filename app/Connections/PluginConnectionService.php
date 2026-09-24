@@ -182,7 +182,6 @@ final readonly class PluginConnectionService
                 ],
                 $operation,
                 $this->grants->forConnection($definition, $connection, $token),
-                getenv('STASHD_BROADCAST_HTTP_FIXTURE_DIR') ?: null,
             );
         } catch (ConnectionException $exception) {
             throw $exception;

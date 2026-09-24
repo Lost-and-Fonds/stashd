@@ -62,7 +62,7 @@ final readonly class StashInputOptions
 
     /**
      * `preg_match()` emits an `E_WARNING` for a malformed pattern rather than
-     * just returning `false` — under a strict/PHPUnit error handler that
+     * just returning `false` — with PHP's warning handler that
      * becomes an uncatchable warning, so `@`-suppression alone isn't reliable
      * here. Swap in a no-op handler for the duration of the call instead.
      *

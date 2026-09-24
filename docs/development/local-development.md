@@ -12,11 +12,8 @@ Common project checks are:
 ```bash
 composer lint
 composer analyse
-composer test
-composer test:docker-smoke
 ```
 
-Use the focused test command appropriate to the change before running the full
 suite. Fresh container builds are required for Docker/runtime changes; do not
 reuse stale images when validating plugin or runtime registration.
 

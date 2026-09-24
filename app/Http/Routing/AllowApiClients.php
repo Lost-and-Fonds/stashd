@@ -9,7 +9,7 @@ use Tempest\Router\PreventCrossSiteRequestsMiddleware;
 use Tempest\Router\Route;
 use Tempest\Router\RouteDecorator;
 
-/** Allows machine clients (curl, docker smoke test, API tokens) to POST without Sec-Fetch headers. */
+/** Allows machine clients (curl, API tokens) to POST without Sec-Fetch headers. */
 #[Attribute(Attribute::TARGET_CLASS)]
 final class AllowApiClients implements RouteDecorator
 {

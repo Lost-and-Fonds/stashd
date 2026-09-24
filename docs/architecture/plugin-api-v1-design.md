@@ -19,7 +19,7 @@ abstraction is deliberately deferred until another remote-service plugin
 demonstrates that this lifecycle is useful outside the current media-server
 configuration.
 
-This document designs the semantic Stashd Plugin API from existing behaviour and four capability stress tests. It does not implement a plugin runtime, package format, WIT contract, permissions UI, or plugin conversion.
+This document designs the semantic Stashd Plugin API from existing behaviour and four capability scenarios. It does not implement a plugin runtime, package format, WIT contract, permissions UI, or plugin conversion.
 
 ## 1. Scope and status
 
@@ -152,7 +152,7 @@ The external Jellyfin Component uses the logical key `jellyfin` and produces a r
 
 The broadcast destination is core-resolved and ownership-marked. A configured `destination_path` is currently a literal host/container path, but that is an implementation detail that a future plugin API should not expose to an untrusted plugin.
 
-Jellyfin's external behaviour is separate from publish validity. `MediaServerConnectionRecord` stores the configured endpoint, encrypted credential reference, and selected library settings. The Component knows the protocol: it tests `/System/Info/Public`, lists `/Library/MediaFolders`, and refreshes with `POST /Library/Refresh`. Stashd supplies the selected endpoint and credential-use grant; core does not interpret those protocol operations.
+Jellyfin's external behaviour is separate from publish validity. `MediaServerConnectionRecord` stores the configured endpoint, encrypted credential reference, and selected library settings. The Component knows the protocol: it requests `/System/Info/Public`, lists `/Library/MediaFolders`, and refreshes with `POST /Library/Refresh`. Stashd supplies the selected endpoint and credential-use grant; core does not interpret those protocol operations.
 
 The Component does not receive arbitrary network access. It uses a configured connection and constrained network/credential capabilities for its protocol calls. Credentials are used without exposing their raw value to plugin code.
 
@@ -160,7 +160,7 @@ The Component does not receive arbitrary network access. It uses a configured co
 
 The external Plex Component uses the logical key `plex`. It owns Plex XML parsing, token query usage, library selection, SxxExxx layout, NFO output, caption sidecar selection, and section refresh. Core materializes only the Component's relative publication descriptors and retains filesystem authority.
 
-Plex's external behaviour uses the Connection grant. The Component tests `/identity`, lists `/library/sections`, and triggers `GET /library/sections/{id}/refresh` with the token in the request. The selected library ID is meaningful to Plex; a scan path is not used by the current client in the same way as the endpoint shape suggests. Trigger failures remain separate from broadcast file validity.
+Plex's external behaviour uses the Connection grant. The Component requests `/identity`, lists `/library/sections`, and triggers `GET /library/sections/{id}/refresh` with the token in the request. The selected library ID is meaningful to Plex; a scan path is not used by the current client in the same way as the endpoint shape suggests. Trigger failures remain separate from broadcast file validity.
 
 #### Comparison
 
@@ -186,7 +186,7 @@ Provider-specific or implementation-specific details:
 
 The former shared PHP base class was useful migration evidence, not proof that the plugin API should expose a “series plugin” superclass. The protocol details remain plugin-owned: Stashd owns the transitional reusable Connection record and grants, while each selected Component owns how it lists or refreshes its service. Core does not standardise provider operations.
 
-## 5. Stress test A — YouTube Input
+## 5. Scenario A — YouTube Input
 
 ### Contribution
 
@@ -225,7 +225,7 @@ Product surfaces consuming these facts are Stash Input creation/review, sync act
 
 Passing acquisition bytes through a plugin is more general and can support non-HTTP capture, but it duplicates the hardest parts of Stashd's download boundary: temporary files, probing, checksums, output classification, retries, and provenance. Describing acquisition for core execution is smaller and safer for YouTube. The LaserDisc case prevents making that choice universal: the semantic API must permit a plugin-produced staged stream for sources that core cannot acquire itself.
 
-## 6. Stress test B — Jellyfin and Plex Broadcasts
+## 6. Scenario B — Jellyfin and Plex Broadcasts
 
 ### Contribution and configuration
 
@@ -262,7 +262,7 @@ Useful errors include source Asset missing/unready, output conflict, hardlink un
 
 The plugin must not receive unrelated Assets, arbitrary paths, raw tokens, database access, permission to delete Vault files, or permission to mark a Broadcast valid. Stashd surfaces the plan, progress, validity, and trigger failure in its own Broadcast UI/activity.
 
-## 7. Stress test C — hypothetical TTS Podcast Broadcast
+## 7. Scenario C — hypothetical TTS Podcast Broadcast
 
 ### Contribution and configuration
 
@@ -295,7 +295,7 @@ The plugin must not expose a route, Vue component, or raw HTML. It may use
 generic PublishedResource URLs supplied by Stashd; the plugin owns how those
 opaque URLs are represented in its output.
 
-## 8. Stress test D — hypothetical LaserDisc Capture Input
+## 8. Scenario D — hypothetical LaserDisc Capture Input
 
 ### Contribution
 
@@ -401,7 +401,7 @@ Stashd owns aggregation, display, notification, and remediation controls. No arb
 
 ## 11. Host capability/resource model
 
-Only the following capabilities have evidence across the stress tests or the validated substrate.
+Only the following capabilities have evidence across the scenarios or the validated substrate.
 
 | Capability | Why it exists / evidence | Authority granted | Explicitly not granted | WIT? |
 |---|---|---|---|---|
@@ -675,34 +675,3 @@ This document does not implement or freeze:
 - generic workflow DSL, event bus, database/shell/filesystem access, or plugin-to-plugin RPC;
 - multiple runtime implementations;
 - a universal error enum or universal plugin context object.
-
-## 25. Recommended next validation experiment
-
-Implement one real vertical slice using the draft semantics, with no attempt to convert the existing provider wholesale: a **YouTube Input plugin adapter** is the highest-value first experiment.
-
-It exercises optional source recognition, channel/playlist/video resolution, plugin-internal strategy choice, network policy, credential-use without raw secret exposure, paginated discovery, filters, candidate Item facts, opaque incremental state, preflight with partial estimates, progress/cancellation, provider errors, and the boundary between acquisition description and core-owned download/Vault ingest. It also has existing fixtures and fake seams, keeping validation cheap.
-
-The experiment should stop at a narrow vertical path:
-
-```text
-manifest/runtime inspection
-  → YouTube source resolution
-  → fixture-backed discovery with opaque state
-  → typed preflight/progress/errors
-  → PHP-owned candidate commit
-```
-
-Do not begin with Jellyfin/Plex because their current shared series engine could hide the more important Asset/staging boundary. Do not begin with LaserDisc because native/hardware containment would add runtime questions before the semantic Input contract is tested. After YouTube, a tiny staged-output Broadcast or TTS-like fixture transformation should validate Asset reads, staging writes, and promotion boundaries.
-
-## Verification record
-
-Only this Markdown document was added. The archaeology inspected:
-
-- `AGENTS.md` and the relevant canonical development/architecture documents;
-- [PLUGIN-SPIKE.md](PLUGIN-SPIKE.md);
-- [Broadcast-Plugin-Architecture-Plan.md](Broadcast-Plugin-Architecture-Plan.md);
-- provider, download, Stash Input, Vault, Broadcast, and media-server documentation;
-- the YouTube Provider, discovery/metadata/download seams, Input/preflight/sync/commit flow, and ytdlphp download boundary;
-- `JellyfinBroadcastPlugin`, `PlexBroadcastPlugin`, the shared series engine, Broadcast lifecycle/plan/output ownership, media-server Connections/clients, and trigger handling.
-
-No PHP, Rust, WIT, Vue, database, schema, or runtime file was modified. No implementation test suite was run because the requested change is documentation-only; the final check is Markdown/diff inspection and terminology review.

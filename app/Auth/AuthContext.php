@@ -7,7 +7,7 @@ namespace App\Auth;
 use Tempest\Container\Resettable;
 use Tempest\Container\Singleton;
 
-/** Request-scoped authenticated user resolved by middleware or tests. */
+/** Request-scoped authenticated user resolved by middleware. */
 #[Singleton]
 final class AuthContext implements Resettable
 {

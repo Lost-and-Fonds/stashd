@@ -6,15 +6,16 @@ namespace App\Providers;
 
 use InvalidArgumentException;
 use Stringable;
-use Tempest\Support\Uri\Uri;
 
 use function Tempest\Support\str;
+
+use Tempest\Support\Uri\Uri;
 
 /** Stashd-owned URI value object wrapping Tempest's {@see Uri}. */
 final readonly class StashdUri implements Stringable
 {
     /** @var list<string> */
-    private const array SUPPORTED_SCHEMES = ['http', 'https', 'fake'];
+    private const array SUPPORTED_SCHEMES = ['http', 'https'];
 
     public function __construct(
         public Uri $uri,
@@ -35,11 +36,6 @@ final readonly class StashdUri implements Stringable
         }
 
         return new self(Uri::from($trimmed->toString()));
-    }
-
-    public static function fake(string $path): self
-    {
-        return self::parse('fake://' . str($path)->ltrim('/')->toString());
     }
 
     public function toString(): string

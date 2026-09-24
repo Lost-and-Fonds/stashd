@@ -5,7 +5,7 @@ SDK, package lifecycle, and provider acceptance gates are complete through M11.5
 
 Wasmtime/Wasm implementations are retained only under
 `reference/wasmtime/`. They are excluded from production Docker builds,
-Composer autoloading, discovery, CI, and routine tests.
+Composer autoloading, discovery, and CI.
 
 ## Milestone status
 

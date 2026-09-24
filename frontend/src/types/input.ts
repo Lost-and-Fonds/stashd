@@ -1,6 +1,3 @@
-export type InputStatus = 'active' | 'paused' | 'needs-attention'
-export type InputProvider = 'youtube-channel' | 'youtube-playlist' | 'rss'
-export type InputSyncMode = 'automatic' | 'manual'
 export type InputOptionValue = boolean | string
 
 export interface InputOptionDeclaration {
@@ -54,24 +51,3 @@ export interface LifecycleOperation {
  * boolean options that only apply to certain input types (e.g. YouTube
  * channel's "include Shorts"/"include live").
  */
-export interface InputFilters {
-  titleRegexInclude?: string
-  titleRegexExclude?: string
-  includeShorts?: boolean
-  includeLive?: boolean
-}
-
-export interface InputFixture {
-  id: string
-  stashId: string
-  provider: InputProvider
-  providerLabel: string
-  identity: string
-  url: string
-  status: InputStatus
-  syncMode: InputSyncMode
-  filterSummary?: string
-  filters?: InputFilters
-  lastChecked: string
-  lastCheckedAt: string
-}

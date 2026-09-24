@@ -12,8 +12,8 @@ use Stashd\PluginRuntime\Capabilities\HelperGrant;
 use Stashd\PluginRuntime\Capabilities\Invocation;
 use Stashd\PluginRuntime\Capabilities\ReadableResource;
 use Stashd\PluginRuntime\Package\PackageManager;
-use Stashd\PluginRuntime\Runner\PluginRunner;
 use Stashd\PluginRuntime\Runner\PluginInvocationFailure;
+use Stashd\PluginRuntime\Runner\PluginRunner;
 
 final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
 {
@@ -24,30 +24,30 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
     ) {}
 
     /** @param list<PluginHttpGrant>|null $httpGrants */
-    public function prepare(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory, ?callable $onProgress = null): PluginBroadcastResult
+    public function prepare(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?callable $onProgress = null): PluginBroadcastResult
     {
-        return $this->invoke('broadcast.prepare', $stagingDirectory, $broadcast, $helper, $httpGrants, $fixtureDirectory, $onProgress);
+        return $this->invoke('broadcast.prepare', $stagingDirectory, $broadcast, $helper, $httpGrants, $onProgress);
     }
 
     /** @param list<PluginHttpGrant>|null $httpGrants */
-    public function publish(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory, ?callable $onProgress = null): PluginBroadcastResult
+    public function publish(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?callable $onProgress = null): PluginBroadcastResult
     {
-        return $this->invoke('broadcast.publish', $stagingDirectory, $broadcast, $helper, $httpGrants, $fixtureDirectory, $onProgress);
+        return $this->invoke('broadcast.publish', $stagingDirectory, $broadcast, $helper, $httpGrants, $onProgress);
     }
 
     /** @param list<PluginHttpGrant>|null $httpGrants */
-    public function finalize(string $stagingDirectory, array $broadcast, array $publication, ?array $httpGrants, ?string $fixtureDirectory, ?callable $onProgress = null): PluginBroadcastResult
+    public function finalize(string $stagingDirectory, array $broadcast, array $publication, ?array $httpGrants, ?callable $onProgress = null): PluginBroadcastResult
     {
-        return $this->invoke('broadcast.finalize', $stagingDirectory, ['request' => $broadcast, 'publication' => $publication], null, $httpGrants, $fixtureDirectory, $onProgress);
+        return $this->invoke('broadcast.finalize', $stagingDirectory, ['request' => $broadcast, 'publication' => $publication], null, $httpGrants, $onProgress);
     }
 
     /** @param list<PluginHttpGrant>|null $httpGrants */
-    public function operation(string $stagingDirectory, array $broadcast, string $operation, ?array $httpGrants, ?string $fixtureDirectory): array
+    public function operation(string $stagingDirectory, array $broadcast, string $operation, ?array $httpGrants): array
     {
         /** @var array<string, mixed> $params */
         $params = [...$broadcast, 'name' => $operation];
 
-        $result = $this->invokeRaw('broadcast.operation', $params, $stagingDirectory, null, $httpGrants, $fixtureDirectory);
+        $result = $this->invokeRaw('broadcast.operation', $params, $stagingDirectory, null, $httpGrants);
 
         if (is_array($result['choices'] ?? null)) {
             $result['choices'] = array_map(static function (mixed $choice): mixed {
@@ -68,22 +68,22 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
      */
     public function exportCollection(string $exporter, array $entries): array
     {
-        return $this->invokeRaw('stash.collection.export', ['exporter' => $exporter, 'entries' => $entries], sys_get_temp_dir(), null, null, null);
+        return $this->invokeRaw('stash.collection.export', ['exporter' => $exporter, 'entries' => $entries], sys_get_temp_dir(), null, null);
     }
 
     /** @param array<string, mixed> $broadcast
      * @param  list<PluginHttpGrant>|null  $httpGrants
      */
-    private function invoke(string $method, string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory, ?callable $onProgress = null): PluginBroadcastResult
+    private function invoke(string $method, string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?callable $onProgress = null): PluginBroadcastResult
     {
-        return new PluginBroadcastResult([], [], $this->normalizePublication($this->invokeRaw($method, $broadcast, $stagingDirectory, $helper, $httpGrants, $fixtureDirectory, $onProgress)));
+        return new PluginBroadcastResult([], [], $this->normalizePublication($this->invokeRaw($method, $broadcast, $stagingDirectory, $helper, $httpGrants, $onProgress)));
     }
 
     /** @param array<string, mixed> $params
      * @param  list<PluginHttpGrant>|null  $httpGrants
      * @return array<string, mixed>
      */
-    private function invokeRaw(string $method, array $params, string $stagingDirectory, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory, ?callable $onProgress = null): array
+    private function invokeRaw(string $method, array $params, string $stagingDirectory, ?PluginHelperGrant $helper, ?array $httpGrants, ?callable $onProgress = null): array
     {
         $package = $this->packages->activePath($this->pluginId);
 
@@ -120,9 +120,9 @@ final readonly class PluginBroadcastRuntime implements BroadcastPluginRuntime
             $package,
             $stagingDirectory,
             array_values(array_unique($prefixes)),
-            $credentials,
+            transport: new PluginBroadcastHttpTransport(),
+            credentials: $credentials,
             helpers: $this->helperGrants($package, $helper),
-            transport: new PluginBroadcastHttpTransport($fixtureDirectory),
             removeStagingRoot: false,
         );
         $resources = [];

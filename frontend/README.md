@@ -53,7 +53,7 @@ Avoid prompts such as "build the new frontend" or even "finish the Stashes page"
 
 ## Working rules
 
-- Keep production pages backed by the real API; use test-only data only in test sources.
+- Keep production pages backed by the real API; avoid sample data in runtime flows.
 - Treat phone-sized layouts as first-class; check completed slices at desktop
   and approximately 390px wide.
 - The current task is the maximum scope; stop at its requested slice.

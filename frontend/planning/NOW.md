@@ -7,12 +7,12 @@
 ## Goal
 
 Build approved Stashd pages one slice at a time on the established visual
-foundation, using fixtures/local state until the explicit integration phase.
+foundation, using the real API wherever the backend supports the required behavior.
 
 ## Allowed in this phase
 
 - the specifically requested page slice
-- fixture/local interactions needed to review that slice
+- API-backed loading, empty, and error states for the requested slice
 - responsive behavior for desktop and phone-sized layouts
 - build/typecheck fixes inside the frontend
 
@@ -27,7 +27,7 @@ foundation, using fixtures/local state until the explicit integration phase.
 
 ## Stop condition
 
-Stop when the requested slice is reviewable with fixtures/local state and the
+Stop when the requested slice is reviewable with API-backed state and the
 relevant build/typecheck checks pass.
 
 Then wait for visual feedback or the next explicitly requested slice.

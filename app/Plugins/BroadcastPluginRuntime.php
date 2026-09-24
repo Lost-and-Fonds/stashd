@@ -9,24 +9,24 @@ interface BroadcastPluginRuntime
     /** @param array<string, mixed> $broadcast
      * @param  list<PluginHttpGrant>|null  $httpGrants
      */
-    public function prepare(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory, ?callable $onProgress = null): PluginBroadcastResult;
+    public function prepare(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?callable $onProgress = null): PluginBroadcastResult;
 
     /** @param array<string, mixed> $broadcast
      * @param  list<PluginHttpGrant>|null  $httpGrants
      */
-    public function publish(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?string $fixtureDirectory, ?callable $onProgress = null): PluginBroadcastResult;
+    public function publish(string $stagingDirectory, array $broadcast, ?PluginHelperGrant $helper, ?array $httpGrants, ?callable $onProgress = null): PluginBroadcastResult;
 
     /** @param array<string, mixed> $broadcast
      * @param  array<string, mixed>  $publication
      * @param  list<PluginHttpGrant>|null  $httpGrants
      */
-    public function finalize(string $stagingDirectory, array $broadcast, array $publication, ?array $httpGrants, ?string $fixtureDirectory, ?callable $onProgress = null): PluginBroadcastResult;
+    public function finalize(string $stagingDirectory, array $broadcast, array $publication, ?array $httpGrants, ?callable $onProgress = null): PluginBroadcastResult;
 
     /** @param array<string, mixed> $broadcast
      * @param  list<PluginHttpGrant>|null  $httpGrants
      * @return array<string, mixed>
      */
-    public function operation(string $stagingDirectory, array $broadcast, string $operation, ?array $httpGrants, ?string $fixtureDirectory): array;
+    public function operation(string $stagingDirectory, array $broadcast, string $operation, ?array $httpGrants): array;
 
     /**
      * @param list<array{stash-name: string, broadcast-key: string, broadcast-name: string, public-url: string}> $entries

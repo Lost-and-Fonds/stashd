@@ -54,7 +54,6 @@ final class PluginBuilder
         try {
             $this->copyTree($source, $temporary);
             $this->remove($temporary . '/.git');
-            $this->remove($temporary . '/tests');
             $this->remove($temporary . '/tools');
             $this->remove($temporary . '/vendor');
             $this->installComposer($temporary);
@@ -225,7 +224,7 @@ final class PluginBuilder
             $relative = substr($item->getPathname(), strlen($source) + 1);
             $topLevel = strtok($relative, '/');
 
-            if (in_array($topLevel, ['.git', 'tests', 'tools', 'vendor'], true)) {
+            if (in_array($topLevel, ['.git', 'tools', 'vendor'], true)) {
                 continue;
             }
             $files[$relative] = $item->isLink()

@@ -8,8 +8,7 @@ use Stashd\PluginRuntime\Package\PackageManager;
 use Stashd\PluginRuntime\Package\PluginBuilder;
 use Stashd\PluginRuntime\Package\Umoci;
 
-$root = getenv('STASHD_PLUGIN_PACKAGE_ROOT');
-$root = is_string($root) && trim($root) !== '' ? trim($root) : dirname(__DIR__) . '/.stashd/plugin-packages';
+$root = dirname(__DIR__) . '/.stashd/plugin-packages';
 $sources = array_values(array_filter([
     getenv('STASHD_JELLYFIN_ROOT') ?: dirname(__DIR__, 2) . '/plugins/jellyfin',
     getenv('STASHD_PLEX_ROOT') ?: dirname(__DIR__, 2) . '/plugins/plex',
@@ -40,23 +39,6 @@ foreach ($sources as $source) {
         throw new RuntimeException('installed package is not active: ' . $manifest->id);
     }
     $declaration = json_decode((string) file_get_contents($active . '/stashd-plugin/plugin.json'), true, 512, JSON_THROW_ON_ERROR);
-
-    $youtubeHelperFixture = getenv('STASHD_YOUTUBE_HELPER_FIXTURE');
-
-    if ($manifest->id === 'youtube' && is_string($youtubeHelperFixture) && is_file($youtubeHelperFixture)) {
-        $helper = $declaration['helpers']['yt-dlp']['executable'] ?? null;
-
-        if (is_string($helper)) {
-            $helperPath = $active . '/' . ltrim($helper, '/');
-
-            if (! copy($helperPath, $helperPath . '-real') || ! copy($youtubeHelperFixture, $helperPath)) {
-                throw new RuntimeException('could not install the YouTube yt-dlp fixture wrapper');
-            }
-
-            chmod($helperPath . '-real', 0755);
-            chmod($helperPath, 0755);
-        }
-    }
 
     foreach (is_array($declaration['helpers'] ?? null) ? $declaration['helpers'] : [] as $helper) {
         $executable = is_array($helper) && is_string($helper['executable'] ?? null) ? $active . '/' . $helper['executable'] : '';

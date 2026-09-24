@@ -27,7 +27,7 @@ or public media catalogue.
 
 ## Working rules
 
-- Inspect the relevant existing code, tests, and documentation before
+- Inspect the relevant existing code and documentation before
   inventing a pattern.
 - Keep changes small and feature-first. Preserve unrelated worktree changes.
 - Prefer deletion and existing project patterns over speculative abstractions.
@@ -51,7 +51,7 @@ plugin runtime behavior, host capabilities, WIT, RPC, or SDK work, read:
 4. [`docs/plugins/php-sdk.md`](docs/plugins/php-sdk.md) for PHP work
 5. the relevant WIT in `Lost-and-Fonds/plugin-api`
 
-Do this **before** treating old runtime fixtures, comments, or first-party
+Do this **before** treating older implementation details, comments, or first-party
 implementation quirks as architecture.
 
 Current plugin baseline for new work:
@@ -75,24 +75,9 @@ Do not automatically force one layer to mimic another.
 
 ## Verification
 
-Do not rediscover the project's test strategy for every task.
-
-Backend tests must be run with `./bin/test`. Do not invoke Pest, PHPUnit, or
-the underlying test scripts directly on the host; direct host execution is
-intentionally blocked. Focused tests use the same wrapper, for example
-`./bin/test tests/Feature/FooTest.php` or `./bin/test --filter test_name`.
-
-Read [`docs/development/testing.md`](docs/development/testing.md) and use its
-verification ladder.
-
-Start with the narrowest relevant test and expand only across boundaries touched
-by the change. Prefer existing Composer/package scripts over ad-hoc commands.
-Do not begin by running the entire test universe.
-
-For plugin contract changes, also run the `plugin-api` contract suite and update
-or replay `plugin-api/tests/contract/fixtures/` when wire mapping changes. For
-SDK changes, run the SDK's own tests/static checks in addition to affected
-first-party plugin suites.
+This repository currently has no automated tests or test harness. Use the
+available lint, static-analysis, and production-build commands where relevant;
+do not invoke test commands.
 
 The project uses Lerd for local PHP development and Docker/Podman for
 deployment. See [local development](docs/development/local-development.md),

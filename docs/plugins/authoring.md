@@ -303,7 +303,7 @@ Contract values should be treated as typed values, not vaguely shaped JSON.
 PHP SDK 0.3 rejects malformed required fields, list entries, variants, and
 integer values instead of silently coercing them.
 
-That means plugin tests should catch malformed data early rather than depend on
+Malformed data should be rejected explicitly rather than relying on
 behaviour such as:
 
 - missing strings becoming `""`;
@@ -353,7 +353,6 @@ plugin-repo/
 │   ├── plugin.json
 │   ├── plugin.php
 │   └── helpers.lock.json
-└── tests/
 ```
 
 The Core `PluginBuilder` currently:
@@ -362,7 +361,7 @@ The Core `PluginBuilder` currently:
    `stashd-plugin/helpers.lock.json`;
 2. hashes those files, `composer.lock`, and the target platform for its build
    cache;
-3. copies the source while removing `.git`, tests, tools, and any existing
+3. copies the source while removing `.git`, tools, and any existing
    vendor directory;
 4. requires `composer.lock` and performs a locked production Composer install
    with scripts/plugins disabled;
@@ -408,7 +407,7 @@ checking `vendor/` or downloaded helper binaries into source control.
 ## 9. RPC v1 and cross-language compatibility
 
 Ordinary plugin authors should mostly ignore transport details, but SDK authors
-and boundary tests need a stable representation.
+and SDK implementers need a stable representation.
 
 RPC v1 uses:
 
@@ -433,42 +432,9 @@ The JSON mapping follows the contract compatibility rules:
 Inline WIT byte values use the host's current JSON string representation in RPC
 capability payloads. `resource.read` chunks use base64.
 
-Do not infer these details from one PHP class. The language-neutral conformance
-fixtures in `plugin-api/tests/contract/fixtures/` are specifically intended to
-be replayed by future SDKs.
 
-## 10. Testing strategy
 
-A plugin should be testable without booting the whole Stashd application.
-
-At minimum test:
-
-- source/setting parsing and validation;
-- canonicalisation and provider-ID stability;
-- refresh versus complete discovery behaviour;
-- provider response mapping to contract DTOs;
-- all relevant typed error cases and retryability;
-- acquisition/publication output shapes;
-- helper argument construction without invoking arbitrary host tools;
-- capability denial/unavailability paths;
-- strict rejection of malformed contract values;
-- manifest/package assumptions relevant to the plugin.
-
-For PHP plugins, use the SDK and first-party plugin contract tests as the model
-and run the plugin repository's own Composer scripts (`composer test`, static
-analysis, lint/format checks).
-
-When changing the contract itself, also run the `plugin-api` contract suite:
-
-```bash
-./tests/contract/run.sh
-```
-
-When changing SDK mapping, exercise the cross-language fixtures as well. When
-changing Core's runtime/host integration, follow Core's testing rules and use
-`./bin/test`; do not invoke Pest/PHPUnit directly on the host.
-
-## 11. First-party examples worth copying
+## 10. First-party examples worth copying
 
 ### YouTube Input
 
@@ -501,7 +467,7 @@ Use [`Lost-and-Fonds/podcast`](https://github.com/Lost-and-Fonds/podcast) for:
 Jellyfin and Plex are better references for Broadcasts that need a configured
 external Connection and server-side operations.
 
-## 12. Design rules that save review time
+## 11. Design rules that save review time
 
 - Keep provider semantics out of Core.
 - Do not parse provider responses in Core “just for this one field.”
@@ -520,13 +486,13 @@ external Connection and server-side operations.
 - Prefer a maintained upstream tool/library over reimplementing a mature
   protocol, but keep provider-specific orchestration in the plugin.
 
-## 13. Completion checklist
+## 12. Completion checklist
 
 Before calling a plugin complete, verify all of the following:
 
 - The plugin implements an existing WIT world (Input or Broadcast).
 - New work targets contract `0.2` and a compatible current SDK.
-- Its stable IDs/references are documented and tested.
+- Its stable IDs and references are documented.
 - Manifest identity/version/runtime/API fields are valid.
 - All required network destinations are declared narrowly.
 - Credentials are host-owned and never logged/persisted by the plugin.
@@ -535,9 +501,9 @@ Before calling a plugin complete, verify all of the following:
 - No code assumes direct DB/Vault/host filesystem access.
 - `refresh`/`complete` or `prepare`/`publish` semantics are distinct where they
   need to be.
-- Typed errors and retryability are tested.
-- Malformed DTO/wire values fail loudly in tests.
-- The repository has focused contract tests and its normal lint/static checks
+- Typed errors and retryability match the contract.
+- Malformed DTO and wire values fail loudly.
+- The repository has normal lint and static checks
   pass.
 - The OCI build succeeds for each advertised architecture.
 - A produced artifact can be installed and invoked by a compatible Stashd Core.

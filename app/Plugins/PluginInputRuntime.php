@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
-use App\Downloads\DownloadedFile;
 use App\Downloads\AssetAcquisitionResult;
+use App\Downloads\DownloadedFile;
 use App\Downloads\DownloaderInterface;
 use App\Downloads\DownloadException;
 use App\Downloads\DownloadProbeResult;
@@ -30,9 +30,9 @@ use RuntimeException;
 use Stashd\PluginRuntime\Capabilities\CredentialGrant;
 use Stashd\PluginRuntime\Capabilities\Invocation;
 use Stashd\PluginRuntime\Package\PackageManager;
-use Stashd\PluginRuntime\Runner\PluginRunner;
-use Stashd\PluginRuntime\Runner\PluginProcess;
 use Stashd\PluginRuntime\Runner\PluginInvocationFailure;
+use Stashd\PluginRuntime\Runner\PluginProcess;
+use Stashd\PluginRuntime\Runner\PluginRunner;
 use Tempest\Cache\Cache;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Duration;
@@ -316,7 +316,7 @@ final readonly class PluginInputRuntime implements Provider, DownloaderInterface
         }
 
         $sensitiveValues = array_values(array_filter(array_map(static fn(mixed $credential): mixed => is_array($credential) ? ($credential['value'] ?? null) : null, is_array($params['credentials'] ?? null) ? $params['credentials'] : []), static fn(mixed $value): bool => is_string($value) && $value !== ''));
-        $invocation = new Invocation($package, $stage, array_values(array_unique($prefixes)), $credentials, helpers: $helperGrant === null ? [] : [$helperGrant], transport: new PluginBroadcastHttpTransport(getenv('STASHD_PLUGIN_HTTP_FIXTURE_DIR') ?: null), sensitiveValues: $sensitiveValues);
+        $invocation = new Invocation($package, $stage, array_values(array_unique($prefixes)), transport: new PluginBroadcastHttpTransport(), credentials: $credentials, helpers: $helperGrant === null ? [] : [$helperGrant], sensitiveValues: $sensitiveValues);
         $process = $this->runner->start($this->definition->id, $stage);
 
         try {

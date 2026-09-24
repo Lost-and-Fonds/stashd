@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Reusable "What Stashd will do" review surface. Purely presentational —
- * callers own the fixture analysis/timing and pass in a PreflightState.
+ * callers own the analysis/timing and pass in a PreflightState.
  * Renders whatever operations/notes it's given; carries no knowledge of
  * "hardlink"/"transcode"/"download" or of Input vs Broadcast.
  */

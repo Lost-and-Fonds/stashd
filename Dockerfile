@@ -92,7 +92,7 @@ COPY --from=composer /usr/bin/composer /usr/bin/composer
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential git pkg-config unzip \
     && rm -rf /var/lib/apt/lists/* \
-    && IPE_PROCESSOR_COUNT=2 install-php-extensions xdebug pcov
+    && IPE_PROCESSOR_COUNT=2 install-php-extensions xdebug
 
 COPY docker/php-dev.ini /usr/local/etc/php/conf.d/zz-stashd-dev.ini
 ENV XDEBUG_MODE=off
