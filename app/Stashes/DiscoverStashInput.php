@@ -82,7 +82,7 @@ final readonly class DiscoverStashInput
         // storage estimate are meaningful. Routine sync remains incremental.
         $selectionOptions = match ($intent->value) {
             'core.preflight', 'core.initial_backfill' => new StrategySelectionOptions(preferHighestCapability: true),
-            'core.sync_input' => $backfillMissing || $discoveryIntent === 'complete'
+            'core.sync_input' => $discoveryIntent === 'complete'
                 ? new StrategySelectionOptions(preferHighestCapability: true)
                 : new StrategySelectionOptions(preferIncremental: true),
             default => null,
