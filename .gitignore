@@ -1,5 +1,5 @@
 /vendor/
-/node_modules/
+/node_modules
 /dist/
 /auto-imports.d.ts
 /components.d.ts
@@ -15,6 +15,7 @@
 composer.phar
 /target/
 __pycache__/
+/.php-cs-fixer.cache
 /.env.lerd_override
 /.pi-lens/
 /.stashd/
