@@ -40,6 +40,49 @@ or public media catalogue.
 - Use code-as-paragraphs vertical spacing: separate logical control-flow and
   terminal steps with blank lines, without padding trivial blocks.
 
+### Repository identity and navigation
+
+This repository is **`Lost-and-Fonds/stashd`** on GitHub. Do not infer the
+GitHub owner or repository name from the local checkout path.
+
+Navigate the repository deliberately.
+
+For code-structure discovery, use LSP before grep.
+
+If the search concerns a class, interface, method, function, enum, constant,
+or other code symbol:
+
+1. Call `lsp_symbols` first.
+2. Use `lsp_definition` and `lsp_call_hierarchy` to follow the result.
+3. Use `lsp_references` when available to find callers and usages.
+4. Only use grep if LSP returns no useful match.
+
+Do not use grep merely to search several synonyms for a code concept.
+
+Use grep for exact strings, configuration keys, legacy terminology, error
+messages, serialized names, or when symbol navigation cannot answer the
+question.
+
+Read the smallest useful portions of files first. Expand only when surrounding
+context is needed.
+
+Before editing, establish:
+
+- the subsystem and architectural boundary involved;
+- the existing implementation points that own the behavior;
+- the relevant configuration or dependency boundary;
+- the narrowest existing tests that exercise it.
+
+For broad reconnaissance, use the task agent only when useful. When delegating
+code-structure discovery, explicitly tell it:
+
+> Use LSP symbol navigation first. Do not grep unless LSP cannot locate the
+> relevant implementation. Return only the relevant symbols, files, how they
+> relate, and the tests covering them. Do not propose or make changes.
+
+The main agent should prefer its own LSP tools for focused code navigation,
+especially when references or call relationships are needed.
+
 ## Plugin work: read this first
 
 For any task involving plugin authoring, plugin manifests, provider ports,

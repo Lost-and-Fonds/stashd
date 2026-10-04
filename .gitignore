@@ -1,5 +1,5 @@
 /vendor/
-/node_modules/
+/node_modules
 /dist/
 /auto-imports.d.ts
 /components.d.ts
@@ -25,3 +25,4 @@ __pycache__/
 # Alchemy
 .alchemy
 .env.lerd_override
+/.php-cs-fixer.cache
