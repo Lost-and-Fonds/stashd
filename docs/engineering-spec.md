@@ -1,1 +1,0 @@
-Stashd-Engineering-Specification.md

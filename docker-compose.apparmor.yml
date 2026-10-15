@@ -1,4 +1,0 @@
-services:
-  stashd:
-    security_opt:
-      - apparmor=stashd-plugin-bwrap
