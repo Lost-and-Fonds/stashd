@@ -48,6 +48,14 @@ final class OcflInspector
             }
 
             $path = $file->getPathname();
+            $objectRoot = dirname($path);
+
+            // Ignore optional version-directory inventory copies. All file
+            // paths in a manifest are relative to the OCFL object root.
+            if (!is_file($objectRoot . '/0=ocfl_object_1.1')) {
+                continue;
+            }
+
             $inventory = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
 
             if (is_array($inventory) && ($inventory['id'] ?? null) === $objectId) {
@@ -63,21 +71,14 @@ final class OcflInspector
      */
     public static function assertInventorySidecar(string $inventoryPath): void
     {
-        $found = false;
+        $inventory = json_decode((string) file_get_contents($inventoryPath), true, 512, JSON_THROW_ON_ERROR);
+        $algorithm = $inventory['digestAlgorithm'] ?? null;
+        Assert::assertContains($algorithm, ['sha512', 'sha256']);
 
-        foreach (['sha512', 'sha256'] as $algorithm) {
-            $sidecar = $inventoryPath . '.' . $algorithm;
-
-            if (!is_file($sidecar)) {
-                continue;
-            }
-
-            $found = true;
-            $tokens = preg_split('/\s+/', trim((string) file_get_contents($sidecar)));
-            Assert::assertSame(hash_file($algorithm, $inventoryPath), strtolower($tokens[0] ?? ''));
-        }
-
-        Assert::assertTrue($found, 'The object inventory must have a digest sidecar.');
+        $sidecar = $inventoryPath . '.' . $algorithm;
+        Assert::assertFileExists($sidecar);
+        $tokens = preg_split('/\s+/', trim((string) file_get_contents($sidecar)));
+        Assert::assertSame(hash_file($algorithm, $inventoryPath), strtolower($tokens[0] ?? ''));
     }
 
     /**
