@@ -6,13 +6,11 @@ use League\Flysystem\StorageAttributes;
 use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\Filesystem\Filesystem;
 use RuntimeException;
-use function Tempest\Mapper\map;
-use function Tempest\Support\str;
 
 class OcflFilesystemAdapter implements Filesystem
 {
     function __construct(
-        private readonly StashdStorage $storage
+        private readonly ArchiveStorage $storage
     ) {}
 
     public function read(string $path): string
@@ -67,7 +65,7 @@ class OcflFilesystemAdapter implements Filesystem
     {
         return $this->storage
             ->list($path)
-            ->map(fn (StorageAttributes $item) => basename($item->path()))
+            ->map(fn(StorageAttributes $item) => basename($item->path()))
             ->toArray();
     }
 
@@ -76,14 +74,13 @@ class OcflFilesystemAdapter implements Filesystem
      */
     public function listFilesRecursively(string $path): array
     {
+        $path = trim($path, '/');
+        $prefix = $path === '' ? '' : $path . '/';
+
         return $this->storage
             ->list($path, deep: true)
-            ->map(function (StorageAttributes $item) use ($path) {
-                return $item->isFile()
-                    ? str($item->path())->afterFirst($path . '/')
-                    : null;
-            })
-            ->filter(fn (?string $path) => $path !== null)
+            ->filter(fn(StorageAttributes $item) => $item->isFile())
+            ->map(fn(StorageAttributes $item) => substr($item->path(), strlen($prefix)))
             ->toArray();
     }
 

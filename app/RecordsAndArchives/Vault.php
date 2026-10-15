@@ -3,7 +3,7 @@
 namespace App\RecordsAndArchives;
 
 use App\RecordsAndArchives\Storage\OcflFilesystemAdapter;
-use App\RecordsAndArchives\Storage\StashdStorage;
+use App\RecordsAndArchives\Storage\ArchiveStorage;
 use Exception;
 use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\Storage\HashedNTupleStorageLayout;
@@ -22,7 +22,7 @@ class Vault
 
     public function __construct(
         #[Tag('vault')]
-        private readonly StashdStorage $storage,
+        private readonly ArchiveStorage $storage,
         private readonly Clock $clock,
     ) {}
 
