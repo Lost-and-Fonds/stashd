@@ -63,6 +63,8 @@ class Vault
         );
 
         $this->storage->write(self::IDENTITY_FILENAME, map($vaultIdentity)->toJson());
+
+        $this->identity = $vaultIdentity;
     }
 
     public function getIdentity(): ?VaultIdentity

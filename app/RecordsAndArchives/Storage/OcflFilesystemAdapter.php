@@ -7,6 +7,7 @@ use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\Filesystem\Filesystem;
 use RuntimeException;
 use function Tempest\Mapper\map;
+use function Tempest\Support\str;
 
 class OcflFilesystemAdapter implements Filesystem
 {
@@ -66,7 +67,7 @@ class OcflFilesystemAdapter implements Filesystem
     {
         return $this->storage
             ->list($path)
-            ->map(fn (StorageAttributes $item) => $item->path())
+            ->map(fn (StorageAttributes $item) => basename($item->path()))
             ->toArray();
     }
 
@@ -77,7 +78,12 @@ class OcflFilesystemAdapter implements Filesystem
     {
         return $this->storage
             ->list($path, deep: true)
-            ->map(fn (StorageAttributes $item) => $item->path())
+            ->map(function (StorageAttributes $item) use ($path) {
+                return $item->isFile()
+                    ? str($item->path())->afterFirst($path . '/')
+                    : null;
+            })
+            ->filter(fn (?string $path) => $path !== null)
             ->toArray();
     }
 
