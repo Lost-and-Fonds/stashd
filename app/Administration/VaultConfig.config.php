@@ -1,13 +1,14 @@
 <?php
 
-namespace App\Administration;
+declare(strict_types=1);
+
+use App\Administration\VaultConfig;
 
 use function Tempest\env;
+use function Tempest\root_path;
 
-final class VaultConfig
-{
-    public function __construct(
-        public readonly string $provider,
-        public readonly string $root
-    ) {}
-}
+// The only place we read the configured Vault provider and root.
+return new VaultConfig(
+    provider: env('VAULT_PROVIDER', default: 'local'),
+    root: env('VAULT_ROOT', default: root_path('storage/vault')),
+);
