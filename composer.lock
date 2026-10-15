@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "094a56280bfc6911b554951111bd1ad9",
+    "content-hash": "7076d8925c4b58f875317e212b6772b8",
     "packages": [
         {
             "name": "composer/semver",
@@ -1855,6 +1855,74 @@
                 "source": "https://github.com/nikic/PHP-Parser/tree/v5.9.0"
             },
             "time": "2026-09-13T18:51:52+00:00"
+        },
+        {
+            "name": "ottosmops/ocfl",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ottosmops/ocfl.git",
+                "reference": "b8c9ed5bd335f3653f248daaf9633c5f63234e35"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ottosmops/ocfl/zipball/b8c9ed5bd335f3653f248daaf9633c5f63234e35",
+                "reference": "b8c9ed5bd335f3653f248daaf9633c5f63234e35",
+                "shasum": ""
+            },
+            "require": {
+                "ext-hash": "*",
+                "ext-json": "*",
+                "ext-mbstring": "*",
+                "php": "^8.3"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.18",
+                "league/flysystem": "^3.0",
+                "league/flysystem-memory": "^3.31",
+                "pestphp/pest": "^3.5",
+                "phpstan/phpstan": "^2.0",
+                "rector/rector": "^2.0"
+            },
+            "suggest": {
+                "league/flysystem": "^3.0 — enables FlysystemFilesystem for S3/Azure/GCS/etc. backends"
+            },
+            "bin": [
+                "bin/ocfl"
+            ],
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Ottosmops\\Ocfl\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Andreas Kränzle",
+                    "email": "kraenzle@k-r.ch"
+                }
+            ],
+            "description": "PHP implementation of the Oxford Common File Layout (OCFL) v1.1 storage specification.",
+            "homepage": "https://github.com/ottosmops/ocfl",
+            "keywords": [
+                "archiving",
+                "digital-preservation",
+                "fixity",
+                "ocfl",
+                "oxford-common-file-layout",
+                "repository",
+                "storage",
+                "versioning"
+            ],
+            "support": {
+                "issues": "https://github.com/ottosmops/ocfl/issues",
+                "source": "https://github.com/ottosmops/ocfl"
+            },
+            "time": "2026-04-20T11:35:51+00:00"
         },
         {
             "name": "phpoption/phpoption",
