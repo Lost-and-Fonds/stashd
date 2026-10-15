@@ -31,7 +31,7 @@
         "fmt": "vendor/bin/mago fmt",
         "lint": "vendor/bin/mago lint --reporting-format=rich && vendor/bin/mago lint --fix --format-after-fix",
         "analyse": "vendor/bin/mago analyse",
-        "test": "vendor/bin/phpunit --display-warnings --display-skipped --display-deprecations --display-errors --display-notices",
+        "test": "@php ./vendor/bin/pest",
         "qa": [
             "composer fmt",
             "composer lint",
@@ -41,7 +41,13 @@
         "github:lint": "vendor/bin/mago lint --potentially-unsafe --minimum-fail-level=note --reporting-format=github",
         "github:fmt": "vendor/bin/mago fmt --check",
         "github:analyse": "vendor/bin/mago analyse",
-        "github:test": "vendor/bin/phpunit"
+        "github:test": "@test",
+        "test:ready": "@php ./vendor/bin/pest --exclude-testsuite=Acceptance",
+        "test:unit": "@php ./vendor/bin/pest --testsuite=Unit",
+        "test:feature": "@php ./vendor/bin/pest --testsuite=Feature",
+        "test:acceptance": "@php ./vendor/bin/pest --testsuite=Acceptance",
+        "test:archives": "@php ./vendor/bin/pest tests/Acceptance/RecordsAndArchives",
+        "test:vault": "@php ./vendor/bin/pest tests/Acceptance/RecordsAndArchives/VaultIdentityTest.php"
     },
     "license": "MIT",
     "minimum-stability": "dev",
@@ -52,5 +58,14 @@
             "carthage-software/mago": true,
             "pestphp/pest-plugin": true
         }
+    },
+    "scripts-descriptions": {
+        "test": "Run the complete Pest suite, including unfinished acceptance contracts.",
+        "test:ready": "Run Unit and Feature tests without incomplete acceptance contracts.",
+        "test:unit": "Run only Unit tests.",
+        "test:feature": "Run only Feature tests.",
+        "test:acceptance": "Run all departmental acceptance contracts.",
+        "test:archives": "Run Records & Archives acceptance contracts.",
+        "test:vault": "Run Vault identity and initialization acceptance contracts."
     }
 }
