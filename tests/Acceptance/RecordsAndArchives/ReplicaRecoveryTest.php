@@ -43,8 +43,12 @@ test('clean-room recovery retains the original Vault identity without the old pr
     $replica = $this->archive->path('replica');
     $this->archive->run('replica.sync', ['replica' => $replica]);
 
-    // The adapter MUST rebuild projections in a separate empty database and
-    // MUST NOT use the former primary, application cache or source plugins.
+    // Remove the actual canonical storage root before invoking recovery.
+    // The adapter must additionally use an empty database, fresh application
+    // context and no cached source-plugin data.
+    $this->archive->destroy('vault');
+    expect(file_exists($this->archive->path('vault')))->toBeFalse();
+
     $destination = $this->archive->path('restored-vault');
     $recovered = $this->archive->run('replica.recover', [
         'replica' => $replica,
