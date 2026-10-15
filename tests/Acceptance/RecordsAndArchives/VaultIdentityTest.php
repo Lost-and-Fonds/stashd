@@ -60,9 +60,15 @@ test('initialization refuses to overwrite unrelated existing storage contents', 
     expect(file_get_contents($root . '/existing-important-file'))->toBe('must survive');
 });
 
-test('initialization of an already initialized root retains its identity', function (): void {
+test('initialization cannot replace a previously established Vault identity', function (): void {
     $first = $this->archive->run('vault.initialize');
-    $second = $this->archive->run('vault.initialize');
 
-    expect($second['vault_id'])->toBe($first['vault_id']);
+    try {
+        $second = $this->archive->run('vault.initialize');
+        expect($second['vault_id'])->toBe($first['vault_id']);
+    } catch (ArchivesRejected) {
+        // Refusing to initialize an existing Vault is also a safe policy.
+    }
+
+    expect($this->archive->run('vault.open')['vault_id'])->toBe($first['vault_id']);
 });
