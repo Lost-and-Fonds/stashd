@@ -94,16 +94,37 @@ final class ArchiveFixture
     }
 
     /**
-     * Delete only this workspace, including test primary and replica roots.
+     * Physically destroy one isolated test root for a clean-room recovery.
+     */
+    public function destroy(string $relative): void
+    {
+        self::removeTree($this->path($relative));
+    }
+
+    /**
+     * Delete only this fixture's workspace, including all of its roots.
      */
     public function dispose(): void
     {
-        if (!is_dir($this->workspace)) {
+        self::removeTree($this->workspace);
+    }
+
+    /**
+     * Recursively remove a known disposable path without following links.
+     */
+    private static function removeTree(string $path): void
+    {
+        if (is_link($path) || is_file($path)) {
+            unlink($path);
+            return;
+        }
+
+        if (!is_dir($path)) {
             return;
         }
 
         $files = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($this->workspace, FilesystemIterator::SKIP_DOTS),
+            new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
             RecursiveIteratorIterator::CHILD_FIRST,
         );
 
@@ -115,6 +136,6 @@ final class ArchiveFixture
             }
         }
 
-        rmdir($this->workspace);
+        rmdir($path);
     }
 }
