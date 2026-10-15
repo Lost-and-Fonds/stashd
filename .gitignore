@@ -1,0 +1,43 @@
+# Dependencies
+/vendor/
+/node_modules/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.testing.example
+
+# Runtime files
+/storage/logs/
+/storage/cache/
+/var/cache/
+/var/log/
+/tmp/
+*.log
+
+# Tests and coverage
+/.phpunit.cache/
+/.phpunit.result.cache
+/coverage/
+/.phpunit-watcher.yml
+
+# Frontend build artifacts
+/public/build/
+/public/hot
+/dist/
+
+# IDEs and editors
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+
+# OS clutter
+.DS_Store
+Thumbs.db
+
+# Local Docker overrides
+/compose.override.yaml
+/docker-compose.override.yml
