@@ -1,0 +1,12 @@
+domains:
+  - core
+php_version: "8.5"
+node_version: "22"
+framework: tempest
+framework_version: "3"
+secured: true
+services:
+  - postgres
+workers:
+  - command_bus
+  - schedule
