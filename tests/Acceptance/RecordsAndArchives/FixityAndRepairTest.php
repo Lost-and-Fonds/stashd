@@ -55,7 +55,9 @@ test('corrupt inventory checksums invalidate object verification even if payload
     ]);
 
     $inventory = OcflInspector::inventoryFor($this->archive->path('vault'), $asset['object_id']);
-    file_put_contents($inventory['path'] . '.sha512', str_repeat('0', 128) . "  inventory.json\n");
+    $algorithm = is_file($inventory['path'] . '.sha512') ? 'sha512' : 'sha256';
+    $length = $algorithm === 'sha512' ? 128 : 64;
+    file_put_contents($inventory['path'] . '.' . $algorithm, str_repeat('0', $length) . "  inventory.json\n");
 
     $result = $this->archive->run('fixity.verify', ['object_id' => $asset['object_id']]);
 
