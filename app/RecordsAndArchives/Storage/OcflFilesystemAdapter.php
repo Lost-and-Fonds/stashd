@@ -1,7 +1,8 @@
 <?php
 
-namespace App\RecordsAndArchives;
+namespace App\RecordsAndArchives\Storage;
 
+use League\Flysystem\StorageAttributes;
 use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\Filesystem\Filesystem;
 use RuntimeException;
@@ -63,7 +64,10 @@ class OcflFilesystemAdapter implements Filesystem
      */
     public function listDirectory(string $path): array
     {
-        return map($this->storage->list($path))->toArray();
+        return $this->storage
+            ->list($path)
+            ->map(fn (StorageAttributes $item) => $item->path())
+            ->toArray();
     }
 
     /**
@@ -71,7 +75,10 @@ class OcflFilesystemAdapter implements Filesystem
      */
     public function listFilesRecursively(string $path): array
     {
-        return map($this->storage->list($path, true))->toArray();
+        return $this->storage
+            ->list($path, deep: true)
+            ->map(fn (StorageAttributes $item) => $item->path())
+            ->toArray();
     }
 
     /**

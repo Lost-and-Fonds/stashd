@@ -2,6 +2,8 @@
 
 namespace App\RecordsAndArchives;
 
+use App\RecordsAndArchives\Storage\OcflFilesystemAdapter;
+use App\RecordsAndArchives\Storage\StashdStorage;
 use Exception;
 use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\Storage\HashedNTupleStorageLayout;

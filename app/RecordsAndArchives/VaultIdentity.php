@@ -6,14 +6,14 @@ use Tempest\DateTime\DateTime;
 
 class VaultIdentity
 {
-    private DateTime $createdAt;
+    public DateTime $createdAt;
 
     function __construct(
         public string $format,
         public int $version,
         public string $identifier,
-        int $createdAt
+        string $createdAt
     ) {
-        $this->createdAt = DateTime::fromTimestamp($createdAt);
+        $this->createdAt = DateTime::parse($createdAt);
     }
 }

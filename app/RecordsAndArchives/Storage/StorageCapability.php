@@ -1,6 +1,6 @@
 <?php
 
-namespace App\RecordsAndArchives;
+namespace App\RecordsAndArchives\Storage;
 
 enum StorageCapability
 {
