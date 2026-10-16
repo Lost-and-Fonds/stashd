@@ -5,6 +5,7 @@ namespace App\RecordsAndArchives;
 use JsonSerializable;
 use League\Uri\Urn;
 use Tempest\DateTime\DateTime;
+use Tempest\DateTime\DateTimeInterface;
 use Tempest\DateTime\FormatPattern;
 use Tempest\Validation\Rules\HasDateTimeFormat;
 
@@ -17,7 +18,7 @@ class VaultIdentity implements JsonSerializable
         public Urn $identifier,
 
         #[HasDateTimeFormat(FormatPattern::ISO8601)]
-        public DateTime $createdAt
+        public DateTimeInterface $createdAt
     ) {}
 
     public static function fromJson(string $json): self

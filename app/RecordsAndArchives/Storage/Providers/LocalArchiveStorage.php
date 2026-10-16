@@ -2,13 +2,13 @@
 
 namespace App\RecordsAndArchives\Storage\Providers;
 
-use App\Administration\LocalStorageConfig;
 use App\RecordsAndArchives\Storage\ArchiveStorage;
 use App\RecordsAndArchives\Storage\StorageCapability;
 use DateTimeInterface;
 use InvalidArgumentException;
 use RuntimeException;
 use Tempest\Container\Tag;
+use Tempest\Storage\Config\LocalStorageConfig;
 use Tempest\Storage\DirectoryListing;
 use Tempest\Storage\Storage;
 
@@ -34,10 +34,6 @@ readonly class LocalArchiveStorage implements ArchiveStorage
      */
     public function move(string $source, string $destination): static
     {
-        // Validate and resolve storage-relative paths.
-        $source = $this->resolvePath($source);
-        $destination = $this->resolvePath($destination);
-
         // Tempest needs a relative path here, not an absolute one.
         $parent = dirname($destination);
 
@@ -45,6 +41,10 @@ readonly class LocalArchiveStorage implements ArchiveStorage
         if ($parent !== '.') {
             $this->storage->createDirectory($parent);
         }
+
+        // Validate and resolve storage-relative paths.
+        $source = $this->resolvePath($source);
+        $destination = $this->resolvePath($destination);
 
         // Resolve real directories, following any symlinks.
         $root = realpath($this->config->path);

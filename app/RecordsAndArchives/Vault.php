@@ -8,12 +8,11 @@ use Exception;
 use League\Uri\Urn;
 use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\Storage\HashedNTupleStorageLayout;
-use Ottosmops\Ocfl\Storage\StorageRoot;
+use Ottosmops\Ocfl\Storage\StorageRoot as OcflStorageRoot;
 use Symfony\Component\Uid\Uuid;
 use Tempest\Container\Singleton;
 use Tempest\Container\Tag;
 use function Tempest\Clock\now;
-use function Tempest\Mapper\map;
 
 #[Singleton]
 class Vault
@@ -28,7 +27,7 @@ class Vault
         private readonly ArchiveStorage $storage
     ) {}
 
-    public function open(): StorageRoot
+    public function open(): OcflStorageRoot
     {
         if (!$this->storage->fileExists(self::IDENTITY_FILENAME)) {
             throw new Exception('Vault identity does not exist');
@@ -36,9 +35,9 @@ class Vault
 
         $identityData = $this->storage->read(self::IDENTITY_FILENAME);
 
-        $this->identity = map($identityData)->to(VaultIdentity::class);
+        $this->identity = VaultIdentity::fromJson($identityData);
 
-        return StorageRoot::open(
+        return OcflStorageRoot::open(
             path: '',
             fs: new OcflFilesystemAdapter($this->storage)
         );
@@ -53,7 +52,7 @@ class Vault
             shortObjectRoot: false,
         );
 
-        StorageRoot::create(
+        OcflStorageRoot::create(
             path: '',
             layout: $layout,
             fs: new OcflFilesystemAdapter($this->storage)
@@ -66,7 +65,7 @@ class Vault
             createdAt: now()
         );
 
-        $this->storage->write(self::IDENTITY_FILENAME, json_encode($this->identity));
+        $this->storage->write(self::IDENTITY_FILENAME, json_encode($this->identity, JSON_THROW_ON_ERROR));
     }
 
     public function getIdentity(): ?VaultIdentity
