@@ -11,6 +11,7 @@ use InvalidArgumentException;
 use LogicException;
 use Ottosmops\Ocfl\Validation\ErrorCode;
 use Ottosmops\Ocfl\Validation\OcflException;
+use Symfony\Component\Uid\Uuid;
 use PHPUnit\Framework\IncompleteTestError;
 use Tempest\Clock\ClockInitializer;
 use Tempest\Container\GenericContainer;
@@ -37,7 +38,7 @@ final class LocalArchivesDriver implements ArchivesDriver
      */
     public function run(string $operation, array $arguments): array
     {
-        if (!in_array($operation, ['vault.initialize', 'vault.open', 'vault.list_objects'], true)) {
+        if (!in_array($operation, ['vault.initialize', 'vault.open', 'vault.list_objects', 'storage.ocfl_round_trip'], true)) {
             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
         }
 
@@ -60,6 +61,7 @@ final class LocalArchivesDriver implements ArchivesDriver
                 'vault.initialize' => self::initialize($vault),
                 'vault.open' => self::open($vault),
                 'vault.list_objects' => ['object_ids' => $vault->open()->listObjects()],
+                'storage.ocfl_round_trip' => self::ocflRoundTrip($vault),
             };
         } finally {
             GenericContainer::setInstance($previous);
@@ -107,6 +109,35 @@ final class LocalArchivesDriver implements ArchivesDriver
         }
 
         return ['vault_id' => self::identityId($vault)];
+    }
+
+    /**
+     * Exercise real OCFL version publication through Stashd's storage adapter.
+     *
+     * This is a storage-integration contract, not a substitute for the
+     * application-level Asset preservation tests.
+     *
+     * @return array{object_id: string, versions: list<string>}
+     */
+    private static function ocflRoundTrip(Vault $vault): array
+    {
+        $root = $vault->open();
+        $id = 'urn:uuid:' . Uuid::v4()->toRfc4122();
+
+        $object = $root->createObject($id);
+
+        $first = $object->newVersion()
+            ->addContents('example.txt', 'original bytes')
+            ->commit();
+
+        $second = $root->getObject($id)->newVersion()
+            ->addContents('example.txt', 'revised bytes')
+            ->commit();
+
+        return [
+            'object_id' => $id,
+            'versions' => [$first->head(), $second->head()],
+        ];
     }
 
     /**
