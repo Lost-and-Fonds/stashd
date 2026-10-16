@@ -7,20 +7,28 @@ durable records. They are not tests of mocked repositories.
 
 ## State of the suite
 
-The fresh dev branch has no Vault implementation yet, so these tests are presently
-**INCOMPLETE**, not green. This is intentional. The test fixture refuses to
-manufacture a successful result. The adapter is the first integration seam to
-implement as real application capabilities arrive.
+The default driver, `Tests\Support\RecordsAndArchives\LocalArchivesDriver`,
+runs implemented Vault operations against actual Stashd services, a real Tempest
+container and filesystem-backed OCFL storage. It builds a **fresh container for
+each operation** using the test's private storage root, so a reopen must load
+the durable Vault identity rather than reuse an in-memory singleton.
+
+Other operations stay **INCOMPLETE**, not green, until their real application
+capabilities exist. The driver must never manufacture successful receipts or
+substitute an in-memory Vault. This is the permanent local acceptance harness,
+not a separate smoke-test implementation.
 
 The one *test-only* interface is
-Tests\Support\RecordsAndArchives\ArchivesDriver. Point to an autoloadable class
-implementing it with the STASHD_ARCHIVES_ACCEPTANCE_DRIVER environment variable:
+`Tests\Support\RecordsAndArchives\ArchivesDriver`. To run against a different
+real backend, set `STASHD_ARCHIVES_ACCEPTANCE_DRIVER` to an autoloadable class
+implementing that interface:
 
     STASHD_ARCHIVES_ACCEPTANCE_DRIVER='Tests\YourRealArchivesDriver' ./vendor/bin/pest --testsuite=Acceptance
 
-Tests with no configured driver are marked incomplete by PHPUnit. A real driver
-must exercise the application and preserve genuine results or translate an
-expected domain rejection to ArchivesRejected; never return made-up outcomes.
+Drivers must exercise real application services and preserve genuine results
+or translate an expected domain rejection to ArchivesRejected. Unsupported
+operations should raise PHPUnit's IncompleteTestError; never return made-up
+outcomes.
 
 The tests' operation names and result arrays are **NOT** an app-level API design.
 The adapter is free to use real Tempest services, HTTP, CLI or supervised
@@ -44,6 +52,7 @@ fixtures. Do not point the driver at a user's working Vault.
 Every driver call receives workspace and primary plus explicit parameters.
 
 - vault.initialize and vault.open: return vault_id, an immutable string identity.
+- vault.list_objects: enumerate actual OCFL Object IDs from the storage root.
 - catalogue.list: return items (each entry includes object_id and uri) and assets.
 - catalogue.drop_projection: destroy only the disposable test catalogue DB/index.
 - asset.preserve: item_uri, asset_key, files (logical path to input filepath),
@@ -108,7 +117,9 @@ total-host-loss survival before a coherent replica recovery point.
 
 Write the whole department contract before implementation, but progress through
 one test group at a time. Start with VaultIdentityTest. Continue only after
-meaningful assertions pass against real persisted OCFL evidence. A test that
+meaningful assertions pass against real persisted OCFL evidence. The separate
+catalogue projection assertion will remain incomplete until catalogue services
+exist; successful Vault initialization alone does not prove a database projection. A test that
 is incomplete because the adapter is absent is not red and not proof.
 
 Codex and other implementers may write unit and integration tests freely. They
