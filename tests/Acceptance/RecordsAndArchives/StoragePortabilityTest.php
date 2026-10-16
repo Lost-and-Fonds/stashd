@@ -10,7 +10,9 @@ test('the local archival storage adapter commits and reopens two OCFL versions',
     $receipt = $this->archive->run('storage.ocfl_round_trip');
     $objectId = $receipt['object_id'];
 
-    expect($receipt['versions'])->toBe(['v1', 'v2']);
+    expect($receipt['versions'])->toBe(['v1', 'v2'])
+        ->and($receipt['listed_files'])->toContain('v1/content/example.txt')
+        ->toContain('v2/content/example.txt');
 
     $found = OcflInspector::inventoryFor($this->archive->path('vault'), $objectId);
 

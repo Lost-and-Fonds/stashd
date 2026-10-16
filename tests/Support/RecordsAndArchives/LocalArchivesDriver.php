@@ -117,7 +117,7 @@ final class LocalArchivesDriver implements ArchivesDriver
      * This is a storage-integration contract, not a substitute for the
      * application-level Asset preservation tests.
      *
-     * @return array{object_id: string, versions: list<string>}
+     * @return array{object_id: string, versions: list<string>, listed_files: list<string>}
      */
     private static function ocflRoundTrip(Vault $vault): array
     {
@@ -137,6 +137,7 @@ final class LocalArchivesDriver implements ArchivesDriver
         return [
             'object_id' => $id,
             'versions' => [$first->head(), $second->head()],
+            'listed_files' => $second->fs->listFilesRecursively($second->path),
         ];
     }
 
