@@ -10,9 +10,9 @@ use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\Storage\HashedNTupleStorageLayout;
 use Ottosmops\Ocfl\Storage\StorageRoot;
 use Symfony\Component\Uid\Uuid;
-use Tempest\Clock\Clock;
 use Tempest\Container\Singleton;
 use Tempest\Container\Tag;
+use function Tempest\Clock\now;
 use function Tempest\Mapper\map;
 
 #[Singleton]
@@ -25,8 +25,7 @@ class Vault
 
     public function __construct(
         #[Tag('vault')]
-        private readonly ArchiveStorage $storage,
-        private readonly Clock $clock,
+        private readonly ArchiveStorage $storage
     ) {}
 
     public function open(): StorageRoot
@@ -35,7 +34,9 @@ class Vault
             throw new Exception('Vault identity does not exist');
         }
 
-        $this->identity = map($this->storage->read(self::IDENTITY_FILENAME))->to(VaultIdentity::class);
+        $identityData = $this->storage->read(self::IDENTITY_FILENAME);
+
+        $this->identity = map($identityData)->to(VaultIdentity::class);
 
         return StorageRoot::open(
             path: '',
@@ -58,16 +59,14 @@ class Vault
             fs: new OcflFilesystemAdapter($this->storage)
         );
 
-        $vaultIdentity = new VaultIdentity(
+        $this->identity = new VaultIdentity(
             format: self::VAULT_FORMAT,
             version: self::VAULT_VERSION,
             identifier: Urn::fromRfc2141(nid: 'uuid', nss: Uuid::v4()->toRfc4122()),
-            createdAt: $this->clock->now()->toIso8601String()
+            createdAt: now()
         );
 
-        $this->storage->write(self::IDENTITY_FILENAME, map($vaultIdentity)->toJson());
-
-        $this->identity = $vaultIdentity;
+        $this->storage->write(self::IDENTITY_FILENAME, json_encode($this->identity));
     }
 
     public function getIdentity(): ?VaultIdentity

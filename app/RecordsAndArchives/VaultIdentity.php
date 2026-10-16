@@ -2,22 +2,47 @@
 
 namespace App\RecordsAndArchives;
 
+use JsonSerializable;
 use League\Uri\Urn;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\FormatPattern;
 use Tempest\Validation\Rules\HasDateTimeFormat;
 
-class VaultIdentity
+class VaultIdentity implements JsonSerializable
 {
-    #[HasDateTimeFormat(FormatPattern::ISO8601)]
-    public DateTime $createdAt;
 
-    function __construct(
+    public function __construct(
         public string $format,
         public int $version,
         public Urn $identifier,
-        string $createdAt
-    ) {
-        $this->createdAt = DateTime::parse($createdAt);
+
+        #[HasDateTimeFormat(FormatPattern::ISO8601)]
+        public DateTime $createdAt
+    ) {}
+
+    public static function fromJson(string $json): self
+    {
+        $data = json_decode(
+            $json,
+            associative: true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        return new self(
+            format: $data['format'],
+            version: $data['version'],
+            identifier: Urn::fromString($data['identifier']),
+            createdAt: DateTime::parse($data['createdAt']),
+        );
+    }
+
+    public function jsonSerialize(): array
+    {
+        return [
+            'format' => $this->format,
+            'version' => $this->version,
+            'identifier' => $this->identifier->toString(),
+            'createdAt' => $this->createdAt->format(FormatPattern::ISO8601),
+        ];
     }
 }
