@@ -6,7 +6,6 @@ namespace Tests\Support\RecordsAndArchives;
 
 use FilesystemIterator;
 use InvalidArgumentException;
-use PHPUnit\Framework\IncompleteTestError;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
@@ -71,13 +70,8 @@ final class ArchiveFixture
      */
     public function run(string $operation, array $arguments = []): array
     {
-        $class = getenv('STASHD_ARCHIVES_ACCEPTANCE_DRIVER');
-
-        if (!$class) {
-            throw new IncompleteTestError(
-                'Connect a real ArchivesDriver using STASHD_ARCHIVES_ACCEPTANCE_DRIVER.',
-            );
-        }
+        // Use the real local implementation unless a different backend is requested.
+        $class = getenv('STASHD_ARCHIVES_ACCEPTANCE_DRIVER') ?: LocalArchivesDriver::class;
 
         if (!class_exists($class) || !is_a($class, ArchivesDriver::class, true)) {
             throw new RuntimeException('The acceptance driver must implement ArchivesDriver.');
