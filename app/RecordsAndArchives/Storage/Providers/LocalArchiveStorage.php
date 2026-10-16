@@ -34,14 +34,6 @@ readonly class LocalArchiveStorage implements ArchiveStorage
      */
     public function move(string $source, string $destination): static
     {
-        // Tempest needs a relative path here, not an absolute one.
-        $parent = dirname($destination);
-
-        // Only create the parent directory if we're not already at the storage root.
-        if ($parent !== '.') {
-            $this->storage->createDirectory($parent);
-        }
-
         // Validate and resolve storage-relative paths.
         $source = $this->resolvePath($source);
         $destination = $this->resolvePath($destination);
