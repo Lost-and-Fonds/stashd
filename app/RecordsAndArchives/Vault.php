@@ -2,9 +2,10 @@
 
 namespace App\RecordsAndArchives;
 
-use App\RecordsAndArchives\Storage\OcflFilesystemAdapter;
 use App\RecordsAndArchives\Storage\ArchiveStorage;
+use App\RecordsAndArchives\Storage\OcflFilesystemAdapter;
 use Exception;
+use League\Uri\Urn;
 use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\Storage\HashedNTupleStorageLayout;
 use Ottosmops\Ocfl\Storage\StorageRoot;
@@ -18,6 +19,8 @@ use function Tempest\Mapper\map;
 class Vault
 {
     private const string IDENTITY_FILENAME = 'identity.json';
+    private const string VAULT_FORMAT = 'stashd-vault';
+    private const int VAULT_VERSION = 1;
     private ?VaultIdentity $identity = null;
 
     public function __construct(
@@ -56,9 +59,9 @@ class Vault
         );
 
         $vaultIdentity = new VaultIdentity(
-            format: 'stashd-vault',
-            version: 1,
-            identifier: 'urn:uuid:' . Uuid::v4()->toRfc4122(),
+            format: self::VAULT_FORMAT,
+            version: self::VAULT_VERSION,
+            identifier: Urn::fromRfc2141(nid: 'uuid', nss: Uuid::v4()->toRfc4122()),
             createdAt: $this->clock->now()->toIso8601String()
         );
 

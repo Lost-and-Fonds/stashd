@@ -34,21 +34,64 @@ readonly class LocalArchiveStorage implements ArchiveStorage
      */
     public function move(string $source, string $destination): static
     {
-        // Resolve both paths within the configured storage root.
+        // Validate and resolve storage-relative paths.
         $source = $this->resolvePath($source);
         $destination = $this->resolvePath($destination);
 
-        // Ensure both paths are on the same filesystem.
-        if (stat($source)['dev'] !== stat($destination)['dev']) {
-            throw new InvalidArgumentException('Cannot move files between different storage devices');
+        // Tempest needs a relative path here, not an absolute one.
+        $parent = dirname($destination);
+
+        // Only create the parent directory if we're not already at the storage root.
+        if ($parent !== '.') {
+            $this->storage->createDirectory($parent);
         }
 
-        // Ensure the destination parent directory exists.
-        $this->storage->createDirectory(dirname($destination));
+        // Resolve real directories, following any symlinks.
+        $root = realpath($this->config->path);
+        $sourceParent = realpath(dirname($source));
+        $destinationParent = realpath(dirname($destination));
 
-        // Perform the native rename.
-        // Throw if the operation fails.
-        rename($source, $destination) or throw new RuntimeException('Failed to rename file');
+        // Make sure all the directories exist.
+        if ($root === false || $sourceParent === false || $destinationParent === false) {
+            throw new RuntimeException('Storage directory does not exist');
+        }
+
+        // OCFL currently publishes by renaming sibling entries.
+        // Same actual directory means same filesystem.
+        if ($sourceParent !== $destinationParent) {
+            throw new RuntimeException('Atomic rename requires the same directory');
+        }
+
+        $parent = $sourceParent;
+
+        if ($parent !== $root && !str_starts_with($parent, $root . DIRECTORY_SEPARATOR)) {
+            throw new RuntimeException('Path escapes the Vault root');
+        }
+
+        // Do not accept symbolic links as source or destination.
+        if (is_link($source) || is_link($destination)) {
+            throw new RuntimeException('Cannot rename symbolic links');
+        }
+
+        $sourceIsDirectory = is_dir($source);
+
+        if (!$sourceIsDirectory && !is_file($source)) {
+            throw new RuntimeException('Rename source does not exist');
+        }
+
+        // Version directories must never replace existing content.
+        if ($sourceIsDirectory && file_exists($destination)) {
+            throw new RuntimeException('Destination directory already exists');
+        }
+
+        // File replacement is permitted for the OCFL root inventory.
+        if (!$sourceIsDirectory && is_dir($destination)) {
+            throw new RuntimeException('Cannot replace a directory with a file');
+        }
+
+        if (!@rename($source, $destination)) {
+            throw new RuntimeException('Atomic rename failed');
+        }
 
         return $this;
     }

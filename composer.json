@@ -4,7 +4,9 @@
     "require": {
         "tempest/framework": "^3.0",
         "ext-intl": "*",
-        "ottosmops/ocfl": "*"
+        "ottosmops/ocfl": "*",
+        "symfony/lock": "^8.1",
+        "league/uri": "^7.8"
     },
     "require-dev": {
         "pestphp/pest": "^v5.3.2",
