@@ -9,7 +9,7 @@ test('a new installation creates one persistent logical Vault identity', functio
     $created = $this->archive->run('vault.initialize');
     $opened = $this->archive->run('vault.open');
 
-    expect($created['vault_id'])->toBeString()->not->toBeEmpty()
+    expect($created['vault_id'])->toBeString()->toStartWith('urn:uuid:')
         ->and($opened['vault_id'])->toBe($created['vault_id']);
 
     OcflInspector::assertRoot($this->archive->path('vault'));
@@ -32,6 +32,14 @@ test('two separately initialized installations are not the same Vault', function
     expect($second['vault_id'])->not->toBe($first['vault_id']);
 
     OcflInspector::assertRoot($this->archive->path('another-vault'));
+});
+
+test('a new Vault has no OCFL Objects on disk', function (): void {
+    $this->archive->run('vault.initialize');
+
+    $objects = $this->archive->run('vault.list_objects');
+
+    expect($objects['object_ids'])->toBe([]);
 });
 
 test('an empty new Vault has no archived Items or Assets', function (): void {
