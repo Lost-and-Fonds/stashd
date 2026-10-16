@@ -8,7 +8,7 @@ durable records. They are not tests of mocked repositories.
 ## State of the suite
 
 The default driver, `Tests\Support\RecordsAndArchives\LocalArchivesDriver`,
-runs implemented Vault operations against actual Stashd services, a real Tempest
+runs implemented Vault and storage operations against actual Stashd services, a real Tempest
 container and filesystem-backed OCFL storage. It builds a **fresh container for
 each operation** using the test's private storage root, so a reopen must load
 the durable Vault identity rather than reuse an in-memory singleton.
@@ -53,6 +53,9 @@ Every driver call receives workspace and primary plus explicit parameters.
 
 - vault.initialize and vault.open: return vault_id, an immutable string identity.
 - vault.list_objects: enumerate actual OCFL Object IDs from the storage root.
+- storage.ocfl_round_trip: commit two versions directly through the real OCFL
+  storage adapter and return their actual Object ID and version names. This is
+  a backend integration check, not an application-level Asset preservation receipt.
 - catalogue.list: return items (each entry includes object_id and uri) and assets.
 - catalogue.drop_projection: destroy only the disposable test catalogue DB/index.
 - asset.preserve: item_uri, asset_key, files (logical path to input filepath),
@@ -119,8 +122,9 @@ Write the whole department contract before implementation, but progress through
 one test group at a time. Start with VaultIdentityTest. Continue only after
 meaningful assertions pass against real persisted OCFL evidence. The separate
 catalogue projection assertion will remain incomplete until catalogue services
-exist; successful Vault initialization alone does not prove a database projection. A test that
-is incomplete because the adapter is absent is not red and not proof.
+exist; successful Vault initialization alone does not prove a database
+projection. A test that is incomplete because its application capability is
+not implemented is not red and not proof.
 
 Codex and other implementers may write unit and integration tests freely. They
 must not silently change acceptance expectations to match an implementation.
