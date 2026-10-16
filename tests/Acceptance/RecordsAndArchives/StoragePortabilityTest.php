@@ -4,6 +4,35 @@ declare(strict_types=1);
 
 use Tests\Support\RecordsAndArchives\OcflInspector;
 
+test('the local archival storage adapter commits and reopens two OCFL versions', function (): void {
+    $this->archive->run('vault.initialize');
+
+    $receipt = $this->archive->run('storage.ocfl_round_trip');
+    $objectId = $receipt['object_id'];
+
+    expect($receipt['versions'])->toBe(['v1', 'v2']);
+
+    $found = OcflInspector::inventoryFor($this->archive->path('vault'), $objectId);
+
+    expect($found['inventory']['head'])->toBe('v2');
+    OcflInspector::assertInventorySidecar($found['path']);
+
+    foreach (['v1' => 'original bytes', 'v2' => 'revised bytes'] as $version => $expected) {
+        $physical = OcflInspector::payloadPath(
+            $this->archive->path('vault'),
+            $objectId,
+            $version,
+            'example.txt',
+        );
+
+        expect(file_get_contents($physical))->toBe($expected);
+    }
+
+    // Reopen with another Tempest container, not a cached OCFL object.
+    $this->archive->run('vault.open');
+    expect(OcflInspector::inventoryFor($this->archive->path('vault'), $objectId)['inventory']['head'])->toBe('v2');
+});
+
 test('the actual configured backend, not the logical Vault, reports storage capabilities', function (): void {
     $this->archive->run('vault.initialize');
 
