@@ -7,10 +7,10 @@ use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\Filesystem\Filesystem;
 use RuntimeException;
 
-class OcflFilesystemAdapter implements Filesystem
+readonly class OcflFilesystemAdapter implements Filesystem
 {
-    function __construct(
-        private readonly ArchiveStorage $storage
+    public function __construct(
+        private ArchiveStorage $storage
     ) {}
 
     public function read(string $path): string

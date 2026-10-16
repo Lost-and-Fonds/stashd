@@ -42,3 +42,4 @@ Thumbs.db
 /compose.override.yaml
 /docker-compose.override.yml
 .env.before_lerd
+/.tempest/scheduler/last-schedule-run.cache.php
