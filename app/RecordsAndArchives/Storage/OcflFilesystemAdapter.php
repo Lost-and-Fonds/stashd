@@ -2,7 +2,6 @@
 
 namespace App\RecordsAndArchives\Storage;
 
-use League\Flysystem\StorageAttributes;
 use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\Filesystem\Filesystem;
 use RuntimeException;
@@ -68,10 +67,13 @@ readonly class OcflFilesystemAdapter implements Filesystem
      */
     public function listDirectory(string $path): array
     {
-        return $this->storage
-            ->list(self::normalizePath($path))
-            ->map(fn(StorageAttributes $item) => basename($item->path()))
-            ->toArray();
+        $names = [];
+
+        foreach ($this->storage->list(self::normalizePath($path))->toArray() as $item) {
+            $names[] = basename($item->path());
+        }
+
+        return $names;
     }
 
     /**
@@ -82,11 +84,17 @@ readonly class OcflFilesystemAdapter implements Filesystem
         $path = self::normalizePath($path);
         $prefix = $path === '' ? '' : $path . '/';
 
-        return $this->storage
-            ->list($path, deep: true)
-            ->filter(fn(StorageAttributes $item) => $item->isFile())
-            ->map(fn(StorageAttributes $item) => substr($item->path(), strlen($prefix)))
-            ->toArray();
+        $files = [];
+
+        foreach ($this->storage->list($path, deep: true)->toArray() as $item) {
+            if (!$item->isFile()) {
+                continue;
+            }
+
+            $files[] = substr($item->path(), strlen($prefix));
+        }
+
+        return $files;
     }
 
     /**
