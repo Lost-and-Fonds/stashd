@@ -9,7 +9,7 @@ use RuntimeException;
 readonly class OcflFilesystemAdapter implements Filesystem
 {
     public function __construct(
-        private ArchiveStorage $storage
+        private ArchiveStorage $storage,
     ) {}
 
     private static function normalizePath(string $path): string
@@ -29,6 +29,27 @@ readonly class OcflFilesystemAdapter implements Filesystem
 
     public function copy(string $source, string $destination): void
     {
+        if (is_link($source)) {
+            throw new RuntimeException('Source file may not be a symbolic link');
+        }
+
+        if (str_starts_with($source, '/') && is_file($source)) {
+
+            $stream = fopen($source, 'rb');
+
+            if ($stream === false) {
+                throw new RuntimeException('Could not open source file stream');
+            }
+
+            try {
+                $this->storage->writeStream(self::normalizePath($destination), $stream);
+            } finally {
+                fclose($stream);
+            }
+
+            return;
+        }
+
         $this->storage->copy(self::normalizePath($source), self::normalizePath($destination));
     }
 
@@ -87,7 +108,7 @@ readonly class OcflFilesystemAdapter implements Filesystem
         $files = [];
 
         foreach ($this->storage->list($path, deep: true)->toArray() as $item) {
-            if (!$item->isFile()) {
+            if (! $item->isFile()) {
                 continue;
             }
 
@@ -104,9 +125,17 @@ readonly class OcflFilesystemAdapter implements Filesystem
         string $path,
         DigestAlgorithm $algorithm,
     ): string {
-        $stream = $this->storage->readStream(self::normalizePath($path));
+        if (is_link($path)) {
+            throw new RuntimeException('Source file may not be a symbolic link');
+        }
 
-        if (!is_resource($stream)) {
+        if (str_starts_with($path, '/') && is_file($path)) {
+            $stream = fopen($path, 'rb');
+        } else {
+            $stream = $this->storage->readStream(self::normalizePath($path));
+        }
+
+        if (! is_resource($stream)) {
             throw new RuntimeException('Could not open file stream');
         }
 
