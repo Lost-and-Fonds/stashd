@@ -2,7 +2,7 @@
 
 namespace App\RecordsAndArchives;
 
-enum ObjectType: string
+enum IdentifierType: string
 {
     case Item = 'item';
     case Asset = 'asset';

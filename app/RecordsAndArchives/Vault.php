@@ -62,20 +62,23 @@ class Vault
         $this->identity = new VaultIdentity(
             format: self::VAULT_FORMAT,
             version: self::VAULT_VERSION,
-            identifier: $this->newObjectId(ObjectType::Vault),
+            identifier: $this->urnFromUuid(IdentifierType::Vault),
             createdAt: now()
         );
 
-        $this->storage->write(self::IDENTITY_FILENAME, json_encode($this->identity, JSON_THROW_ON_ERROR));
+        $this->storage->write(
+            location: self::IDENTITY_FILENAME,
+            contents: json_encode($this->identity, JSON_THROW_ON_ERROR));
     }
 
-    public function createObject(ObjectType $type, array $files): OcflObject
+    public function createObject(IdentifierType $type, ?Uuid $uuid = null, array $files = []): OcflObject
     {
         $object = $this->open()->createObject(
-            id: $this->newObjectId($type)->toString()
+            id: $this->urnFromUuid($type, $uuid)->toString()
         );
 
         $version = $object->newVersion();
+
 
         foreach ($files as $logicalPath => $sourcePath) {
             $version = $version->addFile($logicalPath, $sourcePath);
@@ -84,10 +87,10 @@ class Vault
         return $version->commit();
     }
 
-    public function updateObject(Urn $objectId, array $files): OcflObject
+    public function updateObject(Urn $objectUrn, array $files): OcflObject
     {
         $object = $this->open()->getObject(
-            id: $objectId->toString()
+            id: $objectUrn->toString()
         );
 
         $version = $object->newVersion();
@@ -104,10 +107,12 @@ class Vault
         return $this->identity;
     }
 
-    public function newObjectId(ObjectType $type): Urn
+    public function urnFromUuid(IdentifierType $type, ?Uuid $uuid = null): Urn
     {
+        $uuid ??= Uuid::v4();
+
         return Urn::fromRfc2141(
             nid: 'stashd',
-            nss: $type->value . ':' . Uuid::v4()->toRfc4122());
+            nss: $type->value . ':' . $uuid->toRfc4122());
     }
 }
