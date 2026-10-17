@@ -26,12 +26,11 @@ it('excludes another process for the same Object URN while allowing unrelated lo
         . '$id = \League\Uri\Urn::fromString($argv[1]);'
         . '$container = new \Tempest\Container\GenericContainer();'
         . '$factory = (new \App\RecordsAndArchives\Concurrency\LockFactoryInitializer())->initialize($container);'
-        . '(new \App\RecordsAndArchives\Concurrency\ObjectWriteLock($factory))->exclusiveWrite($id, function () { echo "READY\\n"; flush(); sleep(2); });',
+        . '(new \App\RecordsAndArchives\Concurrency\ObjectWriteLock($factory))->exclusiveWrite($id, function () { echo "READY\\n"; flush(); fgets(STDIN); });',
         $objectId->toString(),
     ], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, dirname(__DIR__, 3));
 
     expect(is_resource($process))->toBeTrue();
-    fclose($pipes[0]);
 
     try {
         $ready = false;
@@ -69,7 +68,22 @@ it('excludes another process for the same Object URN while allowing unrelated lo
             $unprefixed->release();
         }
     } finally {
-        proc_terminate($process);
+        fwrite($pipes[0], "RELEASE\n");
+        fclose($pipes[0]);
+
+        $deadline = microtime(true) + 2;
+        do {
+            $status = proc_get_status($process);
+            if (!$status['running']) {
+                break;
+            }
+            usleep(10_000);
+        } while (microtime(true) < $deadline);
+
+        if ($status['running']) {
+            proc_terminate($process);
+        }
+
         fclose($pipes[1]);
         fclose($pipes[2]);
         proc_close($process);
