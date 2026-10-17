@@ -7,6 +7,7 @@ use App\RecordsAndArchives\Storage\OcflFilesystemAdapter;
 use Exception;
 use League\Uri\Urn;
 use Ottosmops\Ocfl\DigestAlgorithm;
+use Ottosmops\Ocfl\OcflObject;
 use Ottosmops\Ocfl\Storage\HashedNTupleStorageLayout;
 use Ottosmops\Ocfl\Storage\StorageRoot as OcflStorageRoot;
 use Symfony\Component\Uid\Uuid;
@@ -61,15 +62,52 @@ class Vault
         $this->identity = new VaultIdentity(
             format: self::VAULT_FORMAT,
             version: self::VAULT_VERSION,
-            identifier: Urn::fromRfc2141(nid: 'uuid', nss: Uuid::v4()->toRfc4122()),
+            identifier: $this->newObjectId(ObjectType::Vault),
             createdAt: now()
         );
 
         $this->storage->write(self::IDENTITY_FILENAME, json_encode($this->identity, JSON_THROW_ON_ERROR));
     }
 
+    public function createObject(ObjectType $type, array $files): OcflObject
+    {
+        $object = $this->open()->createObject(
+            id: $this->newObjectId($type)->toString()
+        );
+
+        $version = $object->newVersion();
+
+        foreach ($files as $logicalPath => $sourcePath) {
+            $version = $version->addFile($logicalPath, $sourcePath);
+        }
+
+        return $version->commit();
+    }
+
+    public function updateObject(Urn $objectId, array $files): OcflObject
+    {
+        $object = $this->open()->getObject(
+            id: $objectId->toString()
+        );
+
+        $version = $object->newVersion();
+
+        foreach ($files as $logicalPath => $sourcePath) {
+            $version = $version->addFile($logicalPath, $sourcePath);
+        }
+
+        return $version->commit();
+    }
+
     public function getIdentity(): ?VaultIdentity
     {
         return $this->identity;
+    }
+
+    public function newObjectId(ObjectType $type): Urn
+    {
+        return Urn::fromRfc2141(
+            nid: 'stashd',
+            nss: $type->value . ':' . Uuid::v4()->toRfc4122());
     }
 }
