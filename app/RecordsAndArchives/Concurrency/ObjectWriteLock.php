@@ -8,6 +8,8 @@ use Symfony\Component\Lock\LockFactory;
 
 class ObjectWriteLock
 {
+    private const RESOURCE_PREFIX = 'stashd:object-write:';
+
     function __construct(
         private readonly LockFactory $lockFactory
     ) {}
@@ -15,7 +17,7 @@ class ObjectWriteLock
     public function exclusiveWrite(Urn $objectId, callable $callback): mixed
     {
         $lock = $this->lockFactory->createLock(
-            resource: $objectId->toString(),
+            resource: self::RESOURCE_PREFIX . $objectId->toString(),
             ttl: null
         );
 
