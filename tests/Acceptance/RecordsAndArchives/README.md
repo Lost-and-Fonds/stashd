@@ -53,6 +53,8 @@ Every driver call receives workspace and primary plus explicit parameters.
 
 - vault.initialize and vault.open: return vault_id, an immutable string identity.
 - vault.list_objects: enumerate actual OCFL Object IDs from the storage root.
+- vault.object_stream_read: object_id, version, logical_path; return a readable
+  stream for that exact archived file. The caller closes the stream.
 - storage.ocfl_round_trip: commit two versions directly through the real OCFL
   storage adapter and return their actual Object ID and version names. This is
   a backend integration check, not an application-level Asset preservation receipt.

@@ -40,7 +40,7 @@ final class LocalArchivesDriver implements ArchivesDriver
     {
         if (! in_array(
             $operation,
-            ['vault.initialize', 'vault.open', 'vault.list_objects', 'storage.ocfl_round_trip', 'vault.object_create', 'vault.object_update', 'vault.object_read'],
+            ['vault.initialize', 'vault.open', 'vault.list_objects', 'storage.ocfl_round_trip', 'vault.object_create', 'vault.object_update', 'vault.object_read', 'vault.object_stream_read'],
             true,
         )) {
             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
@@ -69,6 +69,7 @@ final class LocalArchivesDriver implements ArchivesDriver
                 'vault.object_create' => self::createObject($vault, $arguments),
                 'vault.object_update' => self::updateObject($vault, $arguments),
                 'vault.object_read' => self::readObject($vault, $arguments),
+                'vault.object_stream_read' => self::readObjectStream($vault, $arguments),
             };
         } finally {
             GenericContainer::setInstance($previous);
@@ -173,6 +174,16 @@ final class LocalArchivesDriver implements ArchivesDriver
     private static function readObject(Vault $vault, array $arguments): array
     {
         return ['bytes' => $vault->readObjectContent(
+            \League\Uri\Urn::fromString($arguments['object_id']),
+            $arguments['version'],
+            $arguments['logical_path'],
+        )];
+    }
+
+    /** @param array<string, mixed> $arguments @return array{stream: resource} */
+    private static function readObjectStream(Vault $vault, array $arguments): array
+    {
+        return ['stream' => $vault->readObjectStream(
             \League\Uri\Urn::fromString($arguments['object_id']),
             $arguments['version'],
             $arguments['logical_path'],

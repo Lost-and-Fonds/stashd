@@ -106,3 +106,114 @@ test('a failed first write can retry an uncommitted Object UUID', function (): v
         ])['bytes'],
     )->toBe('retried');
 });
+
+test('stream reads resolve the requested historical version', function (): void {
+    $this->archive->run('vault.initialize');
+    $created = $this->archive->run('vault.object_create', [
+        'type' => 'asset',
+        'uuid' => '123e4567-e89b-12d3-a456-426614174203',
+        'files' => ['data.bin' => ['contents' => 'version one']],
+    ]);
+    $updated = $this->archive->run('vault.object_update', [
+        'object_id' => $created['object_id'],
+        'files' => ['data.bin' => ['contents' => 'version two']],
+    ]);
+
+    foreach ([[$created, 'version one'], [$updated, 'version two']] as [$receipt, $expected]) {
+        $stream = $this->archive->run('vault.object_stream_read', [
+            'object_id' => $created['object_id'],
+            'version' => $receipt['version'],
+            'logical_path' => 'data.bin',
+        ])['stream'];
+
+        try {
+            expect(stream_get_contents($stream))->toBe($expected);
+        } finally {
+            fclose($stream);
+        }
+    }
+});
+
+test('stream reads reject missing Objects, versions, and logical paths', function (): void {
+    $this->archive->run('vault.initialize');
+    $created = $this->archive->run('vault.object_create', [
+        'type' => 'asset',
+        'uuid' => '123e4567-e89b-12d3-a456-426614174204',
+        'files' => ['data.bin' => ['contents' => 'present']],
+    ]);
+
+    expect(fn () => $this->archive->run('vault.object_stream_read', [
+        'object_id' => 'urn:stashd:asset:123e4567-e89b-12d3-a456-426614174205',
+        'version' => 'v1',
+        'logical_path' => 'data.bin',
+    ]))->toThrow(Ottosmops\Ocfl\Validation\OcflException::class);
+
+    expect(fn () => $this->archive->run('vault.object_stream_read', [
+        'object_id' => $created['object_id'],
+        'version' => 'v9',
+        'logical_path' => 'data.bin',
+    ]))->toThrow(OutOfBoundsException::class);
+
+    expect(fn () => $this->archive->run('vault.object_stream_read', [
+        'object_id' => $created['object_id'],
+        'version' => 'v1',
+        'logical_path' => 'missing.bin',
+    ]))->toThrow(OutOfBoundsException::class);
+});
+
+test('large historical content streams with bounded PHP memory', function (): void {
+    $this->archive->run('vault.initialize');
+    $path = $this->archive->path('inputs/large.bin');
+    mkdir(dirname($path), 0o700, true);
+    $output = fopen($path, 'wb');
+    $chunk = str_repeat('0123456789abcdef', 4096);
+    $expectedHash = hash_init('sha256');
+    $bytes = 32 * 1024 * 1024;
+
+    try {
+        for ($written = 0; $written < $bytes; $written += strlen($chunk)) {
+            if (fwrite($output, $chunk) !== strlen($chunk)) {
+                throw new RuntimeException('Failed while creating large test content.');
+            }
+
+            hash_update($expectedHash, $chunk);
+        }
+    } finally {
+        fclose($output);
+    }
+
+    $created = $this->archive->run('vault.object_create', [
+        'type' => 'asset',
+        'uuid' => '123e4567-e89b-12d3-a456-426614174206',
+        'files' => ['large.bin' => $path],
+    ]);
+
+    $baseline = memory_get_usage(false);
+    memory_reset_peak_usage();
+    $stream = $this->archive->run('vault.object_stream_read', [
+        'object_id' => $created['object_id'],
+        'version' => $created['version'],
+        'logical_path' => 'large.bin',
+    ])['stream'];
+    $actualHash = hash_init('sha256');
+    $read = 0;
+
+    try {
+        while (! feof($stream)) {
+            $buffer = fread($stream, 64 * 1024);
+
+            if ($buffer === false) {
+                throw new RuntimeException('Failed while reading archived test content.');
+            }
+
+            $read += strlen($buffer);
+            hash_update($actualHash, $buffer);
+        }
+    } finally {
+        fclose($stream);
+    }
+
+    expect($read)->toBe($bytes)
+        ->and(hash_final($actualHash))->toBe(hash_final($expectedHash))
+        ->and(memory_get_peak_usage(false) - $baseline)->toBeLessThan(2 * 1024 * 1024);
+});

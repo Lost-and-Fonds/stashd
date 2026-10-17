@@ -8,6 +8,7 @@ use App\RecordsAndArchives\Storage\OcflFilesystemAdapter;
 use Exception;
 use InvalidArgumentException;
 use League\Uri\Urn;
+use RuntimeException;
 use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\OcflObject;
 use Ottosmops\Ocfl\VersionBuilder;
@@ -137,7 +138,42 @@ class Vault
 
     public function readObjectContent(Urn $objectUrn, string $version, string $logicalPath): string
     {
-        return $this->open()->getObject(id: $objectUrn->toString())->readContent($version, $logicalPath);
+        $stream = $this->readObjectStream($objectUrn, $version, $logicalPath);
+
+        try {
+            $contents = stream_get_contents($stream);
+
+            if ($contents === false) {
+                throw new RuntimeException('Could not read archived content stream.');
+            }
+
+            return $contents;
+        } finally {
+            fclose($stream);
+        }
+    }
+
+    /**
+     * Open an exact-version file as a stream. The caller owns and must close it.
+     *
+     * @return resource
+     */
+    public function readObjectStream(Urn $objectUrn, string $version, string $logicalPath): mixed
+    {
+        $object = $this->open()->getObject(id: $objectUrn->toString());
+        $physicalPath = $object->path . '/' . $object->resolveContentPath($version, $logicalPath);
+
+        if (! $this->storage->fileExists($physicalPath)) {
+            throw new OcflException(ErrorCode::E092, "Archived content missing at '{$physicalPath}'.");
+        }
+
+        $stream = $this->storage->readStream($physicalPath);
+
+        if (! is_resource($stream)) {
+            throw new RuntimeException("Could not open archived content stream for '{$logicalPath}'.");
+        }
+
+        return $stream;
     }
 
     public function getIdentity(): ?VaultIdentity

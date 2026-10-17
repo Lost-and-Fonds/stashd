@@ -9,7 +9,7 @@ test('a new installation creates one persistent logical Vault identity', functio
     $created = $this->archive->run('vault.initialize');
     $opened = $this->archive->run('vault.open');
 
-    expect($created['vault_id'])->toBeString()->toStartWith('urn:uuid:')
+    expect($created['vault_id'])->toBeString()->toStartWith('urn:stashd:vault:')
         ->and($opened['vault_id'])->toBe($created['vault_id']);
 
     OcflInspector::assertRoot($this->archive->path('vault'));
