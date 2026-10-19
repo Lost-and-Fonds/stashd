@@ -8,14 +8,14 @@ use App\RecordsAndArchives\Storage\OcflFilesystemAdapter;
 use Exception;
 use InvalidArgumentException;
 use League\Uri\Urn;
-use RuntimeException;
 use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\OcflObject;
-use Ottosmops\Ocfl\VersionBuilder;
 use Ottosmops\Ocfl\Storage\HashedNTupleStorageLayout;
 use Ottosmops\Ocfl\Storage\StorageRoot as OcflStorageRoot;
 use Ottosmops\Ocfl\Validation\ErrorCode;
 use Ottosmops\Ocfl\Validation\OcflException;
+use Ottosmops\Ocfl\VersionBuilder;
+use RuntimeException;
 use Symfony\Component\Uid\Uuid;
 use Tempest\Container\Singleton;
 use Tempest\Container\Tag;
@@ -85,6 +85,7 @@ class Vault
 
     public function createObject(IdentifierType $type, ?Uuid $uuid = null, array $files = []): OcflObject
     {
+        $this->validateFiles($files);
         $id = $this->urnFromUuid($type, $uuid);
 
         return $this->writeLock->exclusiveWrite($id, function () use ($id, $files): OcflObject {
@@ -105,6 +106,8 @@ class Vault
 
     public function updateObject(Urn $objectUrn, array $files): OcflObject
     {
+        $this->validateFiles($files);
+
         return $this->writeLock->exclusiveWrite($objectUrn, function () use ($objectUrn, $files): OcflObject {
             $version = $this->open()->getObject(id: $objectUrn->toString())->newVersion();
 
@@ -112,25 +115,43 @@ class Vault
         });
     }
 
+    private function validateFiles(array $files): void
+    {
+        if ($files === []) {
+            throw new InvalidArgumentException('An OCFL version must contain at least one file change.');
+        }
+
+        foreach ($files as $logicalPath => $source) {
+            if (
+                ! is_string($logicalPath)
+                || $logicalPath === ''
+                || str_starts_with($logicalPath, '/')
+                || str_contains($logicalPath, '\\')
+                || preg_match('/^[a-zA-Z]:|[\x00-\x1f\x7f]/', $logicalPath)
+                || array_intersect(explode('/', $logicalPath), ['', '.', '..']) !== []
+            ) {
+                throw new InvalidArgumentException('Logical file paths must be safe relative OCFL paths.');
+            }
+
+            if (! is_string($source) && ! (is_array($source) && isset($source['contents']) && is_string($source['contents']))) {
+                throw new InvalidArgumentException('Each file must be a source path or a contents entry.');
+            }
+
+            if (is_string($source) && str_starts_with($source, '/') && (! is_file($source) || ! is_readable($source))) {
+                throw new RuntimeException('Acquisition source must be a readable regular file.');
+            }
+        }
+    }
+
     /** @param array<string, string|array{contents: string}> $files */
     private function stageFiles(VersionBuilder $version, array $files): VersionBuilder
     {
         foreach ($files as $logicalPath => $source) {
-            if (! is_string($logicalPath) || $logicalPath === '') {
-                throw new InvalidArgumentException('Logical file paths must be nonempty strings.');
-            }
-
             if (is_string($source)) {
                 $version->addFile($logicalPath, $source);
-            } elseif (is_array($source) && isset($source['contents']) && is_string($source['contents'])) {
-                $version->addContents($logicalPath, $source['contents']);
             } else {
-                throw new InvalidArgumentException('Each file must be a source path or a contents entry.');
+                $version->addContents($logicalPath, $source['contents']);
             }
-        }
-
-        if ($files === []) {
-            throw new InvalidArgumentException('An OCFL version must contain at least one file change.');
         }
 
         return $version;

@@ -104,7 +104,8 @@ test('a failed first write can retry an uncommitted Object UUID', function (): v
             'version' => $created['version'],
             'logical_path' => 'data.bin',
         ])['bytes'],
-    )->toBe('retried');
+    )
+        ->toBe('retried');
 });
 
 test('stream reads resolve the requested historical version', function (): void {
@@ -119,7 +120,10 @@ test('stream reads resolve the requested historical version', function (): void 
         'files' => ['data.bin' => ['contents' => 'version two']],
     ]);
 
-    foreach ([[$created, 'version one'], [$updated, 'version two']] as [$receipt, $expected]) {
+    foreach ([
+        [$created, 'version one'],
+        [$updated, 'version two'],
+    ] as [$receipt, $expected]) {
         $stream = $this->archive->run('vault.object_stream_read', [
             'object_id' => $created['object_id'],
             'version' => $receipt['version'],
@@ -146,19 +150,22 @@ test('stream reads reject missing Objects, versions, and logical paths', functio
         'object_id' => 'urn:stashd:asset:123e4567-e89b-12d3-a456-426614174205',
         'version' => 'v1',
         'logical_path' => 'data.bin',
-    ]))->toThrow(Ottosmops\Ocfl\Validation\OcflException::class);
+    ]))
+        ->toThrow(Ottosmops\Ocfl\Validation\OcflException::class);
 
     expect(fn () => $this->archive->run('vault.object_stream_read', [
         'object_id' => $created['object_id'],
         'version' => 'v9',
         'logical_path' => 'data.bin',
-    ]))->toThrow(OutOfBoundsException::class);
+    ]))
+        ->toThrow(OutOfBoundsException::class);
 
     expect(fn () => $this->archive->run('vault.object_stream_read', [
         'object_id' => $created['object_id'],
         'version' => 'v1',
         'logical_path' => 'missing.bin',
-    ]))->toThrow(OutOfBoundsException::class);
+    ]))
+        ->toThrow(OutOfBoundsException::class);
 });
 
 test('large historical content streams with bounded PHP memory', function (): void {
@@ -182,11 +189,14 @@ test('large historical content streams with bounded PHP memory', function (): vo
         fclose($output);
     }
 
+    $writeBaseline = memory_get_usage(false);
+    memory_reset_peak_usage();
     $created = $this->archive->run('vault.object_create', [
         'type' => 'asset',
         'uuid' => '123e4567-e89b-12d3-a456-426614174206',
         'files' => ['large.bin' => $path],
     ]);
+    expect(memory_get_peak_usage(false) - $writeBaseline)->toBeLessThan(2 * 1024 * 1024);
 
     $baseline = memory_get_usage(false);
     memory_reset_peak_usage();
@@ -213,7 +223,10 @@ test('large historical content streams with bounded PHP memory', function (): vo
         fclose($stream);
     }
 
-    expect($read)->toBe($bytes)
-        ->and(hash_final($actualHash))->toBe(hash_final($expectedHash))
-        ->and(memory_get_peak_usage(false) - $baseline)->toBeLessThan(2 * 1024 * 1024);
+    expect($read)
+        ->toBe($bytes)
+        ->and(hash_final($actualHash))
+        ->toBe(hash_final($expectedHash))
+        ->and(memory_get_peak_usage(false) - $baseline)
+        ->toBeLessThan(2 * 1024 * 1024);
 });
