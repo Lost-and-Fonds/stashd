@@ -17,6 +17,19 @@ readonly class OcflFilesystemAdapter implements Filesystem
         return ltrim($path, '/');
     }
 
+    private static function validateSource(string $path): void
+    {
+        $component = $path;
+
+        while ($component !== '.' && $component !== '/' && $component !== '') {
+            if (is_link($component)) {
+                throw new RuntimeException('Source file may not traverse a symbolic link');
+            }
+
+            $component = dirname($component);
+        }
+    }
+
     public function read(string $path): string
     {
         return $this->storage->read(self::normalizePath($path));
@@ -29,12 +42,9 @@ readonly class OcflFilesystemAdapter implements Filesystem
 
     public function copy(string $source, string $destination): void
     {
-        if (is_link($source)) {
-            throw new RuntimeException('Source file may not be a symbolic link');
-        }
+        self::validateSource($source);
 
         if (str_starts_with($source, '/') && is_file($source)) {
-
             $stream = fopen($source, 'rb');
 
             if ($stream === false) {
@@ -125,9 +135,7 @@ readonly class OcflFilesystemAdapter implements Filesystem
         string $path,
         DigestAlgorithm $algorithm,
     ): string {
-        if (is_link($path)) {
-            throw new RuntimeException('Source file may not be a symbolic link');
-        }
+        self::validateSource($path);
 
         if (str_starts_with($path, '/') && is_file($path)) {
             $stream = fopen($path, 'rb');
