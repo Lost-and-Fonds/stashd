@@ -18,6 +18,11 @@ class ObjectWriteLock
         $this->lockFactory = $lockFactory ?? new LockFactory(new FlockStore());
     }
 
+    /**
+     * @template T
+     * @param callable(Urn): T $callback
+     * @return T
+     */
     public function exclusiveWrite(Urn $objectId, callable $callback): mixed
     {
         $lock = $this->lockFactory->createLock(
