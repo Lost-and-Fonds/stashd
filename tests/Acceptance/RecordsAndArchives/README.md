@@ -5,6 +5,14 @@ from the agreed preservation architecture. They must ultimately use actual
 Tempest application services, real OCFL byte storage, and independently observed
 durable records. They are not tests of mocked repositories.
 
+## Run the local file workflow
+
+See [AssetArchive](../../../app/RecordsAndArchives/AssetArchive.md) for runnable
+Lerd commands, identity policy, integrity evidence and publication limitations.
+The original Asset preservation contracts now call production `AssetArchive`;
+`AssetCliTest.php` also starts fresh Tempest CLI processes under a 32 MiB limit.
+Item pinning, provenance events and replica recovery remain explicitly INCOMPLETE.
+
 ## State of the suite
 
 The default driver, `Tests\Support\RecordsAndArchives\LocalArchivesDriver`,
@@ -23,7 +31,7 @@ The one *test-only* interface is
 real backend, set `STASHD_ARCHIVES_ACCEPTANCE_DRIVER` to an autoloadable class
 implementing that interface:
 
-    STASHD_ARCHIVES_ACCEPTANCE_DRIVER='Tests\YourRealArchivesDriver' ./vendor/bin/pest --testsuite=Acceptance
+    STASHD_ARCHIVES_ACCEPTANCE_DRIVER='Tests\YourRealArchivesDriver' ./bin/test.sh --testsuite=Acceptance
 
 Drivers must exercise real application services and preserve genuine results
 or translate an expected domain rejection to ArchivesRejected. Unsupported

@@ -115,6 +115,31 @@ class Vault
         });
     }
 
+    /**
+     * Publish a complete logical snapshot under the existing Object lock.
+     * @param array<string, string|array{contents: string}> $files
+     * @param callable(?OcflObject): void $validate
+     */
+    public function commitSnapshot(Urn $id, array $files, callable $validate): OcflObject
+    {
+        $this->validateFiles($files);
+
+        return $this->writeLock->exclusiveWrite($id, function () use ($id, $files, $validate): OcflObject {
+            $root = $this->open();
+            $object = $root->hasObject($id->toString()) ? $root->getObject($id->toString()) : null;
+            $validate($object);
+            $object ??= $root->createObject($id->toString());
+            $version = $object->newVersion();
+            if ($object->head() !== '') {
+                foreach ($object->logicalPaths($object->head()) as $path) {
+                    $version->removeFile($path);
+                }
+            }
+
+            return $this->stageFiles($version, $files)->commit();
+        });
+    }
+
     private function validateFiles(array $files): void
     {
         if ($files === []) {

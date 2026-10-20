@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Support\RecordsAndArchives;
 
+use App\RecordsAndArchives\AssetArchive;
+use App\RecordsAndArchives\InvalidAsset;
 use App\RecordsAndArchives\InvalidItemRevision;
 use App\RecordsAndArchives\ItemArchive;
 use App\RecordsAndArchives\Storage\ArchiveStorageInitializer;
@@ -51,6 +53,9 @@ final class LocalArchivesDriver implements ArchivesDriver
                 'vault.object_update',
                 'vault.object_read',
                 'vault.object_stream_read',
+                'asset.preserve',
+                'asset.read',
+                'asset.stream',
                 'item.record',
                 'item.read',
             ],
@@ -84,6 +89,13 @@ final class LocalArchivesDriver implements ArchivesDriver
                 'vault.object_update' => self::updateObject($vault, $arguments),
                 'vault.object_read' => self::readObject($vault, $arguments),
                 'vault.object_stream_read' => self::readObjectStream($vault, $arguments),
+                'asset.preserve' => self::preserveAsset($container->get(AssetArchive::class), $arguments),
+                'asset.read' => self::readAsset($container->get(AssetArchive::class), $arguments),
+                'asset.stream' => ['stream' => $container->get(AssetArchive::class)->readStream(
+                    \League\Uri\Urn::fromString($arguments['object_id']),
+                    $arguments['version'],
+                    $arguments['logical_path'],
+                )],
                 'item.record' => self::commitItemRevision($items, $arguments),
                 'item.read' => $items->read(
                     \League\Uri\Urn::fromString($arguments['object_id']),
@@ -92,6 +104,25 @@ final class LocalArchivesDriver implements ArchivesDriver
             };
         } finally {
             GenericContainer::setInstance($previous);
+        }
+    }
+
+    private static function preserveAsset(AssetArchive $assets, array $arguments): array
+    {
+        try {
+            return $assets->preserve($arguments['item_uri'], $arguments['asset_key'], $arguments['files']);
+        } catch (InvalidAsset|InvalidItemRevision $exception) {
+            throw new ArchivesRejected($exception->getMessage(), previous: $exception);
+        }
+    }
+
+    private static function readAsset(AssetArchive $assets, array $arguments): array
+    {
+        $stream = $assets->readStream(\League\Uri\Urn::fromString($arguments['object_id']), $arguments['version'], $arguments['logical_path']);
+        try {
+            return ['bytes' => stream_get_contents($stream)];
+        } finally {
+            fclose($stream);
         }
     }
 
