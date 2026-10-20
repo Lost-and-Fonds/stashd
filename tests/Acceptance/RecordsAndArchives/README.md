@@ -98,6 +98,17 @@ errors and failed test setup must not be swallowed. The driver must use the OCFL
 object id in the receipt, so the tests can scan the actual object inventory.
 Results are semantic observable outcomes; internal method names are unrestricted.
 
+## Implemented Item slice
+
+`item.record` and `item.read` delegate to production `ItemRecords`. Metadata-only
+Items support deterministic exact-URI identity, durable snapshots, fresh-container
+reopening and exact historical reads. See `app/RecordsAndArchives/ItemRecords.md`
+for the identity algorithm, record format and first-create race semantics.
+`ItemRecordTest` independently verifies inventories and historical payloads.
+Nonempty pins are rejected; the three Item scenarios requiring genuine
+`asset.preserve` remain INCOMPLETE. A rejection pass is not proof of Asset
+ownership/version validation.
+
 ## Independent proofs and limits
 
 OcflInspector separately reads root marker 0=ocfl_1.1, root inventory and digest
