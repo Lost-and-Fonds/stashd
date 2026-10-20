@@ -3,6 +3,7 @@
 namespace App\RecordsAndArchives;
 
 use App\Administration\VaultConfig;
+use JsonException;
 use League\Uri\Urn;
 use RuntimeException;
 use Tempest\Console\Console;
@@ -14,6 +15,7 @@ final readonly class ArchiveCommands
         private Console $console,
         private Vault $vault,
         private AssetArchive $assets,
+        private ItemArchive $items,
         private VaultConfig $config,
     ) {}
 
@@ -22,6 +24,30 @@ final readonly class ArchiveCommands
     {
         $this->vault->create();
         $this->console->writeln(json_encode(['root' => $this->config->root, 'vault_id' => $this->vault->getIdentity()?->identifier->toString()], JSON_THROW_ON_ERROR));
+    }
+
+    #[ConsoleCommand(name: 'item:commit', description: 'Commit a complete Item snapshot with JSON metadata and an optional JSON list of exact Asset pins.')]
+    public function commitItem(string $uri, string $metadata = '{}', string $pins = '[]'): void
+    {
+        try {
+            $metadataValues = json_decode($metadata, true, flags: JSON_THROW_ON_ERROR);
+            $pinValues = json_decode($pins, true, flags: JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new InvalidItemRevision('Item metadata and pins must be valid JSON.', previous: $exception);
+        }
+        if (! is_array($metadataValues) || ! is_array($pinValues) || ! str_starts_with(ltrim($pins), '[')) {
+            throw new InvalidItemRevision('Metadata must be a JSON object or array; pins must be a JSON list.');
+        }
+        $object = $this->items->commitRevision($uri, $metadataValues, $pinValues);
+        $this->report(['object_id' => $object->id(), 'version' => $object->head()]);
+    }
+
+    #[ConsoleCommand(name: 'item:inspect', description: 'Read an Item revision and its stored exact Asset pins. Omitted version reads the Item head.')]
+    public function inspectItem(string $objectId, ?string $version = null): void
+    {
+        $id = Urn::fromString($objectId);
+        $version ??= $this->vault->open()->getObject($objectId)->head();
+        $this->report([...$this->items->read($id, $version), 'ocfl_version' => $version]);
     }
 
     #[ConsoleCommand(name: 'asset:import', description: 'Preserve one file as a complete Asset version. Sources must be absolute local paths.')]

@@ -62,7 +62,7 @@ Example import output (digest abbreviated here only):
 
 ## Identity and version contract
 
-Item identity uses `ItemArchive`'s existing `exact-uri-v1` policy. Asset identity is
+Item identity uses the shared `ItemIdentity` component's unchanged `exact-uri-v1` policy. Asset identity is
 `urn:stashd:asset:` plus a UUIDv5 in `Uuid::NAMESPACE_URL`, with this exact name:
 
 ```text
@@ -138,9 +138,9 @@ A process crash may leave a `stashd-asset-*` directory in the container's tempor
 directory; it is not an acknowledged custody checkpoint or recoverable commit
 candidate. No custody is acknowledged before successful verification.
 
-Scope completeness, provenance events, Item version pins, replication, repair and
-the full candidate journal remain explicitly INCOMPLETE in their acceptance
-contracts. The architecture decision log and reconciliation supply the agreed
+Scope completeness, provenance events, replication, repair and the full candidate
+journal remain explicitly INCOMPLETE in their acceptance contracts. Exact Item
+version pins are now implemented; see [the connected workflow](ItemArchive.md). The architecture decision log and reconciliation supply the agreed
 invariants; the candidate draft's field names and state machine are not ratified
 contracts and are not implemented here.
 
@@ -177,10 +177,9 @@ Manual Lerd demonstration, PHP 8.5.11, 2026-10-21:
   measured with `memory_get_peak_usage(true)` in a shutdown callback; limit 32 MiB.
   This measures PHP allocation, not whole-process RSS or filesystem cache.
 
-Final full suite: **104 passed, 36 incomplete, 459 assertions**, no failures.
-The 22 Asset service cases and the real CLI case pass. No acceptance assertions
-were removed or relaxed; unsupported pinning, provenance and recovery contracts
-are marked incomplete before their still-unimplemented boundaries.
+PR #51 recorded a full-suite result of 104 passed, 36 incomplete and 459 assertions.
+The subsequent connected Item slice activates the pinning contracts; see
+[ItemArchive verification](ItemArchive.md) for current results.
 
 Focused Mago analysis of the new service/commands is clean. Changed-file lint
 passes without diagnostics. Broader

@@ -11,7 +11,8 @@ See [AssetArchive](../../../app/RecordsAndArchives/AssetArchive.md) for runnable
 Lerd commands, identity policy, integrity evidence and publication limitations.
 The original Asset preservation contracts now call production `AssetArchive`;
 `AssetCliTest.php` also starts fresh Tempest CLI processes under a 32 MiB limit.
-Item pinning, provenance events and replica recovery remain explicitly INCOMPLETE.
+Item pinning uses production Asset ownership and exact-version integrity checks.
+Provenance events and replica recovery remain explicitly INCOMPLETE.
 
 ## State of the suite
 
@@ -109,14 +110,14 @@ Results are semantic observable outcomes; internal method names are unrestricted
 ## Implemented Item slice
 
 `item.record` delegates to production `ItemArchive::commitRevision()`;
-`item.read` delegates to `ItemArchive::read()`. Metadata-only
+`item.read` delegates to `ItemArchive::read()`. Metadata-only and pinned
 Items support deterministic exact-URI identity, durable snapshots, fresh-container
 reopening and exact historical reads. See `app/RecordsAndArchives/ItemArchive.md`
 for the identity algorithm, record format and first-create race semantics.
 `ItemArchiveTest` independently verifies inventories and historical payloads.
-Nonempty pins are rejected; the three Item scenarios requiring genuine
-`asset.preserve` remain INCOMPLETE. A rejection pass is not proof of Asset
-ownership/version validation.
+Malformed, missing, corrupt and foreign pins are rejected. The three Item-history
+pinning contracts are active; successful historical relationships are independently
+verified against physical inventories and bytes.
 
 The acceptance operation remains `item.record` to preserve the existing contract.
 A future move to `item.commit_revision` requires an explicit contract update.
