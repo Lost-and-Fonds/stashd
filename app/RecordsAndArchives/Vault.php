@@ -104,6 +104,7 @@ class Vault
         });
     }
 
+    /** @param array<string, string|array{contents: string}> $files */
     public function updateObject(Urn $objectUrn, array $files): OcflObject
     {
         $this->validateFiles($files);
@@ -113,6 +114,16 @@ class Vault
 
             return $this->stageFiles($version, $files)->commit();
         });
+    }
+
+    public function getObject(Urn $objectUrn): OcflObject
+    {
+        return $this->open()->getObject(id: $objectUrn->toString());
+    }
+
+    public function listObjects(): array
+    {
+        return $this->open()->listObjects();
     }
 
     private function validateFiles(array $files): void

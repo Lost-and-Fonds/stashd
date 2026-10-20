@@ -12,6 +12,7 @@ use LogicException;
 use Ottosmops\Ocfl\Validation\ErrorCode;
 use Ottosmops\Ocfl\Validation\OcflException;
 use PHPUnit\Framework\IncompleteTestError;
+use RuntimeException;
 use Symfony\Component\Uid\Uuid;
 use Tempest\Clock\ClockInitializer;
 use Tempest\Container\GenericContainer;
@@ -40,7 +41,18 @@ final class LocalArchivesDriver implements ArchivesDriver
     {
         if (! in_array(
             $operation,
-            ['vault.initialize', 'vault.open', 'vault.list_objects', 'storage.ocfl_round_trip', 'vault.object_create', 'vault.object_update', 'vault.object_read', 'vault.object_stream_read'],
+            [
+                'vault.initialize',
+                'vault.open',
+                'vault.list_objects',
+                'storage.ocfl_round_trip',
+                'vault.object_create',
+                'vault.object_update',
+                'vault.object_read',
+                'vault.object_stream_read',
+                'item.record',
+                'item.read',
+            ],
             true,
         )) {
             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
@@ -70,6 +82,8 @@ final class LocalArchivesDriver implements ArchivesDriver
                 'vault.object_update' => self::updateObject($vault, $arguments),
                 'vault.object_read' => self::readObject($vault, $arguments),
                 'vault.object_stream_read' => self::readObjectStream($vault, $arguments),
+                'item.record' => self::recordItem($vault, $arguments),
+                'item.read' => self::readItem($vault, $arguments),
             };
         } finally {
             GenericContainer::setInstance($previous);
@@ -190,9 +204,80 @@ final class LocalArchivesDriver implements ArchivesDriver
         )];
     }
 
-    /**
-     * Return the identity loaded or created by the actual Vault service.
-     */
+    /** @param array<string, mixed> $arguments @return array{object_id: string, version: string} */
+    private static function recordItem(Vault $vault, array $arguments): array
+    {
+        try {
+            $uri = \League\Uri\Uri::new($arguments['uri']);
+        } catch (\Throwable $exception) {
+            throw new ArchivesRejected('Item identity must be a valid absolute URI.', previous: $exception);
+        }
+        if ($uri->getScheme() === null) {
+            throw new ArchivesRejected('Item identity must be a valid absolute URI.');
+        }
+        $canonicalUri = $uri->normalize()->toString();
+        $namespace = Uuid::fromString('6ba7b811-9dad-11d1-80b4-00c04fd430c8');
+        $itemNamespace = Uuid::v5($namespace, 'urn:stashd:item-identity');
+        $itemUuid = Uuid::v5($itemNamespace, $canonicalUri);
+        $objectUrn = $vault->urnFromUuid(\App\RecordsAndArchives\IdentifierType::Item, $itemUuid);
+        $pins = $arguments['pins'] ?? [];
+        if (! is_array($pins)) {
+            throw new ArchivesRejected('Item pins must be a list of exact Asset versions.');
+        }
+        foreach ($pins as $pin) {
+            if (! is_array($pin) || ! is_string($pin['object_id'] ?? null) || ! is_string($pin['version'] ?? null)) {
+                throw new ArchivesRejected('Item pins must identify an Asset Object and version.');
+            }
+            $assetId = $pin['object_id'];
+            if (! str_starts_with($assetId, 'urn:stashd:asset:')) {
+                throw new ArchivesRejected('Item pin must identify an Asset Object.');
+            }
+            try {
+                $assetUrn = \League\Uri\Urn::fromString($assetId);
+                $asset = $vault->getObject($assetUrn);
+                if (! in_array($pin['version'], $asset->versionNames(), true)) {
+                    throw new ArchivesRejected('Item pin does not identify an existing Asset version.');
+                }
+                $assetRecord = json_decode($vault->readObjectContent($assetUrn, $pin['version'], 'asset.json'), true, flags: JSON_THROW_ON_ERROR);
+            } catch (ArchivesRejected $exception) {
+                throw $exception;
+            } catch (\Throwable $exception) {
+                throw new ArchivesRejected('Item pin does not identify an existing Asset version.', previous: $exception);
+            }
+            if (($assetRecord['item_uri'] ?? null) !== $canonicalUri) {
+                throw new ArchivesRejected('Item pin references an Asset owned by another Item.');
+            }
+        }
+        $files = ['record.json' => ['contents' => json_encode([
+            'uri' => $canonicalUri,
+            'source_uri' => $arguments['uri'],
+            'pins' => $pins,
+            'metadata' => $arguments['metadata'] ?? [],
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)]];
+        $root = $vault->open();
+        if ($root->hasObject($objectUrn->toString())) {
+            $object = $vault->updateObject($objectUrn, $files);
+        } else {
+            $object = $vault->createObject(\App\RecordsAndArchives\IdentifierType::Item, $itemUuid, $files);
+        }
+
+        return ['object_id' => $object->id(), 'version' => $object->head()];
+    }
+
+    /** @param array<string, mixed> $arguments @return array<string, mixed> */
+    private static function readItem(Vault $vault, array $arguments): array
+    {
+        $objectUrn = \League\Uri\Urn::fromString($arguments['object_id']);
+        $object = $vault->getObject($objectUrn);
+        $version = $arguments['version'] ?? $object->head();
+        $record = json_decode($vault->readObjectContent($objectUrn, $version, 'record.json'), true, flags: JSON_THROW_ON_ERROR);
+        if (! is_array($record)) {
+            throw new RuntimeException('Archived Item record is malformed.');
+        }
+
+        return $record;
+    }
+
     private static function identityId(Vault $vault): string
     {
         return $vault->getIdentity()?->identifier->toString() ?? throw new LogicException('Vault did not establish an identity.');
