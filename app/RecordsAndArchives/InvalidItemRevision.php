@@ -4,4 +4,4 @@ namespace App\RecordsAndArchives;
 
 use InvalidArgumentException;
 
-final class InvalidItemRecord extends InvalidArgumentException {}
+final class InvalidItemRevision extends InvalidArgumentException {}

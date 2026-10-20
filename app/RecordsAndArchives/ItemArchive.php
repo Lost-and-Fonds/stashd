@@ -10,8 +10,8 @@ use Ottosmops\Ocfl\OcflObject;
 use Symfony\Component\Uid\Uuid;
 use UnexpectedValueException;
 
-/** Durable Item records; no catalogue or process-local identity registry. */
-final readonly class ItemRecords
+/** Commits and reads immutable Item revisions in the canonical Vault. */
+final readonly class ItemArchive
 {
     private const string FORMAT = 'stashd-item';
     private const string IDENTITY_POLICY = 'exact-uri-v1';
@@ -25,12 +25,12 @@ final readonly class ItemRecords
      * @param array<array-key, mixed> $metadata Opaque JSON values, owned by the producer.
      * @param array<array-key, mixed> $pins Nonempty pins require the future Asset preservation service.
      */
-    public function record(string $uri, array $metadata = [], array $pins = []): OcflObject
+    public function commitRevision(string $uri, array $metadata = [], array $pins = []): OcflObject
     {
         $uuid = $this->uuidForUri($uri);
         $id = $this->vault->urnFromUuid(IdentifierType::Item, $uuid);
         if ($pins !== []) {
-            throw new InvalidItemRecord('Asset pins are unsupported until canonical Asset preservation can establish ownership.');
+            throw new InvalidItemRevision('Asset pins are unsupported until canonical Asset preservation can establish ownership.');
         }
 
         try {
@@ -45,14 +45,14 @@ final readonly class ItemRecords
                 'pins' => [],
             ], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION);
         } catch (JsonException $exception) {
-            throw new InvalidItemRecord('Item metadata must contain valid JSON values.', previous: $exception);
+            throw new InvalidItemRevision('Item metadata must contain valid JSON values.', previous: $exception);
         }
         $this->validateMetadata($metadata);
         $files = [self::RECORD_PATH => ['contents' => $json]];
         $root = $this->vault->open();
 
         if (! $root->hasObject($id->toString()) || $root->getObject($id->toString())->head() === '') {
-            // shortcut: concurrent first creators may race here; Vault rejects the loser under its write lock. Retry the record call.
+            // shortcut: concurrent first creators may race here; Vault rejects the loser under its write lock. Retry the commitRevision call.
             return $this->vault->createObject(IdentifierType::Item, $uuid, $files);
         }
 
@@ -108,12 +108,12 @@ final readonly class ItemRecords
     private function uuidForUri(string $uri): Uuid
     {
         if (! preg_match('/^[a-zA-Z][a-zA-Z0-9+.-]*:.+$/D', $uri) || preg_match('/[^a-zA-Z0-9._~:\/?#\[\]@!$&\x27()*+,;=%-]/', $uri) || preg_match('/%(?![a-fA-F0-9]{2})/', $uri)) {
-            throw new InvalidItemRecord('Canonical Item identity must be an absolute, ASCII URI with valid percent escapes.');
+            throw new InvalidItemRevision('Canonical Item identity must be an absolute, ASCII URI with valid percent escapes.');
         }
         try {
             Uri::new($uri);
         } catch (SyntaxError $exception) {
-            throw new InvalidItemRecord('Canonical Item URI is invalid.', previous: $exception);
+            throw new InvalidItemRevision('Canonical Item URI is invalid.', previous: $exception);
         }
 
         // Parse only for validation: never hash the parser's normalized serialization.
@@ -127,7 +127,7 @@ final readonly class ItemRecords
             if (is_array($value)) {
                 $this->validateMetadata($value);
             } elseif (! is_null($value) && ! is_scalar($value)) {
-                throw new InvalidItemRecord('Item metadata must contain JSON values, not PHP objects.');
+                throw new InvalidItemRevision('Item metadata must contain JSON values, not PHP objects.');
             }
         }
     }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Support\RecordsAndArchives;
 
-use App\RecordsAndArchives\InvalidItemRecord;
-use App\RecordsAndArchives\ItemRecords;
+use App\RecordsAndArchives\InvalidItemRevision;
+use App\RecordsAndArchives\ItemArchive;
 use App\RecordsAndArchives\Storage\ArchiveStorageInitializer;
 use App\RecordsAndArchives\Vault;
 use Exception;
@@ -73,7 +73,7 @@ final class LocalArchivesDriver implements ArchivesDriver
 
         try {
             $vault = $container->get(Vault::class);
-            $items = $container->get(ItemRecords::class);
+            $items = $container->get(ItemArchive::class);
 
             return match ($operation) {
                 'vault.initialize' => self::initialize($vault),
@@ -84,7 +84,7 @@ final class LocalArchivesDriver implements ArchivesDriver
                 'vault.object_update' => self::updateObject($vault, $arguments),
                 'vault.object_read' => self::readObject($vault, $arguments),
                 'vault.object_stream_read' => self::readObjectStream($vault, $arguments),
-                'item.record' => self::recordItem($items, $arguments),
+                'item.record' => self::commitItemRevision($items, $arguments),
                 'item.read' => $items->read(
                     \League\Uri\Urn::fromString($arguments['object_id']),
                     $arguments['version'] ?? null,
@@ -210,11 +210,11 @@ final class LocalArchivesDriver implements ArchivesDriver
     }
 
     /** @param array<string, mixed> $arguments @return array{object_id: string, version: string} */
-    private static function recordItem(ItemRecords $items, array $arguments): array
+    private static function commitItemRevision(ItemArchive $items, array $arguments): array
     {
         try {
-            $object = $items->record($arguments['uri'], $arguments['metadata'] ?? [], $arguments['pins'] ?? []);
-        } catch (InvalidItemRecord $exception) {
+            $object = $items->commitRevision($arguments['uri'], $arguments['metadata'] ?? [], $arguments['pins'] ?? []);
+        } catch (InvalidItemRevision $exception) {
             throw new ArchivesRejected($exception->getMessage(), previous: $exception);
         }
 

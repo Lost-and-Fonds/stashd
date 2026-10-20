@@ -1,13 +1,17 @@
-# Item archival records, format 1
+# Item archive and revisions, format 1
 
-`ItemRecords` is a Tempest-autowired production service. It uses `Vault` for
+`ItemArchive` is a Tempest-autowired production service. It uses `Vault` for
 canonical OCFL writes and reads; it needs no database, catalogue, cache or
 process-local identity map. The Vault must already be initialized.
 
+An **Item** is a logical identity. An **Item revision** is an immutable historical
+snapshot. The **Item archive** is the production service that commits and reads
+those revisions. The versioned `item.json` document is the archival record.
+
 ```php
-$items = $container->get(\App\RecordsAndArchives\ItemRecords::class);
-$first = $items->record('urn:example:book:123', ['title' => 'Original']);
-$second = $items->record('urn:example:book:123', ['title' => 'Revised']);
+$items = $container->get(\App\RecordsAndArchives\ItemArchive::class);
+$first = $items->commitRevision('urn:example:book:123', ['title' => 'Original']);
+$second = $items->commitRevision('urn:example:book:123', ['title' => 'Revised']);
 $original = $items->read(\League\Uri\Urn::fromString($first->id()), $first->head());
 $latest = $items->read(\League\Uri\Urn::fromString($first->id()));
 ```
@@ -23,6 +27,12 @@ path rewriting. League URI is used for validation only; its serialization is
 never used for identity. URI-semantic canonicalization belongs to the producer.
 Different canonical strings remain different Items, including equivalent-looking
 URLs. Changing a canonical string does not rename or merge its existing Item.
+
+**Open integration decision:** before relying on this policy across producers,
+confirm where producer canonicalization is enforced and how independent sources
+agree on a canonical URI for the same Item. This service validates URI syntax;
+it cannot establish that cross-source semantic agreement. Keep that integration
+gate explicit when adding producers.
 
 Reproduce the ID without Stashd:
 
@@ -47,7 +57,7 @@ Each Item has its own peer OCFL Object. Its versioned logical `item.json` contai
 - `metadata`: the supplied complete metadata snapshot as JSON values.
 - `pins: []`: explicitly metadata-only, with no claim of acquired material.
 
-Each successful `record()` call creates an OCFL archival revision, including
+Each successful `commitRevision()` call creates an OCFL archival revision, including
 repeated snapshots. This is archive commit order, not source chronology. OCFL
 inventory versions retain commit timestamps; the service does not invent source
 observation times or provenance. Metadata must be JSON-compatible arrays/scalars/
@@ -72,7 +82,7 @@ The existence check is **not atomic with first creation**. Concurrent first
 creators can both observe absence; `Vault::createObject()` reopens under its
 Object write lock and rejects the loser if history has since committed. It never
 turns that stale create into an overwrite. The caller may retry the complete
-record call. Subsequent full snapshots are serialized by the Vault lock, with no
+`commitRevision()` call. Subsequent full snapshots are serialized by the Vault lock, with no
 optimistic concurrency/precondition API. Callers must not use raw Vault writes to
 bypass Item record validation. This is the current single-host flock guarantee,
 not a distributed commit coordinator or a promise of power-loss durability.
@@ -89,7 +99,7 @@ cannot corrupt metadata-only history, not that Asset validation is complete.
 
 ## Evidence
 
-`ItemRecordTest` exercises the production service through the thin acceptance
+`ItemArchiveTest` exercises the production service through the thin acceptance
 adapter, with a fresh Tempest container on every call and real local OCFL storage.
 It independently reads inventory sidecars, version states, historical inventory
 bytes, physical payloads and payload digests. It also checks identity distinctions,

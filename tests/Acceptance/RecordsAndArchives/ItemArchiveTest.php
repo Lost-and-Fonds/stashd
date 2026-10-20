@@ -7,7 +7,7 @@ use Tests\Support\RecordsAndArchives\ArchivesRejected;
 use Tests\Support\RecordsAndArchives\ArchiveTestCase;
 use Tests\Support\RecordsAndArchives\OcflInspector;
 
-final class ItemRecordTest extends ArchiveTestCase
+final class ItemArchiveTest extends ArchiveTestCase
 {
     public function testItemHistoryIsIndependentlyRecoverableFromInventoriesAndExactHistoricalPayloads(): void
     {
@@ -141,7 +141,7 @@ final class ItemRecordTest extends ArchiveTestCase
         expect($second['object_id'])->toBe($first['object_id']);
     }
 
-    public function testItemRecordsCannotAppendToAnUnrelatedObjectAtTheDeterministicIdentity(): void
+    public function testItemArchiveCannotAppendToAnUnrelatedObjectAtTheDeterministicIdentity(): void
     {
         $this->archive->run('vault.initialize');
         $object = $this->archive->run('vault.object_create', [
