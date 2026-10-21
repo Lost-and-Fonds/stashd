@@ -83,6 +83,7 @@ class Vault
         );
     }
 
+    /** @param array<string, string|array{contents: string}> $files */
     public function createObject(IdentifierType $type, ?Uuid $uuid = null, array $files = []): OcflObject
     {
         $this->validateFiles($files);
@@ -91,7 +92,7 @@ class Vault
         return $this->writeLock->exclusiveWrite($id, function () use ($id, $files): OcflObject {
             $root = $this->open();
             $object = $root->hasObject($id->toString())
-                ? $root->getObject($id->toString())
+                ? $this->objectForWrite($id)
                 : $root->createObject(id: $id->toString());
 
             if ($object->id() !== $id->toString() || $object->head() !== '') {
@@ -104,12 +105,13 @@ class Vault
         });
     }
 
+    /** @param array<string, string|array{contents: string}> $files */
     public function updateObject(Urn $objectUrn, array $files): OcflObject
     {
         $this->validateFiles($files);
 
         return $this->writeLock->exclusiveWrite($objectUrn, function () use ($objectUrn, $files): OcflObject {
-            $version = $this->open()->getObject(id: $objectUrn->toString())->newVersion();
+            $version = $this->objectForWrite($objectUrn)->newVersion();
 
             return $this->stageFiles($version, $files)->commit();
         });
@@ -126,7 +128,7 @@ class Vault
 
         return $this->writeLock->exclusiveWrite($id, function () use ($id, $files, $validate): OcflObject {
             $root = $this->open();
-            $object = $root->hasObject($id->toString()) ? $root->getObject($id->toString()) : null;
+            $object = $root->hasObject($id->toString()) ? $this->objectForWrite($id) : null;
             $validate($object);
             $object ??= $root->createObject($id->toString());
             $version = $object->newVersion();
@@ -138,6 +140,40 @@ class Vault
 
             return $this->stageFiles($version, $files)->commit();
         });
+    }
+
+    /** Inspect physical history under the same local lock as publication. Never repairs or deletes. */
+    public function inspectObject(Urn $id): array
+    {
+        return $this->writeLock->exclusiveWrite($id, fn (): array => $this->publication($id)->result());
+    }
+
+    public function getObject(Urn $id): OcflObject
+    {
+        $state = $this->publication($id, verifyContent: false);
+        if ($state->object !== null) {
+            return $state->object;
+        }
+        if ($state->issues === []) {
+            return $this->open()->getObject($id->toString());
+        }
+        throw new OcflException(ErrorCode::E060, implode('; ', $state->issues));
+    }
+
+    private function publication(Urn $id, bool $verifyContent = true): PublicationInspection
+    {
+        $root = $this->open();
+        $path = '/' . $root->layout()->resolveObjectPath($id->toString());
+        return new PublicationInspection($this->storage, $path, $id->toString(), $verifyContent);
+    }
+
+    private function objectForWrite(Urn $id): OcflObject
+    {
+        $state = $this->publication($id);
+        if ($state->issues !== []) {
+            throw new \UnexpectedValueException('Publication requires reconciliation: ' . implode('; ', $state->issues));
+        }
+        return $state->object ?? $this->open()->getObject($id->toString());
     }
 
     private function validateFiles(array $files): void
@@ -206,7 +242,7 @@ class Vault
      */
     public function readObjectStream(Urn $objectUrn, string $version, string $logicalPath): mixed
     {
-        $object = $this->open()->getObject(id: $objectUrn->toString());
+        $object = $this->getObject($objectUrn);
         $physicalPath = $object->path . '/' . $object->resolveContentPath($version, $logicalPath);
 
         if (! $this->storage->fileExists($physicalPath)) {

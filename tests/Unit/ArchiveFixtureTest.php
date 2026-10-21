@@ -10,9 +10,13 @@ test('archive acceptance workspaces are unique and contain their own inputs', fu
 
     try {
         $file = $first->input('sample.bin', "real bytes\0");
-        expect(file_get_contents($file))->toBe("real bytes\0")
-            ->and($first->path('vault'))->not->toBe($second->path('vault'))
-            ->and(file_exists($second->path('inputs/sample.bin')))->toBeFalse();
+        expect(file_get_contents($file))
+            ->toBe("real bytes\0")
+            ->and($first->path('vault'))
+            ->not
+            ->toBe($second->path('vault'))
+            ->and(file_exists($second->path('inputs/sample.bin')))
+            ->toBeFalse();
     } finally {
         $first->dispose();
         $second->dispose();

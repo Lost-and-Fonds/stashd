@@ -9,11 +9,10 @@ use Tempest\Container\Initializer;
 
 class LockFactoryInitializer implements Initializer
 {
-
     public function initialize(Container $container): LockFactory
     {
         return new LockFactory(
-            new FlockStore()
+            new FlockStore(),
         );
     }
 }

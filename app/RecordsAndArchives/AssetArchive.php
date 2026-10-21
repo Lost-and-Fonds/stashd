@@ -132,7 +132,7 @@ final readonly class AssetArchive
      */
     public function inspect(Urn $id, string $version): array
     {
-        $object = $this->vault->open()->getObject($id->toString());
+        $object = $this->vault->getObject($id);
         $record = json_decode($this->vault->readObjectContent($id, $version, self::RECORD), true, flags: JSON_THROW_ON_ERROR);
         if (
             ! is_array($record)

@@ -11,14 +11,13 @@ use Tempest\Validation\Rules\HasDateTimeFormat;
 
 class VaultIdentity implements JsonSerializable
 {
-
     public function __construct(
         public string $format,
         public int $version,
         public Urn $identifier,
 
         #[HasDateTimeFormat(FormatPattern::ISO8601)]
-        public DateTimeInterface $createdAt
+        public DateTimeInterface $createdAt,
     ) {}
 
     public static function fromJson(string $json): self

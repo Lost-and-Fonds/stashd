@@ -61,7 +61,7 @@ final readonly class ItemArchive
         $files = [self::RECORD_PATH => ['contents' => $json]];
         $root = $this->vault->open();
 
-        if (! $root->hasObject($id->toString()) || $root->getObject($id->toString())->head() === '') {
+        if (! $root->hasObject($id->toString()) || $this->vault->getObject($id)->head() === '') {
             // shortcut: concurrent first creators may race here; Vault rejects the loser under its write lock. Retry the commitRevision call.
             return $this->vault->createObject(IdentifierType::Item, $uuid, $files);
         }
@@ -77,7 +77,7 @@ final readonly class ItemArchive
     /** @return array{format: string, version: int, identity_policy: string, object_id: string, uri: string, metadata: array, pins: array} */
     public function read(Urn $objectId, ?string $version = null): array
     {
-        $object = $this->vault->open()->getObject($objectId->toString());
+        $object = $this->vault->getObject($objectId);
         $version ??= $object->head();
         $json = $this->vault->readObjectContent($objectId, $version, self::RECORD_PATH);
         $digest = hash($object->inventory->digestAlgorithm->hashAlgorithm(), $json);

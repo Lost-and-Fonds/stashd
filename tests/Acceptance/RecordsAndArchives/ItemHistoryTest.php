@@ -18,9 +18,12 @@ test('an Item without archived content remains a durable discoverable archival r
         'version' => $record['version'],
     ]);
 
-    expect($read['uri'])->toBe('https://example.test/items/metadata-only')
-        ->and($read['pins'])->toBe([])
-        ->and($read['metadata']['title'])->toBe('Known but not acquired');
+    expect($read['uri'])
+        ->toBe('https://example.test/items/metadata-only')
+        ->and($read['pins'])
+        ->toBe([])
+        ->and($read['metadata']['title'])
+        ->toBe('Known but not acquired');
 });
 
 test('an Item pins an exact Asset version rather than an unqualified latest revision', function (): void {
@@ -72,10 +75,15 @@ test('an Item revision cannot retroactively rewrite the pins on an old Item vers
     $first = $this->archive->run('item.read', ['object_id' => $item1['object_id'], 'version' => $item1['version']]);
     $second = $this->archive->run('item.read', ['object_id' => $item2['object_id'], 'version' => $item2['version']]);
 
-    expect($item1['object_id'])->toBe($item2['object_id'])
-        ->and($item1['version'])->not->toBe($item2['version'])
-        ->and($first['pins'][0]['version'])->toBe($asset1['version'])
-        ->and($second['pins'][0]['version'])->toBe($asset2['version']);
+    expect($item1['object_id'])
+        ->toBe($item2['object_id'])
+        ->and($item1['version'])
+        ->not
+        ->toBe($item2['version'])
+        ->and($first['pins'][0]['version'])
+        ->toBe($asset1['version'])
+        ->and($second['pins'][0]['version'])
+        ->toBe($asset2['version']);
 });
 
 test('an Item cannot pin a nonexistent Asset version', function (): void {
@@ -84,7 +92,8 @@ test('an Item cannot pin a nonexistent Asset version', function (): void {
     expect(fn () => $this->archive->run('item.record', [
         'uri' => 'https://example.test/items/bad-pin',
         'pins' => [['object_id' => 'does-not-exist', 'version' => 'v999']],
-    ]))->toThrow(ArchivesRejected::class);
+    ]))
+        ->toThrow(ArchivesRejected::class);
 });
 
 test('an Item cannot claim another Item’s Asset as its own', function (): void {
@@ -98,7 +107,8 @@ test('an Item cannot claim another Item’s Asset as its own', function (): void
     expect(fn () => $this->archive->run('item.record', [
         'uri' => 'https://example.test/items/owner-b',
         'pins' => [['object_id' => $asset['object_id'], 'version' => $asset['version']]],
-    ]))->toThrow(ArchivesRejected::class);
+    ]))
+        ->toThrow(ArchivesRejected::class);
 });
 
 test('non-HTTP canonical Item URIs can retain their archival identity', function (): void {
@@ -129,9 +139,12 @@ test('metadata revisions remain readable without destroying their original obser
     $old = $this->archive->run('item.read', ['object_id' => $first['object_id'], 'version' => $first['version']]);
     $new = $this->archive->run('item.read', ['object_id' => $second['object_id'], 'version' => $second['version']]);
 
-    expect($first['object_id'])->toBe($second['object_id'])
-        ->and($old['metadata']['title'])->toBe('Original')
-        ->and($new['metadata']['title'])->toBe('Corrected');
+    expect($first['object_id'])
+        ->toBe($second['object_id'])
+        ->and($old['metadata']['title'])
+        ->toBe('Original')
+        ->and($new['metadata']['title'])
+        ->toBe('Corrected');
 });
 
 test('rejected Item updates leave the last valid Item version intact', function (): void {
@@ -145,7 +158,8 @@ test('rejected Item updates leave the last valid Item version intact', function 
     expect(fn () => $this->archive->run('item.record', [
         'uri' => 'https://example.test/items/safety',
         'pins' => [['object_id' => 'missing', 'version' => 'v1']],
-    ]))->toThrow(ArchivesRejected::class);
+    ]))
+        ->toThrow(ArchivesRejected::class);
 
     $read = $this->archive->run('item.read', ['object_id' => $item['object_id']]);
     expect($read['metadata']['title'])->toBe('Keep me');

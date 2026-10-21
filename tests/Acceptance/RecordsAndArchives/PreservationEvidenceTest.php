@@ -36,8 +36,7 @@ test('a closed known scope with verified components may be reported complete', f
         'version' => $asset['version'],
     ]);
 
-    expect($evidence['complete'])->toBeTrue()
-        ->and($evidence['known_missing'])->toBe([]);
+    expect($evidence['complete'])->toBeTrue()->and($evidence['known_missing'])->toBe([]);
 });
 
 test('a partial Asset with missing known components remains preserved but incomplete', function (): void {
@@ -54,13 +53,18 @@ test('a partial Asset with missing known components remains preserved but incomp
         'version' => $asset['version'],
     ]);
 
-    expect($evidence['complete'])->toBeFalse()
-        ->and($evidence['known_missing'])->toContain('b.bin')
-        ->and($this->archive->run('asset.read', [
-            'object_id' => $asset['object_id'],
-            'version' => $asset['version'],
-            'logical_path' => 'a.bin',
-        ])['bytes'])->toBe('valid partial evidence');
+    expect($evidence['complete'])
+        ->toBeFalse()
+        ->and($evidence['known_missing'])
+        ->toContain('b.bin')
+        ->and(
+            $this->archive->run('asset.read', [
+                'object_id' => $asset['object_id'],
+                'version' => $asset['version'],
+                'logical_path' => 'a.bin',
+            ])['bytes'],
+        )
+        ->toBe('valid partial evidence');
 });
 
 test('later complete acquisition cannot retroactively declare an older partial version complete', function (): void {
@@ -91,8 +95,7 @@ test('later complete acquisition cannot retroactively declare an older partial v
         'version' => $new['version'],
     ]);
 
-    expect($earlier['complete'])->toBeFalse()
-        ->and($later['complete'])->toBeTrue();
+    expect($earlier['complete'])->toBeFalse()->and($later['complete'])->toBeTrue();
 });
 
 test('reacquiring identical source bytes still preserves new provenance evidence', function (): void {
@@ -116,6 +119,5 @@ test('reacquiring identical source bytes still preserves new provenance evidence
     $events = $this->archive->run('history.events', ['object_id' => $first['object_id']]);
     $evidence = json_encode($events['events'], JSON_THROW_ON_ERROR);
 
-    expect($evidence)->toContain('attempt-one')
-        ->and($evidence)->toContain('attempt-two');
+    expect($evidence)->toContain('attempt-one')->and($evidence)->toContain('attempt-two');
 });

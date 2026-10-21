@@ -34,7 +34,7 @@ final class OcflInspector
      */
     public static function inventoryFor(string $root, string $objectId): array
     {
-        if (!is_dir($root)) {
+        if (! is_dir($root)) {
             throw new RuntimeException('The OCFL storage root does not exist.');
         }
 
@@ -43,7 +43,7 @@ final class OcflInspector
         );
 
         foreach ($iterator as $file) {
-            if (!$file->isFile() || $file->getFilename() !== 'inventory.json') {
+            if (! $file->isFile() || $file->getFilename() !== 'inventory.json') {
                 continue;
             }
 
@@ -52,7 +52,7 @@ final class OcflInspector
 
             // Ignore optional version-directory inventory copies. All file
             // paths in a manifest are relative to the OCFL object root.
-            if (!is_file($objectRoot . '/0=ocfl_object_1.1')) {
+            if (! is_file($objectRoot . '/0=ocfl_object_1.1')) {
                 continue;
             }
 
@@ -81,6 +81,36 @@ final class OcflInspector
         Assert::assertSame(hash_file($algorithm, $inventoryPath), strtolower($tokens[0] ?? ''));
     }
 
+    /** Verify a known acknowledged snapshot using only native JSON and hashing. */
+    public static function assertAcknowledgedHistory(string $root, string $id, string $head): void
+    {
+        $digest = hash('sha256', $id);
+        $path = $root . '/' . substr($digest, 0, 2) . '/' . substr($digest, 2, 2) . '/' . $digest;
+        $inventoryPath = $path . '/' . $head . '/inventory.json';
+        self::assertInventorySidecar($inventoryPath);
+        $raw = (string) file_get_contents($inventoryPath);
+        $inventory = json_decode($raw, true, flags: JSON_THROW_ON_ERROR);
+        Assert::assertSame($id, $inventory['id']);
+        Assert::assertSame($head, $inventory['head']);
+        $algorithm = $inventory['digestAlgorithm'];
+        Assert::assertSame(hash($algorithm, $raw) . ' inventory.json', trim((string) file_get_contents($path . '/inventory.json.' . $algorithm)));
+        foreach ($inventory['versions'] as $version => $entry) {
+            $historicalPath = $path . '/' . $version . '/inventory.json';
+            self::assertInventorySidecar($historicalPath);
+            $historical = json_decode((string) file_get_contents($historicalPath), true, flags: JSON_THROW_ON_ERROR);
+            Assert::assertSame($entry, $historical['versions'][$version]);
+            foreach ($entry['state'] as $hash => $names) {
+                Assert::assertNotEmpty($names);
+                Assert::assertArrayHasKey($hash, $inventory['manifest']);
+            }
+        }
+        foreach ($inventory['manifest'] as $hash => $paths) {
+            foreach ($paths as $relative) {
+                Assert::assertSame($hash, hash_file($algorithm, $path . '/' . $relative));
+            }
+        }
+    }
+
     /**
      * Resolve an exact version and logical path to immutable payload bytes.
      */
@@ -95,12 +125,12 @@ final class OcflInspector
         $state = $inventory['versions'][$version]['state'] ?? [];
 
         foreach ($state as $digest => $paths) {
-            if (!is_array($paths) || !in_array($logicalPath, $paths, true)) {
+            if (! is_array($paths) || ! in_array($logicalPath, $paths, true)) {
                 continue;
             }
 
             foreach ($inventory['manifest'][$digest] ?? [] as $contentPath) {
-                if (!is_string($contentPath) || str_starts_with($contentPath, '/') || str_contains($contentPath, '..')) {
+                if (! is_string($contentPath) || str_starts_with($contentPath, '/') || str_contains($contentPath, '..')) {
                     continue;
                 }
 

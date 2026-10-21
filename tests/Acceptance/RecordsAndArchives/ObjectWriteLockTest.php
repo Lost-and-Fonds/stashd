@@ -10,7 +10,7 @@ use Tempest\Container\GenericContainer;
 
 function lockFactory(): LockFactory
 {
-    return (new LockFactoryInitializer())->initialize(new GenericContainer());
+    return new LockFactoryInitializer()->initialize(new GenericContainer());
 }
 
 it('excludes another process for the same Object URN while allowing unrelated locks', function () {
@@ -19,16 +19,21 @@ it('excludes another process for the same Object URN while allowing unrelated lo
     $resource = 'stashd:object-write:' . $objectId->toString();
     $factory = lockFactory();
     $pipes = [];
-    $process = proc_open([
-        PHP_BINARY,
-        '-r',
-        'require getcwd() . "/vendor/autoload.php";'
-        . '$id = \League\Uri\Urn::fromString($argv[1]);'
-        . '$container = new \Tempest\Container\GenericContainer();'
-        . '$factory = (new \App\RecordsAndArchives\Concurrency\LockFactoryInitializer())->initialize($container);'
-        . '(new \App\RecordsAndArchives\Concurrency\ObjectWriteLock($factory))->exclusiveWrite($id, function () { echo "READY\\n"; flush(); fgets(STDIN); });',
-        $objectId->toString(),
-    ], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, dirname(__DIR__, 3));
+    $process = proc_open(
+        [
+            PHP_BINARY,
+            '-r',
+            'require getcwd() . "/vendor/autoload.php";'
+                . '$id = \League\Uri\Urn::fromString($argv[1]);'
+                . '$container = new \Tempest\Container\GenericContainer();'
+                . '$factory = (new \App\RecordsAndArchives\Concurrency\LockFactoryInitializer())->initialize($container);'
+                . '(new \App\RecordsAndArchives\Concurrency\ObjectWriteLock($factory))->exclusiveWrite($id, function () { echo "READY\\n"; flush(); fgets(STDIN); });',
+            $objectId->toString(),
+        ],
+        [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+        $pipes,
+        dirname(__DIR__, 3),
+    );
 
     expect(is_resource($process))->toBeTrue();
 
@@ -74,7 +79,7 @@ it('excludes another process for the same Object URN while allowing unrelated lo
         $deadline = microtime(true) + 2;
         do {
             $status = proc_get_status($process);
-            if (!$status['running']) {
+            if (! $status['running']) {
                 break;
             }
             usleep(10_000);
@@ -94,9 +99,10 @@ it('releases an Object write lock when its callback throws', function () {
     $objectId = Urn::fromString('urn:uuid:123e4567-e89b-12d3-a456-426614174102');
     $factory = lockFactory();
 
-    expect(fn () => (new ObjectWriteLock($factory))->exclusiveWrite($objectId, function () {
+    expect(fn () => new ObjectWriteLock($factory)->exclusiveWrite($objectId, function () {
         throw new RuntimeException('archive failed');
-    }))->toThrow(RuntimeException::class, 'archive failed');
+    }))
+        ->toThrow(RuntimeException::class, 'archive failed');
 
     $lock = $factory->createLock('stashd:object-write:' . $objectId->toString(), ttl: null);
     expect($lock->acquire(false))->toBeTrue();
