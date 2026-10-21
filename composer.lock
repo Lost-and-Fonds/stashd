@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "98158861200eee7545e32323724aa9e1",
+    "content-hash": "a3944af0c0dd2e524a5d46763d267c95",
     "packages": [
         {
             "name": "composer/semver",
@@ -2040,16 +2040,16 @@
         },
         {
             "name": "ottosmops/ocfl",
-            "version": "v1.0.0",
+            "version": "dev-fix/atomic-inventory-sidecars",
             "source": {
                 "type": "git",
-                "url": "https://github.com/ottosmops/ocfl.git",
-                "reference": "b8c9ed5bd335f3653f248daaf9633c5f63234e35"
+                "url": "https://github.com/hipsterjazzbo/ocfl.git",
+                "reference": "c7b79ee85e6b95011a34d9623c16daa80c238a77"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/ottosmops/ocfl/zipball/b8c9ed5bd335f3653f248daaf9633c5f63234e35",
-                "reference": "b8c9ed5bd335f3653f248daaf9633c5f63234e35",
+                "url": "https://api.github.com/repos/hipsterjazzbo/ocfl/zipball/c7b79ee85e6b95011a34d9623c16daa80c238a77",
+                "reference": "c7b79ee85e6b95011a34d9623c16daa80c238a77",
                 "shasum": ""
             },
             "require": {
@@ -2078,7 +2078,53 @@
                     "Ottosmops\\Ocfl\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "autoload-dev": {
+                "psr-4": {
+                    "Tests\\": "tests/"
+                }
+            },
+            "archive": {
+                "exclude": [
+                    "/tests",
+                    "/.github",
+                    "/.gitattributes",
+                    "/.gitignore",
+                    "/.gitmodules",
+                    "/.editorconfig",
+                    "/.phpstan.cache",
+                    "/.phpunit.cache",
+                    "/phpunit.xml",
+                    "/phpstan.neon",
+                    "/pint.json",
+                    "/rector.php",
+                    "/CHANGELOG.md"
+                ]
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ],
+                "test:coverage": [
+                    "pest --coverage"
+                ],
+                "analyse": [
+                    "phpstan analyse"
+                ],
+                "format": [
+                    "pint"
+                ],
+                "format:check": [
+                    "pint --test"
+                ],
+                "refactor": [
+                    "rector process"
+                ],
+                "check": [
+                    "@format:check",
+                    "@analyse",
+                    "@test"
+                ]
+            },
             "license": [
                 "MIT"
             ],
@@ -2104,7 +2150,7 @@
                 "issues": "https://github.com/ottosmops/ocfl/issues",
                 "source": "https://github.com/ottosmops/ocfl"
             },
-            "time": "2026-04-20T11:35:51+00:00"
+            "time": "2026-10-21T02:26:00+00:00"
         },
         {
             "name": "phpoption/phpoption",
@@ -8914,9 +8960,18 @@
             "time": "2026-10-05T23:14:19+00:00"
         }
     ],
-    "aliases": [],
+    "aliases": [
+        {
+            "package": "ottosmops/ocfl",
+            "version": "dev-fix/atomic-inventory-sidecars",
+            "alias": "1.0.1",
+            "alias_normalized": "1.0.1.0"
+        }
+    ],
     "minimum-stability": "dev",
-    "stability-flags": {},
+    "stability-flags": {
+        "ottosmops/ocfl": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

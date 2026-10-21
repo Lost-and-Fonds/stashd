@@ -46,8 +46,8 @@ final readonly class ArchiveCommands
     public function inspectItem(string $objectId, ?string $version = null): void
     {
         $id = Urn::fromString($objectId);
-        $version ??= $this->vault->open()->getObject($objectId)->head();
-        $this->report([...$this->items->read($id, $version), 'ocfl_version' => $version]);
+        $version ??= $this->vault->getObject($id)->head();
+        $this->report([...$this->items->read($id, $version), 'ocfl_version' => $version, 'publication' => $this->vault->inspectObject($id)]);
     }
 
     #[ConsoleCommand(name: 'asset:import', description: 'Preserve one file as a complete Asset version. Sources must be absolute local paths.')]
@@ -59,7 +59,8 @@ final readonly class ArchiveCommands
     #[ConsoleCommand(name: 'asset:inspect', description: 'Read and independently verify an exact Asset version.')]
     public function inspect(string $objectId, string $version): void
     {
-        $this->report($this->assets->inspect(Urn::fromString($objectId), $version));
+        $id = Urn::fromString($objectId);
+        $this->report([...$this->assets->inspect($id, $version), 'publication' => $this->vault->inspectObject($id)]);
     }
 
     #[ConsoleCommand(name: 'asset:export', description: 'Export an exact historical file to a new absolute destination. Never overwrites.')]
@@ -98,6 +99,12 @@ final readonly class ArchiveCommands
             fclose($input);
         }
         $this->console->writeln(json_encode(['destination' => $destination, ...$expected], JSON_THROW_ON_ERROR));
+    }
+
+    #[ConsoleCommand(name: 'vault:inspect-object', description: 'Verify acknowledged local Object history and report incomplete publication evidence without changing files.')]
+    public function inspectPublication(string $objectId): void
+    {
+        $this->report(['object_id' => $objectId, ...$this->vault->inspectObject(Urn::fromString($objectId))]);
     }
 
     private function report(array $record): void

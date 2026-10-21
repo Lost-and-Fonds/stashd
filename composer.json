@@ -4,7 +4,7 @@
     "require": {
         "tempest/framework": "^3.0",
         "ext-intl": "*",
-        "ottosmops/ocfl": "^1.0",
+        "ottosmops/ocfl": "dev-fix/atomic-inventory-sidecars as 1.0.1",
         "symfony/lock": "^8.1",
         "league/uri": "^7.8",
         "symfony/uid": "^8.1"
@@ -72,5 +72,11 @@
         "test:acceptance": "Run all departmental acceptance contracts.",
         "test:archives": "Run Records & Archives acceptance contracts.",
         "test:vault": "Run Vault identity and initialization acceptance contracts."
-    }
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/hipsterjazzbo/ocfl"
+        }
+    ]
 }
