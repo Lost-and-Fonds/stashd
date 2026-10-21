@@ -3,10 +3,10 @@
 namespace App\RecordsAndArchives;
 
 use JsonException;
-use League\Uri\Exceptions\SyntaxError;
-use League\Uri\Uri;
 use League\Uri\Urn;
 use Ottosmops\Ocfl\OcflObject;
+use Ottosmops\Ocfl\Validation\OcflException;
+use OutOfBoundsException;
 use Symfony\Component\Uid\Uuid;
 use UnexpectedValueException;
 
@@ -19,18 +19,28 @@ final readonly class ItemArchive
 
     public function __construct(
         private Vault $vault,
+        private ItemIdentity $identity,
+        private AssetArchive $assets,
     ) {}
 
     /**
      * @param array<array-key, mixed> $metadata Opaque JSON values, owned by the producer.
-     * @param array<array-key, mixed> $pins Nonempty pins require the future Asset preservation service.
+     * @param array<array-key, mixed> $pins Exact Asset Object/version references, verified before publication.
      */
     public function commitRevision(string $uri, array $metadata = [], array $pins = []): OcflObject
     {
-        $uuid = $this->uuidForUri($uri);
+        $uuid = $this->identity->uuidForUri($uri);
         $id = $this->vault->urnFromUuid(IdentifierType::Item, $uuid);
-        if ($pins !== []) {
-            throw new InvalidItemRevision('Asset pins are unsupported until canonical Asset preservation can establish ownership.');
+        $pins = $this->pinReferences($pins);
+        foreach ($pins as $pin) {
+            try {
+                $asset = $this->assets->inspect(Urn::fromString($pin['object_id']), $pin['version']);
+            } catch (OcflException|OutOfBoundsException|UnexpectedValueException|JsonException|InvalidAsset $exception) {
+                throw new InvalidItemRevision('Pinned Asset version is missing, incompatible or corrupt.', previous: $exception);
+            }
+            if (($asset['item_uri'] ?? null) !== $uri || ($asset['item_object_id'] ?? null) !== $id->toString()) {
+                throw new InvalidItemRevision('Pinned Asset belongs to a different canonical Item.');
+            }
         }
 
         try {
@@ -42,7 +52,7 @@ final readonly class ItemArchive
                 'object_id' => $id->toString(),
                 'uri' => $uri,
                 'metadata' => $metadata,
-                'pins' => [],
+                'pins' => $pins,
             ], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION);
         } catch (JsonException $exception) {
             throw new InvalidItemRevision('Item metadata must contain valid JSON values.', previous: $exception);
@@ -68,8 +78,14 @@ final readonly class ItemArchive
     public function read(Urn $objectId, ?string $version = null): array
     {
         $object = $this->vault->open()->getObject($objectId->toString());
+        $version ??= $object->head();
+        $json = $this->vault->readObjectContent($objectId, $version, self::RECORD_PATH);
+        $digest = hash($object->inventory->digestAlgorithm->hashAlgorithm(), $json);
+        if (! in_array(self::RECORD_PATH, $object->inventory->versions[$version]->state[$digest] ?? [], true)) {
+            throw new UnexpectedValueException('Archived Item record differs from its OCFL inventory.');
+        }
         $record = json_decode(
-            $this->vault->readObjectContent($objectId, $version ?? $object->head(), self::RECORD_PATH),
+            $json,
             associative: true,
             flags: JSON_THROW_ON_ERROR,
         );
@@ -81,12 +97,18 @@ final readonly class ItemArchive
             || ($record['object_id'] ?? null) !== $objectId->toString()
             || ! is_string($record['uri'] ?? null)
             || ! is_array($record['metadata'] ?? null)
-            || ($record['pins'] ?? null) !== []
+            || ! is_array($record['pins'] ?? null)
         ) {
             throw new UnexpectedValueException('Unsupported or inconsistent archived Item record.');
         }
         if ($this->objectIdForUri($record['uri'])->toString() !== $objectId->toString()) {
             throw new UnexpectedValueException('Archived Item URI does not match its Object identity.');
+        }
+
+        try {
+            $pins = $this->pinReferences($record['pins']);
+        } catch (InvalidItemRevision $exception) {
+            throw new UnexpectedValueException('Unsupported archived Item pins.', previous: $exception);
         }
 
         return [
@@ -96,28 +118,47 @@ final readonly class ItemArchive
             'object_id' => $objectId->toString(),
             'uri' => $record['uri'],
             'metadata' => $record['metadata'],
-            'pins' => [],
+            'pins' => $pins,
         ];
     }
 
     public function objectIdForUri(string $uri): Urn
     {
-        return $this->vault->urnFromUuid(IdentifierType::Item, $this->uuidForUri($uri));
+        return $this->identity->objectIdForUri($uri);
     }
 
-    private function uuidForUri(string $uri): Uuid
+    /**
+     * @param array<array-key, mixed> $pins
+     * @return list<array{object_id: string, version: string}>
+     */
+    private function pinReferences(array $pins): array
     {
-        if (! preg_match('/^[a-zA-Z][a-zA-Z0-9+.-]*:.+$/D', $uri) || preg_match('/[^a-zA-Z0-9._~:\/?#\[\]@!$&\x27()*+,;=%-]/', $uri) || preg_match('/%(?![a-fA-F0-9]{2})/', $uri)) {
-            throw new InvalidItemRevision('Canonical Item identity must be an absolute, ASCII URI with valid percent escapes.');
+        if (! array_is_list($pins)) {
+            throw new InvalidItemRevision('Asset pins must be a list of exact Object/version references.');
         }
-        try {
-            Uri::new($uri);
-        } catch (SyntaxError $exception) {
-            throw new InvalidItemRevision('Canonical Item URI is invalid.', previous: $exception);
+        $references = [];
+        $seen = [];
+        foreach ($pins as $pin) {
+            if (
+                ! is_array($pin)
+                || count($pin) !== 2
+                || ! is_string($pin['object_id'] ?? null)
+                || ! is_string($pin['version'] ?? null)
+                || ! preg_match('/^urn:stashd:asset:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/D', $pin['object_id'])
+                || ! Uuid::isValid(substr($pin['object_id'], strlen('urn:stashd:asset:')))
+                || ! preg_match('/^v[1-9][0-9]*$/D', $pin['version'])
+            ) {
+                throw new InvalidItemRevision('Each pin requires a canonical Asset Object ID and an exact OCFL version.');
+            }
+            $key = $pin['object_id'];
+            if (isset($seen[$key])) {
+                throw new InvalidItemRevision('Each Asset Object may be pinned only once per Item revision.');
+            }
+            $seen[$key] = true;
+            $references[] = ['object_id' => $pin['object_id'], 'version' => $pin['version']];
         }
 
-        // Parse only for validation: never hash the parser's normalized serialization.
-        return Uuid::v5(Uuid::fromString(Uuid::NAMESPACE_URL), 'stashd:item:exact-uri-v1:' . $uri);
+        return $references;
     }
 
     /** @param array<array-key, mixed> $metadata */

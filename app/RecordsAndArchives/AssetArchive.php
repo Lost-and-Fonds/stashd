@@ -18,7 +18,7 @@ final readonly class AssetArchive
 
     public function __construct(
         private Vault $vault,
-        private ItemArchive $items,
+        private ItemIdentity $items,
     ) {}
 
     public function objectId(string $itemUri, string $assetKey): Urn
