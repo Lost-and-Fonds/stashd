@@ -10,13 +10,22 @@ use OutOfBoundsException;
 use Symfony\Component\Uid\Uuid;
 use UnexpectedValueException;
 
-/** Commits and reads immutable Item revisions in the canonical Vault. */
+/**
+ * Publish immutable Item metadata revisions with exact Asset version references.
+ *
+ * Item identity follows the shared exact-URI policy. Asset ownership and byte
+ * evidence are verified before publication; Item and Asset commits remain
+ * separate operations, with no transaction spanning their Objects.
+ */
 final readonly class ItemArchive
 {
     private const string FORMAT = 'stashd-item';
     private const string IDENTITY_POLICY = 'exact-uri-v1';
     private const string RECORD_PATH = 'item.json';
 
+    /**
+     * Bind publication, deterministic identity and Asset verification services.
+     */
     public function __construct(
         private Vault $vault,
         private ItemIdentity $identity,
@@ -24,8 +33,20 @@ final readonly class ItemArchive
     ) {}
 
     /**
+     * Append a complete Item metadata and pin snapshot for an exact canonical URI.
+     *
+     * Validates JSON values and verifies each unique Asset pin before writing.
+     * Omitted metadata and pins become empty snapshots. Equal input still creates
+     * a new revision. Concurrent first creators can race; the Vault rejects the
+     * loser under its lock, and the caller may retry the whole operation.
+     *
+     * Asset checks precede the Item write lock and do not form a transaction
+     * with Asset publication. A rejected Item revision does not remove Assets.
+     *
      * @param array<array-key, mixed> $metadata Opaque JSON values, owned by the producer.
      * @param array<array-key, mixed> $pins Exact Asset Object/version references, verified before publication.
+     * @throws InvalidItemRevision When metadata or pins fail validation.
+     * @throws UnexpectedValueException When existing Item identity is incompatible.
      */
     public function commitRevision(string $uri, array $metadata = [], array $pins = []): OcflObject
     {
@@ -74,7 +95,15 @@ final readonly class ItemArchive
         return $this->vault->updateObject($id, $files);
     }
 
-    /** @return array{format: string, version: int, identity_policy: string, object_id: string, uri: string, metadata: array, pins: array} */
+    /**
+     * Read an exact Item revision, defaulting to the acknowledged head.
+     *
+     * Verifies record bytes against OCFL state and checks identity and pin
+     * structure. It does not reverify the referenced Asset payloads. An explicit
+     * missing version fails instead of falling back to the head.
+     *
+     * @return array{format: string, version: int, identity_policy: string, object_id: string, uri: string, metadata: array, pins: array}
+     */
     public function read(Urn $objectId, ?string $version = null): array
     {
         $object = $this->vault->getObject($objectId);
@@ -122,12 +151,20 @@ final readonly class ItemArchive
         ];
     }
 
+    /**
+     * Resolve the shared deterministic Item identity without reading or writing history.
+     */
     public function objectIdForUri(string $uri): Urn
     {
         return $this->identity->objectIdForUri($uri);
     }
 
     /**
+     * Validate and retain one exact version reference per canonical Asset ID.
+     *
+     * Rejects aliases, extra fields and duplicate Object IDs with
+     * InvalidItemRevision. Existence and ownership are checked separately.
+     *
      * @param array<array-key, mixed> $pins
      * @return list<array{object_id: string, version: string}>
      */
@@ -161,7 +198,14 @@ final readonly class ItemArchive
         return $references;
     }
 
-    /** @param array<array-key, mixed> $metadata */
+    /**
+     * Recursively reject PHP objects and other non-JSON metadata values.
+     *
+     * Scalar encoding errors are checked by JSON serialization before this
+     * helper runs. Invalid values raise InvalidItemRevision.
+     *
+     * @param array<array-key, mixed> $metadata
+     */
     private function validateMetadata(array $metadata): void
     {
         foreach ($metadata as $value) {

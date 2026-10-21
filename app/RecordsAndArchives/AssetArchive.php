@@ -10,17 +10,32 @@ use Tempest\Storage\Config\LocalStorageConfig;
 use Tempest\Storage\GenericStorage;
 use UnexpectedValueException;
 
-/** Preserves complete logical Asset snapshots; no Item version pins are implied. */
+/**
+ * Preserve complete Asset file snapshots and their accepted byte evidence.
+ *
+ * Identity combines an exact Item URI with an Asset key. Publication retains
+ * older versions and does not create or advance Item pins. Receipts are
+ * returned only after rereading and verifying the committed snapshot.
+ */
 final readonly class AssetArchive
 {
     private const string RECORD = '.stashd/asset.json';
     private const string POLICY = 'exact-item-uri-key-v1';
 
+    /**
+     * Use the Vault for publication and the shared Item identity policy for ownership.
+     */
     public function __construct(
         private Vault $vault,
         private ItemIdentity $items,
     ) {}
 
+    /**
+     * Derive a deterministic Asset URN from its owning Item URI and safe key.
+     *
+     * The exact URI policy and key bytes participate in identity. This performs
+     * validation but does not require the Item or Asset to exist.
+     */
     public function objectId(string $itemUri, string $assetKey): Urn
     {
         $item = $this->items->objectIdForUri($itemUri);
@@ -32,7 +47,22 @@ final readonly class AssetArchive
         ));
     }
 
-    /** @param array<string, string> $files Complete version, logical path => absolute local source. */
+    /**
+     * Acquire private file copies and publish them as a complete Asset version.
+     *
+     * Rejects unsafe paths, reserved metadata names and symbolic-link sources.
+     * Checks opened source identity and observed size and timestamp changes around
+     * copying. Private copies supply accepted hashes and publication bytes. Temporary
+     * staging and owned streams are cleaned up on exit.
+     *
+     * Ownership validation and snapshot publication use the Vault Object lock.
+     * A failed post-commit verification can leave a published version without a
+     * receipt. Repeating the call creates another version, even for equal bytes.
+     *
+     * @param array<string, string> $files Complete version, logical path => absolute local source.
+     * @throws InvalidAsset When paths or acquisition sources are invalid.
+     * @throws UnexpectedValueException When ownership or committed evidence differs.
+     */
     public function preserve(string $itemUri, string $assetKey, array $files): array
     {
         $id = $this->objectId($itemUri, $assetKey);
@@ -127,7 +157,12 @@ final readonly class AssetArchive
     }
 
     /**
-     * Read and verify an exact version, including its persisted archival identity.
+     * Read and verify an exact Asset version and its persisted archival identity.
+     *
+     * Checks the complete logical file set, accepted sizes and SHA-512 digests
+     * against storage bytes and OCFL state. All verification streams are closed.
+     * Missing, incompatible or corrupt records raise read or validation errors.
+     *
      * @return array{files: array<string, array{size: int, algorithm: string, digest: string}>, ...}
      */
     public function inspect(Urn $id, string $version): array
@@ -174,7 +209,11 @@ final readonly class AssetArchive
     }
 
     /**
-     * Caller owns the bounded-memory exact-version stream.
+     * Verify an exact Asset version before opening its requested logical file.
+     *
+     * The caller owns and must close the returned stream. Verification and the
+     * final open are separate reads; this does not return a private byte copy.
+     *
      * @return resource
      */
     public function readStream(Urn $id, string $version, string $logicalPath): mixed
@@ -188,6 +227,12 @@ final readonly class AssetArchive
         return $this->vault->readObjectStream($id, $version, $logicalPath);
     }
 
+    /**
+     * Reject keys and logical paths that cannot safely name relative files.
+     *
+     * Absolute paths, traversal, empty components and control characters raise
+     * InvalidAsset. Reserved archival names are checked by the preservation caller.
+     */
     private static function validatePath(mixed $path): void
     {
         if (
@@ -202,6 +247,12 @@ final readonly class AssetArchive
         }
     }
 
+    /**
+     * Require a readable absolute local file without symbolic-link components.
+     *
+     * Invalid sources raise InvalidAsset. This path check does not freeze a file;
+     * acquisition separately checks the opened inode and observed stat changes.
+     */
     private static function validateSource(mixed $source): void
     {
         if (! is_string($source) || ! str_starts_with($source, '/') || str_contains($source, "\0")) {
@@ -218,6 +269,11 @@ final readonly class AssetArchive
     }
 
     /**
+     * Consume a verification stream to measure its bytes and SHA-512 digest.
+     *
+     * Takes ownership of the stream and closes it even when hashing fails.
+     * A non-resource or incomplete read raises RuntimeException.
+     *
      * @param resource $stream
      * @return array{size: int, algorithm: string, digest: string}
      */

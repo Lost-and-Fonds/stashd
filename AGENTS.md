@@ -12,6 +12,33 @@
     - `composer analyse` for static analysis
     - `composer test` for testing
 
+## PHP documentation policy
+
+This policy applies throughout this repository, including production code, tests,
+fixtures, anonymous classes, and any future departments or plugins developed here.
+
+- Every new class, interface, enum, trait and method must have a useful multiline
+  PHPDoc block. This includes constructors, destructors, static methods and all
+  visibility levels. The opening `/**`, description and closing `*/` must occupy
+  separate lines; a one-line `/** Does thing. */` does not comply.
+- Begin with a complete, plain-English sentence explaining intent and responsibility.
+  Describe how a type fits into the application and the constraints a maintainer
+  needs to understand. For methods, explain the outcome and relevant caller duties.
+  Do not merely repeat a declaration's name or use generic boilerplate.
+- Document archival invariants, version creation, destructive or append-only effects,
+  resource ownership and stream closure, concurrency and transaction boundaries,
+  preconditions and failure semantics wherever relevant. State only guarantees
+  supported by the implementation; inspect the implementation and tests when unsure.
+- Update existing PHPDoc whenever behavior, contracts, side effects or assumptions
+  change. Preserve accurate type annotations, including generics and array shapes;
+  add `@param`, `@return` and `@throws` where they help explain the contract.
+- Preserve useful, specific existing documentation. Concision is welcome when
+  behavior is simple; an annotation-only or `@inheritDoc`-only block is insufficient.
+- Treat missing, misleading, single-line or boilerplate PHPDoc as a review defect.
+  Check coverage and accuracy during normal development and code review, including
+  declarations in nested and attributed constructs. Use parser or token analysis for
+  repository-wide coverage checks; a regex-only count does not establish compliance.
+
 ## Frontend
 
 - Use TailwindCSS

@@ -11,14 +11,30 @@ use Tempest\Http\Response;
 use Tempest\Router\GenericResponseSender;
 use Tempest\Router\ResponseSender;
 
-/** Tempest's default File/Download sender buffers readfile() in an unbounded ob_start(). */
+/**
+ * Transmit verified downloads without unbounded framework output buffering.
+ *
+ * Tempest's default File/Download sender buffers readfile() in ob_start().
+ * This sender delegates ordinary responses and closes owned download streams
+ * after transmission, including HEAD requests and failures.
+ */
 final readonly class BrowserResponseSender implements ResponseSender
 {
+    /**
+     * Bind the fallback sender and request container used to distinguish HEAD responses.
+     */
     public function __construct(
         private GenericResponseSender $default,
         private Container $container,
     ) {}
 
+    /**
+     * Send verified download headers and stream bytes directly after flushing buffers.
+     *
+     * HEAD requests send no body. A transmitted-byte mismatch raises
+     * RuntimeException after output may have started. The download is closed
+     * in all outcomes; ordinary responses use the default sender.
+     */
     public function send(Response $response): Response
     {
         if (! $response instanceof VerifiedDownload) {

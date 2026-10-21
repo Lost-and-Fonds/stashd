@@ -2,6 +2,12 @@
 
 use Tests\Support\RecordsAndArchives\OcflInspector;
 
+/**
+ * Run a real archival child process with a selected abrupt-death boundary.
+ *
+ * Collects stdout, stderr, exit status and termination signal, closing pipes
+ * and reaping the child. A 20-second timeout kills it and raises RuntimeException.
+ */
 function crash_process(string $root, string $operation, string $kind, string $value = '', string $boundary = ''): array
 {
     $process = proc_open(
@@ -39,6 +45,12 @@ function crash_process(string $root, string $operation, string $kind, string $va
     return ['output' => $output, 'error' => $error, 'exit' => $status['exitcode'] >= 0 ? $status['exitcode'] : $exit, 'signal' => $status['termsig']];
 }
 
+/**
+ * Hash every physical file under a disposable Vault root for before-and-after comparisons.
+ *
+ * Sorts relative paths so tests can detect changed bytes without consulting
+ * application services or relying on directory enumeration order.
+ */
 function crash_snapshot(string $root): array
 {
     $files = [];

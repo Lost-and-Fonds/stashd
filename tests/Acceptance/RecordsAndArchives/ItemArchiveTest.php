@@ -7,8 +7,20 @@ use Tests\Support\RecordsAndArchives\ArchivesRejected;
 use Tests\Support\RecordsAndArchives\ArchiveTestCase;
 use Tests\Support\RecordsAndArchives\OcflInspector;
 
+/**
+ * Exercise real Item publication, identity and exact Asset pins through the acceptance driver.
+ *
+ * Independent inventory and payload reads check persisted history rather than
+ * relying solely on application read results. Each test uses a disposable Vault.
+ */
 final class ItemArchiveTest extends ArchiveTestCase
 {
+    /**
+     * Prove metadata revisions remain recoverable from physical OCFL history.
+     *
+     * Checks stable identity, immutable earlier inventories and exact historical
+     * JSON values after reopening the Vault.
+     */
     public function testItemHistoryIsIndependentlyRecoverableFromInventoriesAndExactHistoricalPayloads(): void
     {
         $this->archive->run('vault.initialize');
@@ -77,6 +89,11 @@ final class ItemArchiveTest extends ArchiveTestCase
             ->toBe([$first['object_id']]);
     }
 
+    /**
+     * Prove URI spellings that differ in exact bytes retain distinct Item identities.
+     *
+     * Checks stored URI values as well as identity uniqueness across the examples.
+     */
     public function testItemIdentityPreservesDistinctionsInCanonicalURIBytes(): void
     {
         $this->archive->run('vault.initialize');
@@ -101,6 +118,9 @@ final class ItemArchiveTest extends ArchiveTestCase
         expect(array_unique($ids))->toHaveCount(count($uris));
     }
 
+    /**
+     * Require invalid canonical URI inputs to be rejected without creating an Object.
+     */
     #[DataProvider('invalidUris')]
     public function testInvalidCanonicalURIsDoNotCreateObjects(string $uri): void
     {
@@ -109,6 +129,9 @@ final class ItemArchiveTest extends ArchiveTestCase
         expect($this->archive->run('vault.list_objects')['object_ids'])->toBe([]);
     }
 
+    /**
+     * Require invalid metadata and malformed pins to leave the existing inventory unchanged.
+     */
     public function testInvalidMetadataAndPinsCannotModifyCommittedItemHistory(): void
     {
         $this->archive->run('vault.initialize');
@@ -125,6 +148,9 @@ final class ItemArchiveTest extends ArchiveTestCase
         expect($read['metadata']['title'])->toBe('Keep');
     }
 
+    /**
+     * Require explicit missing revisions to fail instead of returning current Item metadata.
+     */
     public function testHistoricalItemReadsRejectMissingVersionsRatherThanFallingBackToLatest(): void
     {
         $this->archive->run('vault.initialize');
@@ -132,6 +158,9 @@ final class ItemArchiveTest extends ArchiveTestCase
         expect(fn () => $this->archive->run('item.read', ['object_id' => $item['object_id'], 'version' => 'v999']))->toThrow(OutOfBoundsException::class);
     }
 
+    /**
+     * Check that Item identity depends on canonical URI bytes rather than Vault identity.
+     */
     public function testTheSameCanonicalURIHasReproducibleIdentityInIndependentVaults(): void
     {
         $this->archive->run('vault.initialize');
@@ -142,6 +171,11 @@ final class ItemArchiveTest extends ArchiveTestCase
         expect($second['object_id'])->toBe($first['object_id']);
     }
 
+    /**
+     * Seed incompatible history at the expected identity and require append rejection.
+     *
+     * Compares inventory bytes to ensure the unrelated Object is left intact.
+     */
     public function testItemArchiveCannotAppendToAnUnrelatedObjectAtTheDeterministicIdentity(): void
     {
         $this->archive->run('vault.initialize');
@@ -156,6 +190,12 @@ final class ItemArchiveTest extends ArchiveTestCase
         expect(file_get_contents($found['path']))->toBe($before);
     }
 
+    /**
+     * Verify exact pins survive later Asset revisions and acquisition-source deletion.
+     *
+     * Checks persisted Item payloads, inventory evidence and historical Asset bytes;
+     * Asset publication alone must not advance the Item revision.
+     */
     public function testPinsPersistInPhysicalItemHistoryAndRetainExactHistoricalBytes(): void
     {
         $this->archive->run('vault.initialize');
@@ -210,6 +250,12 @@ final class ItemArchiveTest extends ArchiveTestCase
             ->toBe($pins2);
     }
 
+    /**
+     * Reject malformed pin sets without altering either committed Object history.
+     *
+     * The provider's valid placeholders are replaced with an actual owned Asset
+     * reference so mixed valid and invalid lists exercise the real verifier.
+     */
     #[DataProvider('invalidPins')]
     public function testMalformedPinsCannotModifyExistingItemOrAssetHistory(array $pins): void
     {
@@ -234,6 +280,11 @@ final class ItemArchiveTest extends ArchiveTestCase
             ->toBeFalse();
     }
 
+    /**
+     * Supply malformed, duplicate and noncanonical pin lists for rejection scenarios.
+     *
+     * The valid placeholder is resolved by the test after creating its owned Asset.
+     */
     public static function invalidPins(): array
     {
         $id = 'urn:stashd:asset:00000000-0000-4000-8000-000000000001';
@@ -258,6 +309,12 @@ final class ItemArchiveTest extends ArchiveTestCase
         ]);
     }
 
+    /**
+     * Require one version per Asset Object within a single Item snapshot.
+     *
+     * After rejection, checks unchanged Item history and continued readability of
+     * both independently committed Asset versions.
+     */
     public function testOneItemSnapshotCannotPinDifferentVersionsOfTheSameAsset(): void
     {
         $this->archive->run('vault.initialize');
@@ -296,6 +353,12 @@ final class ItemArchiveTest extends ArchiveTestCase
         }
     }
 
+    /**
+     * Accept multiple owned Assets and reject mixed lists containing an unusable pin.
+     *
+     * Exercises foreign ownership, incompatible records and absent versions while
+     * requiring the previously committed Item inventory to remain unchanged.
+     */
     public function testMultipleOwnedAssetsAreVerifiedAndForeignMissingOrIncompatiblePinsAreRejectedTogether(): void
     {
         $this->archive->run('vault.initialize');
@@ -330,6 +393,12 @@ final class ItemArchiveTest extends ArchiveTestCase
         }
     }
 
+    /**
+     * Check exact-version fixity without turning Item rejection into Asset rollback.
+     *
+     * A valid unlinked Asset version survives rejected metadata; corruption in that
+     * version blocks its pin while an intact older version remains usable.
+     */
     public function testIntegrityChecksUseTheExactPinnedVersionAndFailedItemCommitRetainsUnlinkedAsset(): void
     {
         $this->archive->run('vault.initialize');
@@ -357,6 +426,11 @@ final class ItemArchiveTest extends ArchiveTestCase
             ->toBe('v2');
     }
 
+    /**
+     * Reject invalid first publication and detect pins injected into an archived payload.
+     *
+     * Checks both absence of a new Item and inventory mismatch on the tampered record.
+     */
     public function testInvalidFirstPinDoesNotCreateAnItemAndCorruptItemPayloadCannotInventPins(): void
     {
         $this->archive->run('vault.initialize');
@@ -375,6 +449,9 @@ final class ItemArchiveTest extends ArchiveTestCase
             ->toThrow(UnexpectedValueException::class, 'differs from its OCFL inventory');
     }
 
+    /**
+     * Supply empty, relative, malformed and non-ASCII URI inputs for identity rejection.
+     */
     public static function invalidUris(): array
     {
         return array_map(static fn (string $uri): array => [$uri], [

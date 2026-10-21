@@ -9,8 +9,17 @@ use Tempest\DateTime\DateTimeInterface;
 use Tempest\DateTime\FormatPattern;
 use Tempest\Validation\Rules\HasDateTimeFormat;
 
+/**
+ * Represent the identity persisted separately from the Vault OCFL root.
+ *
+ * Serialization retains format, schema version, permanent URN and creation
+ * time. This data object does not enforce supported format or version values.
+ */
 class VaultIdentity implements JsonSerializable
 {
+    /**
+     * Hold the supplied identity fields without reading storage or validating the schema.
+     */
     public function __construct(
         public string $format,
         public int $version,
@@ -20,6 +29,12 @@ class VaultIdentity implements JsonSerializable
         public DateTimeInterface $createdAt,
     ) {}
 
+    /**
+     * Decode persisted identity fields and parse the URN and creation timestamp.
+     *
+     * Malformed JSON or incompatible field values propagate decoding, parsing or
+     * type errors. This method does not validate format and version compatibility.
+     */
     public static function fromJson(string $json): self
     {
         $data = json_decode(
@@ -36,6 +51,9 @@ class VaultIdentity implements JsonSerializable
         );
     }
 
+    /**
+     * Emit identity fields with a string URN and ISO 8601 creation timestamp.
+     */
     public function jsonSerialize(): array
     {
         return [

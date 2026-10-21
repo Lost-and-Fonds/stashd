@@ -22,6 +22,13 @@ use Tempest\Container\Tag;
 
 use function Tempest\Clock\now;
 
+/**
+ * Provide the canonical OCFL storage boundary for the configured Vault.
+ *
+ * Object writes use a local per-Object lock and retain committed history.
+ * Publication inspection distinguishes acknowledged history from stranded
+ * files; it does not repair them or provide a multi-Object transaction.
+ */
 #[Singleton]
 class Vault
 {
@@ -32,6 +39,11 @@ class Vault
     private ?VaultIdentity $identity = null;
     private readonly ObjectWriteLock $writeLock;
 
+    /**
+     * Bind the tagged archival storage and create the local Object lock.
+     *
+     * Construction performs no storage initialization or identity read.
+     */
     public function __construct(
         #[Tag('vault')]
         private readonly ArchiveStorage $storage,
@@ -39,6 +51,12 @@ class Vault
         $this->writeLock = new ObjectWriteLock();
     }
 
+    /**
+     * Load the persisted Vault identity and open its OCFL storage root.
+     *
+     * Refreshes the cached identity on each call. A missing identity raises an
+     * Exception; malformed identity data and OCFL failures propagate to callers.
+     */
     public function open(): OcflStorageRoot
     {
         if (! $this->storage->fileExists(self::IDENTITY_FILENAME)) {
@@ -55,6 +73,12 @@ class Vault
         );
     }
 
+    /**
+     * Initialize a new OCFL root and persist a newly generated Vault identity.
+     *
+     * Use only for a new, empty root. OCFL rejects an existing nonempty root;
+     * root creation and identity writing are separate filesystem operations.
+     */
     public function create(): void
     {
         $layout = new HashedNTupleStorageLayout(
@@ -83,7 +107,16 @@ class Vault
         );
     }
 
-    /** @param array<string, string|array{contents: string}> $files */
+    /**
+     * Commit the first version of a typed Object under its write lock.
+     *
+     * An uncommitted shell may be retried, but committed history is rejected.
+     * Validation runs before locking; publication failures can leave material
+     * that must be inspected before another write.
+     *
+     * @param array<string, string|array{contents: string}> $files
+     * @throws OcflException When committed history already exists or OCFL publication fails.
+     */
     public function createObject(IdentifierType $type, ?Uuid $uuid = null, array $files = []): OcflObject
     {
         $this->validateFiles($files);
@@ -105,7 +138,15 @@ class Vault
         });
     }
 
-    /** @param array<string, string|array{contents: string}> $files */
+    /**
+     * Append file changes to an existing Object while holding its write lock.
+     *
+     * Paths omitted from the change set remain in the new version. Earlier
+     * versions are retained. Reconciliation issues block publication; a failed
+     * commit may leave physical material requiring inspection.
+     *
+     * @param array<string, string|array{contents: string}> $files
+     */
     public function updateObject(Urn $objectUrn, array $files): OcflObject
     {
         $this->validateFiles($files);
@@ -118,7 +159,13 @@ class Vault
     }
 
     /**
-     * Publish a complete logical snapshot under the existing Object lock.
+     * Publish a complete logical snapshot while holding the Object write lock.
+     *
+     * The validator receives the existing Object, or null for a new identity,
+     * before a version is staged. Omitted paths are removed from the new logical
+     * state while remaining available in earlier versions. Validation and
+     * publication share one Object lock, not a multi-Object transaction.
+     *
      * @param array<string, string|array{contents: string}> $files
      * @param callable(?OcflObject): void $validate
      */
@@ -142,12 +189,25 @@ class Vault
         });
     }
 
-    /** Inspect physical history under the same local lock as publication. Never repairs or deletes. */
+    /**
+     * Inspect acknowledged history and stranded material under the publication lock.
+     *
+     * Returns diagnostic issues without repairing, promoting or deleting files.
+     *
+     * @return array{head: ?string, versions: list<string>, issues: list<string>}
+     */
     public function inspectObject(Urn $id): array
     {
         return $this->writeLock->exclusiveWrite($id, fn (): array => $this->publication($id)->result());
     }
 
+    /**
+     * Open the history acknowledged by the root inventory checksum.
+     *
+     * Readers may receive verified older history even when inspection reports
+     * stranded publication material. This path checks inventory history but
+     * skips content hashing; consumers must verify the payloads they use.
+     */
     public function getObject(Urn $id): OcflObject
     {
         $state = $this->publication($id, verifyContent: false);
@@ -160,6 +220,12 @@ class Vault
         throw new OcflException(ErrorCode::E060, implode('; ', $state->issues));
     }
 
+    /**
+     * Resolve the Object layout path and inspect its publication evidence.
+     *
+     * Content verification is enabled by default; disabling it still checks
+     * acknowledged inventories and historical consistency.
+     */
     private function publication(Urn $id, bool $verifyContent = true): PublicationInspection
     {
         $root = $this->open();
@@ -167,6 +233,12 @@ class Vault
         return new PublicationInspection($this->storage, $path, $id->toString(), $verifyContent);
     }
 
+    /**
+     * Require reconciled publication evidence before extending an Object.
+     *
+     * Unlike the read path, this rejects any inspection issue with an
+     * UnexpectedValueException. Callers must already hold the Object lock.
+     */
     private function objectForWrite(Urn $id): OcflObject
     {
         $state = $this->publication($id);
@@ -176,6 +248,14 @@ class Vault
         return $state->object ?? $this->open()->getObject($id->toString());
     }
 
+    /**
+     * Reject empty changes and unsafe logical paths before staging files.
+     *
+     * Sources must be path strings or inline contents entries. Absolute source
+     * paths must name readable regular files; this does not snapshot their bytes.
+     *
+     * @param array<array-key, mixed> $files
+     */
     private function validateFiles(array $files): void
     {
         if ($files === []) {
@@ -204,7 +284,13 @@ class Vault
         }
     }
 
-    /** @param array<string, string|array{contents: string}> $files */
+    /**
+     * Add path sources and inline bytes to an uncommitted version builder.
+     *
+     * The caller owns locking and commit. This helper does not publish a version.
+     *
+     * @param array<string, string|array{contents: string}> $files
+     */
     private function stageFiles(VersionBuilder $version, array $files): VersionBuilder
     {
         foreach ($files as $logicalPath => $source) {
@@ -218,6 +304,12 @@ class Vault
         return $version;
     }
 
+    /**
+     * Read one exact historical file into memory and close its stream.
+     *
+     * Missing Objects, versions or paths propagate their read failures. Use the
+     * stream variant when the complete payload should not be buffered.
+     */
     public function readObjectContent(Urn $objectUrn, string $version, string $logicalPath): string
     {
         $stream = $this->readObjectStream($objectUrn, $version, $logicalPath);
@@ -258,11 +350,24 @@ class Vault
         return $stream;
     }
 
+    /**
+     * Return the last identity loaded or created by this Vault instance.
+     *
+     * Returns null until an identity is assigned in memory. Creation assigns
+     * it before writing identity.json, so a value alone does not prove successful
+     * initialization or current storage availability.
+     */
     public function getIdentity(): ?VaultIdentity
     {
         return $this->identity;
     }
 
+    /**
+     * Build a Stashd URN in the requested identity namespace.
+     *
+     * A supplied UUID gives reproducible identity; omitting it generates a
+     * random UUID. No Object is created or checked for existence.
+     */
     public function urnFromUuid(IdentifierType $type, ?Uuid $uuid = null): Urn
     {
         $uuid ??= Uuid::v4();

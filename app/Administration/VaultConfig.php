@@ -11,6 +11,9 @@ namespace App\Administration;
  */
 final readonly class VaultConfig
 {
+    /**
+     * Hold the selected storage provider and root used to derive tagged Vault storage.
+     */
     public function __construct(
         public string $provider,
         public string $root,
