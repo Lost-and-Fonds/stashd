@@ -236,9 +236,12 @@ test('PSC-T09 Vault only recovery survives actual removal of disposable projecti
     // Adapter must create a real isolated projection here, then physically drop it.
     $name = 'stashd_tx_test_' . bin2hex(random_bytes(8));
     $fixture = ['database' => $name, 'username' => $name, 'schema' => $name];
-    $projection = Probe::run($workspace, ['operation' => 'projection.describe', 'fixture' => $fixture]);
-    $database = ProjectionProbe::connect($projection, $name);
+    $projectionCreated = false;
+    $database = null;
     try {
+        $projection = Probe::run($workspace, ['operation' => 'projection.describe', 'fixture' => $fixture]);
+        $projectionCreated = true;
+        $database = ProjectionProbe::connect($projection, $name);
         $exists = $database->prepare('SELECT count(*) FROM pg_namespace WHERE nspname = ?');
         $exists->execute([$projection['schema']]);
         expect((int) $exists->fetchColumn())->toBe(1);
@@ -258,11 +261,20 @@ test('PSC-T09 Vault only recovery survives actual removal of disposable projecti
         expect((int) $exists->fetchColumn())->toBe(1);
         expect(Probe::snapshot($workspace . '/vault'))->toBe($before);
     } finally {
-        // The validated private schema is disposable even when recovery assertions fail.
-        $database->exec('DROP SCHEMA IF EXISTS "' . $name . '" CASCADE');
-        $exists = null;
-        $database = null;
-        Probe::run($workspace, ['operation' => 'projection.dispose', 'fixture' => $fixture]);
+        try {
+            // Never issue SQL against an unvalidated PDO connection.
+            if ($database instanceof PDO) {
+                $database->exec('DROP SCHEMA IF EXISTS "' . $name . '" CASCADE');
+            }
+        } finally {
+            $exists = null;
+            $database = null;
+            // Describe may have provisioned a role/database even if connection
+            // validation failed; dispose must be scoped to the parent-generated IDs.
+            if ($projectionCreated) {
+                Probe::run($workspace, ['operation' => 'projection.dispose', 'fixture' => $fixture]);
+            }
+        }
     }
 })->with(['asset-verified:master', 'item-verified', 'after-ack']);
 
