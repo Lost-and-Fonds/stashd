@@ -10,7 +10,7 @@ final class BrowserServer
     private mixed $process;
     public readonly string $url;
 
-    public function __construct(string $root, string $log)
+    public function __construct(string $root, string $log, array $environment = [])
     {
         $socket = stream_socket_server('tcp://127.0.0.1:0');
         $address = stream_socket_get_name($socket, false);
@@ -26,8 +26,10 @@ final class BrowserServer
                 ...getenv(),
                 'VAULT_ROOT' => $root,
                 'ENVIRONMENT' => 'local',
+                'VAULT_BROWSER_ENABLED' => 'true',
                 'SIGNING_KEY' => base64_encode(str_repeat('s', 32)),
                 'ENCRYPTION_KEY' => base64_encode(str_repeat('e', 32)),
+                ...$environment,
             ],
         );
         if (! is_resource($this->process)) {

@@ -14,10 +14,12 @@ use Tempest\Http\Request;
 use Tempest\Http\Response;
 use Tempest\Http\Status;
 use Tempest\Router\Get;
+use Tempest\Router\WithMiddleware;
 use Throwable;
 
 use function Tempest\View\view;
 
+#[WithMiddleware(RequireLocalVaultBrowser::class)]
 final readonly class VaultBrowserController
 {
     public function __construct(
@@ -35,6 +37,14 @@ final readonly class VaultBrowserController
         try {
             $root = $this->vault->open();
             foreach ($root->listObjects() as $id) {
+                if (str_starts_with($id, 'urn:stashd:asset:')) {
+                    try {
+                        $this->assets->inspect(self::id($id, 'asset'), $root->getObject($id)->head());
+                    } catch (Throwable) {
+                        $notices[] = $id . ' — unreadable or incompatible Asset record.';
+                    }
+                    continue;
+                }
                 if (! str_starts_with($id, 'urn:stashd:item:')) {
                     $notices[] = $id . ' — not an Item; omitted from the Item list.';
                     continue;

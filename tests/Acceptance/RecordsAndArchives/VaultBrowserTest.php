@@ -30,7 +30,7 @@ test('HTTP browser reconstructs exact historical pins and streams real archived 
     $server = new BrowserServer($root, $this->archive->path('http.log'));
     try {
         $overview = $server->request('/');
-        expect($overview['status'])->toBe(200)->and($overview['body'])->toContain($uri, 'Revised', 'v3');
+        expect($overview['status'])->toBe(200)->and($overview['body'])->toContain($uri, 'Revised', 'v3')->not->toContain('Object notices');
         $metadata = $server->request(browser_item_url($item['object_id'], 'v1'));
         expect($metadata['status'])->toBe(200)->and($metadata['body'])->toContain('Metadata-only revision', '&lt;script&gt;')->not->toContain('<script>alert');
         $server->stop();
@@ -125,6 +125,12 @@ test('HTTP browser reports uninitialized, empty, unrelated and damaged canonical
             'uuid' => 'd9016017-0220-4590-98f0-438b226c3dd8',
             'files' => ['unrelated' => ['contents' => 'not an Asset record']],
         ]);
+        expect($server->request('/')['body'])->toContain('unreadable or incompatible Asset record');
+        $this->archive->run('vault.object_create', [
+            'type' => 'vault',
+            'uuid' => 'd9016017-0220-4590-98f0-438b226c3dd8',
+            'files' => ['unrelated' => ['contents' => 'unsupported peer Object']],
+        ]);
         expect($server->request('/')['body'])->toContain('not an Item; omitted');
         $found = OcflInspector::inventoryFor($this->archive->path('vault'), $object['object_id']);
         file_put_contents($found['path'], '{broken');
@@ -133,3 +139,50 @@ test('HTTP browser reports uninitialized, empty, unrelated and damaged canonical
         $server->stop();
     }
 });
+
+test('HTTP browser denies every route before reading the Vault unless explicitly enabled locally', function (string $environment, string $enabled): void {
+    $this->archive->run('vault.initialize');
+    $uri = 'urn:test:private-web-item';
+    $item = $this->archive->run('item.record', ['uri' => $uri, 'metadata' => ['title' => 'Private archived title']]);
+    $source = $this->archive->input('private', 'private archived bytes');
+    $asset = $this->archive->run('asset.preserve', ['item_uri' => $uri, 'asset_key' => 'master', 'files' => ['private.bin' => $source]]);
+    $root = $this->archive->path('vault');
+    $identity = $root . '/identity.json';
+    // A real Vault open reads identity.json. Age its access time so relatime records any read.
+    touch($identity, 1, 1);
+    $server = new BrowserServer($root, $this->archive->path('denied.log'), ['ENVIRONMENT' => $environment, 'VAULT_BROWSER_ENABLED' => $enabled]);
+    try {
+        foreach ([
+            '/',
+            browser_item_url($item['object_id'], 'v1'),
+            browser_asset_url($asset['object_id'], 'v1'),
+            browser_asset_url($asset['object_id'], 'v1') . '/download?path=private.bin',
+        ] as $path) {
+            $response = $server->request($path);
+            expect($response['status'])->toBe(404);
+            expect($response['body'])->not->toContain($uri, 'Private archived title', 'private archived bytes', $root);
+            clearstatcache(true, $identity);
+            expect(fileatime($identity))->toBe(1);
+        }
+    } finally {
+        $server->stop();
+    }
+    // Positive control: the same HTTP route can read this real Vault when locally opted in.
+    $server = new BrowserServer($root, $this->archive->path('enabled.log'));
+    try {
+        expect($server->request('/')['body'])->toContain('Private archived title');
+        clearstatcache(true, $identity);
+        expect(fileatime($identity))->toBeGreaterThan(1);
+    } finally {
+        $server->stop();
+    }
+
+    // Tempest maps 'null' to the default; it also overrides an opted-in developer .env.
+})->with([
+    'local default opt-in' => ['local', 'null'],
+    'local disabled' => ['local', 'false'],
+    'local invalid opt-in' => ['local', 'yes'],
+    'production default opt-in' => ['production', 'null'],
+    'production opted in' => ['production', 'true'],
+    'staging opted in' => ['staging', 'true'],
+]);

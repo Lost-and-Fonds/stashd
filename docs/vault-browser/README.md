@@ -1,6 +1,7 @@
 # Local Vault browser
 
-Open `/` in the existing Tempest application. The browser reads the configured
+The browser is disabled by default. Open `/` in the existing Tempest application
+after explicitly enabling it for local development. The browser reads the configured
 canonical Vault directly through `Vault`, `ItemArchive` and `AssetArchive`.
 No database, search service, catalogue, browser JavaScript or frontend build is
 required. It is a local development interface, with no authentication or user
@@ -14,12 +15,20 @@ From this Core checkout on the host:
 lerd start                   # if Lerd is not already running
 lerd link                    # once for a new checkout
 lerd console key:generate    # once if Tempest's local signing/encryption keys are absent
+# In the local, ignored .env, explicitly set:
+# ENVIRONMENT=local
+# VAULT_BROWSER_ENABLED=true
 lerd open
 ```
 
 This checkout is linked at <https://core.test/>. For another checkout, use the
 URL Lerd reports (including its configured DNS suffix). The document root is
-`public/`; routes run through `public/index.php`. No worker is required.
+`public/`; routes run through `public/index.php`. No worker is required. A shared route middleware denies overview, Item, Asset
+and download requests with 404 unless the environment is `local` and
+`VAULT_BROWSER_ENABLED=true`. The opt-in cannot enable the browser in production
+or staging. Denial happens before controller execution or opening the Vault.
+Do not expose the developer server externally (including tunnels or LAN sharing).
+This opt-in is a development boundary, not production authentication.
 
 Vault configuration is read only in `app/Administration/VaultConfig.config.php`:
 `VAULT_PROVIDER=local`, `VAULT_ROOT` defaults to `storage/vault` in this checkout.
@@ -41,8 +50,8 @@ There are no browser write endpoints or multipart upload in this slice.
 ## Navigation and correctness
 
 - `/`: enumerate `Vault::open()->listObjects()`, verify Item records and show
-  title, canonical URI and OCFL head. Non-Item Objects and invalid Item records
-  appear in Object notices. An unreadable OCFL inventory can stop enumeration;
+  title, canonical URI and OCFL head. Healthy Asset Objects are expected peers and do not produce warnings. Invalid
+  Item/Asset records and unexpected Objects appear in Object notices. An unreadable OCFL inventory can stop enumeration;
   the page returns 503 and explicitly says no complete list is available.
 - `/items/{object-id}?version=v2`: read that exact Item revision. An omitted
   version resolves the Item head once. Revision links never change stored pins.
@@ -72,7 +81,8 @@ failure. The browser sender flushes buffers before sending the verified stream.
 
 This is a synchronous filesystem scan, without pagination or an index. It is
 intended for development Vaults, not million-Item interactive browsing. Asset
-inspection verifies all logical files in the selected Asset. External mutation
+inspection verifies all logical files; the overview verifies Asset heads too,
+so it can distinguish healthy peers from incompatible or corrupt Assets. External mutation
 of the canonical Vault during requests remains outside the archive service's
 immutability assumption. No repair, commit journal or crash recovery is added.
 
@@ -92,8 +102,8 @@ Tailwind CLI installation; no Node package or lockfile is added to Core.
 
 | Check | Passed | Failed | Incomplete |
 | --- | ---: | ---: | ---: |
-| Focused real HTTP browser tests | 3 | 0 | 0 |
-| Records & Archives suite | 129 | 0 | 33 |
+| Focused real HTTP browser tests | 9 | 0 | 0 |
+| Records & Archives suite | 135 | 0 | 33 |
 
 The HTTP tests start real Tempest web processes against disposable OCFL Vaults,
 using production services to preserve fixtures. They traverse routes and the
@@ -101,6 +111,13 @@ actual response sender over TCP, restart the application, delete original
 sources, compare independent SHA-512 hashes, reject invalid IDs/versions/paths,
 escape metadata, and exercise missing/corrupt content and inventories. A 64 MiB
 binary file downloads correctly with a **32 MiB server PHP memory limit**.
+The access-boundary regression covers disabled/default/invalid local opt-in,
+production with and without opt-in, and opted-in staging across all four routes.
+It checks that denied responses contain no archival data or storage path and
+that the real Vault identity file's aged access time remains untouched. A fresh,
+opted-in local HTTP request is the positive control and updates that access time.
+A healthy Item/Asset Vault has no warning; incompatible Assets and unsupported
+Objects retain notices. Both review regressions failed before the fixes.
 No internal services or persistence are mocked. Deliberately forcing every
 historical pin to Asset v2 made the v2 → v1 HTTP proof fail at the exact Asset
 link/hash assertion; restoration passed.
