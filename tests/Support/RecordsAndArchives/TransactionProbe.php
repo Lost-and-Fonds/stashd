@@ -21,13 +21,13 @@ final class TransactionProbe
      * @param array<string, mixed> $request
      * @return array{process: resource, prefix: string, boundary: string}
      */
-    public static function start(string $workspace, array $request, string $boundary = '', string $gate = ''): array
+    public static function start(string $workspace, array $request, string $boundary = '', string $pause = ''): array
     {
         $prefix = $workspace . '/process-' . bin2hex(random_bytes(8));
         $request['root'] = $workspace . '/vault';
         file_put_contents($prefix . '.json', json_encode($request, JSON_THROW_ON_ERROR));
         $process = proc_open(
-            [PHP_BINARY, __DIR__ . '/transaction-process.php', $prefix, $boundary, $gate],
+            [PHP_BINARY, __DIR__ . '/transaction-process.php', $prefix, $boundary, $pause],
             [0 => ['file', '/dev/null', 'r'], 1 => ['file', $prefix . '.out', 'w'], 2 => ['file', $prefix . '.err', 'w']],
             $pipes,
             env_vars: [
@@ -45,6 +45,74 @@ final class TransactionProbe
             throw new RuntimeException('Could not start transaction probe.');
         }
         return compact('process', 'prefix', 'boundary');
+    }
+
+    /**
+     * Require an actual authority transition while the supervised child remains paused.
+     *
+     * The adapter must report contention only after a denied claim, never before
+     * attempting it. The caller owns cleanup if this assertion fails.
+     */
+    private static function paused(array $child, string $boundary): void
+    {
+        $deadline = microtime(true) + 5;
+        while (! is_file($child['prefix'] . '.paused') && microtime(true) < $deadline) {
+            $status = proc_get_status($child['process']);
+            Assert::assertTrue($status['running'], 'Child exited before ' . $boundary . ': ' . file_get_contents($child['prefix'] . '.err'));
+            usleep(10_000);
+        }
+        Assert::assertFileExists($child['prefix'] . '.paused', 'Missing authority boundary: ' . $boundary);
+        Assert::assertSame($boundary, file_get_contents($child['prefix'] . '.paused'));
+    }
+
+    /**
+     * Hold one owner until a second writer proves a denied authority claim.
+     *
+     * Resume or kill the owner before releasing the contender. Both children
+     * are always reaped; missing hooks and publication during contention fail.
+     * This supervises the real boundary and implements no commit authority.
+     */
+    public static function contend(string $workspace, array $owner, array $contender, bool $killOwner): array
+    {
+        $children = [];
+        try {
+            $a = self::start($workspace, $owner, pause: 'authority-held');
+            $children['a'] = $a;
+            self::paused($a, 'authority-held');
+            $before = self::snapshot($workspace . '/vault');
+            $b = self::start($workspace, $contender, pause: 'authority-contended');
+            $children['b'] = $b;
+            self::paused($b, 'authority-contended');
+            Assert::assertSame('', file_get_contents($a['prefix'] . '.out'));
+            Assert::assertSame('', file_get_contents($b['prefix'] . '.out'));
+            Assert::assertStringNotContainsString('authority-held', file_get_contents($b['prefix'] . '.events'));
+            Assert::assertSame($before, self::snapshot($workspace . '/vault'), 'Contender published while another writer owned authority.');
+            if ($killOwner) {
+                proc_terminate($a['process'], 9);
+            } else {
+                file_put_contents($a['prefix'] . '.resume', 'resume');
+            }
+            $first = self::finish($a);
+            unset($children['a']);
+            if ($killOwner) {
+                Assert::assertSame(9, $first['signal']);
+                Assert::assertSame('', $first['out']);
+                $first = ['status' => 'owner-killed'];
+            } else {
+                Assert::assertSame(0, $first['exit'], $first['err']);
+                $first = json_decode($first['out'], true, flags: JSON_THROW_ON_ERROR);
+            }
+            file_put_contents($b['prefix'] . '.resume', 'resume');
+            $second = self::finish($b);
+            unset($children['b']);
+            Assert::assertSame(0, $second['exit'], $second['err']);
+            return [$first, json_decode($second['out'], true, flags: JSON_THROW_ON_ERROR)];
+        } finally {
+            foreach (array_filter($children, static fn (array $child): bool => is_resource($child['process'])) as $child) {
+                proc_terminate($child['process'], 9);
+                proc_close($child['process']);
+            }
+        }
     }
 
     /**

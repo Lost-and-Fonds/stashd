@@ -75,11 +75,11 @@ cross-repository planning authority. No protocol/SDK/plugin changes belong here.
 | T02 | Eleven before/after seal, Asset, Item and acknowledgement boundaries; source removal after sealing; three fresh-process recoveries; exact bytes and immutable old history. |
 | T03 | Duplicate dispatch returns the same Item revision and changes no settled Vault bytes. |
 | T04 | Out-of-order disjoint candidates keep the newer relationship or explicitly conflict. |
-| T05 | Two live PHP processes released from a shared gate cannot duplicate one transaction's Item/Asset versions. |
+| T05 | Writer A holds commit authority until B proves a denied claim; normal release and owner death cannot duplicate one transaction's versions. |
 | T06 | Same ID plus different bytes cannot replace the original candidate. |
 | T07 | Damaged candidate manifest or custody bytes cause containment, without deletion or Object publication. |
 | T08 | Metadata delta retains existing pins and creates no Asset revision. |
-| T09 | Actual disposable PostgreSQL schema removal is independently checked through PDO; Vault-only recovery and projection rebuild retain archival bytes. |
+| T09 | A dedicated disposable PostgreSQL database/role is validated before schema destruction; direct base-table queries verify the rebuilt exact Item and pins. |
 | T10 | Negative controls require independent assertions to reject real lost relationships, fabricated v99 receipts and damaged physical bytes. |
 | T11 | Explicit stale exact-pin precondition cannot overwrite a newer pin. |
 | T12 | Unsafe Asset key, absent source and invalid Item URI cannot publish. |
@@ -87,15 +87,33 @@ cross-repository planning authority. No protocol/SDK/plugin changes belong here.
 | T14 | Zero-Asset transaction creates exactly one metadata-only Item. |
 | T15 | Seal identity and physical manifest digest survive producer source mutation; publication uses accepted bytes. |
 | T16 | Unreachable projection service does not prevent authoritative completion or cause duplicate recovery writes. |
-| T17 | Two different concurrent candidates retain every successfully acknowledged relationship or explicitly conflict. |
+| T17 | Two different candidates contend at the authority boundary; release and owner-death recovery retain every acknowledged relationship or explicitly conflict. |
 | T18 | Unknown transaction identity cannot adopt unrelated committed Objects as its own history. |
 | T19 | A real second Item publication is detected by the independent snapshot witness. |
+| T20 | Real-flock supervisor controls prove held/denied-claim overlap, owner-death cleanup and detection of a bypassed lock. |
+| T21 | Wrong database, role, host or schema is rejected before creating a destructive-test PDO connection. |
+| T22 | An added OCFL revision file is rejected even when every pre-existing file remains byte-identical. |
 
-Every child has unreachable ordinary DB configuration. PostgreSQL projection
-fixtures must use an explicitly isolated test connection; T09 refuses a schema
-name outside `stashd_tx_test_<hex>`, verifies its existence before destruction and
-absence afterward. An adapter boolean alone is insufficient. Never connect these
+Every child has unreachable ordinary DB configuration. T09 generates a fresh
+`stashd_tx_test_<16 hex>` name in the parent for the database, login role and
+schema. The adapter cannot select another connection: PDO creation requires the
+exact `lerd-postgres:5432` DSN and generated database/user/schema. Read-only server
+queries then verify current database/user, database ownership, an unprivileged role
+and no role memberships before any schema destruction. The local service address
+is an explicit fixture constraint, not a production storage requirement.
+
+T09 verifies schema existence, destruction and recreation through PDO, then
+queries actual base tables for the exact Item Object/version and all exact Asset
+pins observed independently in OCFL. Adapter response data cannot satisfy these
+queries. The adapter supplies only validated physical table/column identifiers;
+SQL expressions, views and constant SELECT witnesses are excluded. The dedicated
+schema, database and role must be disposed after the test. Never connect these
 tests to a working Vault or production catalogue.
+
+T07/T11/T13/T18 compare **complete** before/after Vault file snapshots: prohibited
+recovery cannot add files or revisions as well as mutate/delete earlier bytes.
+Diagnostic output for these paths belongs outside the Vault snapshot (the private
+process logs), rather than an unspecified exception permitting archival writes.
 
 The parent performs SIGKILL only after observing the selected child's boundary
 marker. Missing boundary, timeout, launch error and nonzero exit all fail. Logs
@@ -133,9 +151,16 @@ It must translate these **test-only** operations to the real application boundar
   Return `status`, `transaction_id`, and on completion exact `item` Object/version.
   Expected domain rejections return an explicit semantic status; setup, storage,
   programming and unexpected process errors must remain errors.
-- `projection.describe/destroy/rebuild`: create/inspect/drop/rebuild only the
-  private PostgreSQL fixture; describe supplies PDO `dsn`, `username`, `password`,
-  `schema`; rebuild returns actually projected `items` as Object/version pairs.
+- `projection.describe/destroy/rebuild/dispose`: requests carry a parent-generated
+  `fixture` with exact `database`, `username`, `schema`. Describe provisions only
+  that disposable database and unprivileged owner role, and supplies PDO `dsn`,
+  `username`, `password`, `schema`, plus physical `tables.items` and `tables.pins`.
+  Each table descriptor contains `name` and `columns` mapping semantic field names
+  to actual plain identifiers. Item fields are `object_id`, `version`; pin fields
+  are `item_object_id`, `item_version`, `asset_object_id`, `asset_version`.
+  This inspection map is test vocabulary, not a mandated production schema.
+  Rebuild returns projected `items`; the parent additionally queries the actual
+  base tables. Dispose removes only the generated database and role after cleanup.
 
 Call the supplied boundary callback at actual completed boundaries named in T02;
 never emit a marker before doing the work it describes. `item-published` occurs
@@ -145,6 +170,37 @@ selected boundary the callback waits; the supervisor kills that PHP process.
 Place hooks at the application/storage seam, without implementing a parallel
 transaction engine in the adapter. All JSON names above are normalized test
 results, not mandated production serialization or command names.
+
+T05/T17 no longer rely on simultaneous process launch. The adapter calls
+`authority-held` **after acquiring the real publication authority and before any
+OCFL publication**. While A is paused there, B must attempt that same authority
+and call `authority-contended` **only after an actual denied nonblocking claim or
+equivalent observed fencing/ownership refusal**, before retrying. Merely reporting
+that a claim is about to start does not meet this contract. The parent verifies
+that neither child has returned success or changed Vault files while A holds
+authority, then either releases A or kills/reaps A before releasing B. Recovery
+must reuse completed steps. Missing or dishonest ownership hooks fail. Leases that
+permit takeover while an old owner remains alive still need the separate stale-fence
+vectors below; local flock controls are not evidence of distributed fencing.
+
+`probe.ownership` is only the supervisor's real-flock self-check. It publishes
+no OCFL data and returns no archival receipts; transaction operations still have
+no default implementation. A deliberate lock bypass proves the supervisor rejects
+a process that never establishes actual contention.
+
+The independent PostgreSQL witness has a separate opt-in sensitivity proof:
+
+```sh
+STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Support/RecordsAndArchives/ProjectionProbeProofTest.php --compact
+```
+
+Provide the configured local PostgreSQL service's test-admin `dsn`, `username`
+and `password` in private, ignored `tmp/projection-proof.json`. The proof creates a
+fresh database and unprivileged role, checks empty/missing/wrong persisted rows,
+and drops only those generated fixtures in cleanup. It fails if the configuration
+is absent; it is outside default testsuite directories and never passes incomplete.
+Delete the private configuration afterward. This proves the SQL witness's
+sensitivity, not the still-unimplemented production projection rebuild.
 
 ## Unresolved decisions and bounded Phase 2
 
@@ -186,7 +242,7 @@ Item snapshot, trust SQL after Vault damage) demonstrably fail relevant tests.
 No checkpoint WIT redesign, replica engine, distributed storage, UI, generic workflow
 framework or power-loss guarantee is included in this implementation brief.
 
-## Recorded baseline — 2026-10-22
+## Initial baseline — 2026-10-22, commit `84bb3da`
 
 Environment: PHP 8.5 through the repository's `bin/test.sh` wrapper and Lerd;
 fresh child processes, private temporary local OCFL storage. No working Vault
@@ -231,3 +287,33 @@ and actual transaction/journal recovery remain unproven. The chosen journal form
 still needs its own independent evidence reader and damage/conflict vectors in
 Phase 2; the current witness does not establish an on-disk transaction-to-version
 binding by merely trusting a transaction ID in a response.
+
+## Review corrections and freeze gate
+
+The PR #57 review tightened prohibited-write snapshots, destructive projection
+connection safety and independent persisted-row queries, and deterministic
+authority contention. The planned intra-Object crashes, damaged/conflicting journal
+evidence, transaction-to-version binding reader and stale-live-owner fencing remain
+required Phase 2 vectors; these corrections do not remove or claim those proofs.
+
+The revised transaction suite has **35 expected missing-capability failures and
+13 passing proofs/controls, 665 assertions**. Two added owner-death datasets account
+for the extra expected failures. New review controls T20–T22 pass **8 cases, 107
+assertions**. The explicit real PostgreSQL witness proof passes **1 case, 83
+assertions**; its database, role and ignored connection configuration were removed.
+Focused formatting/lint of all five changed/new PHP files pass.
+The complete revised Records & Archives run is **35 failed, 33 incomplete,
+193 passed, 3,435 assertions**; all failures carry missing-capability diagnostics.
+`composer qa` was repeated and still stops at the pre-existing unsafe-finally
+lint error. Focused static analysis was repeated: **126 errors, 32 warnings,
+1 help**, including the dynamic test/JSON/resource typing; it remains non-green,
+and no suppressions or production changes were introduced.
+
+**Do not merge this Phase 1 PR alone into `dev`.** Keep it on its feature branch
+until Phase 2 satisfies the protected contracts, or a separately reviewed opt-in
+acceptance gate isolates them. Do not turn expected failures into skips/incompletes
+or weaken assertions to make the default suite green. PR #57 remains a handoff
+pending review of these corrections. After approval, record the corrected PR head
+commit as the frozen independent acceptance baseline; Phase 2 must name that exact
+commit and preserve the protected tests. Any contract amendment requires independent
+review and an explicit explanation, separate from implementation convenience.

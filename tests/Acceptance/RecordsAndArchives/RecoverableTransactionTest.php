@@ -3,6 +3,7 @@
 use PHPUnit\Framework\AssertionFailedError;
 use Tests\Support\RecordsAndArchives\ArchiveFixture;
 use Tests\Support\RecordsAndArchives\OcflInspector;
+use Tests\Support\RecordsAndArchives\ProjectionProbe;
 use Tests\Support\RecordsAndArchives\TransactionProbe as Probe;
 
 /**
@@ -165,36 +166,13 @@ test('PSC-T04 stale disjoint deltas preserve newer relationships or explicitly r
     }
 });
 
-test('PSC-T05 two concurrent dispatchers cannot both publish the same candidate', function (): void {
+test('PSC-T05 two concurrent dispatchers cannot both publish the same candidate', function (bool $killOwner): void {
     $workspace = transaction_workspace($this->archive);
     Probe::run($workspace, transaction_request($this->archive));
     $commit = ['operation' => 'commit', 'transaction_id' => 'tx-a'];
-    $gate = $workspace . '/go';
-    $a = Probe::start($workspace, $commit, gate: $gate);
-    $b = Probe::start($workspace, $commit, gate: $gate);
-    $deadline = microtime(true) + 5;
-    while ((! is_file($a['prefix'] . '.ready') || ! is_file($b['prefix'] . '.ready')) && microtime(true) < $deadline) {
-        usleep(10_000);
-    }
-    $ready = is_file($a['prefix'] . '.ready') && is_file($b['prefix'] . '.ready');
-    file_put_contents($gate, 'go');
-    $results = [];
-    $failure = null;
-    foreach ([$a, $b] as $child) {
-        try {
-            $results[] = Probe::finish($child);
-        } catch (Throwable $error) {
-            $failure ??= $error;
-        }
-    }
-    if ($failure !== null) {
-        throw $failure;
-    }
-    expect($ready)->toBeTrue('Both PHP processes must reach the shared start gate.');
-    foreach ($results as $result) {
-        expect($result['exit'])->toBe(0, $result['err']);
-        $outcome = json_decode($result['out'], true, flags: JSON_THROW_ON_ERROR);
-        expect($outcome['status'])->toBeIn(['complete', 'busy']);
+    $results = Probe::contend($workspace, $commit, $commit, $killOwner);
+    foreach ($results as $index => $outcome) {
+        expect($outcome['status'])->toBeIn($index === 0 && $killOwner ? ['owner-killed'] : ['complete', 'busy']);
     }
     $receipt = Probe::run($workspace, ['operation' => 'recover', 'transaction_id' => 'tx-a']);
     Probe::committed($workspace . '/vault', $receipt, 'tx-a', ['master' => 'master bytes']);
@@ -202,7 +180,7 @@ test('PSC-T05 two concurrent dispatchers cannot both publish the same candidate'
     foreach ($this->archive->run('vault.list_objects')['object_ids'] as $id) {
         expect(array_keys(OcflInspector::inventoryFor($workspace . '/vault', $id)['inventory']['versions']))->toBe(['v1']);
     }
-});
+})->with([false, true]);
 
 test('PSC-T06 same identity cannot be resealed with different content', function (): void {
     $workspace = transaction_workspace($this->archive);
@@ -224,7 +202,7 @@ test('PSC-T07 damaged sealed evidence is contained without publication or deleti
         $outcome = Probe::run($workspace, ['operation' => 'recover', 'transaction_id' => 'tx-a']);
         expect($outcome['status'])->toBeIn(['rejected', 'quarantined']);
         expect(file_get_contents($path))->toBe('damaged evidence');
-        transaction_retains($before, Probe::snapshot($workspace . '/vault'));
+        expect(Probe::snapshot($workspace . '/vault'))->toBe($before);
         expect($this->archive->run('vault.list_objects')['object_ids'])->toBe([]);
     }
 })->with(['manifest', 'custody']);
@@ -256,14 +234,15 @@ test('PSC-T09 Vault only recovery survives actual removal of disposable projecti
     Probe::run($workspace, transaction_request($this->archive));
     Probe::finish(Probe::start($workspace, ['operation' => 'commit', 'transaction_id' => 'tx-a'], $boundary));
     // Adapter must create a real isolated projection here, then physically drop it.
-    $projection = Probe::run($workspace, ['operation' => 'projection.describe']);
-    expect($projection['schema'])->toMatch('/^stashd_tx_test_[a-f0-9]+$/D');
-    $database = new PDO($projection['dsn'], $projection['username'], $projection['password']);
+    $name = 'stashd_tx_test_' . bin2hex(random_bytes(8));
+    $fixture = ['database' => $name, 'username' => $name, 'schema' => $name];
+    $projection = Probe::run($workspace, ['operation' => 'projection.describe', 'fixture' => $fixture]);
+    $database = ProjectionProbe::connect($projection, $name);
     try {
         $exists = $database->prepare('SELECT count(*) FROM pg_namespace WHERE nspname = ?');
         $exists->execute([$projection['schema']]);
         expect((int) $exists->fetchColumn())->toBe(1);
-        $dropped = Probe::run($workspace, ['operation' => 'projection.destroy']);
+        $dropped = Probe::run($workspace, ['operation' => 'projection.destroy', 'fixture' => $fixture]);
         expect($dropped['verified_absent'])->toBeTrue();
         $exists->execute([$projection['schema']]);
         expect((int) $exists->fetchColumn())->toBe(0);
@@ -271,14 +250,19 @@ test('PSC-T09 Vault only recovery survives actual removal of disposable projecti
         $receipt = Probe::run($workspace, ['operation' => 'recover', 'transaction_id' => 'tx-a']);
         Probe::committed($workspace . '/vault', $receipt, 'tx-a', ['master' => 'master bytes']);
         $before = Probe::snapshot($workspace . '/vault');
-        $rebuilt = Probe::run($workspace, ['operation' => 'projection.rebuild']);
+        $rebuilt = Probe::run($workspace, ['operation' => 'projection.rebuild', 'fixture' => $fixture]);
         expect($rebuilt['items'])->toContain($receipt['item']);
+        $record = Probe::json(OcflInspector::payloadPath($workspace . '/vault', $receipt['item']['object_id'], $receipt['item']['version'], 'item.json'));
+        ProjectionProbe::assertRebuilt($database, $projection, $receipt['item'], $record['pins']);
         $exists->execute([$projection['schema']]);
         expect((int) $exists->fetchColumn())->toBe(1);
         expect(Probe::snapshot($workspace . '/vault'))->toBe($before);
     } finally {
         // The validated private schema is disposable even when recovery assertions fail.
-        $database->exec('DROP SCHEMA IF EXISTS "' . $projection['schema'] . '" CASCADE');
+        $database->exec('DROP SCHEMA IF EXISTS "' . $name . '" CASCADE');
+        $exists = null;
+        $database = null;
+        Probe::run($workspace, ['operation' => 'projection.dispose', 'fixture' => $fixture]);
     }
 })->with(['asset-verified:master', 'item-verified', 'after-ack']);
 
@@ -318,7 +302,7 @@ test('PSC-T11 a stale conflicting precondition cannot replace a newer exact pin'
     $before = Probe::snapshot($workspace . '/vault');
     $rejected = Probe::run($workspace, ['operation' => 'commit', 'transaction_id' => 'old']);
     expect($rejected['status'])->toBeIn(['conflict', 'quarantined']);
-    transaction_retains($before, Probe::snapshot($workspace . '/vault'));
+    expect(Probe::snapshot($workspace . '/vault'))->toBe($before);
     Probe::committed($workspace . '/vault', $new, 'new', ['master' => 'new bytes']);
 });
 
@@ -353,7 +337,7 @@ test('PSC-T13 contradictory committed evidence cannot be acknowledged or erased 
     for ($attempt = 0; $attempt < 2; $attempt++) {
         $result = Probe::run($workspace, ['operation' => 'recover', 'transaction_id' => 'tx-a']);
         expect($result['status'])->toBeIn(['quarantined', 'degraded']);
-        transaction_retains($before, Probe::snapshot($workspace . '/vault'));
+        expect(Probe::snapshot($workspace . '/vault'))->toBe($before);
     }
 })->with(['sidecar', 'inventory', 'payload']);
 
@@ -390,37 +374,19 @@ test('PSC-T16 projection failure cannot undo authoritative completion or duplica
     expect(Probe::snapshot($workspace . '/vault'))->toBe($before);
 });
 
-test('PSC-T17 different concurrent candidates preserve every acknowledged relationship', function (): void {
+test('PSC-T17 different concurrent candidates preserve every acknowledged relationship', function (bool $killOwner): void {
     $workspace = transaction_workspace($this->archive);
     Probe::run($workspace, transaction_request($this->archive, 'a', ['a' => 'A bytes']));
     Probe::run($workspace, transaction_request($this->archive, 'b', ['b' => 'B bytes']));
-    $gate = $workspace . '/go';
-    $a = Probe::start($workspace, ['operation' => 'commit', 'transaction_id' => 'a'], gate: $gate);
-    $b = Probe::start($workspace, ['operation' => 'commit', 'transaction_id' => 'b'], gate: $gate);
-    $deadline = microtime(true) + 5;
-    while ((! is_file($a['prefix'] . '.ready') || ! is_file($b['prefix'] . '.ready')) && microtime(true) < $deadline) {
-        usleep(10_000);
-    }
-    $ready = is_file($a['prefix'] . '.ready') && is_file($b['prefix'] . '.ready');
-    file_put_contents($gate, 'go');
-    $outcomes = [];
-    $failure = null;
-    foreach ([$a, $b] as $child) {
-        try {
-            $outcomes[] = Probe::finish($child);
-        } catch (Throwable $error) {
-            $failure ??= $error;
-        }
-    }
-    if ($failure !== null) {
-        throw $failure;
-    }
-    expect($ready)->toBeTrue();
+    $outcomes = Probe::contend(
+        $workspace,
+        ['operation' => 'commit', 'transaction_id' => 'a'],
+        ['operation' => 'commit', 'transaction_id' => 'b'],
+        $killOwner,
+    );
     $committed = [];
-    foreach ($outcomes as $index => $result) {
-        expect($result['exit'])->toBe(0, $result['err']);
-        $outcome = json_decode($result['out'], true, flags: JSON_THROW_ON_ERROR);
-        if ($outcome['status'] === 'busy') {
+    foreach ($outcomes as $index => $outcome) {
+        if (in_array($outcome['status'], ['busy', 'owner-killed'], true)) {
             $outcome = Probe::run($workspace, ['operation' => 'recover', 'transaction_id' => $index === 0 ? 'a' : 'b']);
         }
         expect($outcome['status'])->toBeIn(['complete', 'conflict', 'quarantined']);
@@ -440,7 +406,7 @@ test('PSC-T17 different concurrent candidates preserve every acknowledged relati
         expect(isset($inventory['versions'][$outcome['item']['version']]))->toBeTrue();
     }
     Probe::committed($workspace . '/vault', $last, $last['transaction_id'], $expected);
-});
+})->with([false, true]);
 
 test('PSC-T18 an unknown transaction cannot invent history from unrelated committed Objects', function (): void {
     $workspace = transaction_workspace($this->archive);
@@ -449,7 +415,7 @@ test('PSC-T18 an unknown transaction cannot invent history from unrelated commit
     $before = Probe::snapshot($workspace . '/vault');
     $unknown = Probe::run($workspace, ['operation' => 'recover', 'transaction_id' => 'never-sealed']);
     expect($unknown['status'])->toBeIn(['absent', 'rejected', 'quarantined']);
-    transaction_retains($before, Probe::snapshot($workspace . '/vault'));
+    expect(Probe::snapshot($workspace . '/vault'))->toBe($before);
 });
 
 test('PSC-T19 independent snapshot witness detects duplicate archival publication', function (): void {
@@ -460,4 +426,47 @@ test('PSC-T19 independent snapshot witness detects duplicate archival publicatio
     $request['metadata'] = ['event' => 'duplicate tx-a'];
     Probe::run($workspace, [...$request, 'operation' => 'legacy.publish']);
     expect(fn () => expect(Probe::snapshot($workspace . '/vault'))->toBe($before))->toThrow(AssertionFailedError::class);
+});
+
+test('PSC-T20 authority supervisor observes real contention and detects a bypassed lock', function (bool $killOwner, bool $bypass): void {
+    $workspace = transaction_workspace($this->archive);
+    $run = fn (): array => Probe::contend($workspace, ['operation' => 'probe.ownership'], ['operation' => 'probe.ownership', 'bypass_lock' => $bypass], $killOwner);
+    if ($bypass) {
+        expect($run)->toThrow(AssertionFailedError::class, 'Child exited before authority-contended');
+        return;
+    }
+    $results = $run();
+    expect($results[0]['status'])->toBe($killOwner ? 'owner-killed' : 'probe-complete');
+    expect($results[1]['status'])->toBe('probe-complete');
+})->with([[false, false], [true, false], [false, true]]);
+
+test('PSC-T21 destructive projection connections reject wrong database role host and schema before connecting', function (string $field): void {
+    $name = 'stashd_tx_test_0123456789abcdef';
+    $projection = [
+        'dsn' => 'pgsql:host=lerd-postgres;port=5432;dbname=' . $name,
+        'username' => $name,
+        'schema' => $name,
+        'password' => bin2hex(random_bytes(16)),
+    ];
+    if ($field === 'database') {
+        $projection['dsn'] = 'pgsql:host=lerd-postgres;port=5432;dbname=core';
+    } elseif ($field === 'host') {
+        $projection['dsn'] = 'pgsql:host=elsewhere;port=5432;dbname=' . $name;
+    } else {
+        $projection[$field] = 'postgres';
+    }
+    expect(fn () => ProjectionProbe::connect($projection, $name))->toThrow(AssertionFailedError::class);
+})->with(['database', 'username', 'host', 'schema']);
+
+test('PSC-T22 prohibited writes include additional OCFL files with all earlier bytes unchanged', function (): void {
+    $workspace = transaction_workspace($this->archive);
+    $request = transaction_request($this->archive, bytes: []);
+    $receipt = Probe::run($workspace, [...$request, 'operation' => 'legacy.publish']);
+    $object = dirname(OcflInspector::inventoryFor($workspace . '/vault', $receipt['item']['object_id'])['path']);
+    $before = Probe::snapshot($workspace . '/vault');
+    mkdir($object . '/v2');
+    file_put_contents($object . '/v2/inventory.json', 'unauthorised new revision evidence');
+    $after = Probe::snapshot($workspace . '/vault');
+    transaction_retains($before, $after);
+    expect(fn () => expect($after)->toBe($before))->toThrow(AssertionFailedError::class);
 });

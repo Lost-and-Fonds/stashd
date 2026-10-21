@@ -12,30 +12,43 @@ use Tempest\Container\GenericContainer;
 use Tempest\Storage\Config\LocalStorageConfig;
 use Tempest\Storage\GenericStorage;
 
-[$script, $prefix, $stop, $gate] = $argv;
+[$script, $prefix, $stop, $pause] = $argv;
 $request = json_decode(file_get_contents($prefix . '.json'), true, flags: JSON_THROW_ON_ERROR);
 // This callback pauses only; the supervising parent performs the actual SIGKILL.
-$boundary = static function (string $name) use ($prefix, $stop): void {
+$boundary = static function (string $name) use ($prefix, $stop, $pause): void {
+    file_put_contents($prefix . '.events', $name . "\n", FILE_APPEND);
     if ($name === $stop) {
         file_put_contents($prefix . '.boundary', $name);
         while (true) {
             usleep(10_000);
         }
     }
-};
-if ($gate !== '') {
-    file_put_contents($prefix . '.ready', 'ready');
-    $deadline = microtime(true) + 10;
-    while (! is_file($gate)) {
-        if (microtime(true) > $deadline) {
-            fwrite(STDERR, 'Start gate timed out');
-            exit(1);
+    if ($name === $pause) {
+        file_put_contents($prefix . '.paused', $name);
+        $deadline = microtime(true) + 30;
+        while (! is_file($prefix . '.resume')) {
+            if (microtime(true) > $deadline) {
+                throw new RuntimeException('Authority pause timed out.');
+            }
+            usleep(10_000);
         }
-        usleep(10_000);
     }
-}
+};
 try {
-    if ($request['operation'] !== 'legacy.publish') {
+    if ($request['operation'] === 'probe.ownership') {
+        // Supervisor self-check only: a real flock, with no archival operations or receipts.
+        $lock = fopen(dirname($request['root']) . '/authority.lock', 'c');
+        if (! ($request['bypass_lock'] ?? false) && ! flock($lock, LOCK_EX | LOCK_NB)) {
+            $boundary('authority-contended');
+            if (! flock($lock, LOCK_EX)) {
+                throw new RuntimeException('Could not acquire probe lock.');
+            }
+        }
+        $boundary('authority-held');
+        $result = ['status' => 'probe-complete'];
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    } elseif ($request['operation'] !== 'legacy.publish') {
         $adapter = getenv('STASHD_TRANSACTION_TEST_ADAPTER');
         if (! $adapter) {
             fwrite(STDERR, 'UNIMPLEMENTED: recoverable preservation transaction boundary: ' . $request['operation']);
