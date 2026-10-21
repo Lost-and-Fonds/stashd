@@ -79,6 +79,37 @@ inside an unbounded output buffer: a real 64 MiB/32 MiB HTTP proof exposed that
 failure. The browser sender flushes buffers before sending the verified stream.
 `BrowserExceptionRenderer` preserves explicit browser error pages in local mode.
 
+### Why not a Generator response?
+
+Investigated against the locked **Tempest v3.19.2** and current official `3.x`
+source. Native Generator streaming is implemented for **Server-Sent Events**,
+not raw attachment downloads:
+
+- Returning a Generator directly fails `GenericRouter::createResponse()` because
+  its accepted types are `string|array|Response|View`.
+- `new Ok($generator)` is accepted as a response body, but
+  `GenericResponseSender::sendContent()` attempts to `echo` it, producing
+  “Generator could not be converted to string”. The accepted body type alone
+  does not establish streaming support.
+- `EventStream` consumes a callback's Generator, wrapping ordinary yielded values
+  in `ServerSentMessage`, which JSON-encodes them. The sender then writes `event:`
+  and `data:` framing. This changes original bytes; arbitrary binary data can
+  also fail JSON encoding. Changing the Content-Type does not remove framing.
+
+A temporary real HTTP probe confirmed both ordinary Generator forms fail with
+500, while a textual EventStream returns 200 with framing and a different SHA-512
+from the yielded text (1 probe passed, 10 assertions). An initial binary SSE probe
+also failed on invalid UTF-8. The temporary probe routes/test were removed.
+The archive sender is retained until Tempest provides raw streaming with bounded
+buffering, exact binary output, and correct HEAD/resource cleanup behavior. No
+vendor patch or framework dependency change was made.
+
+Official source:
+[router conversion](https://github.com/tempestphp/tempest-framework/blob/v3.19.2/packages/router/src/GenericRouter.php#L91),
+[response sender](https://github.com/tempestphp/tempest-framework/blob/v3.19.2/packages/router/src/GenericResponseSender.php#L95),
+[EventStream](https://github.com/tempestphp/tempest-framework/blob/v3.19.2/packages/http/src/Responses/EventStream.php),
+[ServerSentMessage](https://github.com/tempestphp/tempest-framework/blob/v3.19.2/packages/http/src/ServerSentMessage.php).
+
 This is a synchronous filesystem scan, without pagination or an index. It is
 intended for development Vaults, not million-Item interactive browsing. Asset
 inspection verifies all logical files; the overview verifies Asset heads too,
