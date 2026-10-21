@@ -22,3 +22,9 @@
 		Join the <a href="https://tempestphp.com/discord">Discord</a> server
   </sub>
 </div>
+
+## Local Vault browser
+
+Open the existing Tempest application through Lerd to browse canonical Items,
+select historical revisions and download their exact preserved Asset bytes.
+See [launch instructions, limitations and running screenshots](docs/vault-browser/README.md).

@@ -44,3 +44,6 @@ Thumbs.db
 /docker-compose.override.yml
 .env.before_lerd
 /.tempest/scheduler/last-schedule-run.cache.php
+
+# Canonical local Vault content
+/storage/vault/
