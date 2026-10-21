@@ -13,13 +13,26 @@ use Ottosmops\Ocfl\OcflObject;
 use Throwable;
 use UnexpectedValueException;
 
-/** Read-only reconciliation: the atomically replaced root sidecar acknowledges a commit. */
+/**
+ * Reconcile readable history against the atomically replaced root checksum.
+ *
+ * Only acknowledged inventories may establish history; complete-looking version
+ * directories are not promoted. Inspection reports stranded material without
+ * repairing it, and can expose older verified history despite root divergence.
+ */
 final class PublicationInspection
 {
     public ?OcflObject $object = null;
     /** @var list<string> */
     public array $issues = [];
 
+    /**
+     * Inspect inventory candidates, historical prefixes and optional content fixity.
+     *
+     * Candidate validation errors are collected as issues rather than establishing
+     * unverified history. Directory-listing failures before inspection propagate.
+     * Content verification may be skipped for readers; no storage mutation occurs.
+     */
     public function __construct(ArchiveStorage $storage, string $path, string $id, bool $verifyContent = true)
     {
         $fs = new OcflFilesystemAdapter($storage);
@@ -58,7 +71,17 @@ final class PublicationInspection
                         throw new UnexpectedValueException('Acknowledged inventory identity or digest algorithm differs.');
                     }
                     // Validate the acknowledged history without claiming stranded material is valid OCFL.
-                    $view = new readonly class($storage, $path, $json, $inventory->versionSequence()) extends OcflFilesystemAdapter {
+                    $view = new /**
+                     * Present a fixed acknowledged inventory to the OCFL validator.
+                     *
+                     * Only the inspection view substitutes root inventory bytes and filters stranded
+                     * root entries. Content and historical inventories still come from real storage.
+                     */ readonly class($storage, $path, $json, $inventory->versionSequence()) extends OcflFilesystemAdapter {
+                        /**
+                         * Capture the acknowledged root bytes and version names for this validation view.
+                         *
+                         * @param list<string> $versions
+                         */
                         public function __construct(
                             ArchiveStorage $storage,
                             private string $root,
@@ -68,21 +91,35 @@ final class PublicationInspection
                             parent::__construct($storage);
                         }
 
+                        /**
+                         * Return captured root inventory bytes while delegating other reads to storage.
+                         */
                         public function read(string $path): string
                         {
                             return $path === $this->root . '/inventory.json' ? $this->json : parent::read($path);
                         }
 
+                        /**
+                         * Hash captured root inventory bytes so validation checks the same bytes it parses.
+                         */
                         public function digestFile(string $path, DigestAlgorithm $algorithm): string
                         {
                             return $path === $this->root . '/inventory.json' ? hash($algorithm->hashAlgorithm(), $this->json) : parent::digestFile($path, $algorithm);
                         }
 
+                        /**
+                         * Expose the captured root inventory as present even when inspecting a historical candidate.
+                         */
                         public function fileExists(string $path): bool
                         {
                             return $path === $this->root . '/inventory.json' || parent::fileExists($path);
                         }
 
+                        /**
+                         * Hide unacknowledged root entries from validation of the selected history.
+                         *
+                         * Other directories retain their actual listing; this view never deletes files.
+                         */
                         public function listDirectory(string $path): array
                         {
                             return $path === $this->root
@@ -157,6 +194,14 @@ final class PublicationInspection
         }
     }
 
+    /**
+     * Return acknowledged head and versions alongside reconciliation issues.
+     *
+     * A null head means no committed Object was established, including a pristine
+     * uncommitted shell. An empty issue list alone does not imply committed history.
+     *
+     * @return array{head: ?string, versions: list<string>, issues: list<string>}
+     */
     public function result(): array
     {
         return ['head' => $this->object?->head(), 'versions' => $this->object?->versionNames() ?? [], 'issues' => $this->issues];

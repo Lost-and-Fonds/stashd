@@ -107,6 +107,15 @@ final class LocalArchivesDriver implements ArchivesDriver
         }
     }
 
+    /**
+     * Invoke real Asset preservation and translate expected domain input failures.
+     *
+     * Invalid Asset or Item identity input becomes ArchivesRejected; unexpected
+     * storage and publication failures remain visible to the test runner.
+     *
+     * @param array<string, mixed> $arguments
+     * @return array<array-key, mixed>
+     */
     private static function preserveAsset(AssetArchive $assets, array $arguments): array
     {
         try {
@@ -116,6 +125,12 @@ final class LocalArchivesDriver implements ArchivesDriver
         }
     }
 
+    /**
+     * Read a verified exact Asset file into the test result and close its stream.
+     *
+     * @param array<string, mixed> $arguments
+     * @return array{bytes: string|false}
+     */
     private static function readAsset(AssetArchive $assets, array $arguments): array
     {
         $stream = $assets->readStream(\League\Uri\Urn::fromString($arguments['object_id']), $arguments['version'], $arguments['logical_path']);
@@ -202,7 +217,12 @@ final class LocalArchivesDriver implements ArchivesDriver
         ];
     }
 
-    /** @param array<string, mixed> $arguments @return array{object_id: string, version: string} */
+    /**
+     * Create a real typed Object from fixture inputs and return its committed identity.
+     *
+     * @param array<string, mixed> $arguments
+     * @return array{object_id: string, version: string}
+     */
     private static function createObject(Vault $vault, array $arguments): array
     {
         $type = \App\RecordsAndArchives\IdentifierType::from($arguments['type']);
@@ -212,7 +232,12 @@ final class LocalArchivesDriver implements ArchivesDriver
         return ['object_id' => $object->id(), 'version' => $object->head()];
     }
 
-    /** @param array<string, mixed> $arguments @return array{object_id: string, version: string} */
+    /**
+     * Append real Object file changes and report the resulting version to the scenario.
+     *
+     * @param array<string, mixed> $arguments
+     * @return array{object_id: string, version: string}
+     */
     private static function updateObject(Vault $vault, array $arguments): array
     {
         $object = $vault->updateObject(\League\Uri\Urn::fromString($arguments['object_id']), $arguments['files']);
@@ -220,7 +245,12 @@ final class LocalArchivesDriver implements ArchivesDriver
         return ['object_id' => $object->id(), 'version' => $object->head()];
     }
 
-    /** @param array<string, mixed> $arguments @return array{bytes: string} */
+    /**
+     * Return exact historical file bytes through the Vault buffered read boundary.
+     *
+     * @param array<string, mixed> $arguments
+     * @return array{bytes: string}
+     */
     private static function readObject(Vault $vault, array $arguments): array
     {
         return ['bytes' => $vault->readObjectContent(
@@ -230,7 +260,14 @@ final class LocalArchivesDriver implements ArchivesDriver
         )];
     }
 
-    /** @param array<string, mixed> $arguments @return array{stream: resource} */
+    /**
+     * Return a real exact-version stream without consuming it.
+     *
+     * The acceptance scenario owns and must close the stream in the result.
+     *
+     * @param array<string, mixed> $arguments
+     * @return array{stream: resource}
+     */
     private static function readObjectStream(Vault $vault, array $arguments): array
     {
         return ['stream' => $vault->readObjectStream(
@@ -240,7 +277,15 @@ final class LocalArchivesDriver implements ArchivesDriver
         )];
     }
 
-    /** @param array<string, mixed> $arguments @return array{object_id: string, version: string} */
+    /**
+     * Publish an Item snapshot and report its real Object ID and version.
+     *
+     * Maps invalid revision input to ArchivesRejected while allowing unexpected
+     * publication failures to fail the test.
+     *
+     * @param array<string, mixed> $arguments
+     * @return array{object_id: string, version: string}
+     */
     private static function commitItemRevision(ItemArchive $items, array $arguments): array
     {
         try {

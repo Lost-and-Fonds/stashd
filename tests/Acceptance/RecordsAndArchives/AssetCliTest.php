@@ -2,7 +2,13 @@
 
 use Tests\Support\RecordsAndArchives\OcflInspector;
 
-/** Every invocation boots a fresh real Tempest application, with no DB or acceptance driver. */
+/**
+ * Boot a fresh real Tempest CLI process against the supplied disposable Vault.
+ *
+ * Uses testing mode and a 32 MB memory limit without an acceptance driver.
+ * Closes output pipes and returns the exit code, stdout and stderr; startup
+ * failure raises RuntimeException.
+ */
 function asset_cli(string $root, array $arguments): array
 {
     $pipes = [];

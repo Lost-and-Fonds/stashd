@@ -9,8 +9,14 @@ use Tempest\Container\Singleton;
 use Tempest\Storage\Config\LocalStorageConfig;
 use Tempest\Storage\Storage;
 
+/**
+ * Wrap the tagged Vault filesystem in its local archival storage provider.
+ */
 final class ArchiveStorageInitializer implements Initializer
 {
+    /**
+     * Resolve matching Vault storage and local configuration for the tagged singleton.
+     */
     #[Singleton(tag: 'vault')]
     public function initialize(Container $container): ArchiveStorage
     {

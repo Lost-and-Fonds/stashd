@@ -8,6 +8,9 @@ use League\Uri\Urn;
 use Symfony\Component\Lock\LockFactory;
 use Tempest\Container\GenericContainer;
 
+/**
+ * Create the real local lock factory used by the cross-process exclusion scenario.
+ */
 function lockFactory(): LockFactory
 {
     return new LockFactoryInitializer()->initialize(new GenericContainer());

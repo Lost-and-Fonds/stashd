@@ -30,7 +30,15 @@ test('a root inventory replaced during reading cannot authenticate different par
     };
     $config = new LocalStorageConfig(path: $root, tag: 'vault');
     // Both hooks return real bytes from the old inode, then publish the replacement.
-    $storage = new readonly class(new GenericStorage($config), $config, substr($inventory, strlen($root) + 1), $publish) extends LocalArchiveStorage {
+    $storage = new /**
+     * Publish a replacement root inventory immediately after reading its old inode.
+     *
+     * Both buffered and stream hooks retain real local bytes, creating a deterministic
+     * reader/publication interleaving without replacing the archival implementation.
+     */ readonly class(new GenericStorage($config), $config, substr($inventory, strlen($root) + 1), $publish) extends LocalArchiveStorage {
+        /**
+         * Bind real local storage, the intercepted inventory path and the publication hook.
+         */
         public function __construct(
             Storage $storage,
             LocalStorageConfig $config,
@@ -40,6 +48,11 @@ test('a root inventory replaced during reading cannot authenticate different par
             parent::__construct($storage, $config);
         }
 
+        /**
+         * Open the old inventory stream before triggering replacement of the root path.
+         *
+         * The caller owns the stream, which continues to refer to its original inode.
+         */
         public function readStream(string $location): mixed
         {
             $stream = parent::readStream($location);
@@ -49,6 +62,11 @@ test('a root inventory replaced during reading cannot authenticate different par
             return $stream;
         }
 
+        /**
+         * Read the original inventory bytes before triggering the replacement hook.
+         *
+         * Returns the captured bytes even though the root path may now contain a newer inventory.
+         */
         public function read(string $location): string
         {
             $bytes = parent::read($location);

@@ -3,11 +3,17 @@
 use Tests\Support\RecordsAndArchives\BrowserServer;
 use Tests\Support\RecordsAndArchives\OcflInspector;
 
+/**
+ * Build a browser URL selecting an exact Item revision for HTTP acceptance checks.
+ */
 function browser_item_url(string $id, string $version): string
 {
     return '/items/' . rawurlencode($id) . '?version=' . $version;
 }
 
+/**
+ * Build the exact Asset-version route used by browser inspection and download checks.
+ */
 function browser_asset_url(string $id, string $version): string
 {
     return '/assets/' . rawurlencode($id) . '/' . $version;

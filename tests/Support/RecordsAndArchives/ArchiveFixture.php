@@ -20,6 +20,12 @@ final class ArchiveFixture
 {
     private string $workspace;
 
+    /**
+     * Create a unique private temporary workspace for one acceptance scenario.
+     *
+     * Creation failure raises RuntimeException. The test must call dispose() to
+     * remove its generated files after the scenario.
+     */
     public function __construct()
     {
         $this->workspace = sys_get_temp_dir() . '/stashd-archives-' . bin2hex(random_bytes(12));

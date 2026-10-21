@@ -19,9 +19,18 @@ use Throwable;
 
 use function Tempest\View\view;
 
+/**
+ * Provide local read-only views of Item history and verified Asset versions.
+ *
+ * The middleware requires local opt-in. Downloads use verified private temporary
+ * copies; browser routes never initialize the Vault or publish archival history.
+ */
 #[WithMiddleware(RequireLocalVaultBrowser::class)]
 final readonly class VaultBrowserController
 {
+    /**
+     * Bind archival readers and display configuration for the local browser routes.
+     */
     public function __construct(
         private Vault $vault,
         private ItemArchive $items,
@@ -29,6 +38,12 @@ final readonly class VaultBrowserController
         private VaultConfig $config,
     ) {}
 
+    /**
+     * Enumerate readable Items and report unsupported or unreadable Objects as notices.
+     *
+     * An absent Vault identity produces an initialization notice; other root
+     * failures return service unavailable rather than a misleading complete list.
+     */
     #[Get('/')]
     public function index(): Response
     {
@@ -71,6 +86,13 @@ final readonly class VaultBrowserController
         return $this->page('Vault', ['state' => 'Vault connected', 'items' => $items, 'notices' => $notices, 'identity' => $this->vault->getIdentity()?->identifier->toString()]);
     }
 
+    /**
+     * Display one Item revision and verify its exact Asset pins for the page.
+     *
+     * An omitted version selects the current head. Missing versions return 404,
+     * invalid input returns 400, and unavailable pins remain visible as errors
+     * without substituting newer Asset versions.
+     */
     #[Get('/items/{id}')]
     public function item(string $id, Request $request): Response
     {
@@ -106,6 +128,12 @@ final readonly class VaultBrowserController
         }
     }
 
+    /**
+     * Display verified evidence for an exact Asset version.
+     *
+     * Invalid identifiers or version syntax return 400; unavailable or failed
+     * verification returns 404 without substituting another version.
+     */
     #[Get('/assets/{id}/{version}')]
     public function asset(string $id, string $version): Response
     {
@@ -120,6 +148,14 @@ final readonly class VaultBrowserController
         }
     }
 
+    /**
+     * Prepare a private verified copy of one exact Asset file for transmission.
+     *
+     * Checks copied size and SHA-512 before constructing a download response.
+     * Closes the archival input and transfers successful temporary-stream ownership
+     * to VerifiedDownload. Errors become browser responses; the temporary copy
+     * is closed in the general failure handler.
+     */
     #[Get('/assets/{id}/{version}/download')]
     public function download(string $id, string $version, Request $request): Response
     {
@@ -160,6 +196,11 @@ final readonly class VaultBrowserController
         }
     }
 
+    /**
+     * Require the canonical lowercase Stashd URN form for the requested Object type.
+     *
+     * Invalid identifiers raise InvalidArgumentException before archival lookup.
+     */
     private static function id(string $id, string $type): Urn
     {
         if (! preg_match('/^urn:stashd:' . $type . ':[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/D', $id)) {
@@ -168,6 +209,11 @@ final readonly class VaultBrowserController
         return Urn::fromString($id);
     }
 
+    /**
+     * Require an explicit positive OCFL version name without aliases or leading zeros.
+     *
+     * Invalid input raises InvalidArgumentException for the route error handlers.
+     */
     private static function version(mixed $version): void
     {
         if (! is_string($version) || ! preg_match('/^v[1-9][0-9]*$/D', $version)) {
@@ -175,11 +221,19 @@ final readonly class VaultBrowserController
         }
     }
 
+    /**
+     * Build a browser error page with the supplied HTTP status and readable message.
+     */
     private function error(Status $status, string $message): Response
     {
         return $this->page('Unavailable', ['error' => $message], $status);
     }
 
+    /**
+     * Render the browser view with storage configuration and caller-supplied page data.
+     *
+     * Disables response caching and MIME sniffing for archival browsing.
+     */
     private function page(string $title, array $data, Status $status = Status::OK): Response
     {
         return new GenericResponse($status, view(__DIR__ . '/browser.view.php', title: $title, data: $data, config: $this->config), headers: [

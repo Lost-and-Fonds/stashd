@@ -81,7 +81,9 @@ final class OcflInspector
         Assert::assertSame(hash_file($algorithm, $inventoryPath), strtolower($tokens[0] ?? ''));
     }
 
-    /** Verify a known acknowledged snapshot using only native JSON and hashing. */
+    /**
+     * Verify a known acknowledged snapshot using only native JSON and hashing.
+     */
     public static function assertAcknowledgedHistory(string $root, string $id, string $head): void
     {
         $digest = hash('sha256', $id);
