@@ -66,7 +66,7 @@ before #58 can be declared complete.
 `PreservationTransaction::prepare()` accepts one Item URI, Asset-key-to-file
 changes, metadata field assignments and optional exact pin preconditions.
 `commit()` is also the recovery entry point: dispatch/recovery provides only the
-sealed identity, never a replacement snapshot. `discover()` reports healthy IDs
+sealed identity, never a replacement snapshot. `discover()` reports intact candidate/journal IDs
 and damaged buckets separately so one incident cannot hide unrelated candidates.
 Callers schedule discovery/recovery; no new worker or queue dependency is added.
 
@@ -279,3 +279,46 @@ The concurrency blocker is addressed for local processes. The PR remains draft
 and unmerged pending independent acceptance-owner review; projection isolation is
 still explicitly deferred to #60. These results do not expand the phase's local
 process-crash guarantees to power loss or distributed publication.
+
+## PR #59 acceptance review: physical oracle and discovery journals
+
+The independent reader now hashes the verified plan envelope's original `json`
+bytes directly. It does not reproduce production's JSON encoding. Both the string
+fixture and the numeric-metadata fixture use that same reader to check the
+physical candidate/plan digests, independently verified OCFL history, and exact
+Asset and Item transaction bindings. This covers integral-valued floats such as
+`1.0` and nested `2.0`, which a default decode/re-encode can silently turn into
+integers. The production binding format is unchanged.
+
+Discovery validates every observed present `plan.json`, `complete.json` and
+`custody-release.json` envelope with the existing checksum/JSON reader. It checks
+candidate-to-plan seal linkage and intended Item identity, completion identity
+and planned version, and any release authorization's candidate/completion
+linkage. Missing required predecessors, invalid envelopes, and contradictory
+linkage are reported in that bucket's `quarantined` result. Later immutable
+records are read before their predecessors, matching publication's opposite
+write ordering. Discovery remains read-only and never acknowledges completion:
+its `ids` identify intact candidates/journal envelopes for recovery. Actual OCFL
+publication proof and complete plan semantics still belong to `commit`/`recover`.
+
+Eleven two-bucket fault cases cover malformed/checksum-damaged plans and
+completions, rechecksummed wrong candidate/Item/transaction identities, completion
+without a plan, and malformed/misbound custody-release authorization. Each case
+requires repeated discovery to identify only the damaged bucket, preserve every
+Vault byte, and leave the unrelated healthy candidate discoverable and able to
+complete through the real production recovery path. No frozen acceptance source
+or contract is amended.
+
+Acceptance-correction verification (22 October 2026, local Lerd/PHP):
+
+- `STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/RecordsAndArchives/TransactionEvidenceTest.php --filter='sealed numeric metadata|discovery contains damaged present journals' --compact`: **12 passed, 403 assertions**.
+- Restored `./bin/test.sh --compact`: **300 passed, 33 existing incomplete, 14,116 assertions**, exit 0. Protected acceptance/harness sources still have no diff from frozen `680476b57f87b5d356275074688c35eaadea4313`.
+- Negative production control: removing `JSON_PRESERVE_ZERO_FRACTION` only from plan-binding computation still produces a completed transaction, but the numeric physical reader fails its exact stored-binding assertion (**1 failed, 30 assertions**). This demonstrates that successful replay and correct metadata alone cannot satisfy the oracle.
+- Negative production control: bypassing present-journal discovery checks fails all eleven two-bucket cases (**11 failed, 172 assertions**). Both controls exited 1 from failed assertions, and production source was restored in `finally` before the passing reruns.
+- Focused lint/format pass (two existing early-continue suggestions). Focused changed-PHP analysis: **0 errors**, 7 Pest fixture-property warnings and the existing comparison help message. AST-based PHPDoc coverage verifies **33 declarations**; no suppressions.
+- `composer qa` again stops at unchanged `ObjectWriteLockTest.php:86` unsafe-finally lint. Separate full analysis: **1,163 errors, 193 warnings, 11 help messages**; error count unchanged, with one additional Pest fixture warning from the new discovery test.
+- Final PostgreSQL inspection reports **0 generated fixture databases and 0 roles**. The private test-admin configuration was removed after verification. `.phpactor.json` remains untouched.
+
+The oracle/discovery corrections are ready for independent acceptance re-review.
+No CI or independent test-owner certification is claimed; #59 remains draft and
+unmerged, and projection isolation remains tracked separately in #60.

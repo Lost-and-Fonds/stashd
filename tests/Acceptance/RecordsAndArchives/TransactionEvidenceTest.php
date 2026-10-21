@@ -42,6 +42,35 @@ function evidence_bytes(string $path): string
     return $bytes;
 }
 
+/**
+ * Independently bind exact Asset and Item revisions to verified physical journal bytes.
+ *
+ * Hash the original plan-envelope JSON rather than reproducing production encoding;
+ * numeric JSON types and serialization differences must remain visible to this oracle.
+ */
+function evidence_bindings(string $root, string $candidatePath): void
+{
+    $candidateBytes = evidence_bytes($candidatePath);
+    $candidateDigest = hash('sha512', $candidateBytes);
+    expect(file_get_contents(dirname($candidatePath) . '/candidate.sha512'))->toBe($candidateDigest);
+    /** @var array{delta: array{id: string, changes: array<string, array{digest: string}>}} $candidate */
+    $candidate = json_decode($candidateBytes, true, flags: JSON_THROW_ON_ERROR);
+    expect($candidate['delta']['id'])->toBe('evidence');
+    expect($candidate['delta']['changes']['master']['digest'])->toBe(hash('sha512', 'accepted bytes'));
+    $planEnvelope = Probe::json(dirname($candidatePath) . '/plan.json');
+    expect(hash('sha512', $planEnvelope['json']))->toBe($planEnvelope['sha512']);
+    /** @var array{candidate: string, item: array{object_id: string, version: string}, assets: array<string, array{object_id: string, version: string}>} $plan */
+    $plan = json_decode($planEnvelope['json'], true, flags: JSON_THROW_ON_ERROR);
+    expect($plan['candidate'])->toBe($candidateDigest);
+    $binding = ['id' => 'evidence', 'candidate' => $candidateDigest, 'plan' => hash('sha512', $planEnvelope['json'])];
+    foreach ([$plan['item'], ...array_values($plan['assets'])] as $step) {
+        OcflInspector::assertAcknowledgedHistory($root, $step['object_id'], $step['version']);
+        $path = str_starts_with($step['object_id'], 'urn:stashd:item:') ? 'item.json' : '.stashd/asset.json';
+        $record = Probe::json(OcflInspector::payloadPath($root, $step['object_id'], $step['version'], $path));
+        expect($record['transaction'])->toBe($binding);
+    }
+}
+
 test('independent physical reader proves candidate plan and exact OCFL version linkage', function (): void {
     $workspace = evidence_workspace($this->archive);
     $request = evidence_request($this->archive);
@@ -49,25 +78,7 @@ test('independent physical reader proves candidate plan and exact OCFL version l
     /** @var array{status: string, transaction_id: string, item: array{object_id: string, version: string}} $receipt */
     $receipt = Probe::run($workspace, ['operation' => 'commit', 'transaction_id' => 'evidence']);
     expect($receipt['status'])->toBe('complete');
-    $candidateBytes = evidence_bytes($prepared['candidate_path']);
-    $candidateDigest = hash('sha512', $candidateBytes);
-    expect(file_get_contents(dirname($prepared['candidate_path']) . '/candidate.sha512'))->toBe($candidateDigest);
-    /** @var array{delta: array{id: string, changes: array<string, array{digest: string}>}} $candidate */
-    $candidate = json_decode($candidateBytes, true, flags: JSON_THROW_ON_ERROR);
-    expect($candidate['delta']['id'])->toBe('evidence');
-    expect($candidate['delta']['changes']['master']['digest'])->toBe(hash('sha512', 'accepted bytes'));
-    $planEnvelope = Probe::json(dirname($prepared['candidate_path']) . '/plan.json');
-    expect(hash('sha512', $planEnvelope['json']))->toBe($planEnvelope['sha512']);
-    /** @var array{candidate: string, item: array{object_id: string, version: string}, assets: array<string, array{object_id: string, version: string}>} $plan */
-    $plan = json_decode($planEnvelope['json'], true, flags: JSON_THROW_ON_ERROR);
-    expect($plan['candidate'])->toBe($candidateDigest);
-    $binding = ['id' => 'evidence', 'candidate' => $candidateDigest, 'plan' => hash('sha512', json_encode($plan, JSON_THROW_ON_ERROR))];
-    foreach ([$plan['item'], ...array_values($plan['assets'])] as $step) {
-        OcflInspector::assertAcknowledgedHistory($workspace . '/vault', $step['object_id'], $step['version']);
-        $path = str_starts_with($step['object_id'], 'urn:stashd:item:') ? 'item.json' : '.stashd/asset.json';
-        $record = Probe::json(OcflInspector::payloadPath($workspace . '/vault', $step['object_id'], $step['version'], $path));
-        expect($record['transaction'])->toBe($binding);
-    }
+    evidence_bindings($workspace . '/vault', $prepared['candidate_path']);
     expect(Probe::run($workspace, ['operation' => 'discover'])['ids'])->toBe(['evidence']);
     Probe::committed($workspace . '/vault', $receipt, 'evidence', ['master' => 'accepted bytes']);
 });
@@ -210,6 +221,7 @@ test('sealed numeric metadata keeps its exact JSON types through plan persistenc
     expect($receipt['status'])->toBe('complete');
     $item = Probe::json(OcflInspector::payloadPath($workspace . '/vault', $receipt['item']['object_id'], $receipt['item']['version'], 'item.json'));
     expect($item['metadata'])->toBe($request['metadata']);
+    evidence_bindings($workspace . '/vault', $workspace . '/vault/extensions/stashd-transactions/' . hash('sha256', 'evidence') . '/candidate.json');
     $before = Probe::snapshot($workspace . '/vault');
     expect(Probe::run($workspace, ['operation' => 'recover', 'transaction_id' => 'evidence'])['item'])->toBe($receipt['item']);
     expect(Probe::snapshot($workspace . '/vault'))->toBe($before);
@@ -227,3 +239,68 @@ test('discovery contains a damaged bucket without hiding another sealed candidat
     expect(Probe::snapshot($workspace . '/vault'))->toBe($before);
     expect(Probe::run($workspace, ['operation' => 'recover', 'transaction_id' => 'healthy'])['status'])->toBe('complete');
 });
+
+test('discovery contains damaged present journals while another candidate remains recoverable', function (string $damage): void {
+    $workspace = evidence_workspace($this->archive);
+    $bad = Probe::run($workspace, [...evidence_request($this->archive, 'bad'), 'operation' => 'prepare']);
+    Probe::run($workspace, ['operation' => 'commit', 'transaction_id' => 'bad']);
+    Probe::run($workspace, [...evidence_request($this->archive, 'healthy'), 'operation' => 'prepare']);
+    $directory = dirname($bad['candidate_path']);
+    if (str_starts_with($damage, 'release')) {
+        expect(Probe::run($workspace, ['operation' => 'custody.release', 'transaction_id' => 'bad'])['status'])->toBe('released');
+    }
+    $name = match (explode('-', $damage)[0]) {
+        'completion' => 'complete',
+        'release' => 'custody-release',
+        default => 'plan',
+    };
+    $path = $directory . '/' . $name . '.json';
+    if ($damage === 'completion-without-plan') {
+        unlink($directory . '/plan.json');
+    } elseif (str_ends_with($damage, 'malformed')) {
+        file_put_contents($path, '{');
+    } elseif (str_ends_with($damage, 'checksum')) {
+        $envelope = Probe::json($path);
+        $envelope['sha512'] = str_repeat('0', 128);
+        file_put_contents($path, json_encode($envelope, JSON_THROW_ON_ERROR));
+    } else {
+        $envelope = Probe::json($path);
+        /** @var array{candidate?: string, transaction_id?: string, item?: array{object_id: string, version: string}} $record */
+        $record = json_decode($envelope['json'], true, flags: JSON_THROW_ON_ERROR);
+        if (in_array($damage, ['plan-linkage', 'release-linkage'], true)) {
+            $record['candidate'] = str_repeat('0', 128);
+        } elseif ($damage === 'plan-item') {
+            $record['item'] = ['object_id' => 'urn:example:unrelated', 'version' => 'v99'];
+        } elseif ($damage === 'completion-identity') {
+            $record['transaction_id'] = 'unrelated';
+        } else {
+            $record['item'] = ['object_id' => 'urn:example:unrelated', 'version' => 'v99'];
+        }
+        $json = json_encode($record, JSON_THROW_ON_ERROR);
+        file_put_contents($path, json_encode(['json' => $json, 'sha512' => hash('sha512', $json)], JSON_THROW_ON_ERROR));
+    }
+    $before = Probe::snapshot($workspace . '/vault');
+    for ($attempt = 0; $attempt < 2; $attempt++) {
+        $discovered = Probe::run($workspace, ['operation' => 'discover']);
+        expect($discovered['ids'])->toBe(['healthy']);
+        expect($discovered['quarantined'])->toHaveCount(1);
+        /** @var list<array{path: string, reason: string}> $quarantined */
+        $quarantined = $discovered['quarantined'];
+        expect($quarantined[0]['path'])->toBe($directory);
+        expect($quarantined[0]['reason'])->not->toBe('');
+        expect(Probe::snapshot($workspace . '/vault'))->toBe($before);
+    }
+    expect(Probe::run($workspace, ['operation' => 'recover', 'transaction_id' => 'healthy'])['status'])->toBe('complete');
+})->with([
+    'plan-malformed',
+    'plan-checksum',
+    'plan-linkage',
+    'plan-item',
+    'completion-malformed',
+    'completion-checksum',
+    'completion-identity',
+    'completion-item',
+    'completion-without-plan',
+    'release-malformed',
+    'release-linkage',
+]);

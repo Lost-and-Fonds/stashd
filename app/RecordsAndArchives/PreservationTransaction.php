@@ -333,10 +333,13 @@ final readonly class PreservationTransaction
     }
 
     /**
-     * Discover healthy sealed candidates while reporting damaged evidence locally.
+     * Discover intact candidates and journal envelopes for authoritative recovery.
      *
      * SQL is never consulted. One quarantined bucket cannot hide other recoverable
-     * candidates. Preparing directories are retained and never promoted.
+     * candidates. Present envelopes and candidate/plan/receipt linkage are checked
+     * without publishing or rewriting anything. OCFL publication and full plan
+     * semantics remain the responsibility of commit/recovery, not this diagnostic.
+     * Preparing directories are retained and never promoted.
      *
      * @return array{ids: list<string>, quarantined: list<array{path: string, reason: string}>}
      */
@@ -358,7 +361,39 @@ final readonly class PreservationTransaction
                 $id = $data['delta']['id'] ?? null;
                 $this->require(is_string($id) && $directory === $this->directory($id), 'Candidate directory identity differs.');
                 $candidate = $this->candidate($id);
-                if (! is_file($directory . '/complete.json')) {
+                // Read later records first: publication writes their immutable predecessors first.
+                $journal = [];
+                foreach (['custody-release', 'complete', 'plan'] as $name) {
+                    $path = $directory . '/' . $name . '.json';
+                    $journal[$name] = file_exists($path) || is_link($path) ? $this->readEvidence($path) : null;
+                }
+                if ($journal['plan'] !== null) {
+                    $this->require(($journal['plan']['candidate'] ?? null) === $this->digest($id), 'Discovered plan does not bind the sealed candidate.');
+                    $this->require(is_array($journal['plan']['item'] ?? null), 'Discovered plan has no Item identity.');
+                    $this->require(
+                        ($journal['plan']['item']['object_id'] ?? null) === $this->items->objectIdForUri($candidate['delta']['uri'])->toString()
+                        && ($journal['plan']['item']['version'] ?? null) === $this->next($candidate['base']),
+                        'Discovered plan Item identity differs from the candidate.',
+                    );
+                }
+                if ($journal['complete'] !== null) {
+                    $this->require($journal['plan'] !== null, 'Discovered completion has no publication plan.');
+                    $this->require(
+                        $journal['complete'] === [
+                            'status' => 'complete',
+                            'transaction_id' => $id,
+                            'item' => ['object_id' => $this->items->objectIdForUri($candidate['delta']['uri'])->toString(), 'version' => $this->next($candidate['base'])],
+                        ],
+                        'Discovered completion contradicts the candidate and plan.',
+                    );
+                }
+                if ($journal['custody-release'] !== null) {
+                    $this->require(
+                        $journal['complete'] !== null && $journal['custody-release'] === ['completion' => $journal['complete'], 'candidate' => $this->digest($id)],
+                        'Discovered custody release contradicts completion evidence.',
+                    );
+                }
+                if ($journal['complete'] === null) {
                     $this->verifyCustody($id, $candidate);
                 }
                 $ids[] = $id;
