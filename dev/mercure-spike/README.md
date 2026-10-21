@@ -1,8 +1,12 @@
 # Mercure integration spike
 
-Recommendation: **PHP-FPM with a standalone Mercure hub**. The live delivery path
-works independently of the PHP HTTP server. Keep FrankenPHP classic as a separate
-runtime experiment; there is no measured reason here to adopt it for speed.
+Selected PHP runtime: **FrankenPHP classic**, with persistent HTTP workers
+disabled. The requested transport is **embedded Mercure**. Its module is present,
+but the installed Lerd version ignores FrankenPHP settings in personal framework
+overlays and does not load a project Caddyfile through its generic entrypoint.
+The existing standalone hub is the working proof while that upstream limitation
+is corrected. See the [embedded plan and reproduced blocker](embedded-mercure-plan.md).
+FPM remains a tested runtime fallback; no performance advantage is claimed.
 
 This directory is an explicitly installed development fixture, outside Tempest
 application discovery. It uses synthetic messages only. It adds no application
@@ -16,7 +20,7 @@ owns subscriber connections.
 | --- | --- |
 | Core | `dev` at `9045241` before this spike |
 | Tempest | installed and locked v3.19.2 |
-| PHP HTTP | FPM 8.5.11 |
+| PHP HTTP | PHP 8.5.11; FrankenPHP classic selected after the FPM comparison |
 | Lerd | 1.37.0, commit `14f05e85cbe4f0dd4437a53fd291177a7ef6605f` |
 | Site | `https://core.test`, trusted local HTTPS; nginx 1.31.7 |
 | Database | PostgreSQL 16.15 service reachable on Lerd; Core currently binds Tempest default SQLite |
@@ -34,8 +38,8 @@ CLI execution and service management worked without changing that state.
 
 | Choice | Benefits | Costs / findings |
 | --- | --- | --- |
-| FrankenPHP classic + embedded Mercure | Module already installed; one application-server container | Hub follows PHP restart; Lerd's Tempest entrypoint does not enable Mercure; custom runtime configuration and 1.0 JWT integration needed |
-| FrankenPHP classic + standalone Mercure | Independent hub lifecycle; same publisher/subscriber path | Additional PHP runtime change with no demonstrated delivery benefit |
+| FrankenPHP classic + embedded Mercure | Requested transport; module already installed | Lerd configuration blocker reproduced; 1.0 JWT/restart proof remains to be implemented |
+| FrankenPHP classic + standalone Mercure | Current working proof; independent hub lifecycle | Temporary separate service while embedded configuration support is resolved |
 | FPM + standalone Mercure | Demonstrated with current app; independent restart; normal OCI deployment | One small service, separate health/log/config management |
 
 Standalone does not require a separate hostname or a published host port. nginx
@@ -56,7 +60,8 @@ describes 1.x; inspect tagged source when reproducing 0.x behavior.
 
 Run from the Core checkout. These commands assume this machine's site name,
 Podman network and PHP runtime. Inspect `lerd site list` first on another machine.
-No global runtime switch is required. Core explicitly requires `php: ^8.5` in
+Mercure works with both classic and FPM; the committed Lerd configuration selects
+classic. Core explicitly requires `php: ^8.5` in
 Composer; the lock platform metadata was refreshed without changing dependency versions.
 
 ```sh
@@ -196,7 +201,7 @@ production readiness assertion.
   `ObjectWriteLockTest.php:86`. It made no unrelated changes. Focused fixture
   lint and PHP syntax checks passed. The aggregate repository QA is not green.
 
-## FrankenPHP classic: tested, default restored to FPM
+## FrankenPHP classic: selected default, tested FPM fallback
 
 With explicit approval for a temporary switch, both documented commands were
 executed successfully from Core:
@@ -208,10 +213,16 @@ lerd runtime frankenphp --no-worker
 lerd runtime fpm
 ```
 
-Final state: FPM serving HTTPS, async command monitor active and bound to
-`lerd-php85-fpm`, and `.lerd.yaml` identical to its original contents. Separate
-CLI publication, the real archival download hash, and five FPM request probes
-passed after rollback. No experimental runtime selection is committed.
+Selected state: FrankenPHP classic serving HTTPS, with the async command monitor
+bound to `lerd-fp-core`. `.lerd.yaml` commits `runtime: frankenphp`; the omitted
+`runtime_worker` flag defaults to false. The switch uses `--no-worker` explicitly.
+
+The spike first tested rollback to FPM: separate CLI publication reached two
+browser subscribers, the real archival download hash matched, and five request
+probes reported fresh `fpm-fcgi` state. After that proof, the user selected
+FrankenPHP classic as the project default. Use `lerd runtime fpm` to return to the
+tested fallback; it changes `.lerd.yaml`, so do not commit an incidental fallback
+as a new project default.
 
 Lerd writes runtime selection to `.lerd.yaml`. `.lerd.local.yaml` keys override
 the committed file, and Lerd refuses to overwrite a key owned there. Do not
@@ -298,15 +309,18 @@ classic image was 864 MB on disk versus the already installed shared FPM image's
 ### Embedded Mercure configuration
 
 The installed `php-server` exposes `--mercure`, with publisher/subscriber JWT
-keys and trusted issuer/resource identifier variables. A custom Caddyfile is
-possible through Lerd's supported **framework overlay** entrypoint
-(`frankenphp run --config ... --adapter caddyfile`) and environment, without
-patching generated files. There is no project-level Caddy configuration field in
-this installed revision. A global Tempest overlay affects more than Core, so it
-was not changed. An embedded hub would share the PHP container's restart;
-separate CLI publication would still use its HTTP endpoint. Embedded Mercure
-was inspected, not enabled or secured end to end; it needs a separate 1.x token
-fixture before adoption.
+keys and trusted issuer/resource identifier variables. However, Lerd 1.37.0's
+Tempest entrypoint does not pass the flag. Contrary to the earlier report, its
+personal framework overlay merger ignores the `frankenphp` block, so supplying
+an entrypoint there does not change the generated command. The generic command
+also ignores an ordinary project Caddyfile.
+
+The [embedded plan](embedded-mercure-plan.md) contains a live reproducer, the
+explicit isolated upstream correction, and the subsequent 1.x fixture plan.
+Embedded Mercure has not been enabled or secured end to end. The current
+standalone proof establishes no guarantees about the embedded module's JWT
+format or restart/drain behavior. No generated configuration, installed binary
+or upstream checkout was modified to force that configuration.
 
 The Octane requirement is specific to Lerd's **CLI** worker-mode switch; installed
 source checks `laravel/octane` only when worker mode is requested. No Octane,
@@ -346,8 +360,9 @@ Before adoption:
    this. Do not let individual callers choose whether operational data is private.
 5. Test production proxy timeouts, long sessions, sustained slow clients,
    connection limits, memory, graceful rollout and recovery under real load.
-6. Use representative workloads before considering a default runtime change.
-   This completed local comparison establishes no meaningful speed benefit.
+6. Measure representative workloads before claiming throughput or resource
+   benefits from the selected runtime. The local comparison establishes no
+   meaningful speed benefit.
 
 Suggested future `AGENTS.md` additions belong with the first real integration:
 persist before publication; live notifications are idempotent hints; authorize
@@ -404,10 +419,11 @@ No installed binary, vendor source or upstream checkout was modified.
   preserve pre-switch worker state, roll back failed activation, and expose a
   resumable build/readiness result. Add lifecycle parity and failure tests.
   No installed Lerd files were patched.
-- **Caddy configuration scope:** generic classic mode ignores a project
-  Caddyfile; custom entrypoint/env are framework-scoped. If embedded Mercure
-  becomes desirable, propose a project-scoped Caddyfile/entrypoint option with
-  path validation and lifecycle tests. Standalone deployment does not depend on it.
+- **Embedded configuration blocker:** generic classic mode ignores a project
+  Caddyfile, and personal framework overlays silently drop FrankenPHP settings.
+  A live harmless-marker reproducer confirmed this against the installed binary.
+  The [isolated upstream plan](embedded-mercure-plan.md) defines a generic overlay
+  correction and regression tests. Standalone delivery does not depend on it.
 - **Custom-service config:** installed Lerd strips legacy `files:` from user
   service YAML and disallows multiline environment values. Service tuning is
   currently limited to database/cache engines. A small standard OCI image with
@@ -449,7 +465,7 @@ rm public/mercure-spike.php
 lerd service stop stashd-mercure-spike
 lerd service remove stashd-mercure-spike --purge
 rm -r tmp/mercure-spike
-# Only if a classic-mode experiment was separately approved and run:
+# Optional HTTP-runtime fallback:
 lerd runtime fpm
 ```
 
@@ -460,8 +476,8 @@ is gone. Stop the isolated browser and delete its temporary profile. For fresh
 keys, tear down, prepare a new run and register/start again; old tokens then
 fail verification. A zero-downtime production rotation was not tested.
 
-Committed: fixture source, Caddyfile, Containerfile, nginx example, opt-in
-verification scripts and this report. Machine-specific: credentials, public
-entrypoint, service registration/data, nginx override, browser profile, and any
-experimental runtime selection. No mandatory runtime or `.env` changes belong
-in this PR.
+Committed: the selected classic runtime in `.lerd.yaml`, fixture source,
+Caddyfile, Containerfile, nginx example, opt-in verification scripts and this
+report. Machine-specific: credentials, public entrypoint, service
+registration/data, nginx override, browser profile, and temporary runtime
+overrides. Signing secrets and local `.env` changes do not belong in the PR.
