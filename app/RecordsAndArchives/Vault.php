@@ -261,12 +261,15 @@ class Vault
      * Inspect acknowledged history and stranded material under the publication lock.
      *
      * Returns diagnostic issues without repairing, promoting or deleting files.
+     * Content hashing is enabled by default. Disabling it still verifies inventory
+     * checksums/history and detects stranded material, for a short locked recheck
+     * after content was independently verified outside global authority.
      *
      * @return array{head: ?string, versions: list<string>, issues: list<string>}
      */
-    public function inspectObject(Urn $id): array
+    public function inspectObject(Urn $id, bool $verifyContent = true): array
     {
-        return $this->writeLock->exclusiveWrite($id, fn (): array => $this->publication($id)->result());
+        return $this->writeLock->exclusiveWrite($id, fn (): array => $this->publication($id, $verifyContent)->result());
     }
 
     /**

@@ -6,7 +6,9 @@ Frozen independent baseline: `680476b57f87b5d356275074688c35eaadea4313` (#57).
 The local Vault owns `extensions/stashd-transactions/`. Each SHA-256 transaction-ID
 bucket retains an immutable JSON candidate, a SHA-512 seal and private copied
 custody files. Preparation publishes a complete directory by sibling rename;
-preparing directories are never candidates. Retain sealed candidate, plan,
+preparing directories are never candidates. Normal exits remove only the current
+invocation's disposable unsealed copies; process death leaves them unsealed.
+Retain sealed candidate, plan,
 completion and binding evidence indefinitely in this phase. Custody is temporary:
 explicit `releaseCustody()` may reclaim it only after re-verifying persisted
 authoritative completion. Unfinished candidates retain every accepted copy.
@@ -15,7 +17,8 @@ evidence or still-needed custody causes quarantine without changing the Vault.
 The seal detects accidental damage, not a hostile administrator capable of rewriting both content and checksums.
 
 All local Core Object writers and transaction committers share a non-expiring
-flock on this Vault. It remains held through verification and completion; a live
+flock on this Vault. Preparation copies and hashes private bytes outside it;
+only its final inventory recheck and candidate rename hold global authority. It remains held through verification and completion; a live
 owner cannot be timed out or replaced. Kernel process death releases authority.
 Nested Object writes reuse the owning Vault instance's authority. This is local
 process exclusion, not a distributed lease or power-loss guarantee. No committer
@@ -216,3 +219,63 @@ The projection-isolation review item is explicitly deferred to #60, including th
 required healthy-plus-damaged physical OCFL/PostgreSQL isolation acceptance test.
 The custody implementation and regression evidence are ready for re-review;
 independent acceptance-owner certification is still required before merging.
+
+
+## PR #59 follow-up review: parallel preparation
+
+`prepare()` now acquires private custody and computes accepted digests before
+claiming any publication authority. Each invocation owns a unique
+`<transaction-hash>.preparing-<random>` directory. Normal return/failure disposes
+only that invocation's unsealed directory; SIGKILL bypasses cleanup, leaving
+material that discovery/recovery must never adopt. Neither duplicate preparation
+nor a conflicting same-ID submission changes an already sealed candidate.
+
+After copying, preparation acquires a non-expiring per-transaction flock on
+`<transaction-hash>.lock`. Under that authority it compares immutable candidate
+semantics, verifies any still-needed existing custody, and verifies the observed
+Item predecessor. It writes/hashes the candidate manifest before acquiring global
+authority. The global critical section rechecks inventory/checksum/history and
+stranded-material evidence with content hashing disabled, verifies the head is
+unchanged, and atomically renames the private directory. If the Item changed
+since the content-verified observation, preparation explicitly returns `conflict`;
+it does not seal stale state or retry by promoting an old directory. All ordinary
+inspection, commit and recovery calls still enable content hashing by default.
+
+Custody release takes candidate authority before global publication authority,
+so it cannot remove files while a same-ID preparation validates them. Commit
+needs only global authority; it never takes a candidate lock while holding the
+global lock. This fixed ordering prevents inversion during nested completion
+verification. Different transaction IDs do not share candidate locks. The earlier
+cleanup concurrency test now observes the actual denied candidate claim, while
+all frozen commit contention tests continue to observe the global authority.
+
+Production observers report actual completed transitions:
+`custody-copying:<key>` after the first 64 KiB chunk (or the full shorter file)
+with source and private streams still open; `candidate-authority-held` after the
+real claim; `candidate-authority-contended` only after a denied nonblocking claim;
+and `candidate-ready` after verification and physical manifest/seal writing,
+before the final global claim. Existing `before/after-seal` hooks retain their
+original meanings. The test adapter continues to call production directly.
+
+Supplementary tests prove that a distinct Item's transaction commits while A is
+still paused midway through a real 256 KiB custody transfer. They independently
+read B's OCFL bytes before resuming A, then verify A's accepted bytes. Same-ID
+collisions test identical/different bytes with normal release and owner death,
+requiring one sealed candidate and original winner-owned bytes; abandoned copies
+are never promoted. A final-seal race test publishes a newer Item while A is
+paused at `candidate-ready`, then requires explicit conflict without another
+publication. These tests use fresh PHP processes and real local flock/OCFL I/O.
+
+Follow-up concurrency verification (22 October 2026):
+
+- `STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/RecordsAndArchives/TransactionPreparationTest.php tests/Acceptance/RecordsAndArchives/TransactionCustodyTest.php --compact`: **28 passed, 2,774 assertions**. Includes six new preparation cases and all 22 custody lifecycle cases.
+- Final restored `./bin/test.sh --compact`: **289 passed, 33 existing incomplete, 13,737 assertions**, exit 0. All protected tests/harness files still have no diff from frozen `680476b57f87b5d356275074688c35eaadea4313`.
+- Temporary production mutations all exit 1 from failed assertions: restoring a global lock around actual custody copying blocks the independent Item (**1 failed, 16 assertions**); bypassing candidate flock prevents honest denied-claim observation (**4 failed, 96 assertions**); skipping the final head comparison seals stale intent rather than explicitly conflicting (**1 failed, 70 assertions**). Each source was restored in `finally` before the final complete run.
+- Focused lint/format pass, with one early-continue help message. Focused analysis: **0 errors**, 11 Pest fixture-property warnings and one existing comparison help message. AST-based multiline PHPDoc coverage verifies **54 declarations** in changed/new PHP. No suppressions.
+- `composer qa` still stops at unchanged `ObjectWriteLockTest.php:86` unsafe-finally lint. Separate full analysis: **1,163 errors, 192 warnings, 11 help messages** (three new Pest fixture warnings; error count unchanged).
+- Final read-only PostgreSQL check: **0 generated fixture databases and 0 roles**. Private test-admin configuration removed after verification. No working Vault or catalogue was used; `.phpactor.json` remains untouched.
+
+The concurrency blocker is addressed for local processes. The PR remains draft
+and unmerged pending independent acceptance-owner review; projection isolation is
+still explicitly deferred to #60. These results do not expand the phase's local
+process-crash guarantees to power loss or distributed publication.

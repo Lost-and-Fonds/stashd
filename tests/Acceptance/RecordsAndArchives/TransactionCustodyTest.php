@@ -2,6 +2,7 @@
 
 use Tests\Support\RecordsAndArchives\ArchiveFixture;
 use Tests\Support\RecordsAndArchives\OcflInspector;
+use Tests\Support\RecordsAndArchives\PreparationProbe;
 use Tests\Support\RecordsAndArchives\TransactionProbe as Probe;
 
 /**
@@ -179,7 +180,7 @@ test('concurrent cleanup reuses one release authorization under actual publicati
     $receipt = Probe::run($workspace, ['operation' => 'commit', 'transaction_id' => 'custody']);
     $release = ['operation' => 'custody.release', 'transaction_id' => 'custody'];
     /** @var list<array{status: string, item: array{object_id: string, version: string}}> $results */
-    $results = Probe::contend($workspace, $release, $release, false);
+    $results = PreparationProbe::contend($workspace, $release, $release);
     foreach ($results as $result) {
         expect($result['status'])->toBe('released');
         expect($result['item'])->toBe($receipt['item']);

@@ -41,7 +41,11 @@ final readonly class PreservationTransaction
      *
      * Repeated IDs must have identical semantics and byte evidence. Producer
      * paths do not participate in identity. No archival Object is published here.
-     * Unfinished preparation directories are retained but cannot be recovered.
+     * Copying and hashing run without global authority. Same-ID sealing and custody
+     * release share candidate authority; the final predecessor check and rename
+     * alone hold global authority. A changed predecessor explicitly conflicts.
+     * Normal exits remove only this call's unsealed copies; process death retains
+     * preparing directories, which are never promoted by recovery.
      *
      * @param array<array-key, string> $changes Asset key to absolute source file.
      * @param array<array-key, mixed> $metadata Explicit field assignments; omitted fields survive.
@@ -78,50 +82,67 @@ final readonly class PreservationTransaction
         }
         /** @var array<string, string> $changes */
         /** @var array<string, mixed> $metadata */
-        return $this->vault->exclusivePublication(function () use ($id, $uri, $changes, $metadata, $preconditions, $itemId, $boundary): array {
-            $directory = $this->directory($id);
+        $directory = $this->directory($id);
+        $staging = $directory . '.preparing-' . bin2hex(random_bytes(12));
+        if (! mkdir($staging, 0o700)) {
+            throw new RuntimeException('Could not create transaction custody.');
+        }
+        $copies = new \Tempest\Storage\GenericStorage(new \Tempest\Storage\Config\LocalStorageConfig(path: $staging));
+        try {
             ksort($changes);
             $accepted = [];
-            if (is_dir($directory)) {
-                try {
-                    $existing = $this->candidate($id);
-                    if (! is_file($directory . '/complete.json')) {
-                        $this->verifyCustody($id, $existing);
-                    }
-                    foreach ($changes as $key => $source) {
-                        $accepted[$key] = ['file' => 'custody-' . count($accepted), 'size' => filesize($source), 'digest' => hash_file('sha512', $source)];
-                    }
-                    $semantics = ['id' => $id, 'uri' => $uri, 'changes' => $accepted, 'metadata' => $metadata, 'preconditions' => $preconditions];
-                    if ($existing['delta'] !== $semantics) {
-                        return ['status' => 'conflict', 'transaction_id' => $id];
-                    }
-                    return $this->prepared($id, $existing);
-                } catch (UnexpectedValueException|JsonException $error) {
-                    return $this->quarantined($id, $error);
-                }
-            }
-            $staging = $directory . '.preparing-' . bin2hex(random_bytes(12));
-            if (! mkdir($staging, 0o700)) {
-                throw new RuntimeException('Could not create transaction custody.');
-            }
             foreach ($changes as $key => $source) {
                 $name = 'custody-' . count($accepted);
-                $accepted[$key] = ['file' => $name, ...$this->acquire($source, $staging . '/' . $name)];
+                $accepted[$key] = ['file' => $name, ...$this->acquire($source, $staging . '/' . $name, static function () use ($boundary, $key): void {
+                    $boundary?->__invoke('custody-copying:' . $key);
+                })];
             }
             $semantics = ['id' => $id, 'uri' => $uri, 'changes' => $accepted, 'metadata' => $metadata, 'preconditions' => $preconditions];
-            $head = $this->head($itemId);
-            $candidate = ['format' => 'stashd-transaction-1', 'vault' => $this->vaultId(), 'base' => $head, 'delta' => $semantics];
-            $this->validatePreconditions($preconditions);
-            $json = json_encode($candidate, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION);
-            $this->write($staging . '/candidate.json', $json);
-            $this->write($staging . '/candidate.sha512', hash('sha512', $json));
-            $boundary?->__invoke('before-seal');
-            if (! rename($staging, $directory)) {
-                throw new RuntimeException('Could not seal transaction custody.');
+            return $this->exclusiveCandidate(
+                $id,
+                function () use ($id, $directory, $staging, $semantics, $itemId, $boundary): array {
+                    if (is_dir($directory)) {
+                        try {
+                            $existing = $this->candidate($id);
+                            if (! is_file($directory . '/complete.json')) {
+                                $this->verifyCustody($id, $existing);
+                            }
+                            if ($existing['delta'] !== $semantics) {
+                                return ['status' => 'conflict', 'transaction_id' => $id];
+                            }
+                            return $this->prepared($id, $existing);
+                        } catch (UnexpectedValueException|JsonException $error) {
+                            return $this->quarantined($id, $error);
+                        }
+                    }
+                    // Verify the observed predecessor and encode the manifest before claiming global authority.
+                    $head = $this->head($itemId);
+                    $candidate = ['format' => 'stashd-transaction-1', 'vault' => $this->vaultId(), 'base' => $head, 'delta' => $semantics];
+                    $json = json_encode($candidate, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION);
+                    $this->write($staging . '/candidate.json', $json);
+                    $this->write($staging . '/candidate.sha512', hash('sha512', $json));
+                    $boundary?->__invoke('candidate-ready');
+                    $sealed = $this->vault->exclusivePublication(function () use ($itemId, $head, $staging, $directory, $boundary): bool {
+                        if ($this->head($itemId, verifyContent: false) !== $head) {
+                            return false;
+                        }
+                        $boundary?->__invoke('before-seal');
+                        if (! rename($staging, $directory)) {
+                            throw new RuntimeException('Could not seal transaction custody.');
+                        }
+                        $boundary?->__invoke('after-seal');
+                        return true;
+                    });
+                    return $sealed ? $this->prepared($id, $candidate) : ['status' => 'conflict', 'transaction_id' => $id];
+                },
+                $boundary,
+            );
+        } finally {
+            // Only this invocation's unacknowledged copies are disposable; process death retains them unsealed.
+            if (is_dir($staging)) {
+                $copies->deleteDirectory();
             }
-            $boundary?->__invoke('after-seal');
-            return $this->prepared($id, $candidate);
-        });
+        }
     }
 
     /**
@@ -253,56 +274,60 @@ final readonly class PreservationTransaction
      */
     public function releaseCustody(string $id, ?Closure $boundary = null): array
     {
-        return $this->vault->exclusivePublication(
-            function () use ($id, $boundary): array {
-                $directory = $this->directory($id);
-                if (! is_file($directory . '/complete.json')) {
-                    return ['status' => 'not-complete', 'transaction_id' => $id];
-                }
-                $completion = $this->commit($id);
-                if ($completion['status'] !== 'complete') {
-                    return $completion;
-                }
-                try {
-                    $candidate = $this->candidate($id);
-                    $authorization = ['completion' => $completion, 'candidate' => $this->digest($id)];
-                    $path = $directory . '/custody-release.json';
-                    $authorized = file_exists($path);
-                    if ($authorized) {
-                        $this->require($this->readEvidence($path) === $authorization, 'Custody release contradicts completed evidence.');
+        return $this->exclusiveCandidate(
+            $id,
+            fn (): array => $this->vault->exclusivePublication(
+                function () use ($id, $boundary): array {
+                    $directory = $this->directory($id);
+                    if (! is_file($directory . '/complete.json')) {
+                        return ['status' => 'not-complete', 'transaction_id' => $id];
                     }
-                    // Validate every remaining entry before deleting any of them.
-                    foreach ($candidate['delta']['changes'] as $change) {
-                        $file = $directory . '/' . $change['file'];
-                        $this->require(! is_link($file) && (! file_exists($file) ? $authorized : is_file($file)), 'Unexpected or missing custody entry requires containment.');
-                        if (is_file($file)) {
-                            $digest = hash_file('sha512', $file);
-                            $size = filesize($file);
-                            if ($digest === false || $size === false) {
-                                throw new RuntimeException('Could not verify redundant custody.');
-                            }
-                            $this->require($digest === $change['digest'] && $size === $change['size'], 'Changed custody requires containment.');
+                    $completion = $this->commit($id);
+                    if ($completion['status'] !== 'complete') {
+                        return $completion;
+                    }
+                    try {
+                        $candidate = $this->candidate($id);
+                        $authorization = ['completion' => $completion, 'candidate' => $this->digest($id)];
+                        $path = $directory . '/custody-release.json';
+                        $authorized = file_exists($path);
+                        if ($authorized) {
+                            $this->require($this->readEvidence($path) === $authorization, 'Custody release contradicts completed evidence.');
                         }
-                    }
-                    if (! file_exists($path)) {
-                        $boundary?->__invoke('before-custody-release');
-                        $this->saveEvidence($path, $authorization);
-                    }
-                    $boundary?->__invoke('custody-release-authorized');
-                    foreach ($candidate['delta']['changes'] as $key => $change) {
-                        $file = $directory . '/' . $change['file'];
-                        if (is_file($file)) {
-                            if (! unlink($file)) {
-                                throw new RuntimeException('Could not release redundant custody.');
+                        // Validate every remaining entry before deleting any of them.
+                        foreach ($candidate['delta']['changes'] as $change) {
+                            $file = $directory . '/' . $change['file'];
+                            $this->require(! is_link($file) && (! file_exists($file) ? $authorized : is_file($file)), 'Unexpected or missing custody entry requires containment.');
+                            if (is_file($file)) {
+                                $digest = hash_file('sha512', $file);
+                                $size = filesize($file);
+                                if ($digest === false || $size === false) {
+                                    throw new RuntimeException('Could not verify redundant custody.');
+                                }
+                                $this->require($digest === $change['digest'] && $size === $change['size'], 'Changed custody requires containment.');
                             }
-                            $boundary?->__invoke('custody-released:' . $key);
                         }
+                        if (! file_exists($path)) {
+                            $boundary?->__invoke('before-custody-release');
+                            $this->saveEvidence($path, $authorization);
+                        }
+                        $boundary?->__invoke('custody-release-authorized');
+                        foreach ($candidate['delta']['changes'] as $key => $change) {
+                            $file = $directory . '/' . $change['file'];
+                            if (is_file($file)) {
+                                if (! unlink($file)) {
+                                    throw new RuntimeException('Could not release redundant custody.');
+                                }
+                                $boundary?->__invoke('custody-released:' . $key);
+                            }
+                        }
+                        return ['status' => 'released', 'transaction_id' => $id, 'item' => $completion['item']];
+                    } catch (UnexpectedValueException|JsonException|InvalidItemRevision|InvalidAsset $error) {
+                        return $this->quarantined($id, $error);
                     }
-                    return ['status' => 'released', 'transaction_id' => $id, 'item' => $completion['item']];
-                } catch (UnexpectedValueException|JsonException|InvalidItemRevision|InvalidAsset $error) {
-                    return $this->quarantined($id, $error);
-                }
-            },
+                },
+                $boundary,
+            ),
             $boundary,
         );
     }
@@ -342,6 +367,41 @@ final readonly class PreservationTransaction
             }
         }
         return ['ids' => $ids, 'quarantined' => $quarantined];
+    }
+
+    /**
+     * Serialize same-ID sealing and custody release without blocking unrelated Items.
+     *
+     * Always acquire this non-expiring local lock before global publication authority.
+     * Commit never acquires candidate authority, so nested completion verification
+     * cannot invert the lock order. Lock files remain in place across process death.
+     *
+     * @template T
+     * @param callable(): T $operation
+     * @param null|Closure(string): void $boundary Actual candidate authority observer.
+     * @return T
+     */
+    private function exclusiveCandidate(string $id, callable $operation, ?Closure $boundary): mixed
+    {
+        $path = $this->directory($id) . '.lock';
+        $this->require(! is_link($path), 'Candidate authority may not be a symbolic link.');
+        $lock = fopen($path, 'c+b');
+        if ($lock === false) {
+            throw new RuntimeException('Could not open candidate authority.');
+        }
+        try {
+            if (! flock($lock, LOCK_EX | LOCK_NB)) {
+                $boundary?->__invoke('candidate-authority-contended');
+                if (! flock($lock, LOCK_EX)) {
+                    throw new RuntimeException('Could not claim candidate authority.');
+                }
+            }
+            $boundary?->__invoke('candidate-authority-held');
+            return $operation();
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
     }
 
     /**
@@ -526,14 +586,17 @@ final readonly class PreservationTransaction
     }
 
     /**
-     * Read a verified acknowledged head, rejecting all stranded or corrupt material.
+     * Read an acknowledged head, rejecting stranded or contradictory publication.
+     *
+     * Content hashing is the default. Preparation may skip it only for the final
+     * locked recheck after verifying content outside global publication authority.
      */
-    private function head(Urn $id): ?string
+    private function head(Urn $id, bool $verifyContent = true): ?string
     {
         if (! $this->vault->open()->hasObject($id->toString())) {
             return null;
         }
-        $state = $this->vault->inspectObject($id);
+        $state = $this->vault->inspectObject($id, $verifyContent);
         $this->require($state['issues'] === [], 'Object publication requires reconciliation: ' . implode('; ', $state['issues']));
         return $state['head'];
     }
@@ -544,9 +607,10 @@ final readonly class PreservationTransaction
      * Both streams are closed on failure. Observed inode or stat changes reject the
      * source; retained private copies supply later publication, never producer paths.
      *
+     * @param Closure(): void $duringCopy Observer called after the first copied chunk with streams still open.
      * @return array{size: int, digest: string}
      */
-    private function acquire(string $source, string $destination): array
+    private function acquire(string $source, string $destination, Closure $duringCopy): array
     {
         AssetArchive::validateSource($source);
         $input = fopen($source, 'rb');
@@ -565,7 +629,16 @@ final readonly class PreservationTransaction
             $before = fstat($input);
             $current = stat($source);
             $this->require($before !== false && $current !== false && $before['ino'] === $current['ino'] && $before['dev'] === $current['dev'], 'Source changed while opening.');
-            $size = stream_copy_to_stream($input, $output);
+            $first = stream_copy_to_stream($input, $output, 65_536);
+            if ($first === false) {
+                throw new RuntimeException('Could not copy custody bytes.');
+            }
+            $duringCopy();
+            $rest = stream_copy_to_stream($input, $output);
+            if ($rest === false) {
+                throw new RuntimeException('Could not finish custody transfer.');
+            }
+            $size = $first + $rest;
             $after = fstat($input);
             $this->require(
                 $size === $before['size']
