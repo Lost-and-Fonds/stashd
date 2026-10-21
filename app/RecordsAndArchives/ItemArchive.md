@@ -96,8 +96,9 @@ Neither identity algorithm nor the version-1 persisted record schema changed.
 
 Pins must be a list of records containing exactly two string fields:
 `object_id` (a canonical lowercase `urn:stashd:asset:<uuid>`) and `version`
-(`v1`, `v2`, etc., with no leading zeros or aliases). Duplicate Object/version
-pairs are rejected. List order is preserved; there is no inferred latest version.
+(`v1`, `v2`, etc., with no leading zeros or aliases). Each Asset Object may appear
+only once per Item revision, including when the proposed pins name different
+versions. List order is preserved; there is no inferred latest version.
 
 Before writing, every exact target is opened from the canonical Vault and
 verified through production `AssetArchive::inspect()`: identity policy, logical

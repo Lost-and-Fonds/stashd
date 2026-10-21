@@ -258,6 +258,44 @@ final class ItemArchiveTest extends ArchiveTestCase
         ]);
     }
 
+    public function testOneItemSnapshotCannotPinDifferentVersionsOfTheSameAsset(): void
+    {
+        $this->archive->run('vault.initialize');
+        $uri = 'urn:example:one-version-per-asset';
+        $source = $this->archive->input('revision', 'first');
+        $asset = $this->archive->run('asset.preserve', ['item_uri' => $uri, 'asset_key' => 'master', 'files' => ['a' => $source]]);
+        $firstPin = ['object_id' => $asset['object_id'], 'version' => 'v1'];
+        $item = $this->archive->run('item.record', ['uri' => $uri, 'metadata' => ['title' => 'Keep'], 'pins' => [$firstPin]]);
+        file_put_contents($source, 'second');
+        $this->archive->run('asset.preserve', ['item_uri' => $uri, 'asset_key' => 'master', 'files' => ['a' => $source]]);
+        $itemInventory = OcflInspector::inventoryFor($this->archive->path('vault'), $item['object_id']);
+        $assetInventory = OcflInspector::inventoryFor($this->archive->path('vault'), $asset['object_id']);
+        $before = file_get_contents($itemInventory['path']);
+        $historical = file_get_contents(dirname($itemInventory['path']) . '/v1/inventory.json');
+        $assetBefore = file_get_contents($assetInventory['path']);
+
+        expect(fn () => $this->archive->run('item.record', [
+            'uri' => $uri,
+            'metadata' => ['title' => 'Reject'],
+            'pins' => [$firstPin, ['object_id' => $asset['object_id'], 'version' => 'v2']],
+        ]))
+            ->toThrow(ArchivesRejected::class);
+
+        expect(file_get_contents($itemInventory['path']))
+            ->toBe($before)
+            ->and(file_get_contents(dirname($itemInventory['path']) . '/v1/inventory.json'))
+            ->toBe($historical)
+            ->and(is_dir(dirname($itemInventory['path']) . '/v2'))
+            ->toBeFalse()
+            ->and(file_get_contents($assetInventory['path']))
+            ->toBe($assetBefore);
+        $read = $this->archive->run('item.read', ['object_id' => $item['object_id']]);
+        expect($read['pins'])->toBe([$firstPin])->and($read['metadata'])->toBe(['title' => 'Keep']);
+        foreach (['v1' => 'first', 'v2' => 'second'] as $version => $bytes) {
+            expect($this->archive->run('asset.read', ['object_id' => $asset['object_id'], 'version' => $version, 'logical_path' => 'a'])['bytes'])->toBe($bytes);
+        }
+    }
+
     public function testMultipleOwnedAssetsAreVerifiedAndForeignMissingOrIncompatiblePinsAreRejectedTogether(): void
     {
         $this->archive->run('vault.initialize');

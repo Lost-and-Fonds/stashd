@@ -150,9 +150,9 @@ final readonly class ItemArchive
             ) {
                 throw new InvalidItemRevision('Each pin requires a canonical Asset Object ID and an exact OCFL version.');
             }
-            $key = $pin['object_id'] . '@' . $pin['version'];
+            $key = $pin['object_id'];
             if (isset($seen[$key])) {
-                throw new InvalidItemRevision('Duplicate Asset Object/version pin.');
+                throw new InvalidItemRevision('Each Asset Object may be pinned only once per Item revision.');
             }
             $seen[$key] = true;
             $references[] = ['object_id' => $pin['object_id'], 'version' => $pin['version']];
