@@ -10,8 +10,10 @@ test('the local archival storage adapter commits and reopens two OCFL versions',
     $receipt = $this->archive->run('storage.ocfl_round_trip');
     $objectId = $receipt['object_id'];
 
-    expect($receipt['versions'])->toBe(['v1', 'v2'])
-        ->and($receipt['listed_files'])->toContain('v1/content/example.txt')
+    expect($receipt['versions'])
+        ->toBe(['v1', 'v2'])
+        ->and($receipt['listed_files'])
+        ->toContain('v1/content/example.txt')
         ->toContain('v2/content/example.txt');
 
     $found = OcflInspector::inventoryFor($this->archive->path('vault'), $objectId);
@@ -100,8 +102,7 @@ test('large input files remain byte-exact across archival streaming and versione
         'large.bin',
     );
 
-    expect(hash_file('sha256', $path))->toBe($expectedHash)
-        ->and(filesize($path))->toBe(filesize($source));
+    expect(hash_file('sha256', $path))->toBe($expectedHash)->and(filesize($path))->toBe(filesize($source));
 });
 
 test('physical storage integrity is independent of the availability of catalogue projections', function (): void {
@@ -118,11 +119,13 @@ test('physical storage integrity is independent of the availability of catalogue
         'version' => $asset['version'],
     ]);
 
-    expect($verified['healthy'])->toBeTrue()
+    expect($verified['healthy'])
+        ->toBeTrue()
         ->and(file_get_contents(OcflInspector::payloadPath(
             $this->archive->path('vault'),
             $asset['object_id'],
             $asset['version'],
             'data.bin',
-        )))->toBe('archive truth');
+        )))
+        ->toBe('archive truth');
 });

@@ -26,11 +26,12 @@ test('a replica of a complete Vault has the same identity and a verified coheren
 
     OcflInspector::assertRoot($replica);
 
-    expect($synced['complete'])->toBeTrue()
-        ->and($synced['recovery_point'])->toBeString()->not->toBeEmpty()
-        ->and($verified['healthy'])->toBeTrue()
-        ->and($verified['recovery_point'])->toBe($synced['recovery_point'])
-        ->and($initial['vault_id'])->toBeString()->not->toBeEmpty();
+    expect($synced['complete'])
+        ->toBeTrue()
+        ->and($synced['recovery_point'])
+        ->toBeString()
+        ->not->toBeEmpty()->and($verified['healthy'])->toBeTrue()->and($verified['recovery_point'])->toBe($synced['recovery_point'])->and($initial['vault_id'])->toBeString()
+        ->not->toBeEmpty();
 });
 
 test('clean-room recovery retains the original Vault identity without the old primary or database', function (): void {
@@ -61,8 +62,7 @@ test('clean-room recovery retains the original Vault identity without the old pr
         'empty_database' => true,
     ]);
 
-    expect($recovered['complete'])->toBeTrue()
-        ->and($recovered['vault_id'])->toBe($initial['vault_id']);
+    expect($recovered['complete'])->toBeTrue()->and($recovered['vault_id'])->toBe($initial['vault_id']);
 
     OcflInspector::assertRoot($destination);
     $read = $this->archive->run('asset.read', [
@@ -110,13 +110,15 @@ test('a recovered Item still pins the old exact Asset revision after later revis
         'version' => $item['version'],
     ]);
 
-    expect($recoveredItem['pins'])->toBe([['object_id' => $old['object_id'], 'version' => $old['version']]])
+    expect($recoveredItem['pins'])
+        ->toBe([['object_id' => $old['object_id'], 'version' => $old['version']]])
         ->and(file_get_contents(OcflInspector::payloadPath(
             $destination,
             $new['object_id'],
             $new['version'],
             'data.bin',
-        )))->toBe('new content');
+        )))
+        ->toBe('new content');
 });
 
 test('rebuilding the catalogue from an independently verified replica retains metadata-only Items', function (): void {
@@ -160,9 +162,12 @@ test('a lagging replica cannot claim to contain changes newer than its own verif
     $catalogue = $this->archive->run('catalogue.list', ['primary' => $destination]);
     $uris = array_column($catalogue['items'], 'uri');
 
-    expect($recovered['recovery_point'])->toBe($first['recovery_point'])
-        ->and($uris)->toContain('https://example.test/replica/earlier')
-        ->and($uris)->not->toContain('https://example.test/replica/later');
+    expect($recovered['recovery_point'])
+        ->toBe($first['recovery_point'])
+        ->and($uris)
+        ->toContain('https://example.test/replica/earlier')
+        ->and($uris)
+        ->not->toContain('https://example.test/replica/later');
 });
 
 test('a corrupted replica cannot be declared a complete recoverable Vault', function (): void {

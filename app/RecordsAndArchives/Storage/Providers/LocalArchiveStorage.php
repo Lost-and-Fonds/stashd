@@ -17,14 +17,13 @@ readonly class LocalArchiveStorage implements ArchiveStorage
     public function __construct(
         #[Tag('vault')]
         private Storage $storage,
-        private LocalStorageConfig $config
+        private LocalStorageConfig $config,
     ) {}
 
     public function supports(StorageCapability $capability): bool
     {
         return match ($capability) {
-            StorageCapability::AtomicDirectoryRename,
-            StorageCapability::AtomicFileReplace => true,
+            StorageCapability::AtomicDirectoryRename, StorageCapability::AtomicFileReplace => true,
             default => false,
         };
     }
@@ -56,7 +55,7 @@ readonly class LocalArchiveStorage implements ArchiveStorage
 
         $parent = $sourceParent;
 
-        if ($parent !== $root && !str_starts_with($parent, $root . DIRECTORY_SEPARATOR)) {
+        if ($parent !== $root && ! str_starts_with($parent, $root . DIRECTORY_SEPARATOR)) {
             throw new RuntimeException('Path escapes the Vault root');
         }
 
@@ -67,7 +66,7 @@ readonly class LocalArchiveStorage implements ArchiveStorage
 
         $sourceIsDirectory = is_dir($source);
 
-        if (!$sourceIsDirectory && !is_file($source)) {
+        if (! $sourceIsDirectory && ! is_file($source)) {
             throw new RuntimeException('Rename source does not exist');
         }
 
@@ -77,11 +76,11 @@ readonly class LocalArchiveStorage implements ArchiveStorage
         }
 
         // File replacement is permitted for the OCFL root inventory.
-        if (!$sourceIsDirectory && is_dir($destination)) {
+        if (! $sourceIsDirectory && is_dir($destination)) {
             throw new RuntimeException('Cannot replace a directory with a file');
         }
 
-        if (!@rename($source, $destination)) {
+        if (! @rename($source, $destination)) {
             throw new RuntimeException('Atomic rename failed');
         }
 
@@ -274,17 +273,10 @@ readonly class LocalArchiveStorage implements ArchiveStorage
 
     private function resolvePath(string $path): string
     {
-        if (
-            $path === '' ||
-            str_starts_with($path, '/') ||
-            str_contains($path, '\\') ||
-            str_contains($path, "\0") ||
-            in_array('..', explode('/', $path), true)
-        ) {
+        if ($path === '' || str_starts_with($path, '/') || str_contains($path, '\\') || str_contains($path, "\0") || in_array('..', explode('/', $path), true)) {
             throw new InvalidArgumentException('Invalid storage path');
         }
 
         return rtrim($this->config->path, '/') . '/' . $path;
     }
-
 }

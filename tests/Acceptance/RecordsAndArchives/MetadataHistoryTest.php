@@ -34,16 +34,25 @@ test('updating one metadata stream retains the original version', function (): v
     $first = $this->archive->run('metadata.record', [...$base, 'document' => ['title' => 'Before']]);
     $second = $this->archive->run('metadata.record', [...$base, 'document' => ['title' => 'After']]);
 
-    expect($second['object_id'])->toBe($first['object_id'])
-        ->and($second['version'])->not->toBe($first['version'])
-        ->and($this->archive->run('metadata.read', [
-            'object_id' => $first['object_id'],
-            'version' => $first['version'],
-        ])['document']['title'])->toBe('Before')
-        ->and($this->archive->run('metadata.read', [
-            'object_id' => $second['object_id'],
-            'version' => $second['version'],
-        ])['document']['title'])->toBe('After');
+    expect($second['object_id'])
+        ->toBe($first['object_id'])
+        ->and($second['version'])
+        ->not
+        ->toBe($first['version'])
+        ->and(
+            $this->archive->run('metadata.read', [
+                'object_id' => $first['object_id'],
+                'version' => $first['version'],
+            ])['document']['title'],
+        )
+        ->toBe('Before')
+        ->and(
+            $this->archive->run('metadata.read', [
+                'object_id' => $second['object_id'],
+                'version' => $second['version'],
+            ])['document']['title'],
+        )
+        ->toBe('After');
 });
 
 test('different sources for the same metadata facet keep separate provenance identities', function (): void {
@@ -84,11 +93,16 @@ test('editorial corrections cannot overwrite the original source observation', f
         'document' => ['title' => 'Human correction'],
     ]);
 
-    expect($source['object_id'])->not->toBe($editorial['object_id'])
-        ->and($this->archive->run('metadata.read', [
-            'object_id' => $source['object_id'],
-            'version' => $source['version'],
-        ])['document']['title'])->toBe('Original source claim');
+    expect($source['object_id'])
+        ->not
+        ->toBe($editorial['object_id'])
+        ->and(
+            $this->archive->run('metadata.read', [
+                'object_id' => $source['object_id'],
+                'version' => $source['version'],
+            ])['document']['title'],
+        )
+        ->toBe('Original source claim');
 });
 
 test('invalid metadata must not replace a previously preserved valid revision', function (): void {
@@ -102,11 +116,14 @@ test('invalid metadata must not replace a previously preserved valid revision', 
 
     expect(fn () => $this->archive->run('metadata.record', [
         ...$base,
-        'document' => "not a JSON object",
-    ]))->toThrow(ArchivesRejected::class);
+        'document' => 'not a JSON object',
+    ]))
+        ->toThrow(ArchivesRejected::class);
 
-    expect($this->archive->run('metadata.read', [
-        'object_id' => $good['object_id'],
-        'version' => $good['version'],
-    ])['document'])->toBe(['title' => 'good']);
+    expect(
+        $this->archive->run('metadata.read', [
+            'object_id' => $good['object_id'],
+            'version' => $good['version'],
+        ])['document'],
+    )->toBe(['title' => 'good']);
 });

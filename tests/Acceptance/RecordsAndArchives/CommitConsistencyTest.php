@@ -19,8 +19,7 @@ test('an interrupted staged write cannot become a falsely committed Asset', func
     $this->archive->run('vault.open');
     $catalogue = $this->archive->run('catalogue.list');
 
-    expect($outcome['reported_success'])->toBeFalse()
-        ->and($catalogue['assets'])->toBe([]);
+    expect($outcome['reported_success'])->toBeFalse()->and($catalogue['assets'])->toBe([]);
 });
 
 test('a crash after a durable Asset commit but before its Item commit leaves no invented Item pin', function (): void {
@@ -39,8 +38,7 @@ test('a crash after a durable Asset commit but before its Item commit leaves no 
     $this->archive->run('vault.open');
     $catalogue = $this->archive->run('catalogue.list');
 
-    expect($outcome['reported_success'])->toBeFalse()
-        ->and($catalogue['items'])->toBe([]);
+    expect($outcome['reported_success'])->toBeFalse()->and($catalogue['items'])->toBe([]);
 
     // A valid but unlinked Asset is recoverable evidence, never a fabricated Item commit.
     expect($catalogue['assets'])->not->toBe([]);
@@ -62,8 +60,7 @@ test('an interrupted inventory publication reconciles instead of claiming succes
     $this->archive->run('vault.open');
     $verified = $this->archive->run('fixity.verify');
 
-    expect($outcome['reported_success'])->toBeFalse()
-        ->and($verified['healthy'])->toBeTrue();
+    expect($outcome['reported_success'])->toBeFalse()->and($verified['healthy'])->toBeTrue();
 });
 
 test('two competing writers cannot corrupt or silently overwrite committed Asset history', function (): void {

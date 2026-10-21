@@ -17,8 +17,7 @@ test('fixity verification actually reads committed content and reports a healthy
         'version' => $asset['version'],
     ]);
 
-    expect($result['healthy'])->toBeTrue()
-        ->and($result['issues'])->toBe([]);
+    expect($result['healthy'])->toBeTrue()->and($result['issues'])->toBe([]);
 });
 
 test('external corruption of canonical bytes cannot be reported as verified', function (): void {
@@ -42,8 +41,10 @@ test('external corruption of canonical bytes cannot be reported as verified', fu
         'version' => $asset['version'],
     ]);
 
-    expect($result['healthy'])->toBeFalse()
-        ->and($result['issues'])->not->toBe([]);
+    expect($result['healthy'])
+        ->toBeFalse()
+        ->and($result['issues'])
+        ->not->toBe([]);
 });
 
 test('corrupt inventory checksums invalidate object verification even if payload survives', function (): void {
@@ -61,8 +62,10 @@ test('corrupt inventory checksums invalidate object verification even if payload
 
     $result = $this->archive->run('fixity.verify', ['object_id' => $asset['object_id']]);
 
-    expect($result['healthy'])->toBeFalse()
-        ->and($result['issues'])->not->toBe([]);
+    expect($result['healthy'])
+        ->toBeFalse()
+        ->and($result['issues'])
+        ->not->toBe([]);
 });
 
 test('verified replica repair restores exact historical bytes and records repair history', function (): void {
@@ -91,14 +94,17 @@ test('verified replica repair restores exact historical bytes and records repair
     ]);
     $after = $this->archive->run('history.events', ['object_id' => $asset['object_id']]);
 
-    expect($outcome['repaired'])->toBeTrue()
+    expect($outcome['repaired'])
+        ->toBeTrue()
         ->and(file_get_contents(OcflInspector::payloadPath(
             $this->archive->path('vault'),
             $asset['object_id'],
             $asset['version'],
             'data.bin',
-        )))->toBe('authentic bytes')
-        ->and(count($after['events']))->toBeGreaterThan(count($before['events']));
+        )))
+        ->toBe('authentic bytes')
+        ->and(count($after['events']))
+        ->toBeGreaterThan(count($before['events']));
 });
 
 test('a corrupted replica is never accepted as repair authority', function (): void {
@@ -122,11 +128,15 @@ test('a corrupted replica is never accepted as repair authority', function (): v
         'replica' => $replica,
     ]);
 
-    expect($outcome['repaired'])->toBeFalse()
-        ->and($this->archive->run('fixity.verify', [
-            'object_id' => $asset['object_id'],
-            'version' => $asset['version'],
-        ])['healthy'])->toBeFalse();
+    expect($outcome['repaired'])
+        ->toBeFalse()
+        ->and(
+            $this->archive->run('fixity.verify', [
+                'object_id' => $asset['object_id'],
+                'version' => $asset['version'],
+            ])['healthy'],
+        )
+        ->toBeFalse();
 });
 
 test('a repair cannot silently replace the archived original with different content', function (): void {
@@ -152,11 +162,13 @@ test('a repair cannot silently replace the archived original with different cont
         'version' => $asset['version'],
     ]);
 
-    expect($evidence['healthy'])->toBeTrue()
+    expect($evidence['healthy'])
+        ->toBeTrue()
         ->and(hash_file('sha256', OcflInspector::payloadPath(
             $this->archive->path('vault'),
             $asset['object_id'],
             $asset['version'],
             'data.bin',
-        )))->toBe(hash('sha256', 'original truth'));
+        )))
+        ->toBe(hash('sha256', 'original truth'));
 });

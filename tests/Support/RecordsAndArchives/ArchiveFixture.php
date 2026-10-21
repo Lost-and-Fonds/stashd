@@ -24,7 +24,7 @@ final class ArchiveFixture
     {
         $this->workspace = sys_get_temp_dir() . '/stashd-archives-' . bin2hex(random_bytes(12));
 
-        if (!mkdir($this->workspace, 0700, true)) {
+        if (! mkdir($this->workspace, 0700, true)) {
             throw new RuntimeException('Unable to create the acceptance workspace.');
         }
     }
@@ -49,7 +49,7 @@ final class ArchiveFixture
         $path = $this->path('inputs/' . $name);
         $parent = dirname($path);
 
-        if (!is_dir($parent) && !mkdir($parent, 0700, true)) {
+        if (! is_dir($parent) && ! mkdir($parent, 0700, true)) {
             throw new RuntimeException('Unable to create fixture input directory.');
         }
 
@@ -73,7 +73,7 @@ final class ArchiveFixture
         // Use the real local implementation unless a different backend is requested.
         $class = getenv('STASHD_ARCHIVES_ACCEPTANCE_DRIVER') ?: LocalArchivesDriver::class;
 
-        if (!class_exists($class) || !is_a($class, ArchivesDriver::class, true)) {
+        if (! class_exists($class) || ! is_a($class, ArchivesDriver::class, true)) {
             throw new RuntimeException('The acceptance driver must implement ArchivesDriver.');
         }
 
@@ -113,7 +113,7 @@ final class ArchiveFixture
             return;
         }
 
-        if (!is_dir($path)) {
+        if (! is_dir($path)) {
             return;
         }
 
@@ -123,7 +123,7 @@ final class ArchiveFixture
         );
 
         foreach ($files as $file) {
-            if ($file->isDir() && !$file->isLink()) {
+            if ($file->isDir() && ! $file->isLink()) {
                 rmdir($file->getPathname());
             } else {
                 unlink($file->getPathname());
