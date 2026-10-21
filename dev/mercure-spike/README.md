@@ -19,7 +19,7 @@ owns subscriber connections.
 | PHP HTTP | FPM 8.5.11 |
 | Lerd | 1.37.0, commit `14f05e85cbe4f0dd4437a53fd291177a7ef6605f` |
 | Site | `https://core.test`, trusted local HTTPS; nginx 1.31.7 |
-| Database | running `postgis/postgis:16-3.5-alpine` on the Lerd network |
+| Database | PostgreSQL 16.15 service reachable on Lerd; Core currently binds Tempest default SQLite |
 | Existing workers | async command monitor active; scheduler inactive |
 | Installed FrankenPHP base | `dunglas/frankenphp:php8.5-alpine`; FrankenPHP 1.13.0, Caddy 2.11.7 |
 | Embedded modules | `http.handlers.mercure`, `.bolt`, `.local`, and `admin.api.mercure_health`, all v1.0.3 |
@@ -56,7 +56,8 @@ describes 1.x; inspect tagged source when reproducing 0.x behavior.
 
 Run from the Core checkout. These commands assume this machine's site name,
 Podman network and PHP runtime. Inspect `lerd site list` first on another machine.
-No global runtime switch is required.
+No global runtime switch is required. Core explicitly requires `php: ^8.5` in
+Composer; the lock platform metadata was refreshed without changing dependency versions.
 
 ```sh
 podman build -t localhost/stashd-mercure-spike:local dev/mercure-spike
@@ -141,6 +142,9 @@ bounded synthetic test, not a capacity benchmark. Reports are ignored files in
 The live runs and focused lint results below are development evidence, not a
 production readiness assertion.
 
+- FrankenPHP classic passed **19 live checks**, including a fresh-kernel probe.
+  The earlier FPM run passed 18 live checks; the same fresh-state probe and CLI
+  publication passed separately again after final FPM rollback.
 - Separate PHP CLI publication acknowledged with HTTP 200 and the exact update
   ID; browser EventSource received that ID on two simultaneous subscriptions.
 - `text/event-stream` arrived while streams remained open, without waiting for
@@ -170,7 +174,6 @@ production readiness assertion.
 - Ordinary Vault overview requests returned 200 while subscriptions remained
   open. Four initial browser request lenses had no issues; browser capture
   reported no JavaScript exceptions or requested error/network events.
-- The final canonical live run passed **18 checks**, with no browser exceptions.
 - Nine clients, including one client whose curl output was never consumed,
   received a burst of 96 synthetic 64 KiB publications. All eight draining
   clients received over 6.3 MB, including the final update. A normal Vault
@@ -183,64 +186,130 @@ production readiness assertion.
   sustained CPU measurements or an FPM/FrankenPHP performance comparison.
 - Existing Vault HTTP tests: **9 passed, 148 assertions**. They include historical
   binary hashes, HEAD/resource cleanup and a 64 MiB download under a 32 MiB PHP
-  memory limit. A separate real Lerd HTTPS download of the existing synthetic
+  memory limit, under both local PHP environments. A separate real Lerd HTTPS download of the existing synthetic
   Asset v1 also returned 54 bytes with the expected SHA-512
   `4043c87b84cc8e896fa1f19af33df91cb3a943e1e1aaaf9ae0a0ddac37b1ede2091b4eda24bbf5f3e7087cd1c05b6dfc6ec073cf9a72bfb95c4fb76155e0bfea`.
-  The tests run real disposable HTTP processes; they do not establish
-  the untested FrankenPHP behavior.
+  The actual Item, Asset and download routes worked through Lerd HTTPS under
+  classic and after FPM rollback. The 64 MiB test uses a disposable PHP built-in
+  server, not Caddy; large-file throughput through Caddy was not benchmarked.
 - `composer qa` stopped at the existing `no-unsafe-finally` lint error in
   `ObjectWriteLockTest.php:86`. It made no unrelated changes. Focused fixture
   lint and PHP syntax checks passed. The aggregate repository QA is not green.
 
-## FrankenPHP classic: inspected, not adopted
+## FrankenPHP classic: tested, default restored to FPM
 
-The current site remains FPM. A temporary switch was requested separately
-because the task explicitly reserves runtime changes for approval. Until that
-approval arrives, **classic serving, PostgreSQL/Vault access under classic,
-streaming under classic, and rollback from classic remain untested**. There is
-no claim that an installed FrankenPHP binary establishes application mode.
-
-Exact commands, from Core, once approved:
+With explicit approval for a temporary switch, both documented commands were
+executed successfully from Core:
 
 ```sh
-lerd runtime                    # inspect first
+lerd runtime
 lerd runtime frankenphp --no-worker
-# inspect actual container command, workers, HTTP, downloads and database
+# Perform runtime, CLI, Vault and streaming checks.
 lerd runtime fpm
 ```
 
-Lerd writes runtime selection to `.lerd.yaml`; do not commit the experimental
-selection. `.lerd.local.yaml` keys override the committed file, and Lerd refuses
-to overwrite a key owned there. Do not assume a CLI switch changes that override.
+Final state: FPM serving HTTPS, async command monitor active and bound to
+`lerd-php85-fpm`, and `.lerd.yaml` identical to its original contents. Separate
+CLI publication, the real archival download hash, and five FPM request probes
+passed after rollback. No experimental runtime selection is committed.
 
-The installed Tempest framework definition has no FrankenPHP adapter. Lerd's
-actual generic classic launch is `frankenphp php-server -l :8000 -r public`,
-in a per-site `lerd-fp-core` container on `lerd`, with the Core checkout mounted
-at its absolute host path. nginx changes from FastCGI to HTTP proxying. Lerd
-builds a derived image with its standard PHP extension set, not just the bare
-upstream image. The generic command generates its Caddy JSON configuration
-internally; it does not read a project Caddyfile or pass `--mercure` or `--worker`.
-Core's entrypoint calls `HttpApplication::boot(...)->run()` and exits per request.
-Classic mode should therefore use a fresh Tempest boot, but still needs runtime
-proof after approval. Inspect the actual command/config and use a repeated
-request probe for fresh container/static state; do not infer it from process IDs.
+Lerd writes runtime selection to `.lerd.yaml`. `.lerd.local.yaml` keys override
+the committed file, and Lerd refuses to overwrite a key owned there. Do not
+assume a CLI switch changes that override.
 
-Lerd **stops and recreates running background workers on both runtime switches**,
-repointing them between FPM and the per-site container. Expect a queue-worker
-interruption and changed PID. Record running worker names before switching and
-verify their health afterward. Do not switch during active Jobs.
+The actual classic container command was
+`frankenphp php-server -l :8000 -r public`, in `lerd-fp-core` on network `lerd`,
+with the Core checkout mounted at its absolute host path. Its installed modules
+include Mercure 1.0.3. The generic command constructs Caddy JSON internally;
+there is no generated project Caddyfile, no `--worker`, and no `--mercure` flag.
+Caddy administration/config persistence are disabled by that command. nginx
+changed from FastCGI to HTTP proxying at `lerd-fp-core:8000`; the separate hub's
+exact-match nginx route continued working.
 
-For embedded Mercure, the installed `php-server` exposes `--mercure`, with
-publisher/subscriber JWT keys and trusted issuer/resource identifier variables.
-A custom Caddyfile is possible through Lerd's supported **framework overlay**
-entrypoint (`frankenphp run --config ... --adapter caddyfile`) and environment,
-without patching generated files. There is no project-level Caddy configuration
-field in this installed Lerd revision. A global Tempest overlay affects more
-than Core, so it was not changed. Embedded hub restart would follow the PHP
-container; separate CLI publication would still need the HTTP hub endpoint.
+Five authenticated requests booted the real Core Tempest kernel. Each reported
+SAPI `frankenphp`, request-local counter 1, a different `TEMPEST_START` constant,
+and the actual kernel's `longRunning=false`, while PID remained 1. This proves
+fresh PHP/Tempest state despite process reuse. FPM and post-rollback probes
+reported `fpm-fcgi` with the same reset invariants. Core's normal entrypoint
+still calls `HttpApplication::boot(...)->run()` and exits per request.
 
-The Octane requirement is specific to Lerd's worker-mode switch. Installed
-source checks for `laravel/octane` only when worker mode is requested. No Octane,
+The full live proof passed on classic, including publication from a separate
+PHP CLI process, native browser subscriptions, PHP-container restart and hub
+restart. Existing Vault HTTP tests also passed (9 tests, 148 assertions). Real
+Lerd HTTPS overview, historical Item, Asset and archival download routes worked.
+`lerd php tempest asset:inspect ... v1` verified the existing Vault's exact
+historical bytes and reported no publication issues. CLI PHP in the classic
+container is PHP 8.5.11 NTS; the web SAPI is FrankenPHP. Separate background
+processes are not FrankenPHP HTTP workers.
+
+nginx terminates TLS: FPM receives `HTTPS=on`, while classic receives HTTP and
+`X-Forwarded-Proto: https`. The development fixture checks that known Lerd proxy
+header as well as `HTTPS`; it is overwritten by nginx, not accepted from an
+untrusted internet proxy. Future production auth needs an explicit trusted-proxy
+configuration rather than copying this development assumption.
+
+**Database distinction:** PostgreSQL was reachable from both classic PHP CLI and
+a temporary authenticated HTTP probe: a read-only query returned database `core`
+and PostgreSQL 16.15. The same CLI query passed after FPM rollback. However,
+Core has no application database configuration and currently binds Tempest's
+vendor-default SQLite config. `migrate:validate` succeeds but catches invalid
+migration queries, so that command alone did not prove PostgreSQL integration.
+No database configuration, schema or existing operational state was changed.
+Select the intended authoritative database explicitly when implementing Jobs.
+
+### Runtime switching and workers
+
+The documented **CLI** switch stops and recreates active/configured worker units,
+repointing them between FPM and the per-site container. Observed command-monitor
+PIDs changed from 945911 (FPM) to 947012 (classic), then 949150 after the tested
+classic PHP restart, and 1066327 after final FPM rollback. Its `ExecStart` correctly
+named the selected container. The scheduler is timer-driven and is inactive
+between ticks; CLI output shows its timer being recreated too. Expect an
+interruption: record worker/timer health and do not switch during active Jobs.
+
+The **MCP** switch has different behavior in Lerd 1.37.0: it left the monitor's
+original PID 766599 executing in FPM while changing the HTTP runtime. It also
+wrote the selected runtime before the image was ready. The first derived-image
+build took over eight minutes; the MCP caller timed out at 300 s while the build
+continued and eventually switched the site. Core continued serving FPM during
+the build. Do not launch a competing switch while that build is still running.
+Use the tested CLI commands for this experiment; see the upstream correction
+below. Never infer execution mode solely from the registry's selected runtime.
+
+### Limited local timing/resource comparison
+
+Thirty sequential HTTPS Vault overview requests followed five warm-ups for each
+runtime, with no application/code/data changes between the samples:
+
+| Runtime | Median | p95 |
+| --- | ---: | ---: |
+| FPM | 105.33 ms | 117.52 ms |
+| FrankenPHP classic | 99.46 ms | 132.37 ms |
+
+This serial local sample is not a throughput, concurrency or production
+benchmark. The mixed median/tail result establishes no meaningful speed benefit.
+A snapshot showed the classic container using about 190 MB, while the still
+running shared FPM container used about 42 MB and the separate hub about 15 MB.
+These containers have different roles and thread/process settings; this is
+observed local footprint, not normalized per-request overhead. The derived
+classic image was 864 MB on disk versus the already installed shared FPM image's
+552 MB; neither figure is the compressed download size.
+
+### Embedded Mercure configuration
+
+The installed `php-server` exposes `--mercure`, with publisher/subscriber JWT
+keys and trusted issuer/resource identifier variables. A custom Caddyfile is
+possible through Lerd's supported **framework overlay** entrypoint
+(`frankenphp run --config ... --adapter caddyfile`) and environment, without
+patching generated files. There is no project-level Caddy configuration field in
+this installed revision. A global Tempest overlay affects more than Core, so it
+was not changed. An embedded hub would share the PHP container's restart;
+separate CLI publication would still use its HTTP endpoint. Embedded Mercure
+was inspected, not enabled or secured end to end; it needs a separate 1.x token
+fixture before adoption.
+
+The Octane requirement is specific to Lerd's **CLI** worker-mode switch; installed
+source checks `laravel/octane` only when worker mode is requested. No Octane,
 worker mode or Tempest persistent lifecycle changes are part of this spike.
 
 ## Durable state and adoption requirements
@@ -277,8 +346,8 @@ Before adoption:
    this. Do not let individual callers choose whether operational data is private.
 5. Test production proxy timeouts, long sessions, sustained slow clients,
    connection limits, memory, graceful rollout and recovery under real load.
-6. Complete the separately approved classic/FPM comparison before changing the
-   default PHP runtime. No speed benefit has been established here.
+6. Use representative workloads before considering a default runtime change.
+   This completed local comparison establishes no meaningful speed benefit.
 
 Suggested future `AGENTS.md` additions belong with the first real integration:
 persist before publication; live notifications are idempotent hints; authorize
@@ -317,10 +386,24 @@ No installed binary, vendor source or upstream checkout was modified.
   intermittent closed-transport cleanup error seen in Lerd-managed restarts.
   Run `python3 dev/mercure-spike/reproduce-shutdown.py` after setup. It uses a
   disposable container and random loopback HTTP port, bypassing nginx and Lerd
-  lifecycle code. Its client token is minted by the existing PHP fixture.
+  lifecycle code. Its short-lived tokens are independently signed in the
+  reproducer, using the pinned hub version's claim format. It also verifies that
+  a replacement subscriber key rejects the old-key token (401) and accepts the
+  new-key token (200); the live demo's keys are not changed.
   Do not treat recovered browser delivery as proof of a clean graceful drain.
   Before production, evaluate a current hub with an explicit drain deadline or
   submit a focused upstream shutdown-ordering fix after independent reproduction.
+- **MCP/CLI runtime lifecycle mismatch:** installed MCP `execSiteRuntime` in
+  [`server.go`](https://github.com/lerd-env/lerd/blob/14f05e85cbe4f0dd4437a53fd291177a7ef6605f/internal/mcp/server.go)
+  duplicates the CLI switch without its worker rebinding, failure rollback or
+  Octane guard. Reproducer: record a running worker's PID/ExecStart, use MCP
+  `site runtime` with `worker:false`, then compare worker binding with the HTTP
+  container; use the CLI rollback/switch and compare again. First-image builds
+  can also outlast the 300 s tool timeout while continuing to mutate runtime
+  state. Proposed correction: share one runtime-switch lifecycle across CLI/MCP,
+  preserve pre-switch worker state, roll back failed activation, and expose a
+  resumable build/readiness result. Add lifecycle parity and failure tests.
+  No installed Lerd files were patched.
 - **Caddy configuration scope:** generic classic mode ignores a project
   Caddyfile; custom entrypoint/env are framework-scoped. If embedded Mercure
   becomes desirable, propose a project-scoped Caddyfile/entrypoint option with

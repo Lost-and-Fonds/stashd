@@ -48,6 +48,15 @@ async function browser() {
     return {call,evaluate,close:async()=>{await evaluate('source.close()');ws.close();await fetch('http://127.0.0.1:9339/json/close/'+target.id);}};
 }
 
+const boots=[];
+for(let i=0;i<5;i++) {
+    boots.push(JSON.parse(execFileSync('curl',['-fsS','--data-binary','@-','https://core.test/mercure-spike.php'],{encoding:'utf8',input:new URLSearchParams({password:config.password,probe:'1'}).toString()})));
+}
+check('five requests use fresh PHP state and nonpersistent Tempest kernels', ()=>{
+    assert(boots.every(b=>b.requests===1 && b.long_running===false));
+    assert.equal(new Set(boots.map(b=>b.tempest_start)).size,5);
+});
+report.boots=boots;
 const subscription='/.well-known/mercure?topic='+encodeURIComponent(config.topic);
 check('anonymous subscriber rejected', ()=>assert.equal(curlStatus(subscription),401));
 check('anonymous publisher rejected', ()=>assert.equal(curlStatus('/.well-known/mercure',['-d','topic='+config.topic]),401));

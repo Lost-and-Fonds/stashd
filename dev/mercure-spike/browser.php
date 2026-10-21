@@ -10,11 +10,19 @@ header('X-Content-Type-Options: nosniff');
 $password = $_POST['password'] ?? '';
 if (! is_string($password) || ! hash_equals($config['password'], $password)) {
     http_response_code(401);
-    exit('<!doctype html><html lang="en"><title>Restricted Mercure fixture</title><form method="post"><label>Test password <input type="password" name="password" required></label><button>Connect</button></form></html>');
+    exit(
+        '<!doctype html><html lang="en"><title>Restricted Mercure fixture</title><form method="post"><label>Test password <input type="password" name="password" required></label><button>Connect</button></form></html>',
+    );
 }
-if (($_SERVER['HTTPS'] ?? '') !== 'on') {
+// Lerd terminates TLS at nginx and overwrites this header for its HTTP backend.
+if (($_SERVER['HTTPS'] ?? '') !== 'on' && ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') !== 'https') {
     http_response_code(400);
     exit('HTTPS required');
+}
+if (($_POST['probe'] ?? '') === '1') {
+    header('Content-Type: application/json');
+    echo json_encode(spike_runtime_probe(), JSON_THROW_ON_ERROR);
+    exit();
 }
 setcookie('mercureAuthorization', spike_token($config, 'subscribe'), [
     'expires' => time() + 300,

@@ -30,12 +30,34 @@ function spike_token(array $config, string $action, ?string $topic = null, int $
     return $header . '.' . $payload . '.' . $encode(hash_hmac('sha256', $header . '.' . $payload, $key, true));
 }
 
+/**
+ * Boot the real Core kernel and expose request-local lifecycle evidence.
+ *
+ * The static counter and Tempest start constant must reset for classic requests;
+ * the protected kernel flag independently reports Tempest's long-running mode.
+ */
+function spike_runtime_probe(): array
+{
+    static $requests = 0;
+    $requests++;
+    require_once __DIR__ . '/../../vendor/autoload.php';
+    $container = \Tempest\Core\Tempest::boot(__DIR__ . '/../..');
+    $kernel = $container->get(\Tempest\Core\Kernel::class);
+    return [
+        'requests' => $requests,
+        'tempest_start' => TEMPEST_START,
+        'long_running' => new ReflectionProperty($kernel, 'longRunning')->getValue($kernel),
+        'sapi' => PHP_SAPI,
+        'pid' => getmypid(),
+    ];
+}
+
 if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__) {
     $config = spike_config();
     $action = $argv[1] ?? '';
     if ($action === 'token') {
         echo spike_token($config, $argv[2] ?? 'subscribe', $argv[3] ?? null, (int) ($argv[4] ?? 300));
-        exit;
+        exit();
     }
     if ($action !== 'publish') {
         fwrite(STDERR, "Usage: lerd php dev/mercure-spike/fixture.php publish [message]\n");
