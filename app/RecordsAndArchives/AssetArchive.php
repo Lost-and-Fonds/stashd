@@ -60,10 +60,11 @@ final readonly class AssetArchive
      * receipt. Repeating the call creates another version, even for equal bytes.
      *
      * @param array<string, string> $files Complete version, logical path => absolute local source.
+     * @param null|array{id: string, candidate: string, plan: string} $transaction Core transaction binding retained in this exact version.
      * @throws InvalidAsset When paths or acquisition sources are invalid.
      * @throws UnexpectedValueException When ownership or committed evidence differs.
      */
-    public function preserve(string $itemUri, string $assetKey, array $files): array
+    public function preserve(string $itemUri, string $assetKey, array $files, ?array $transaction = null): array
     {
         $id = $this->objectId($itemUri, $assetKey);
         if ($files === []) {
@@ -130,6 +131,7 @@ final readonly class AssetArchive
                 'asset_key' => $assetKey,
                 'acquisition' => 'local-copy',
                 'files' => $accepted,
+                ...($transaction === null ? [] : ['transaction' => $transaction]),
             ];
             $staged[self::RECORD] = ['contents' => json_encode($record, JSON_THROW_ON_ERROR)];
             $object = $this->vault->commitSnapshot($id, $staged, function (?OcflObject $existing) use ($id, $itemUri, $assetKey): void {
@@ -253,7 +255,7 @@ final readonly class AssetArchive
      * Invalid sources raise InvalidAsset. This path check does not freeze a file;
      * acquisition separately checks the opened inode and observed stat changes.
      */
-    private static function validateSource(mixed $source): void
+    public static function validateSource(mixed $source): void
     {
         if (! is_string($source) || ! str_starts_with($source, '/') || str_contains($source, "\0")) {
             throw new InvalidAsset('Acquisition source must be an absolute local file path.');

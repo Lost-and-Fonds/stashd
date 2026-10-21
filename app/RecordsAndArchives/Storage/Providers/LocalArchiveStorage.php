@@ -34,6 +34,20 @@ readonly class LocalArchiveStorage implements ArchiveStorage
     ) {}
 
     /**
+     * Return the canonical local root for Vault-owned transaction evidence and locks.
+     *
+     * The directory must already exist; callers may not use a missing or linked root.
+     */
+    public function rootPath(): string
+    {
+        $root = realpath($this->config->path);
+        if ($root === false || is_link($this->config->path)) {
+            throw new RuntimeException('A real local Vault root is required.');
+        }
+        return $root;
+    }
+
+    /**
      * Advertise atomic sibling directory rename and file replacement.
      *
      * Conditional writes are not supported; atomic rename remains subject to the
