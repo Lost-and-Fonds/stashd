@@ -40,6 +40,9 @@ return static function (array $request, Closure $boundary): array {
     if (str_starts_with($request['operation'], 'projection.')) {
         return new Tests\Support\RecordsAndArchives\TransactionProjectionFixture()->run($request, $vault, $items, $assets);
     }
+    if ($request['operation'] === 'custody.release') {
+        return $transactions->releaseCustody($request['transaction_id'], $boundary);
+    }
     if ($request['operation'] === 'discover') {
         return $transactions->discover();
     }

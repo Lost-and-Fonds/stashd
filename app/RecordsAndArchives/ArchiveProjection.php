@@ -30,6 +30,8 @@ final readonly class ArchiveProjection
      * The caller supplies an existing private schema and owns its access control.
      * Invalid history aborts before any SQL mutation. SQL failures roll back both
      * tables; projection availability cannot authorize another archival revision.
+     * This initial projection is all-or-nothing: unrelated damaged history also
+     * blocks healthy rows. Per-Item recovery isolation is tracked in issue #60.
      */
     public function rebuild(PDO $database, string $schema): array
     {

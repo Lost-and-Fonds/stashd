@@ -6,11 +6,13 @@ Frozen independent baseline: `680476b57f87b5d356275074688c35eaadea4313` (#57).
 The local Vault owns `extensions/stashd-transactions/`. Each SHA-256 transaction-ID
 bucket retains an immutable JSON candidate, a SHA-512 seal and private copied
 custody files. Preparation publishes a complete directory by sibling rename;
-preparing directories are never candidates. Retain all evidence indefinitely in
-this phase. No SQL is needed to enumerate sealed candidates. Missing or damaged
-seals, custody, plans or contradictory publication evidence cause quarantine
-without changing the Vault. The seal detects accidental damage, not a hostile
-administrator capable of rewriting both content and checksums.
+preparing directories are never candidates. Retain sealed candidate, plan,
+completion and binding evidence indefinitely in this phase. Custody is temporary:
+explicit `releaseCustody()` may reclaim it only after re-verifying persisted
+authoritative completion. Unfinished candidates retain every accepted copy.
+No SQL is needed to enumerate sealed candidates. Missing or damaged permanent
+evidence or still-needed custody causes quarantine without changing the Vault.
+The seal detects accidental damage, not a hostile administrator capable of rewriting both content and checksums.
 
 All local Core Object writers and transaction committers share a non-expiring
 flock on this Vault. It remains held through verification and completion; a live
@@ -43,9 +45,13 @@ Projection rebuilding reads verified authoritative Item history into physical
 PostgreSQL tables. It runs separately from commit and cannot authorize a new
 archival revision. The acceptance fixture provisions only parent-generated,
 strictly validated disposable databases/roles/schemas; test administration is
-separate from unreachable ordinary application DB configuration.
+separate from unreachable ordinary application DB configuration. This initial
+projection is deliberately all-or-nothing: damage in one unrelated Item or Asset
+blocks restoring healthy rows. Per-Item recovery isolation is deferred and tracked
+in [#60](https://github.com/Lost-and-Fonds/stashd/issues/60); it is not approved as
+the final catalogue recovery behavior.
 
-Review decisions still required: retention/garbage collection, user-facing
+Review decisions still required: permanent-evidence retention, user-facing
 conflict resolution and removal semantics, repair of interrupted OCFL writes,
 production projection schema integration and distributed deployment. Local
 process crashes only: no fsync, device-loss, remote backend or power-cut claim.
@@ -69,7 +75,9 @@ in sorted Asset-key order. Producer source paths are not retained as authority.
 JSON string) and `sha512` (its digest). Write to a unique sibling temporary file,
 then rename under authority. A leftover temporary file is never a published plan.
 A missing plan cannot be reconstructed from a revision that already names this
-transaction. All failed or interrupted evidence is retained.
+transaction. Failed and interrupted publication evidence is retained. Explicitly
+authorized completed-custody release affects only the candidate-named copies,
+never journal envelopes, transaction bindings or OCFL files.
 
 Each changed Asset's `.stashd/asset.json` and the Item's `item.json` carry
 `transaction: {id, candidate, plan}`. The candidate value is the exact candidate
@@ -152,8 +160,59 @@ This is implementation evidence, not independent acceptance-owner approval.
 Supplementary vectors and the physical format need that owner's review before
 #58 can be called complete. The PR should remain draft until that gate and the
 phase-specific decisions above are reviewed. In particular, confirm conservative
-whole-Item stale conflict, indefinite retention and quarantine of interrupted
-single-Object material. Automatic repair is deliberately unresolved; this change
+whole-Item stale conflict, indefinite permanent-evidence retention and quarantine
+of interrupted single-Object material. Automatic repair is deliberately unresolved; this change
 does not silently grant orphan-promotion authority. Production catalogue schema
 adoption, removal semantics, acquisition/version deduplication, distributed
 fencing and device durability require separate decisions and evidence.
+
+## PR #59 review: completed custody lifecycle
+
+Custody is required until `complete.json` has been persisted after verification.
+`releaseCustody(id)` is an explicit maintenance operation: it refuses an unfinished
+candidate with `not-complete` and never advances publication to make cleanup
+possible. It holds the same non-expiring Vault authority as commit/recovery.
+Before any deletion it invokes the production completion verifier, which checks
+sealed candidate/plan evidence, exact OCFL transaction bindings, changed Asset
+sizes/digests, the resulting Item metadata/pins and all retained pinned Assets.
+A completion receipt alone cannot authorize deletion or reacknowledgement.
+
+After that verification, cleanup preflights every remaining custody entry and
+persists an immutable checksummed `custody-release.json` envelope containing the
+verified completion receipt and candidate seal digest. It then unlinks only the
+manifest-named `custody-N` regular files. The candidate, seal, plan, completion,
+release authorization and all OCFL bytes remain unchanged. Unexpected, linked or
+changed custody entries are retained for diagnosis. Unexplained missing copies
+before initial authorization cause cleanup quarantine; missing copies after
+recorded authorization are the normal interrupted-cleanup state.
+
+Completed `commit`/`recover` verifies accepted byte evidence against authoritative
+OCFL instead of requiring redundant copies. Interrupted cleanup cannot break
+completion replay, including after only one of several files was removed. Every
+cleanup retry re-verifies OCFL and the original release authorization before
+removing remaining copies; there is no unchecked sweeper. A damaged authorization
+blocks further cleanup but does not independently invalidate intact archival
+completion. Missing/corrupt permanent publication evidence still quarantines
+replay and cleanup. If permanent completion evidence is lost after release, the
+service contains that journal loss rather than inferring permission to republish.
+
+The test adapter only maps `custody.release` to this production operation. Real
+supervisor SIGKILL hooks follow completed verification/authorization/deletion:
+`before-custody-release`, `custody-release-authorized`, and
+`custody-released:<asset-key>`. The authorization is the restart point; no new
+worker, retention timer, power-loss durability claim or OCFL repair is introduced.
+Independent acceptance-owner review remains pending; PR #59 stays draft.
+
+Review-fix verification (22 October 2026):
+
+- `STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/RecordsAndArchives/TransactionCustodyTest.php --compact`: **22 passed, 2,135 assertions** before final additional status assertions. Covers two-copy release, fresh-process commit/recovery replay, preservation of every permanent byte, unfinished/partial/verification-pending custody, four actual SIGKILL cleanup windows, forged completion, damaged authoritative/journal evidence, lost completion reply, concurrent cleanup, and damaged authorization/remaining custody.
+- Final restored `./bin/test.sh --compact`: **283 passed, 33 existing incomplete, 13,101 assertions**, exit 0. All frozen contracts remain unchanged from `680476b57f87b5d356275074688c35eaadea4313`.
+- Three temporary production mutations each fail assertions: trusting the completion receipt during cleanup (**5 failed, 1 passed** damage cases), publishing unfinished work to make cleanup possible (**5 failed**), and requiring released copies on completed replay (**1 failed**). Sources restored in `finally` blocks before the final complete run.
+- Focused lint and format check pass. Focused analysis of review-changed PHP: **0 errors**, 8 Pest fixture-property warnings and the existing comparison help message. AST-based PHPDoc coverage verifies **32 declarations** in those files. No suppressions added.
+- `composer qa` again stops at unchanged `ObjectWriteLockTest.php:86` unsafe-finally lint. Separate full `composer analyse`: **1,163 errors, 189 warnings, 11 help messages**; the review adds only the 8 documented Pest fixture warnings to the previous whole-repository counts.
+- Final read-only PostgreSQL check: **0 generated fixture databases and 0 generated roles**. Private test-admin configuration removed after verification; no working catalogue or Vault was used.
+
+The projection-isolation review item is explicitly deferred to #60, including the
+required healthy-plus-damaged physical OCFL/PostgreSQL isolation acceptance test.
+The custody implementation and regression evidence are ready for re-review;
+independent acceptance-owner certification is still required before merging.

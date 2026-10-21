@@ -85,6 +85,9 @@ final readonly class PreservationTransaction
             if (is_dir($directory)) {
                 try {
                     $existing = $this->candidate($id);
+                    if (! is_file($directory . '/complete.json')) {
+                        $this->verifyCustody($id, $existing);
+                    }
                     foreach ($changes as $key => $source) {
                         $accepted[$key] = ['file' => 'custody-' . count($accepted), 'size' => filesize($source), 'digest' => hash_file('sha512', $source)];
                     }
@@ -126,7 +129,9 @@ final readonly class PreservationTransaction
      *
      * An unknown ID cannot adopt unrelated Objects. Explicit stale deltas conflict
      * before publication. Replays verify authoritative history even after a saved
-     * completion fact. Evidence failures return quarantine without deleting files;
+     * completion fact. Completed replays use sealed byte evidence and verified
+     * OCFL, so redundant custody may have been released. Evidence failures return
+     * quarantine without deleting files;
      * unexpected I/O and programming failures propagate to the caller.
      *
      * @param null|Closure(string): void $boundary Completed application boundary observer.
@@ -141,6 +146,9 @@ final readonly class PreservationTransaction
                 }
                 try {
                     $candidate = $this->candidate($id);
+                    if (! is_file($directory . '/complete.json')) {
+                        $this->verifyCustody($id, $candidate);
+                    }
                     $delta = $candidate['delta'];
                     $itemId = $this->items->objectIdForUri($delta['uri']);
                     if (is_file($directory . '/plan.json')) {
@@ -181,7 +189,6 @@ final readonly class PreservationTransaction
                     }
                     $this->validatePlan($candidate, $plan);
                     $binding = ['id' => $id, 'candidate' => $this->digest($id), 'plan' => hash('sha512', json_encode($plan, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION))];
-                    $this->validatePlan($candidate, $plan);
                     // Inspect every planned Object before writing anything, including damaged later steps.
                     $published = [];
                     foreach ($plan['assets'] as $key => $step) {
@@ -235,6 +242,72 @@ final readonly class PreservationTransaction
     }
 
     /**
+     * Explicitly release redundant custody only after re-verifying persisted completion.
+     *
+     * Holds publication authority through verification, durable release authorization
+     * and unlinking. Never commits an unfinished candidate or removes journal/OCFL
+     * evidence. Interrupted cleanup is idempotent; every retry re-verifies OCFL before
+     * removing remaining files. Unexpected custody entries are retained, not followed.
+     *
+     * @param null|Closure(string): void $boundary Completed cleanup boundary observer.
+     */
+    public function releaseCustody(string $id, ?Closure $boundary = null): array
+    {
+        return $this->vault->exclusivePublication(
+            function () use ($id, $boundary): array {
+                $directory = $this->directory($id);
+                if (! is_file($directory . '/complete.json')) {
+                    return ['status' => 'not-complete', 'transaction_id' => $id];
+                }
+                $completion = $this->commit($id);
+                if ($completion['status'] !== 'complete') {
+                    return $completion;
+                }
+                try {
+                    $candidate = $this->candidate($id);
+                    $authorization = ['completion' => $completion, 'candidate' => $this->digest($id)];
+                    $path = $directory . '/custody-release.json';
+                    $authorized = file_exists($path);
+                    if ($authorized) {
+                        $this->require($this->readEvidence($path) === $authorization, 'Custody release contradicts completed evidence.');
+                    }
+                    // Validate every remaining entry before deleting any of them.
+                    foreach ($candidate['delta']['changes'] as $change) {
+                        $file = $directory . '/' . $change['file'];
+                        $this->require(! is_link($file) && (! file_exists($file) ? $authorized : is_file($file)), 'Unexpected or missing custody entry requires containment.');
+                        if (is_file($file)) {
+                            $digest = hash_file('sha512', $file);
+                            $size = filesize($file);
+                            if ($digest === false || $size === false) {
+                                throw new RuntimeException('Could not verify redundant custody.');
+                            }
+                            $this->require($digest === $change['digest'] && $size === $change['size'], 'Changed custody requires containment.');
+                        }
+                    }
+                    if (! file_exists($path)) {
+                        $boundary?->__invoke('before-custody-release');
+                        $this->saveEvidence($path, $authorization);
+                    }
+                    $boundary?->__invoke('custody-release-authorized');
+                    foreach ($candidate['delta']['changes'] as $key => $change) {
+                        $file = $directory . '/' . $change['file'];
+                        if (is_file($file)) {
+                            if (! unlink($file)) {
+                                throw new RuntimeException('Could not release redundant custody.');
+                            }
+                            $boundary?->__invoke('custody-released:' . $key);
+                        }
+                    }
+                    return ['status' => 'released', 'transaction_id' => $id, 'item' => $completion['item']];
+                } catch (UnexpectedValueException|JsonException|InvalidItemRevision|InvalidAsset $error) {
+                    return $this->quarantined($id, $error);
+                }
+            },
+            $boundary,
+        );
+    }
+
+    /**
      * Discover healthy sealed candidates while reporting damaged evidence locally.
      *
      * SQL is never consulted. One quarantined bucket cannot hide other recoverable
@@ -259,7 +332,10 @@ final readonly class PreservationTransaction
                 $this->require(is_array($data) && is_array($data['delta'] ?? null), 'Candidate delta is missing.');
                 $id = $data['delta']['id'] ?? null;
                 $this->require(is_string($id) && $directory === $this->directory($id), 'Candidate directory identity differs.');
-                $this->candidate($id);
+                $candidate = $this->candidate($id);
+                if (! is_file($directory . '/complete.json')) {
+                    $this->verifyCustody($id, $candidate);
+                }
                 $ids[] = $id;
             } catch (UnexpectedValueException|JsonException|InvalidItemRevision|InvalidAsset $error) {
                 $quarantined[] = ['path' => $directory, 'reason' => $error->getMessage()];
@@ -269,7 +345,7 @@ final readonly class PreservationTransaction
     }
 
     /**
-     * Validate the sealed delta, Vault binding and every retained custody digest.
+     * Validate permanent sealed delta evidence independently of temporary custody.
      *
      * @return Candidate
      */
@@ -306,17 +382,35 @@ final readonly class PreservationTransaction
             $this->require(is_string($key), 'Asset key must be a string.');
             $this->assets->objectId($delta['uri'], $key);
             $this->require(is_array($change) && is_string($change['file'] ?? null) && preg_match('/^custody-[0-9]+$/D', $change['file']) === 1, 'Unsafe custody identity.');
-            $path = $directory . '/' . $change['file'];
+            $this->require(
+                is_int($change['size'] ?? null) && $change['size'] >= 0 && is_string($change['digest'] ?? null) && preg_match('/^[a-f0-9]{128}$/D', $change['digest']) === 1,
+                'Malformed accepted byte evidence.',
+            );
+        }
+        /** @var Candidate $candidate */
+        return $candidate;
+    }
+
+    /**
+     * Require every accepted private file while an unfinished candidate still needs custody.
+     *
+     * Missing, linked or changed files prevent publication. Completed replay instead
+     * verifies the accepted sizes and digests against exact authoritative OCFL bytes.
+     *
+     * @param Candidate $candidate
+     */
+    private function verifyCustody(string $id, array $candidate): void
+    {
+        foreach ($candidate['delta']['changes'] as $change) {
+            $path = $this->directory($id) . '/' . $change['file'];
             $this->require(is_file($path) && ! is_link($path), 'Custody is missing or linked.');
             $digest = hash_file('sha512', $path);
             $size = filesize($path);
             if ($digest === false || $size === false) {
                 throw new RuntimeException('Could not verify custody bytes.');
             }
-            $this->require($digest === ($change['digest'] ?? null) && $size === ($change['size'] ?? null), 'Custody bytes differ.');
+            $this->require($digest === $change['digest'] && $size === $change['size'], 'Custody bytes differ.');
         }
-        /** @var Candidate $candidate */
-        return $candidate;
     }
 
     /**
