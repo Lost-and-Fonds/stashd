@@ -47,3 +47,6 @@ Thumbs.db
 
 # Canonical local Vault content
 /storage/vault/
+
+# Disposable Mercure integration spike entry point
+/public/mercure-spike.php

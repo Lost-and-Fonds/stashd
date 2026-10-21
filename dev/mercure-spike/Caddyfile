@@ -1,0 +1,20 @@
+{
+    admin off
+    auto_https off
+    grace_period 5s
+}
+:80 {
+    mercure {
+        publisher_jwt {env.MERCURE_PUBLISHER_JWT_KEY} HS256
+        subscriber_jwt {env.MERCURE_SUBSCRIBER_JWT_KEY} HS256
+        heartbeat 5s
+        write_timeout 120s
+        dispatch_timeout 2s
+        transport bolt {
+            path /data/mercure.db
+            size 10485760
+        }
+    }
+    respond /healthz 200
+    respond 404
+}
