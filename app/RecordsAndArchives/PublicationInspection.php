@@ -46,10 +46,13 @@ final class PublicationInspection
             try {
                 $acknowledged = InventorySidecar::readDigest($fs, $path, $algorithm);
                 foreach ($candidates as $candidate) {
-                    if (! $fs->fileExists($candidate) || ! hash_equals($acknowledged, $fs->digestFile($candidate, $algorithm))) {
+                    if (! $fs->fileExists($candidate)) {
                         continue;
                     }
                     $json = $fs->read($candidate);
+                    if (! hash_equals($acknowledged, hash($algorithm->hashAlgorithm(), $json))) {
+                        continue;
+                    }
                     $inventory = InventoryReader::fromString($json);
                     if ($inventory->id !== $id || $inventory->digestAlgorithm !== $algorithm) {
                         throw new UnexpectedValueException('Acknowledged inventory identity or digest algorithm differs.');

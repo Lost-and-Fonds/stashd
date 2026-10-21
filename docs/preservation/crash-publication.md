@@ -155,7 +155,7 @@ large Objects. No automatic startup sweep or destructive cleanup is added.
 
 ## Recorded result (2026-10-21)
 
-- Records & Archives: 179 passed, 0 failed, 33 pre-existing incomplete contracts
+- Records & Archives: 180 passed, 0 failed, 33 pre-existing incomplete contracts
   (catalogue, cross-Object interruption, replicas and other unimplemented driver
   operations remain incomplete; no claim that those features work).
 - Crash suite: 44 passed, including 40 process-crash cases and four inspection
@@ -167,5 +167,20 @@ large Objects. No automatic startup sweep or destructive cleanup is added.
 - Formatting and lint of changed PHP pass. Focused static analysis of all five
   changed production classes passes. `composer qa` was run; repository-wide
   lint stops at the existing unsafe-finally error in ObjectWriteLockTest.
-  Unrelated formatter changes from that command were reverted. The upstream
+  Formatter-only changes are retained in a separate commit. The upstream
   standalone regression was run before/after; the upstream full suite was not.
+
+## Read consistency review regression
+
+Candidate inventories are read once; their checksum is calculated from the
+exact JSON string subsequently parsed. Ordinary reads do not hold the writer
+lock, so hashing a path and then reopening it could authenticate a different
+root inventory after an atomic replacement.
+
+`PublicationReadConsistencyTest` deterministically replaces the real root
+inventory after opening its old stream or capturing its old bytes. The root
+checksum still acknowledges v1 while the replacement contains v2. Before the
+fix, `Vault::getObject` incorrectly returns v2. Afterward it returns v1, reads
+its original metadata, rejects v2 and independently verifies the acknowledged
+inventory and payloads. This test performs real local I/O and rename; no
+archival result is mocked. It fails before the fix and passes afterward.
