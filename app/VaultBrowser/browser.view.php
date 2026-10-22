@@ -1,8 +1,15 @@
 <?php
+/**
+ * Tempest injects the page and configuration supplied by VaultBrowserController::page().
+ *
+ * @var \App\VaultBrowser\BrowserPage $page
+ * @var \App\Administration\VaultConfig $config
+ */
+$data = $page->data;
+$title = $data['kind'];
 $e = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $itemUrl = static fn (string $id): string => '/items/' . rawurlencode($id);
 $assetUrl = static fn (string $id, string $version): string => '/assets/' . rawurlencode($id) . '/' . rawurlencode($version);
-$record = $data['record'] ?? [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -18,13 +25,13 @@ $record = $data['record'] ?? [];
 <main class="mx-auto max-w-6xl px-6 py-10">
     <a class="text-sm text-teal-700" href="/">← Vault</a>
     <div class="mb-8 mt-6"><p class="text-sm uppercase tracking-widest text-teal-700">Records &amp; Archives</p><h1 class="mt-2 text-4xl font-semibold tracking-tight"><?= $e(
-        $title === 'Item' ? (is_string($record['metadata']['title'] ?? null) ? $record['metadata']['title'] : 'Untitled Item') : $title,
+        $data['kind'] === 'Item' ? (is_string($data['record']['metadata']['title'] ?? null) ? $data['record']['metadata']['title'] : 'Untitled Item') : $title,
     ) ?></h1></div>
     <?php if (isset($data['error'])): ?>
         <section class="rounded-xl border border-amber-200 bg-amber-50 p-6"><h2 class="text-xl font-semibold"><?= $e(
             $data['error'],
         ) ?></h2><p class="mt-2">No verified record or file could be returned for this request. Check the exact identity, version and Vault content.</p></section>
-    <?php elseif ($title === 'Vault'): ?>
+    <?php elseif ($data['kind'] === 'Vault'): ?>
         <section class="mb-8 rounded-xl border border-stone-200 bg-white p-6"><h2 class="text-lg font-semibold"><?= $e(
             $data['state'],
         ) ?></h2><p class="mt-2 break-all font-mono text-sm"><?= $e(
@@ -46,13 +53,14 @@ $record = $data['record'] ?? [];
         <?php endforeach ?>
         </div>
         <?php if (
-            ($data['notices'] ?? []) !== []
+            $data['notices'] !== []
         ): ?><details class="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-6"><summary class="cursor-pointer font-semibold">Object notices (<?= count(
             $data['notices'],
         ) ?>)</summary><ul class="mt-3 space-y-2 text-sm"><?php foreach ($data['notices'] as $notice): ?><li class="break-all"><?= $e(
             $notice,
         ) ?></li><?php endforeach ?></ul></details><?php endif ?>
-    <?php elseif ($title === 'Item'): ?>
+    <?php elseif ($data['kind'] === 'Item'):
+        $record = $data['record']; ?>
         <section class="rounded-xl border border-stone-200 bg-white p-6"><h2 class="text-lg font-semibold">Item identity</h2><p class="mt-2 break-all"><?= $e(
             $record['uri'],
         ) ?></p><p class="mt-2 break-all font-mono text-xs text-stone-500"><?= $e(
@@ -76,13 +84,14 @@ $record = $data['record'] ?? [];
         <section class="mb-4 rounded-xl border border-stone-200 bg-white p-6"><h3 class="text-lg font-semibold"><?= $e(
             $pin['asset']['asset_key'] ?? 'Unavailable Asset',
         ) ?> <span class="font-mono text-teal-700"><?= $e($pin['version']) ?></span></h3><p class="my-3 break-all font-mono text-xs text-stone-500"><?= $e($pin['object_id']) ?></p>
-            <?php if (isset($pin['error'])): ?><p class="text-amber-800"><?= $e($pin['error']) ?></p><?php else: ?>
+            <?php if (isset($pin['error'])): ?><p class="text-amber-800"><?= $e($pin['error']) ?></p><?php elseif (isset($pin['asset'])): ?>
             <a class="text-sm text-teal-700 underline" href="<?= $e($assetUrl($pin['object_id'], $pin['version'])) ?>">Inspect exact Asset version →</a>
             <ul class="mt-4 space-y-2 text-sm"><?php foreach ($pin['asset']['files'] as $path => $file): ?><li class="break-all"><?= $e($path) ?> · <?= $e(
                 $file['size'],
             ) ?> bytes · SHA-512 <span class="font-mono text-xs"><?= $e($file['digest']) ?></span></li><?php endforeach ?></ul><?php endif ?>
         </section><?php endforeach ?>
-    <?php elseif ($title === 'Asset'): ?>
+    <?php elseif ($data['kind'] === 'Asset'):
+        $record = $data['record']; ?>
         <section class="rounded-xl border border-stone-200 bg-white p-6"><h2 class="text-xl font-semibold"><?= $e(
             $record['asset_key'],
         ) ?> <span class="font-mono text-teal-700"><?= $e($data['selected']) ?></span></h2><p class="mt-2 break-all font-mono text-xs text-stone-500"><?= $e(

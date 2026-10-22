@@ -165,24 +165,30 @@ final readonly class AssetArchive
      * against storage bytes and OCFL state. All verification streams are closed.
      * Missing, incompatible or corrupt records raise read or validation errors.
      *
-     * @return array{files: array<string, array{size: int, algorithm: string, digest: string}>, ...}
+     * @return array{object_id: string, item_object_id: string, item_uri: string, asset_key: string, version: string, files: array<string, array{size: int, algorithm: string, digest: string}>, ...}
      */
     public function inspect(Urn $id, string $version): array
     {
         $object = $this->vault->getObject($id);
         $record = json_decode($this->vault->readObjectContent($id, $version, self::RECORD), true, flags: JSON_THROW_ON_ERROR);
+        if (! is_array($record)) {
+            throw new UnexpectedValueException('Unsupported or inconsistent archived Asset identity.');
+        }
+        $objectId = $record['object_id'] ?? null;
+        $itemObjectId = $record['item_object_id'] ?? null;
+        $itemUri = $record['item_uri'] ?? null;
+        $assetKey = $record['asset_key'] ?? null;
         if (
-            ! is_array($record)
-            || ($record['format'] ?? null) !== 'stashd-asset'
+            ($record['format'] ?? null) !== 'stashd-asset'
             || ($record['schema_version'] ?? null) !== 1
             || ($record['identity_policy'] ?? null) !== self::POLICY
-            || ($record['object_id'] ?? null) !== $id->toString()
-            || ! is_string($record['item_uri'] ?? null)
-            || ! is_string($record['asset_key'] ?? null)
+            || $objectId !== $id->toString()
+            || ! is_string($itemUri)
+            || ! is_string($assetKey)
             || ! is_array($record['files'] ?? null)
             || $record['files'] === []
-            || $this->objectId($record['item_uri'], $record['asset_key'])->toString() !== $id->toString()
-            || ($record['item_object_id'] ?? null) !== $this->items->objectIdForUri($record['item_uri'])->toString()
+            || $this->objectId($itemUri, $assetKey)->toString() !== $id->toString()
+            || $itemObjectId !== $this->items->objectIdForUri($itemUri)->toString()
         ) {
             throw new UnexpectedValueException('Unsupported or inconsistent archived Asset identity.');
         }
@@ -207,7 +213,15 @@ final readonly class AssetArchive
             }
         }
 
-        return [...$record, 'files' => $verified, 'version' => $version];
+        return [
+            ...$record,
+            'object_id' => $objectId,
+            'item_object_id' => $itemObjectId,
+            'item_uri' => $itemUri,
+            'asset_key' => $assetKey,
+            'files' => $verified,
+            'version' => $version,
+        ];
     }
 
     /**
