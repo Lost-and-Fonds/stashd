@@ -1,0 +1,14 @@
+{
+  "exit": 1,
+  "automatic_changes_discarded": [
+    "app/RecordsAndArchives/PublicationInspection.php",
+    "tests/Acceptance/RecordsAndArchives/CrashPublicationTest.php",
+    "tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php",
+    "tests/Acceptance/RecordsAndArchives/TransactionEvidenceTest.php",
+    "tests/Acceptance/RecordsAndArchives/VaultIdentityTest.php",
+    "tests/Support/RecordsAndArchives/ArchiveFixture.php",
+    "tests/Support/RecordsAndArchives/PreparationProbe.php"
+  ],
+  "committed": false,
+  "tracked_sources_unchanged": true
+}
