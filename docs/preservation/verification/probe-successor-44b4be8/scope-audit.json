@@ -1,0 +1,16 @@
+{
+  "base": "d01cad7873ebd2d2f6cf643edc848135e47cacf9",
+  "authorization": "https://github.com/Lost-and-Fonds/stashd/pull/63#pullrequestreview-5620898845",
+  "only_authorized_method_regions_changed": true,
+  "unchanged_regions": [
+    "start/paused/contend",
+    "run/committed",
+    "snapshot"
+  ],
+  "other_four_protected_files_exact": true,
+  "production_dependencies_config_historical_docs_unchanged": true,
+  "new_runtime_files": [
+    "tests/Unit/TransactionProbeContractTest.php",
+    "tests/Support/RecordsAndArchives/transaction-probe-contract-process.php"
+  ]
+}

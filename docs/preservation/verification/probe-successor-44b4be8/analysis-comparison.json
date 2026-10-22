@@ -1,0 +1,42 @@
+{
+  "before": {
+    "errors": 1163,
+    "warnings": 193,
+    "help": 11
+  },
+  "after": {
+    "errors": 1161,
+    "warnings": 191,
+    "help": 11
+  },
+  "added": [],
+  "removed": [
+    {
+      "signature": [
+        "warning",
+        "possibly-false-operand",
+        "Possibly false right operand used in string concatenation (type `false|string`).",
+        "tests/Support/RecordsAndArchives/TransactionProbe.php"
+      ],
+      "count": 2
+    },
+    {
+      "signature": [
+        "error",
+        "invalid-return-statement",
+        "Invalid return type for function `Tests\\Support\\RecordsAndArchives\\TransactionProbe::finish`: expected `array{'err': string, 'exit': int, 'out': string, 'signal': int}`, but found `array{'err': false|string, 'exit': int, 'out': false|string, 'signal': int}`.",
+        "tests/Support/RecordsAndArchives/TransactionProbe.php"
+      ],
+      "count": 1
+    },
+    {
+      "signature": [
+        "error",
+        "less-specific-return-statement",
+        "Returned type `array<array-key, mixed>` is less specific than the declared return type `array<string, mixed>` for function `Tests\\Support\\RecordsAndArchives\\TransactionProbe::json`.",
+        "tests/Support/RecordsAndArchives/TransactionProbe.php"
+      ],
+      "count": 1
+    }
+  ]
+}
