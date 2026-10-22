@@ -11,7 +11,7 @@ use Tempest\Container\GenericContainer;
 /**
  * Create the real local lock factory used by the cross-process exclusion scenario.
  */
-function lockFactory(): LockFactory
+function lock_factory(): LockFactory
 {
     return new LockFactoryInitializer()->initialize(new GenericContainer());
 }
@@ -20,7 +20,7 @@ it('excludes another process for the same Object URN while allowing unrelated lo
     $objectId = Urn::fromString('urn:uuid:123e4567-e89b-12d3-a456-426614174100');
     $otherObjectId = Urn::fromString('urn:uuid:123e4567-e89b-12d3-a456-426614174101');
     $resource = 'stashd:object-write:' . $objectId->toString();
-    $factory = lockFactory();
+    $factory = lock_factory();
     $pipes = [];
     $process = proc_open(
         [
@@ -46,7 +46,8 @@ it('excludes another process for the same Object URN while allowing unrelated lo
 
         while (microtime(true) < $deadline) {
             $read = [$pipes[1]];
-            $write = $except = [];
+            $write = [];
+            $except = [];
             $remaining = max(0, $deadline - microtime(true));
             $seconds = (int) $remaining;
             $microseconds = (int) (($remaining - $seconds) * 1_000_000);
@@ -99,7 +100,7 @@ it('excludes another process for the same Object URN while allowing unrelated lo
 
 it('releases an Object write lock when its callback throws', function () {
     $objectId = Urn::fromString('urn:uuid:123e4567-e89b-12d3-a456-426614174102');
-    $factory = lockFactory();
+    $factory = lock_factory();
 
     expect(fn () => new ObjectWriteLock($factory)->exclusiveWrite($objectId, function () {
         throw new RuntimeException('archive failed');

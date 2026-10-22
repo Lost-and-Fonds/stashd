@@ -47,9 +47,11 @@ final class PublicationInspection
         }
         $candidates = [$path . '/inventory.json'];
         foreach ($names as $name) {
-            if (preg_match('/^v[1-9][0-9]*$/D', $name)) {
-                $candidates[] = $path . '/' . $name . '/inventory.json';
+            if (! preg_match('/^v[1-9][0-9]*$/D', $name)) {
+                continue;
             }
+
+            $candidates[] = $path . '/' . $name . '/inventory.json';
         }
         // Never promote the highest complete directory: only a root checksum can acknowledge it.
         foreach ([DigestAlgorithm::Sha512, DigestAlgorithm::Sha256] as $algorithm) {

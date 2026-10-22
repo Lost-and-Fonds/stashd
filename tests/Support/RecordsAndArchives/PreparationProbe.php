@@ -36,10 +36,12 @@ final class PreparationProbe
     public static function cancel(array $children): void
     {
         foreach ($children as $child) {
-            if (is_resource($child['process'])) {
-                proc_terminate($child['process'], 9);
-                proc_close($child['process']);
+            if (! is_resource($child['process'])) {
+                continue;
             }
+
+            proc_terminate($child['process'], 9);
+            proc_close($child['process']);
         }
     }
 

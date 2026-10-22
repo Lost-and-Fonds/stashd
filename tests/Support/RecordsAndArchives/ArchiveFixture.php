@@ -30,7 +30,7 @@ final class ArchiveFixture
     {
         $this->workspace = sys_get_temp_dir() . '/stashd-archives-' . bin2hex(random_bytes(12));
 
-        if (! mkdir($this->workspace, 0700, true)) {
+        if (! mkdir($this->workspace, 0o700, true)) {
             throw new RuntimeException('Unable to create the acceptance workspace.');
         }
     }
@@ -55,7 +55,7 @@ final class ArchiveFixture
         $path = $this->path('inputs/' . $name);
         $parent = dirname($path);
 
-        if (! is_dir($parent) && ! mkdir($parent, 0700, true)) {
+        if (! is_dir($parent) && ! mkdir($parent, 0o700, true)) {
             throw new RuntimeException('Unable to create fixture input directory.');
         }
 

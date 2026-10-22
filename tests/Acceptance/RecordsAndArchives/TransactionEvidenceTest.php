@@ -2,6 +2,7 @@
 
 use Tests\Support\RecordsAndArchives\ArchiveFixture;
 use Tests\Support\RecordsAndArchives\OcflInspector;
+use Tests\Support\RecordsAndArchives\PreparationProbe;
 use Tests\Support\RecordsAndArchives\TransactionProbe as Probe;
 
 /**
@@ -125,9 +126,11 @@ test('intra Object process death retains evidence and reuses only acknowledged t
     expect($result['status'])->toBe('quarantined');
     expect(Probe::snapshot($workspace . '/vault'))->toBe($before);
     foreach ($before as $path => $digest) {
-        if (preg_match('~/v[0-9]+/~', $path)) {
-            expect(Probe::snapshot($workspace . '/vault')[$path] ?? null)->toBe($digest);
+        if (! preg_match('~/v[0-9]+/~', $path)) {
+            continue;
         }
+
+        expect(Probe::snapshot($workspace . '/vault')[$path] ?? null)->toBe($digest);
     }
 })->with(['asset', 'item'])->with([
     'content-partial',
@@ -193,12 +196,7 @@ test('an aged local authority cannot fence out its still live owner or admit a s
         expect($second['item'])->toBe($first['item']);
         Probe::committed($workspace . '/vault', $second, 'evidence', ['master' => 'accepted bytes']);
     } finally {
-        foreach ($children as $child) {
-            if (is_resource($child['process'])) {
-                proc_terminate($child['process'], 9);
-                proc_close($child['process']);
-            }
-        }
+        PreparationProbe::cancel($children);
     }
 });
 

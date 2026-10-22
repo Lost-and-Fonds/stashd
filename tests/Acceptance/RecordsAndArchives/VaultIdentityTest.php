@@ -61,7 +61,7 @@ test('opening an uninitialized storage root cannot silently initialize it', func
 
 test('initialization refuses to overwrite unrelated existing storage contents', function (): void {
     $root = $this->archive->path('vault');
-    mkdir($root, 0700, true);
+    mkdir($root, 0o700, true);
     file_put_contents($root . '/existing-important-file', 'must survive');
 
     expect(fn () => $this->archive->run('vault.initialize'))
