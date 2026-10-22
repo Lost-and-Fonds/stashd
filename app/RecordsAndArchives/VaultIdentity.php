@@ -8,6 +8,7 @@ use Tempest\DateTime\DateTime;
 use Tempest\DateTime\DateTimeInterface;
 use Tempest\DateTime\FormatPattern;
 use Tempest\Validation\Rules\HasDateTimeFormat;
+use TypeError;
 
 /**
  * Represent the identity persisted separately from the Vault OCFL root.
@@ -33,7 +34,8 @@ class VaultIdentity implements JsonSerializable
      * Decode persisted identity fields and parse the URN and creation timestamp.
      *
      * Malformed JSON or incompatible field values propagate decoding, parsing or
-     * type errors. This method does not validate format and version compatibility.
+     * type errors. Missing fields and incorrect JSON types raise TypeError before
+     * parsing; format and version compatibility remain the caller's responsibility.
      */
     public static function fromJson(string $json): self
     {
@@ -42,6 +44,16 @@ class VaultIdentity implements JsonSerializable
             associative: true,
             flags: JSON_THROW_ON_ERROR,
         );
+
+        if (
+            ! is_array($data)
+            || ! is_string($data['format'] ?? null)
+            || ! is_int($data['version'] ?? null)
+            || ! is_string($data['identifier'] ?? null)
+            || ! is_string($data['createdAt'] ?? null)
+        ) {
+            throw new TypeError('Vault identity must contain string format, identifier and createdAt fields and an integer version.');
+        }
 
         return new self(
             format: $data['format'],

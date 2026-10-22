@@ -24,6 +24,8 @@ use function Tempest\View\view;
  *
  * The middleware requires local opt-in. Downloads use verified private temporary
  * copies; browser routes never initialize the Vault or publish archival history.
+ *
+ * @phpstan-import-type BrowserData from BrowserPage
  */
 #[WithMiddleware(RequireLocalVaultBrowser::class)]
 final readonly class VaultBrowserController
@@ -75,15 +77,21 @@ final readonly class VaultBrowserController
         } catch (Throwable $error) {
             $new = $error::class === \Exception::class && $error->getMessage() === 'Vault identity does not exist';
             return $this->page(
-                'Vault',
                 [
+                    'kind' => 'Vault',
                     'state' => $new ? 'Vault not initialized' : 'Vault unavailable',
                     'notices' => ['Canonical Objects could not be enumerated. No complete Item list is available. Use vault:init only for a new Vault.'],
                 ],
                 $new ? Status::OK : Status::SERVICE_UNAVAILABLE,
             );
         }
-        return $this->page('Vault', ['state' => 'Vault connected', 'items' => $items, 'notices' => $notices, 'identity' => $this->vault->getIdentity()?->identifier->toString()]);
+        return $this->page([
+            'kind' => 'Vault',
+            'state' => 'Vault connected',
+            'items' => $items,
+            'notices' => $notices,
+            'identity' => $this->vault->getIdentity()?->identifier->toString(),
+        ]);
     }
 
     /**
@@ -119,7 +127,7 @@ final readonly class VaultBrowserController
                     $pins[] = [...$pin, 'error' => 'Pinned Asset unavailable or failed verification.'];
                 }
             }
-            return $this->page('Item', ['record' => $record, 'selected' => $version, 'versions' => $object->inventory->versions, 'pins' => $pins]);
+            return $this->page(['kind' => 'Item', 'record' => $record, 'selected' => $version, 'versions' => $object->inventory->versions, 'pins' => $pins]);
         } catch (\InvalidArgumentException) {
             return $this->error(Status::BAD_REQUEST, 'Invalid Item ID or revision');
         } catch (Throwable) {
@@ -139,7 +147,7 @@ final readonly class VaultBrowserController
         try {
             self::version($version);
             $record = $this->assets->inspect(self::id(rawurldecode($id), 'asset'), $version);
-            return $this->page('Asset', ['record' => $record, 'selected' => $version]);
+            return $this->page(['kind' => 'Asset', 'record' => $record, 'selected' => $version]);
         } catch (\InvalidArgumentException) {
             return $this->error(Status::BAD_REQUEST, 'Invalid Asset ID or version');
         } catch (Throwable) {
@@ -212,6 +220,8 @@ final readonly class VaultBrowserController
      * Require an explicit positive OCFL version name without aliases or leading zeros.
      *
      * Invalid input raises InvalidArgumentException for the route error handlers.
+     *
+     * @psalm-assert string $version
      */
     private static function version(mixed $version): void
     {
@@ -225,17 +235,19 @@ final readonly class VaultBrowserController
      */
     private function error(Status $status, string $message): Response
     {
-        return $this->page('Unavailable', ['error' => $message], $status);
+        return $this->page(['kind' => 'Unavailable', 'error' => $message], $status);
     }
 
     /**
      * Render the browser view with storage configuration and caller-supplied page data.
      *
      * Disables response caching and MIME sniffing for archival browsing.
+     *
+     * @param BrowserData $data
      */
-    private function page(string $title, array $data, Status $status = Status::OK): Response
+    private function page(array $data, Status $status = Status::OK): Response
     {
-        return new GenericResponse($status, view(__DIR__ . '/browser.view.php', title: $title, data: $data, config: $this->config), headers: [
+        return new GenericResponse($status, view(__DIR__ . '/browser.view.php', page: new BrowserPage($data), config: $this->config), headers: [
             'Cache-Control' => 'no-store',
             'X-Content-Type-Options' => 'nosniff',
         ]);

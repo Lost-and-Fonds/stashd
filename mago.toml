@@ -10,6 +10,7 @@ excludes = [
 ]
 
 [analyzer]
+excludes = ["tests/**"]
 ignore = [
     "mixed-argument",
     "mixed-assignment",
