@@ -82,11 +82,10 @@ it('excludes another process for the same Object URN while allowing unrelated lo
         $deadline = microtime(true) + 2;
         do {
             $status = proc_get_status($process);
-            if (! $status['running']) {
-                break;
+            if ($status['running']) {
+                usleep(10_000);
             }
-            usleep(10_000);
-        } while (microtime(true) < $deadline);
+        } while ($status['running'] && microtime(true) < $deadline);
 
         if ($status['running']) {
             proc_terminate($process);
