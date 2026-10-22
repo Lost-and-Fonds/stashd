@@ -25,7 +25,8 @@ use function Tempest\Clock\now;
 /**
  * Provide the canonical OCFL storage boundary for the configured Vault.
  *
- * Object writes use a local per-Object lock and retain committed history.
+ * Local Object writes share non-expiring publication authority and per-Object
+ * locks, retaining committed history. The transaction service reuses this authority.
  * Publication inspection distinguishes acknowledged history from stranded
  * files; it does not repair them or provide a multi-Object transaction.
  */
@@ -37,6 +38,7 @@ class Vault
     private const int VAULT_VERSION = 1;
 
     private ?VaultIdentity $identity = null;
+    private bool $publicationHeld = false;
     private readonly ObjectWriteLock $writeLock;
 
     /**
@@ -122,7 +124,7 @@ class Vault
         $this->validateFiles($files);
         $id = $this->urnFromUuid($type, $uuid);
 
-        return $this->writeLock->exclusiveWrite($id, function () use ($id, $files): OcflObject {
+        return $this->exclusivePublication(fn (): OcflObject => $this->writeLock->exclusiveWrite($id, function () use ($id, $files): OcflObject {
             $root = $this->open();
             $object = $root->hasObject($id->toString())
                 ? $this->objectForWrite($id)
@@ -135,7 +137,7 @@ class Vault
             $version = $object->newVersion();
 
             return $this->stageFiles($version, $files)->commit();
-        });
+        }));
     }
 
     /**
@@ -151,11 +153,11 @@ class Vault
     {
         $this->validateFiles($files);
 
-        return $this->writeLock->exclusiveWrite($objectUrn, function () use ($objectUrn, $files): OcflObject {
+        return $this->exclusivePublication(fn (): OcflObject => $this->writeLock->exclusiveWrite($objectUrn, function () use ($objectUrn, $files): OcflObject {
             $version = $this->objectForWrite($objectUrn)->newVersion();
 
             return $this->stageFiles($version, $files)->commit();
-        });
+        }));
     }
 
     /**
@@ -173,7 +175,7 @@ class Vault
     {
         $this->validateFiles($files);
 
-        return $this->writeLock->exclusiveWrite($id, function () use ($id, $files, $validate): OcflObject {
+        return $this->exclusivePublication(fn (): OcflObject => $this->writeLock->exclusiveWrite($id, function () use ($id, $files, $validate): OcflObject {
             $root = $this->open();
             $object = $root->hasObject($id->toString()) ? $this->objectForWrite($id) : null;
             $validate($object);
@@ -186,19 +188,88 @@ class Vault
             }
 
             return $this->stageFiles($version, $files)->commit();
-        });
+        }));
+    }
+
+    /**
+     * Resolve the retained local transaction directory inside the initialized Vault.
+     *
+     * Remote providers cannot provide this phase's filesystem authority guarantees.
+     */
+    public function transactionDirectory(): string
+    {
+        if (! $this->storage instanceof \App\RecordsAndArchives\Storage\Providers\LocalArchiveStorage) {
+            throw new RuntimeException('Preservation transactions require local archival storage.');
+        }
+        $directory = $this->storage->rootPath() . '/extensions/stashd-transactions';
+        if (is_link($directory) || is_link(dirname($directory))) {
+            throw new RuntimeException('Transaction evidence may not traverse symbolic links.');
+        }
+        if (! is_dir($directory) && ! @mkdir($directory, 0o700, true) && ! is_dir($directory)) {
+            throw new RuntimeException('Could not create transaction evidence directory.');
+        }
+        return $directory;
+    }
+
+    /**
+     * Hold non-expiring local authority across publication and verification.
+     *
+     * Nested writes on this instance reuse authority. The callback observes a
+     * denied nonblocking claim before waiting, and acquisition before any write.
+     * The kernel releases authority on process death; live owners cannot expire.
+     *
+     * @template T
+     * @param callable(): T $operation
+     * @param null|callable(string): void $boundary
+     * @return T
+     */
+    public function exclusivePublication(callable $operation, ?callable $boundary = null): mixed
+    {
+        if ($this->publicationHeld) {
+            return $operation();
+        }
+        $path = $this->transactionDirectory() . '/authority.lock';
+        if (is_link($path)) {
+            throw new RuntimeException('Publication authority may not be a symbolic link.');
+        }
+        $lock = fopen($path, 'c+b');
+        if ($lock === false) {
+            throw new RuntimeException('Could not open publication authority.');
+        }
+        try {
+            if (! flock($lock, LOCK_EX | LOCK_NB)) {
+                if ($boundary !== null) {
+                    $boundary('authority-contended');
+                }
+                if (! flock($lock, LOCK_EX)) {
+                    throw new RuntimeException('Could not claim publication authority.');
+                }
+            }
+            $this->publicationHeld = true;
+            if ($boundary !== null) {
+                $boundary('authority-held');
+            }
+            return $operation();
+        } finally {
+            $this->publicationHeld = false;
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
     }
 
     /**
      * Inspect acknowledged history and stranded material under the publication lock.
      *
      * Returns diagnostic issues without repairing, promoting or deleting files.
+     * Content hashing is enabled by default. Disabling it still verifies inventory
+     * checksums/history and detects stranded material, for a short locked recheck
+     * after content was independently verified outside global authority.
      *
      * @return array{head: ?string, versions: list<string>, issues: list<string>}
      */
-    public function inspectObject(Urn $id): array
+    public function inspectObject(Urn $id, bool $verifyContent = true): array
     {
-        return $this->writeLock->exclusiveWrite($id, fn (): array => $this->publication($id)->result());
+        return $this->writeLock->exclusiveWrite($id, fn (): array => $this->publication($id, $verifyContent)->result());
     }
 
     /**

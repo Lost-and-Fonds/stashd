@@ -45,10 +45,11 @@ final readonly class ItemArchive
      *
      * @param array<array-key, mixed> $metadata Opaque JSON values, owned by the producer.
      * @param array<array-key, mixed> $pins Exact Asset Object/version references, verified before publication.
+     * @param null|array{id: string, candidate: string, plan: string} $transaction Core transaction binding retained in this exact version.
      * @throws InvalidItemRevision When metadata or pins fail validation.
      * @throws UnexpectedValueException When existing Item identity is incompatible.
      */
-    public function commitRevision(string $uri, array $metadata = [], array $pins = []): OcflObject
+    public function commitRevision(string $uri, array $metadata = [], array $pins = [], ?array $transaction = null): OcflObject
     {
         $uuid = $this->identity->uuidForUri($uri);
         $id = $this->vault->urnFromUuid(IdentifierType::Item, $uuid);
@@ -74,6 +75,7 @@ final readonly class ItemArchive
                 'uri' => $uri,
                 'metadata' => $metadata,
                 'pins' => $pins,
+                ...($transaction === null ? [] : ['transaction' => $transaction]),
             ], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION);
         } catch (JsonException $exception) {
             throw new InvalidItemRevision('Item metadata must contain valid JSON values.', previous: $exception);
@@ -102,7 +104,7 @@ final readonly class ItemArchive
      * structure. It does not reverify the referenced Asset payloads. An explicit
      * missing version fails instead of falling back to the head.
      *
-     * @return array{format: string, version: int, identity_policy: string, object_id: string, uri: string, metadata: array, pins: array}
+     * @return array{format: string, version: int, identity_policy: string, object_id: string, uri: string, metadata: array, pins: list<array{object_id: string, version: string}>}
      */
     public function read(Urn $objectId, ?string $version = null): array
     {
@@ -206,7 +208,7 @@ final readonly class ItemArchive
      *
      * @param array<array-key, mixed> $metadata
      */
-    private function validateMetadata(array $metadata): void
+    public function validateMetadata(array $metadata): void
     {
         foreach ($metadata as $value) {
             if (is_array($value)) {
