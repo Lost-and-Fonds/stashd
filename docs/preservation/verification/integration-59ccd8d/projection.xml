@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Tests\Support\RecordsAndArchives\ProjectionProbeProofTest" file="tests/Support/RecordsAndArchives/ProjectionProbeProofTest.php" tests="1" assertions="83" errors="0" failures="0" skipped="0" time="0.223233">
+    <testcase name="the PostgreSQL witness rejects response only rebuilds and incorrect persisted relationships" file="tests/Support/RecordsAndArchives/ProjectionProbeProofTest.php::the PostgreSQL witness rejects response only rebuilds and incorrect persisted relationships" class="Tests\Support\RecordsAndArchives\ProjectionProbeProofTest" classname="Tests.Support.RecordsAndArchives.ProjectionProbeProofTest" assertions="83" time="0.223233"/>
+  </testsuite>
+</testsuites>

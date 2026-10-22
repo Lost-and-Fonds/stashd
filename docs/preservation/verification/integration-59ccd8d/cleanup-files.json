@@ -1,0 +1,11 @@
+{
+  "private_configuration_removed": [
+    "transaction-projection-admin.json",
+    "projection-proof.json"
+  ],
+  "remaining_private_or_fixture_json": [],
+  "tracked_diff_empty": true,
+  "phpactor_unchanged": true,
+  "fresh_archival_evidence_files_scanned": 477,
+  "fresh_archive_credential_fields_or_secret_patterns": 0
+}

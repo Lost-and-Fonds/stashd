@@ -1,0 +1,15 @@
+{
+  "qa_exit": 1,
+  "automatic_edit_paths": [
+    "app/RecordsAndArchives/PublicationInspection.php",
+    "tests/Acceptance/RecordsAndArchives/CrashPublicationTest.php",
+    "tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php",
+    "tests/Acceptance/RecordsAndArchives/TransactionEvidenceTest.php",
+    "tests/Acceptance/RecordsAndArchives/VaultIdentityTest.php",
+    "tests/Support/RecordsAndArchives/ArchiveFixture.php",
+    "tests/Support/RecordsAndArchives/PreparationProbe.php"
+  ],
+  "edits_committed": false,
+  "all_automatic_edits_discarded": true,
+  "tracked_sources_exact_candidate": true
+}

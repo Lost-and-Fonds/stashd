@@ -1,0 +1,29 @@
+{
+  "59": {
+    "baseRefName": "test/recoverable-preservation-phase1",
+    "headRefOid": "3534a4c37aa77f53d7f331d97808eb05859b1e00",
+    "isDraft": false,
+    "mergeCommit": {
+      "oid": "de9810d16fca960985c54f6e2f13c752ff043196"
+    },
+    "mergeStateStatus": "UNKNOWN",
+    "mergeable": "UNKNOWN",
+    "mergedAt": "2026-10-22T08:13:37Z",
+    "state": "MERGED",
+    "statusCheckRollup": []
+  },
+  "57": {
+    "baseRefName": "dev",
+    "headRefOid": "59ccd8d9d9161337329c27bcdcfd961d6cd41320",
+    "isDraft": true,
+    "mergeCommit": null,
+    "mergeStateStatus": "CLEAN",
+    "mergeable": "MERGEABLE",
+    "mergedAt": null,
+    "state": "OPEN",
+    "statusCheckRollup": []
+  },
+  "dev": "35a5c302e2f49f77a034dab1df46a78e3273d4fe",
+  "rulesets": [],
+  "rules/branches/dev": []
+}
