@@ -120,3 +120,67 @@ test('projection rebuild isolates damaged history and replaces stale rows withou
         }
     }
 })->with(['item-payload', 'item-inventory', 'asset-payload', 'asset-missing', 'unidentified']);
+
+test('inventory provider read failure aborts rebuild and preserves existing SQL projection', function (): void {
+    $this->archive->run('vault.initialize');
+    $workspace = dirname($this->archive->path('vault'));
+    $root = $workspace . '/vault';
+    $receipts = [];
+    foreach (['healthy', 'unavailable'] as $label) {
+        $receipts[$label] = Probe::run($workspace, [
+            'operation' => 'execute',
+            'transaction_id' => $label,
+            'uri' => 'urn:example:read-failure:' . $label,
+            'changes' => ['master' => $this->archive->input($label, $label)],
+            'metadata' => [],
+            'preconditions' => [],
+        ]);
+        expect($receipts[$label]['status'])->toBe('complete');
+    }
+    $name = 'stashd_tx_test_' . bin2hex(random_bytes(8));
+    $fixture = ['database' => $name, 'username' => $name, 'schema' => $name];
+    $created = false;
+    $database = null;
+    try {
+        $projection = Probe::run($workspace, ['operation' => 'projection.describe', 'fixture' => $fixture]);
+        $created = true;
+        $database = ProjectionProbe::connect($projection, $name);
+        $rebuild = ['operation' => 'projection.rebuild', 'fixture' => $fixture];
+        expect(Probe::run($workspace, $rebuild)['items'])->toHaveCount(2);
+        // Preserve all three tables, including an existing diagnostic, across failed I/O.
+        $database->exec('INSERT INTO "' . $name . '".incidents (path, reason) VALUES (\'previous-scan\', \'existing diagnostic\')');
+        $beforeSql = [];
+        foreach (['items', 'pins', 'incidents'] as $table) {
+            $beforeSql[$table] = $database->query('SELECT * FROM "' . $name . '".' . $table . ' ORDER BY 1')->fetchAll(PDO::FETCH_ASSOC);
+        }
+        $itemId = $receipts['unavailable']['item']['object_id'];
+        $inventory = OcflInspector::inventoryFor($root, $itemId)['path'];
+        $objectPath = ltrim(substr(dirname($inventory), strlen($root)), '/');
+        $beforeVault = Probe::snapshot($root);
+        expect(fn () => Probe::run($workspace, [...$rebuild, 'projection_read_fault' => $objectPath]))
+            ->toThrow(\PHPUnit\Framework\AssertionFailedError::class, 'Injected inventory storage read failure.');
+        foreach ($beforeSql as $table => $rows) {
+            expect($database->query('SELECT * FROM "' . $name . '".' . $table . ' ORDER BY 1')->fetchAll(PDO::FETCH_ASSOC))->toBe($rows);
+        }
+        expect(Probe::snapshot($root))->toBe($beforeVault);
+        // Readable malformed bytes still degrade only the affected Item.
+        foreach ([$inventory, dirname($inventory) . '/v1/inventory.json'] as $path) {
+            file_put_contents($path, '{damaged');
+        }
+        $damagedVault = Probe::snapshot($root);
+        $report = Probe::run($workspace, $rebuild);
+        expect($report['items'])->toBe([$receipts['healthy']['item']]);
+        expect($report['incidents'])->toHaveCount(1);
+        expect($report['incidents'][0]['object_id'])->toBeNull();
+        expect($report['incidents'][0]['path'])->toBe($objectPath);
+        $record = Probe::json(OcflInspector::payloadPath($root, $receipts['healthy']['item']['object_id'], 'v1', 'item.json'));
+        ProjectionProbe::assertRebuilt($database, $projection, $receipts['healthy']['item'], $record['pins']);
+        expect($database->query('SELECT * FROM "' . $name . '".incidents')->fetchAll(PDO::FETCH_ASSOC))->toBe($report['incidents']);
+        expect(Probe::snapshot($root))->toBe($damagedVault);
+    } finally {
+        $database = null;
+        if ($created) {
+            Probe::run($workspace, ['operation' => 'projection.dispose', 'fixture' => $fixture]);
+        }
+    }
+});

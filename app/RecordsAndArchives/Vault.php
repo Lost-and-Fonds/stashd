@@ -81,7 +81,9 @@ class Vault
      * IDs are untrusted discovery hints from root or historical inventories, accepted
      * only when the configured layout maps them back to the observed path. Callers
      * must verify history before using it. Unidentifiable roots retain a null ID.
-     * Listing failures propagate: an incomplete scan cannot authorize replacement.
+     * Listing, existence-check, read and layout failures propagate: an incomplete
+     * scan cannot authorize replacement. Confirmed missing files and readable
+     * malformed JSON provide no hint and allow other candidates to be checked.
      * No Object or Vault bytes are changed; extension directories are not Objects.
      *
      * @return list<array{path: string, object_id: ?string}>
@@ -106,15 +108,20 @@ class Vault
                 }
                 $id = null;
                 foreach ($candidates as $candidate) {
+                    if (! $fs->fileExists($candidate)) {
+                        continue;
+                    }
+                    $json = $fs->read($candidate);
                     try {
-                        $inventory = json_decode($fs->read($candidate), true, flags: JSON_THROW_ON_ERROR);
-                        $hint = is_array($inventory) ? $inventory['id'] ?? null : null;
-                        if (is_string($hint) && trim($root->layout()->resolveObjectPath($hint), '/') === $path) {
-                            $id = $hint;
-                            break;
-                        }
-                    } catch (\Exception) {
-                        // Discovery hints cannot establish archival validity.
+                        $inventory = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+                    } catch (\JsonException) {
+                        // Readable malformed bytes cannot provide an identity hint.
+                        continue;
+                    }
+                    $hint = is_array($inventory) ? $inventory['id'] ?? null : null;
+                    if (is_string($hint) && trim($root->layout()->resolveObjectPath($hint), '/') === $path) {
+                        $id = $hint;
+                        break;
                     }
                 }
                 $objects[] = ['object_id' => $id, 'path' => $path];

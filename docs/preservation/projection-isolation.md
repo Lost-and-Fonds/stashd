@@ -33,6 +33,13 @@ Vault-relative path with a null Object ID. Existing rows for undiscoverable or
 absent Items are removed by full replacement. Roots missing both their Object
 marker and all root inventory evidence cannot be identified as Objects; they
 produce no rows. Root identity/layout/listing failures abort before SQL changes.
+Discovery distinguishes unavailable storage from observed missing or malformed
+evidence: exceptions from directory listing, existence checks, file reads or
+layout resolution abort the scan and leave all SQL rows untouched. A confirmed
+absent inventory file is skipped; readable malformed JSON supplies no identity
+hint, so discovery tries historical candidates or reports the unidentified root.
+A file disappearing between its existence check and read aborts conservatively.
+Infrastructure exceptions are never evidence of corrupt inventory bytes.
 Extension directories are not scanned as Objects.
 
 ## Incident and SQL contract
@@ -86,3 +93,14 @@ to fail; restoring fail-fast OCFL listing caused the unidentified-inventory case
 to fail with E033. Both mutations were restored before the final successful run.
 Generated databases/roles and private test-admin configurations were removed.
 These are local execution results, not independent external certification.
+
+PR #67 review correction: discovery now propagates storage I/O exceptions rather
+than treating unavailable reads as malformed evidence. The targeted real-PostgreSQL
+regression failed against the previous implementation (the expected read failure
+was swallowed), then passed with the fix: existing Item, pin and incident rows
+and all Vault bytes survive the read fault. Its malformed-JSON control still
+isolates the unreadable identity hints and restores the unrelated healthy Item.
+Focused isolation suite: **6 passed, 1,019 assertions**. Required `composer qa`:
+**357 passed, 33 existing incomplete, 20,053 assertions**, exit 0. Changed-file
+analysis found no issues. Generated fixture databases/roles and private test-admin
+configuration were removed again.
