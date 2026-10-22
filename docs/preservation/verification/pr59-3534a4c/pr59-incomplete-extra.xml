@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="CLI Arguments" tests="14" assertions="15" errors="0" failures="0" skipped="7" time="0.124983">
+    <testsuite name="Tests\Acceptance\RecordsAndArchives\FixityAndRepairTest" file="tests/Acceptance/RecordsAndArchives/FixityAndRepairTest.php" tests="6" assertions="0" errors="0" failures="0" skipped="6" time="0.084948">
+      <testcase name="fixity verification actually reads committed content and reports a healthy version" file="tests/Acceptance/RecordsAndArchives/FixityAndRepairTest.php::fixity verification actually reads committed content and reports a healthy version" class="Tests\Acceptance\RecordsAndArchives\FixityAndRepairTest" classname="Tests.Acceptance.RecordsAndArchives.FixityAndRepairTest" assertions="0" time="0.046419">
+        <skipped/>
+      </testcase>
+      <testcase name="external corruption of canonical bytes cannot be reported as verified" file="tests/Acceptance/RecordsAndArchives/FixityAndRepairTest.php::external corruption of canonical bytes cannot be reported as verified" class="Tests\Acceptance\RecordsAndArchives\FixityAndRepairTest" classname="Tests.Acceptance.RecordsAndArchives.FixityAndRepairTest" assertions="0" time="0.009374">
+        <skipped/>
+      </testcase>
+      <testcase name="corrupt inventory checksums invalidate object verification even if payload survives" file="tests/Acceptance/RecordsAndArchives/FixityAndRepairTest.php::corrupt inventory checksums invalidate object verification even if payload survives" class="Tests\Acceptance\RecordsAndArchives\FixityAndRepairTest" classname="Tests.Acceptance.RecordsAndArchives.FixityAndRepairTest" assertions="0" time="0.007682">
+        <skipped/>
+      </testcase>
+      <testcase name="verified replica repair restores exact historical bytes and records repair history" file="tests/Acceptance/RecordsAndArchives/FixityAndRepairTest.php::verified replica repair restores exact historical bytes and records repair history" class="Tests\Acceptance\RecordsAndArchives\FixityAndRepairTest" classname="Tests.Acceptance.RecordsAndArchives.FixityAndRepairTest" assertions="0" time="0.007056">
+        <skipped/>
+      </testcase>
+      <testcase name="a corrupted replica is never accepted as repair authority" file="tests/Acceptance/RecordsAndArchives/FixityAndRepairTest.php::a corrupted replica is never accepted as repair authority" class="Tests\Acceptance\RecordsAndArchives\FixityAndRepairTest" classname="Tests.Acceptance.RecordsAndArchives.FixityAndRepairTest" assertions="0" time="0.007399">
+        <skipped/>
+      </testcase>
+      <testcase name="a repair cannot silently replace the archived original with different content" file="tests/Acceptance/RecordsAndArchives/FixityAndRepairTest.php::a repair cannot silently replace the archived original with different content" class="Tests\Acceptance\RecordsAndArchives\FixityAndRepairTest" classname="Tests.Acceptance.RecordsAndArchives.FixityAndRepairTest" assertions="0" time="0.007017">
+        <skipped/>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Acceptance\RecordsAndArchives\VaultIdentityTest" file="tests/Acceptance/RecordsAndArchives/VaultIdentityTest.php" tests="8" assertions="15" errors="0" failures="0" skipped="1" time="0.040035">
+      <testcase name="a new installation creates one persistent logical Vault identity" file="tests/Acceptance/RecordsAndArchives/VaultIdentityTest.php::a new installation creates one persistent logical Vault identity" class="Tests\Acceptance\RecordsAndArchives\VaultIdentityTest" classname="Tests.Acceptance.RecordsAndArchives.VaultIdentityTest" assertions="5" time="0.022723"/>
+      <testcase name="reopening a Vault in a fresh application context never creates another identity" file="tests/Acceptance/RecordsAndArchives/VaultIdentityTest.php::reopening a Vault in a fresh application context never creates another identity" class="Tests\Acceptance\RecordsAndArchives\VaultIdentityTest" classname="Tests.Acceptance.RecordsAndArchives.VaultIdentityTest" assertions="1" time="0.003039"/>
+      <testcase name="two separately initialized installations are not the same Vault" file="tests/Acceptance/RecordsAndArchives/VaultIdentityTest.php::two separately initialized installations are not the same Vault" class="Tests\Acceptance\RecordsAndArchives\VaultIdentityTest" classname="Tests.Acceptance.RecordsAndArchives.VaultIdentityTest" assertions="3" time="0.004499"/>
+      <testcase name="a new Vault has no OCFL Objects on disk" file="tests/Acceptance/RecordsAndArchives/VaultIdentityTest.php::a new Vault has no OCFL Objects on disk" class="Tests\Acceptance\RecordsAndArchives\VaultIdentityTest" classname="Tests.Acceptance.RecordsAndArchives.VaultIdentityTest" assertions="1" time="0.002541"/>
+      <testcase name="an empty new Vault has no archived Items or Assets" file="tests/Acceptance/RecordsAndArchives/VaultIdentityTest.php::an empty new Vault has no archived Items or Assets" class="Tests\Acceptance\RecordsAndArchives\VaultIdentityTest" classname="Tests.Acceptance.RecordsAndArchives.VaultIdentityTest" assertions="0" time="0.001842">
+        <skipped/>
+      </testcase>
+      <testcase name="opening an uninitialized storage root cannot silently initialize it" file="tests/Acceptance/RecordsAndArchives/VaultIdentityTest.php::opening an uninitialized storage root cannot silently initialize it" class="Tests\Acceptance\RecordsAndArchives\VaultIdentityTest" classname="Tests.Acceptance.RecordsAndArchives.VaultIdentityTest" assertions="2" time="0.001404"/>
+      <testcase name="initialization refuses to overwrite unrelated existing storage contents" file="tests/Acceptance/RecordsAndArchives/VaultIdentityTest.php::initialization refuses to overwrite unrelated existing storage contents" class="Tests\Acceptance\RecordsAndArchives\VaultIdentityTest" classname="Tests.Acceptance.RecordsAndArchives.VaultIdentityTest" assertions="2" time="0.001352"/>
+      <testcase name="initialization cannot replace a previously established Vault identity" file="tests/Acceptance/RecordsAndArchives/VaultIdentityTest.php::initialization cannot replace a previously established Vault identity" class="Tests\Acceptance\RecordsAndArchives\VaultIdentityTest" classname="Tests.Acceptance.RecordsAndArchives.VaultIdentityTest" assertions="1" time="0.002635"/>
+    </testsuite>
+  </testsuite>
+</testsuites>

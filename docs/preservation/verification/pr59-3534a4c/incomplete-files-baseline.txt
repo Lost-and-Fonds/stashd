@@ -1,0 +1,8 @@
+All seven files containing the 33 incompletes have zero diff from 680476b to 3534a4c.
+tests/Acceptance/RecordsAndArchives/MetadataHistoryTest.php
+tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php
+tests/Acceptance/RecordsAndArchives/StoragePortabilityTest.php
+tests/Acceptance/RecordsAndArchives/CommitConsistencyTest.php
+tests/Acceptance/RecordsAndArchives/PreservationEvidenceTest.php
+tests/Acceptance/RecordsAndArchives/FixityAndRepairTest.php
+tests/Acceptance/RecordsAndArchives/VaultIdentityTest.php

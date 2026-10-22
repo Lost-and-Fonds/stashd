@@ -1,0 +1,23 @@
+{
+  "decision": "PASS",
+  "checks": 1097,
+  "stage_object_counts": {
+    "replay": 3,
+    "released-replay": 3,
+    "released": 3,
+    "release-crash": 3,
+    "numeric": 5,
+    "lost-ack-replay": 3,
+    "lost-ack": 3,
+    "complete": 3,
+    "commit-crash": 1
+  },
+  "scenarios": [
+    "partial multi-Object commit SIGKILL and source deletion",
+    "exact-version journal/OCFL binding",
+    "fresh-process recovery and idempotent replay",
+    "custody-release SIGKILL and replay after custody deletion",
+    "lost acknowledgement after complete journal",
+    "fraction-preserving native numeric metadata"
+  ]
+}

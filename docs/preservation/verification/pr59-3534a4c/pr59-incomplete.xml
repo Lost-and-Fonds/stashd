@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="CLI Arguments" tests="29" assertions="13" errors="0" failures="0" skipped="26" time="0.432814">
+    <testsuite name="Tests\Acceptance\RecordsAndArchives\MetadataHistoryTest" file="tests/Acceptance/RecordsAndArchives/MetadataHistoryTest.php" tests="5" assertions="0" errors="0" failures="0" skipped="5" time="0.036022">
+      <testcase name="source-provided metadata remains recoverable as an immutable document revision" file="tests/Acceptance/RecordsAndArchives/MetadataHistoryTest.php::source-provided metadata remains recoverable as an immutable document revision" class="Tests\Acceptance\RecordsAndArchives\MetadataHistoryTest" classname="Tests.Acceptance.RecordsAndArchives.MetadataHistoryTest" assertions="0" time="0.027525">
+        <skipped/>
+      </testcase>
+      <testcase name="updating one metadata stream retains the original version" file="tests/Acceptance/RecordsAndArchives/MetadataHistoryTest.php::updating one metadata stream retains the original version" class="Tests\Acceptance\RecordsAndArchives\MetadataHistoryTest" classname="Tests.Acceptance.RecordsAndArchives.MetadataHistoryTest" assertions="0" time="0.002644">
+        <skipped/>
+      </testcase>
+      <testcase name="different sources for the same metadata facet keep separate provenance identities" file="tests/Acceptance/RecordsAndArchives/MetadataHistoryTest.php::different sources for the same metadata facet keep separate provenance identities" class="Tests\Acceptance\RecordsAndArchives\MetadataHistoryTest" classname="Tests.Acceptance.RecordsAndArchives.MetadataHistoryTest" assertions="0" time="0.002113">
+        <skipped/>
+      </testcase>
+      <testcase name="editorial corrections cannot overwrite the original source observation" file="tests/Acceptance/RecordsAndArchives/MetadataHistoryTest.php::editorial corrections cannot overwrite the original source observation" class="Tests\Acceptance\RecordsAndArchives\MetadataHistoryTest" classname="Tests.Acceptance.RecordsAndArchives.MetadataHistoryTest" assertions="0" time="0.001874">
+        <skipped/>
+      </testcase>
+      <testcase name="invalid metadata must not replace a previously preserved valid revision" file="tests/Acceptance/RecordsAndArchives/MetadataHistoryTest.php::invalid metadata must not replace a previously preserved valid revision" class="Tests\Acceptance\RecordsAndArchives\MetadataHistoryTest" classname="Tests.Acceptance.RecordsAndArchives.MetadataHistoryTest" assertions="0" time="0.001866">
+        <skipped/>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest" file="tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php" tests="8" assertions="0" errors="0" failures="0" skipped="8" time="0.000000">
+      <testcase name="a replica of a complete Vault has the same identity and a verified coherent recovery point" file="tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php::a replica of a complete Vault has the same identity and a verified coherent recovery point" class="Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest" classname="Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest" assertions="0" time="0.000000">
+        <skipped/>
+      </testcase>
+      <testcase name="clean-room recovery retains the original Vault identity without the old primary or database" file="tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php::clean-room recovery retains the original Vault identity without the old primary or database" class="Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest" classname="Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest" assertions="0" time="0.000000">
+        <skipped/>
+      </testcase>
+      <testcase name="a recovered Item still pins the old exact Asset revision after later revisions existed" file="tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php::a recovered Item still pins the old exact Asset revision after later revisions existed" class="Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest" classname="Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest" assertions="0" time="0.000000">
+        <skipped/>
+      </testcase>
+      <testcase name="rebuilding the catalogue from an independently verified replica retains metadata-only Items" file="tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php::rebuilding the catalogue from an independently verified replica retains metadata-only Items" class="Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest" classname="Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest" assertions="0" time="0.000000">
+        <skipped/>
+      </testcase>
+      <testcase name="a lagging replica cannot claim to contain changes newer than its own verified recovery point" file="tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php::a lagging replica cannot claim to contain changes newer than its own verified recovery point" class="Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest" classname="Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest" assertions="0" time="0.000000">
+        <skipped/>
+      </testcase>
+      <testcase name="a corrupted replica cannot be declared a complete recoverable Vault" file="tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php::a corrupted replica cannot be declared a complete recoverable Vault" class="Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest" classname="Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest" assertions="0" time="0.000000">
+        <skipped/>
+      </testcase>
+      <testcase name="a restore never writes archival repairs or new authority into its source replica" file="tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php::a restore never writes archival repairs or new authority into its source replica" class="Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest" classname="Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest" assertions="0" time="0.000000">
+        <skipped/>
+      </testcase>
+      <testcase name="a complete restore preserves archival event evidence rather than rebuilding only current media" file="tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php::a complete restore preserves archival event evidence rather than rebuilding only current media" class="Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest" classname="Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest" assertions="0" time="0.000000">
+        <skipped/>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Acceptance\RecordsAndArchives\StoragePortabilityTest" file="tests/Acceptance/RecordsAndArchives/StoragePortabilityTest.php" tests="5" assertions="13" errors="0" failures="0" skipped="2" time="0.326217">
+      <testcase name="the local archival storage adapter commits and reopens two OCFL versions" file="tests/Acceptance/RecordsAndArchives/StoragePortabilityTest.php::the local archival storage adapter commits and reopens two OCFL versions" class="Tests\Acceptance\RecordsAndArchives\StoragePortabilityTest" classname="Tests.Acceptance.RecordsAndArchives.StoragePortabilityTest" assertions="10" time="0.019675"/>
+      <testcase name="the actual configured backend, not the logical Vault, reports storage capabilities" file="tests/Acceptance/RecordsAndArchives/StoragePortabilityTest.php::the actual configured backend, not the logical Vault, reports storage capabilities" class="Tests\Acceptance\RecordsAndArchives\StoragePortabilityTest" classname="Tests.Acceptance.RecordsAndArchives.StoragePortabilityTest" assertions="0" time="0.002319">
+        <skipped/>
+      </testcase>
+      <testcase name="a backend lacking hardlink support can still preserve independent immutable bytes" file="tests/Acceptance/RecordsAndArchives/StoragePortabilityTest.php::a backend lacking hardlink support can still preserve independent immutable bytes" class="Tests\Acceptance\RecordsAndArchives\StoragePortabilityTest" classname="Tests.Acceptance.RecordsAndArchives.StoragePortabilityTest" assertions="1" time="0.015845"/>
+      <testcase name="large input files remain byte-exact across archival streaming and versioned readback" file="tests/Acceptance/RecordsAndArchives/StoragePortabilityTest.php::large input files remain byte-exact across archival streaming and versioned readback" class="Tests\Acceptance\RecordsAndArchives\StoragePortabilityTest" classname="Tests.Acceptance.RecordsAndArchives.StoragePortabilityTest" assertions="2" time="0.279828"/>
+      <testcase name="physical storage integrity is independent of the availability of catalogue projections" file="tests/Acceptance/RecordsAndArchives/StoragePortabilityTest.php::physical storage integrity is independent of the availability of catalogue projections" class="Tests\Acceptance\RecordsAndArchives\StoragePortabilityTest" classname="Tests.Acceptance.RecordsAndArchives.StoragePortabilityTest" assertions="0" time="0.008549">
+        <skipped/>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Acceptance\RecordsAndArchives\CommitConsistencyTest" file="tests/Acceptance/RecordsAndArchives/CommitConsistencyTest.php" tests="6" assertions="0" errors="0" failures="0" skipped="6" time="0.023089">
+      <testcase name="an interrupted staged write cannot become a falsely committed Asset" file="tests/Acceptance/RecordsAndArchives/CommitConsistencyTest.php::an interrupted staged write cannot become a falsely committed Asset" class="Tests\Acceptance\RecordsAndArchives\CommitConsistencyTest" classname="Tests.Acceptance.RecordsAndArchives.CommitConsistencyTest" assertions="0" time="0.013004">
+        <skipped/>
+      </testcase>
+      <testcase name="a crash after a durable Asset commit but before its Item commit leaves no invented Item pin" file="tests/Acceptance/RecordsAndArchives/CommitConsistencyTest.php::a crash after a durable Asset commit but before its Item commit leaves no invented Item pin" class="Tests\Acceptance\RecordsAndArchives\CommitConsistencyTest" classname="Tests.Acceptance.RecordsAndArchives.CommitConsistencyTest" assertions="0" time="0.002303">
+        <skipped/>
+      </testcase>
+      <testcase name="an interrupted inventory publication reconciles instead of claiming success" file="tests/Acceptance/RecordsAndArchives/CommitConsistencyTest.php::an interrupted inventory publication reconciles instead of claiming success" class="Tests\Acceptance\RecordsAndArchives\CommitConsistencyTest" classname="Tests.Acceptance.RecordsAndArchives.CommitConsistencyTest" assertions="0" time="0.001963">
+        <skipped/>
+      </testcase>
+      <testcase name="two competing writers cannot corrupt or silently overwrite committed Asset history" file="tests/Acceptance/RecordsAndArchives/CommitConsistencyTest.php::two competing writers cannot corrupt or silently overwrite committed Asset history" class="Tests\Acceptance\RecordsAndArchives\CommitConsistencyTest" classname="Tests.Acceptance.RecordsAndArchives.CommitConsistencyTest" assertions="0" time="0.001977">
+        <skipped/>
+      </testcase>
+      <testcase name="source mutation between digesting and publication cannot create a false fixity receipt" file="tests/Acceptance/RecordsAndArchives/CommitConsistencyTest.php::source mutation between digesting and publication cannot create a false fixity receipt" class="Tests\Acceptance\RecordsAndArchives\CommitConsistencyTest" classname="Tests.Acceptance.RecordsAndArchives.CommitConsistencyTest" assertions="0" time="0.001896">
+        <skipped/>
+      </testcase>
+      <testcase name="an interrupted operation cannot leave a complete Item that references missing bytes" file="tests/Acceptance/RecordsAndArchives/CommitConsistencyTest.php::an interrupted operation cannot leave a complete Item that references missing bytes" class="Tests\Acceptance\RecordsAndArchives\CommitConsistencyTest" classname="Tests.Acceptance.RecordsAndArchives.CommitConsistencyTest" assertions="0" time="0.001946">
+        <skipped/>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Acceptance\RecordsAndArchives\PreservationEvidenceTest" file="tests/Acceptance/RecordsAndArchives/PreservationEvidenceTest.php" tests="5" assertions="0" errors="0" failures="0" skipped="5" time="0.047488">
+      <testcase name="an open expected-component set does not justify claiming complete preservation" file="tests/Acceptance/RecordsAndArchives/PreservationEvidenceTest.php::an open expected-component set does not justify claiming complete preservation" class="Tests\Acceptance\RecordsAndArchives\PreservationEvidenceTest" classname="Tests.Acceptance.RecordsAndArchives.PreservationEvidenceTest" assertions="0" time="0.011708">
+        <skipped/>
+      </testcase>
+      <testcase name="a closed known scope with verified components may be reported complete" file="tests/Acceptance/RecordsAndArchives/PreservationEvidenceTest.php::a closed known scope with verified components may be reported complete" class="Tests\Acceptance\RecordsAndArchives\PreservationEvidenceTest" classname="Tests.Acceptance.RecordsAndArchives.PreservationEvidenceTest" assertions="0" time="0.007877">
+        <skipped/>
+      </testcase>
+      <testcase name="a partial Asset with missing known components remains preserved but incomplete" file="tests/Acceptance/RecordsAndArchives/PreservationEvidenceTest.php::a partial Asset with missing known components remains preserved but incomplete" class="Tests\Acceptance\RecordsAndArchives\PreservationEvidenceTest" classname="Tests.Acceptance.RecordsAndArchives.PreservationEvidenceTest" assertions="0" time="0.007387">
+        <skipped/>
+      </testcase>
+      <testcase name="later complete acquisition cannot retroactively declare an older partial version complete" file="tests/Acceptance/RecordsAndArchives/PreservationEvidenceTest.php::later complete acquisition cannot retroactively declare an older partial version complete" class="Tests\Acceptance\RecordsAndArchives\PreservationEvidenceTest" classname="Tests.Acceptance.RecordsAndArchives.PreservationEvidenceTest" assertions="0" time="0.019741">
+        <skipped/>
+      </testcase>
+      <testcase name="reacquiring identical source bytes still preserves new provenance evidence" file="tests/Acceptance/RecordsAndArchives/PreservationEvidenceTest.php::reacquiring identical source bytes still preserves new provenance evidence" class="Tests\Acceptance\RecordsAndArchives\PreservationEvidenceTest" classname="Tests.Acceptance.RecordsAndArchives.PreservationEvidenceTest" assertions="0" time="0.000774">
+        <skipped/>
+      </testcase>
+    </testsuite>
+  </testsuite>
+</testsuites>
