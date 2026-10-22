@@ -1,0 +1,8 @@
+{
+  "private_admin_files_removed": true,
+  "fixture_credentials_remaining": [],
+  "temporary_producers_removed": true,
+  "physical_evidence_retained": "/tmp/stashd-pr59-verification-3534a4c/physical-evidence",
+  "phpactor_sha256": "9d7099a25dc6e154d1c2d377aa7d691b399e42c1bbe8ea2f6ad9f83750bf44a0",
+  "tracked_diff_empty": true
+}

@@ -1,0 +1,1097 @@
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric: OCFL 1.1 root marker
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d: Object marker
+Object ID appears only once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Head matches final version: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Root inventory equals acknowledged head inventory: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3: Object marker
+Object ID appears only once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Head matches final version: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Root inventory equals acknowledged head inventory: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json v2
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/inventory.json v2
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801: Object marker
+Object ID appears only once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Head matches final version: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Root inventory equals acknowledged head inventory: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json v1
+Historical state is manifest-backed
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json v2
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/content/item.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/inventory.json v1
+Historical state is manifest-backed
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/inventory.json v2
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/content/item.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/25/04/250421d5ad538187067bafb891268846a585d8adb425d4637080aa1d97f1f175: Object marker
+Object ID appears only once: urn:stashd:asset:afd58afd-ceb9-5898-a3f1-6f392ab068ff
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:afd58afd-ceb9-5898-a3f1-6f392ab068ff
+Head matches final version: urn:stashd:asset:afd58afd-ceb9-5898-a3f1-6f392ab068ff
+Root inventory equals acknowledged head inventory: urn:stashd:asset:afd58afd-ceb9-5898-a3f1-6f392ab068ff
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/25/04/250421d5ad538187067bafb891268846a585d8adb425d4637080aa1d97f1f175/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/25/04/250421d5ad538187067bafb891268846a585d8adb425d4637080aa1d97f1f175/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/25/04/250421d5ad538187067bafb891268846a585d8adb425d4637080aa1d97f1f175/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/25/04/250421d5ad538187067bafb891268846a585d8adb425d4637080aa1d97f1f175/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/25/04/250421d5ad538187067bafb891268846a585d8adb425d4637080aa1d97f1f175/v1/content/.stashd/asset.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/25/04/250421d5ad538187067bafb891268846a585d8adb425d4637080aa1d97f1f175/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/25/04/250421d5ad538187067bafb891268846a585d8adb425d4637080aa1d97f1f175/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/25/04/250421d5ad538187067bafb891268846a585d8adb425d4637080aa1d97f1f175/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/25/04/250421d5ad538187067bafb891268846a585d8adb425d4637080aa1d97f1f175/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/25/04/250421d5ad538187067bafb891268846a585d8adb425d4637080aa1d97f1f175/v1/content/.stashd/asset.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/87/9b/879b104036d8e6be402614cee6993e1638ba5169f89f2dac92e3bd9cc9c30ec1: Object marker
+Object ID appears only once: urn:stashd:item:f22111d0-665d-588d-8603-1a12fb4bbb57
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:item:f22111d0-665d-588d-8603-1a12fb4bbb57
+Head matches final version: urn:stashd:item:f22111d0-665d-588d-8603-1a12fb4bbb57
+Root inventory equals acknowledged head inventory: urn:stashd:item:f22111d0-665d-588d-8603-1a12fb4bbb57
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/87/9b/879b104036d8e6be402614cee6993e1638ba5169f89f2dac92e3bd9cc9c30ec1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/87/9b/879b104036d8e6be402614cee6993e1638ba5169f89f2dac92e3bd9cc9c30ec1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/87/9b/879b104036d8e6be402614cee6993e1638ba5169f89f2dac92e3bd9cc9c30ec1/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/87/9b/879b104036d8e6be402614cee6993e1638ba5169f89f2dac92e3bd9cc9c30ec1/v1/content/item.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/87/9b/879b104036d8e6be402614cee6993e1638ba5169f89f2dac92e3bd9cc9c30ec1/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/87/9b/879b104036d8e6be402614cee6993e1638ba5169f89f2dac92e3bd9cc9c30ec1/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/87/9b/879b104036d8e6be402614cee6993e1638ba5169f89f2dac92e3bd9cc9c30ec1/v1/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/87/9b/879b104036d8e6be402614cee6993e1638ba5169f89f2dac92e3bd9cc9c30ec1/v1/content/item.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay: OCFL 1.1 root marker
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d: Object marker
+Object ID appears only once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Head matches final version: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Root inventory equals acknowledged head inventory: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3: Object marker
+Object ID appears only once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Head matches final version: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Root inventory equals acknowledged head inventory: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json v2
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/inventory.json v2
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801: Object marker
+Object ID appears only once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Head matches final version: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Root inventory equals acknowledged head inventory: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json v1
+Historical state is manifest-backed
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json v2
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/content/item.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/inventory.json v1
+Historical state is manifest-backed
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/inventory.json v2
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/content/item.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack: OCFL 1.1 root marker
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d: Object marker
+Object ID appears only once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Head matches final version: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Root inventory equals acknowledged head inventory: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3: Object marker
+Object ID appears only once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Head matches final version: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Root inventory equals acknowledged head inventory: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json v2
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/inventory.json v2
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v2/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801: Object marker
+Object ID appears only once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Head matches final version: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Root inventory equals acknowledged head inventory: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json v1
+Historical state is manifest-backed
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json v2
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/content/item.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/inventory.json v1
+Historical state is manifest-backed
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/inventory.json v2
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v2/content/item.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay: OCFL 1.1 root marker
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d: Object marker
+Object ID appears only once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Head matches final version: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Root inventory equals acknowledged head inventory: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3: Object marker
+Object ID appears only once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Head matches final version: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Root inventory equals acknowledged head inventory: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801: Object marker
+Object ID appears only once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Head matches final version: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Root inventory equals acknowledged head inventory: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released: OCFL 1.1 root marker
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d: Object marker
+Object ID appears only once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Head matches final version: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Root inventory equals acknowledged head inventory: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3: Object marker
+Object ID appears only once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Head matches final version: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Root inventory equals acknowledged head inventory: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801: Object marker
+Object ID appears only once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Head matches final version: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Root inventory equals acknowledged head inventory: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash: OCFL 1.1 root marker
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d: Object marker
+Object ID appears only once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Head matches final version: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Root inventory equals acknowledged head inventory: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3: Object marker
+Object ID appears only once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Head matches final version: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Root inventory equals acknowledged head inventory: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801: Object marker
+Object ID appears only once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Head matches final version: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Root inventory equals acknowledged head inventory: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay: OCFL 1.1 root marker
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d: Object marker
+Object ID appears only once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Head matches final version: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Root inventory equals acknowledged head inventory: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3: Object marker
+Object ID appears only once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Head matches final version: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Root inventory equals acknowledged head inventory: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801: Object marker
+Object ID appears only once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Head matches final version: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Root inventory equals acknowledged head inventory: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete: OCFL 1.1 root marker
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d: Object marker
+Object ID appears only once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Head matches final version: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Root inventory equals acknowledged head inventory: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3: Object marker
+Object ID appears only once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Head matches final version: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Root inventory equals acknowledged head inventory: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/data.bin
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/1d/84/1d84b7c4b604f7436cfd6b88462f67b83b85c37c6e280a643a93188983f120b3/v1/content/.stashd/asset.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801: Object marker
+Object ID appears only once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Head matches final version: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Root inventory equals acknowledged head inventory: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/inventory.json v1
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/51/2c/512cf8fac1148fcd1a66ce04402d6f9b85bfc2290be1bfa16e339b35f3fe4801/v1/content/item.json
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/commit-crash: OCFL 1.1 root marker
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/commit-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d: Object marker
+Object ID appears only once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Recognized OCFL digest algorithm
+Contiguous version history: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Head matches final version: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Root inventory equals acknowledged head inventory: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/commit-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/commit-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/commit-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/commit-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/commit-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+Exact inventory checksum sidecar: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/commit-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical identity: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/commit-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json
+Historical version entry immutable: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/commit-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/inventory.json v1
+Historical state is manifest-backed
+Historical state is manifest-backed
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/commit-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/.stashd/asset.json
+Manifest path stays inside Object
+Manifest payload digest: /tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/commit-crash/d7/7c/d77cc98d045deb404a5bc6863261a541daa276b5e5a3804ce54b38a61fb25e1d/v1/content/data.bin
+independent-3534a4c: candidate seal matches physical bytes
+independent-3534a4c: candidate ID
+independent-3534a4c: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/commit-crash/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/plan.json: envelope hashes original JSON
+independent-3534a4c: plan binds candidate
+independent-3534a4c: absent Object only before completion
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+independent-3534a4c: absent Object only before completion
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+independent-3534a4c: accepted Asset digest and size master
+independent-3534a4c: retained custody equals OCFL master
+independent-3534a4c: candidate seal matches physical bytes
+independent-3534a4c: candidate ID
+independent-3534a4c: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/plan.json: envelope hashes original JSON
+independent-3534a4c: plan binds candidate
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+independent-3534a4c: accepted Asset digest and size master
+independent-3534a4c: retained custody equals OCFL master
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+independent-3534a4c: accepted Asset digest and size sidecar
+independent-3534a4c: retained custody equals OCFL sidecar
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/complete/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/complete.json: envelope hashes original JSON
+independent-3534a4c: exact completion receipt
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: complete Item metadata and pins equal plan
+independent-3534a4c: canonical Item URI
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+independent-3534a4c: candidate seal matches physical bytes
+independent-3534a4c: candidate ID
+independent-3534a4c: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/plan.json: envelope hashes original JSON
+independent-3534a4c: plan binds candidate
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+independent-3534a4c: accepted Asset digest and size master
+independent-3534a4c: retained custody equals OCFL master
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+independent-3534a4c: accepted Asset digest and size sidecar
+independent-3534a4c: retained custody equals OCFL sidecar
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/replay/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/complete.json: envelope hashes original JSON
+independent-3534a4c: exact completion receipt
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: complete Item metadata and pins equal plan
+independent-3534a4c: canonical Item URI
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+independent-3534a4c: candidate seal matches physical bytes
+independent-3534a4c: candidate ID
+independent-3534a4c: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/plan.json: envelope hashes original JSON
+independent-3534a4c: plan binds candidate
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+independent-3534a4c: accepted Asset digest and size master
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+independent-3534a4c: accepted Asset digest and size sidecar
+independent-3534a4c: retained custody equals OCFL sidecar
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/complete.json: envelope hashes original JSON
+independent-3534a4c: exact completion receipt
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: complete Item metadata and pins equal plan
+independent-3534a4c: canonical Item URI
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/release-crash/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/custody-release.json: envelope hashes original JSON
+independent-3534a4c: release authorization binds verified completion
+independent-3534a4c: candidate seal matches physical bytes
+independent-3534a4c: candidate ID
+independent-3534a4c: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/plan.json: envelope hashes original JSON
+independent-3534a4c: plan binds candidate
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+independent-3534a4c: accepted Asset digest and size master
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+independent-3534a4c: accepted Asset digest and size sidecar
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/complete.json: envelope hashes original JSON
+independent-3534a4c: exact completion receipt
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: complete Item metadata and pins equal plan
+independent-3534a4c: canonical Item URI
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/custody-release.json: envelope hashes original JSON
+independent-3534a4c: release authorization binds verified completion
+independent-3534a4c: candidate seal matches physical bytes
+independent-3534a4c: candidate ID
+independent-3534a4c: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/plan.json: envelope hashes original JSON
+independent-3534a4c: plan binds candidate
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+independent-3534a4c: accepted Asset digest and size master
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+independent-3534a4c: accepted Asset digest and size sidecar
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/complete.json: envelope hashes original JSON
+independent-3534a4c: exact completion receipt
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: complete Item metadata and pins equal plan
+independent-3534a4c: canonical Item URI
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/released-replay/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/custody-release.json: envelope hashes original JSON
+independent-3534a4c: release authorization binds verified completion
+independent-3534a4c: candidate seal matches physical bytes
+independent-3534a4c: candidate ID
+independent-3534a4c: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/plan.json: envelope hashes original JSON
+independent-3534a4c: plan binds candidate
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+independent-3534a4c: accepted Asset digest and size master
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+independent-3534a4c: accepted Asset digest and size sidecar
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/complete.json: envelope hashes original JSON
+independent-3534a4c: exact completion receipt
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: complete Item metadata and pins equal plan
+independent-3534a4c: canonical Item URI
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/custody-release.json: envelope hashes original JSON
+independent-3534a4c: release authorization binds verified completion
+independent-3534a4c: candidate seal matches physical bytes
+independent-3534a4c: candidate ID
+independent-3534a4c: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/plan.json: envelope hashes original JSON
+independent-3534a4c: plan binds candidate
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+independent-3534a4c: accepted Asset digest and size master
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+independent-3534a4c: accepted Asset digest and size sidecar
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/complete.json: envelope hashes original JSON
+independent-3534a4c: exact completion receipt
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: complete Item metadata and pins equal plan
+independent-3534a4c: canonical Item URI
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/custody-release.json: envelope hashes original JSON
+independent-3534a4c: release authorization binds verified completion
+independent-3534a4c: candidate seal matches physical bytes
+independent-3534a4c: candidate ID
+independent-3534a4c: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/plan.json: envelope hashes original JSON
+independent-3534a4c: plan binds candidate
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: exact Item/Asset binding urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+independent-3534a4c: accepted Asset digest and size master
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+independent-3534a4c: accepted Asset digest and size sidecar
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/complete.json: envelope hashes original JSON
+independent-3534a4c: exact completion receipt
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v1 item.json
+independent-3534a4c: complete Item metadata and pins equal plan
+independent-3534a4c: canonical Item URI
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 .stashd/asset.json
+independent-3534a4c: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v1 data.bin
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/extensions/stashd-transactions/237a59a474d1f625474678a914b9dfc47121cd5f9ddbbd3e35d1f7d88324d616/custody-release.json: envelope hashes original JSON
+independent-3534a4c: release authorization binds verified completion
+After master SIGKILL: exactly one Asset, no Item or sidecar Object
+After master SIGKILL: no completion journal
+After master SIGKILL: both custody copies remain
+commit-crash: actual SIGKILL, no success reply
+release-crash: actual SIGKILL, no success reply
+lost-ack-crash: actual SIGKILL, no success reply
+recovered: exact receipt reused
+replayed: exact receipt reused
+release-crash-recovered: exact receipt reused
+released-replayed: exact receipt reused
+released-recovered: exact receipt reused
+complete -> replay: every Vault byte unchanged
+released -> released-replay: every Vault byte unchanged
+lost-ack -> lost-ack-replay: every Vault byte unchanged
+Only redundant custody files removed
+Only release authorization added
+All permanent journal and OCFL bytes unchanged by release
+Release SIGKILL interrupts between two actual deletions
+complete: one Item plus two Assets
+complete: exactly one version per Object
+replay: one Item plus two Assets
+replay: exactly one version per Object
+release-crash: one Item plus two Assets
+release-crash: exactly one version per Object
+released: one Item plus two Assets
+released: exactly one version per Object
+released-replay: one Item plus two Assets
+released-replay: exactly one version per Object
+independent-lost-ack: candidate seal matches physical bytes
+independent-lost-ack: candidate ID
+independent-lost-ack: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/extensions/stashd-transactions/ca3d0e04b03e2030fcd208357b68744ea5bdfa794fbdd06a307734b19a6b89e1/plan.json: envelope hashes original JSON
+independent-lost-ack: plan binds candidate
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v2 item.json
+independent-lost-ack: exact Item/Asset binding urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 .stashd/asset.json
+independent-lost-ack: exact Item/Asset binding urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 data.bin
+independent-lost-ack: accepted Asset digest and size sidecar
+independent-lost-ack: retained custody equals OCFL sidecar
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/extensions/stashd-transactions/ca3d0e04b03e2030fcd208357b68744ea5bdfa794fbdd06a307734b19a6b89e1/complete.json: envelope hashes original JSON
+independent-lost-ack: exact completion receipt
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v2 item.json
+independent-lost-ack: complete Item metadata and pins equal plan
+independent-lost-ack: canonical Item URI
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-lost-ack: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 .stashd/asset.json
+independent-lost-ack: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 data.bin
+independent-lost-ack: candidate seal matches physical bytes
+independent-lost-ack: candidate ID
+independent-lost-ack: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/extensions/stashd-transactions/ca3d0e04b03e2030fcd208357b68744ea5bdfa794fbdd06a307734b19a6b89e1/plan.json: envelope hashes original JSON
+independent-lost-ack: plan binds candidate
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v2 item.json
+independent-lost-ack: exact Item/Asset binding urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 .stashd/asset.json
+independent-lost-ack: exact Item/Asset binding urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 data.bin
+independent-lost-ack: accepted Asset digest and size sidecar
+independent-lost-ack: retained custody equals OCFL sidecar
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack-replay/extensions/stashd-transactions/ca3d0e04b03e2030fcd208357b68744ea5bdfa794fbdd06a307734b19a6b89e1/complete.json: envelope hashes original JSON
+independent-lost-ack: exact completion receipt
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v2 item.json
+independent-lost-ack: complete Item metadata and pins equal plan
+independent-lost-ack: canonical Item URI
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-lost-ack: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 .stashd/asset.json
+independent-lost-ack: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 data.bin
+independent-lost-ack: candidate seal matches physical bytes
+independent-lost-ack: candidate ID
+independent-lost-ack: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/extensions/stashd-transactions/ca3d0e04b03e2030fcd208357b68744ea5bdfa794fbdd06a307734b19a6b89e1/plan.json: envelope hashes original JSON
+independent-lost-ack: plan binds candidate
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v2 item.json
+independent-lost-ack: exact Item/Asset binding urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 .stashd/asset.json
+independent-lost-ack: exact Item/Asset binding urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 data.bin
+independent-lost-ack: accepted Asset digest and size sidecar
+independent-lost-ack: retained custody equals OCFL sidecar
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/extensions/stashd-transactions/ca3d0e04b03e2030fcd208357b68744ea5bdfa794fbdd06a307734b19a6b89e1/complete.json: envelope hashes original JSON
+independent-lost-ack: exact completion receipt
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v2 item.json
+independent-lost-ack: complete Item metadata and pins equal plan
+independent-lost-ack: canonical Item URI
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-lost-ack: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 .stashd/asset.json
+independent-lost-ack: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 data.bin
+independent-lost-ack: candidate seal matches physical bytes
+independent-lost-ack: candidate ID
+independent-lost-ack: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/extensions/stashd-transactions/ca3d0e04b03e2030fcd208357b68744ea5bdfa794fbdd06a307734b19a6b89e1/plan.json: envelope hashes original JSON
+independent-lost-ack: plan binds candidate
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v2 item.json
+independent-lost-ack: exact Item/Asset binding urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 .stashd/asset.json
+independent-lost-ack: exact Item/Asset binding urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 data.bin
+independent-lost-ack: accepted Asset digest and size sidecar
+independent-lost-ack: retained custody equals OCFL sidecar
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/lost-ack/extensions/stashd-transactions/ca3d0e04b03e2030fcd208357b68744ea5bdfa794fbdd06a307734b19a6b89e1/complete.json: envelope hashes original JSON
+independent-lost-ack: exact completion receipt
+Exact logical payload exists once: urn:stashd:item:95fa2be0-d0a5-50d4-a20e-34c5f377ac68 v2 item.json
+independent-lost-ack: complete Item metadata and pins equal plan
+independent-lost-ack: canonical Item URI
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 .stashd/asset.json
+independent-lost-ack: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:a42b60b9-c5b3-5d3f-9abc-326b8743999d v1 data.bin
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 .stashd/asset.json
+independent-lost-ack: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:c8fe20bb-2afe-520f-b5ae-a00441ac590a v2 data.bin
+Changed Item and sidecar advance exactly once
+Unchanged master remains pinned to v1 after sidecar update
+Lost acknowledgement replays exact receipt
+independent-numeric: candidate seal matches physical bytes
+independent-numeric: candidate ID
+independent-numeric: candidate Vault identity
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/extensions/stashd-transactions/68b001a3810a3ad1ef05a18940c3ed95c8e6c595086bf272b885b8a7d10c0b8a/plan.json: envelope hashes original JSON
+independent-numeric: plan binds candidate
+Exact logical payload exists once: urn:stashd:item:f22111d0-665d-588d-8603-1a12fb4bbb57 v1 item.json
+independent-numeric: exact Item/Asset binding urn:stashd:item:f22111d0-665d-588d-8603-1a12fb4bbb57
+Exact logical payload exists once: urn:stashd:asset:afd58afd-ceb9-5898-a3f1-6f392ab068ff v1 .stashd/asset.json
+independent-numeric: exact Item/Asset binding urn:stashd:asset:afd58afd-ceb9-5898-a3f1-6f392ab068ff
+Exact logical payload exists once: urn:stashd:asset:afd58afd-ceb9-5898-a3f1-6f392ab068ff v1 data.bin
+independent-numeric: accepted Asset digest and size master
+independent-numeric: retained custody equals OCFL master
+/tmp/stashd-pr59-verification-3534a4c/physical-evidence/stages/numeric/extensions/stashd-transactions/68b001a3810a3ad1ef05a18940c3ed95c8e6c595086bf272b885b8a7d10c0b8a/complete.json: envelope hashes original JSON
+independent-numeric: exact completion receipt
+Exact logical payload exists once: urn:stashd:item:f22111d0-665d-588d-8603-1a12fb4bbb57 v1 item.json
+independent-numeric: complete Item metadata and pins equal plan
+independent-numeric: canonical Item URI
+Exact logical payload exists once: urn:stashd:asset:afd58afd-ceb9-5898-a3f1-6f392ab068ff v1 .stashd/asset.json
+independent-numeric: every exact Asset pin belongs to Item
+Exact logical payload exists once: urn:stashd:asset:afd58afd-ceb9-5898-a3f1-6f392ab068ff v1 data.bin
+Native float/integer JSON types preserved in numeric candidate and plan
+Native float/integer JSON types preserved in numeric candidate and plan
+Plan hash uses original fraction-preserving JSON bytes
