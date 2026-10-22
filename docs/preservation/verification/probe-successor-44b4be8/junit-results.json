@@ -1,0 +1,154 @@
+{
+  "phase1": {
+    "counts": {
+      "passed": 74
+    },
+    "incomplete": []
+  },
+  "supplementary": {
+    "counts": {
+      "passed": 113
+    },
+    "incomplete": []
+  },
+  "complete": {
+    "counts": {
+      "passed": 325,
+      "skipped": 33
+    },
+    "incomplete": [
+      [
+        "Tests.Acceptance.RecordsAndArchives.CommitConsistencyTest",
+        "an interrupted staged write cannot become a falsely committed Asset"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.CommitConsistencyTest",
+        "a crash after a durable Asset commit but before its Item commit leaves no invented Item pin"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.CommitConsistencyTest",
+        "an interrupted inventory publication reconciles instead of claiming success"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.CommitConsistencyTest",
+        "two competing writers cannot corrupt or silently overwrite committed Asset history"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.CommitConsistencyTest",
+        "source mutation between digesting and publication cannot create a false fixity receipt"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.CommitConsistencyTest",
+        "an interrupted operation cannot leave a complete Item that references missing bytes"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.FixityAndRepairTest",
+        "fixity verification actually reads committed content and reports a healthy version"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.FixityAndRepairTest",
+        "external corruption of canonical bytes cannot be reported as verified"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.FixityAndRepairTest",
+        "corrupt inventory checksums invalidate object verification even if payload survives"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.FixityAndRepairTest",
+        "verified replica repair restores exact historical bytes and records repair history"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.FixityAndRepairTest",
+        "a corrupted replica is never accepted as repair authority"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.FixityAndRepairTest",
+        "a repair cannot silently replace the archived original with different content"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.MetadataHistoryTest",
+        "source-provided metadata remains recoverable as an immutable document revision"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.MetadataHistoryTest",
+        "updating one metadata stream retains the original version"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.MetadataHistoryTest",
+        "different sources for the same metadata facet keep separate provenance identities"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.MetadataHistoryTest",
+        "editorial corrections cannot overwrite the original source observation"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.MetadataHistoryTest",
+        "invalid metadata must not replace a previously preserved valid revision"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.PreservationEvidenceTest",
+        "an open expected-component set does not justify claiming complete preservation"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.PreservationEvidenceTest",
+        "a closed known scope with verified components may be reported complete"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.PreservationEvidenceTest",
+        "a partial Asset with missing known components remains preserved but incomplete"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.PreservationEvidenceTest",
+        "later complete acquisition cannot retroactively declare an older partial version complete"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.PreservationEvidenceTest",
+        "reacquiring identical source bytes still preserves new provenance evidence"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest",
+        "a replica of a complete Vault has the same identity and a verified coherent recovery point"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest",
+        "clean-room recovery retains the original Vault identity without the old primary or database"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest",
+        "a recovered Item still pins the old exact Asset revision after later revisions existed"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest",
+        "rebuilding the catalogue from an independently verified replica retains metadata-only Items"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest",
+        "a lagging replica cannot claim to contain changes newer than its own verified recovery point"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest",
+        "a corrupted replica cannot be declared a complete recoverable Vault"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest",
+        "a restore never writes archival repairs or new authority into its source replica"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.ReplicaRecoveryTest",
+        "a complete restore preserves archival event evidence rather than rebuilding only current media"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.StoragePortabilityTest",
+        "the actual configured backend, not the logical Vault, reports storage capabilities"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.StoragePortabilityTest",
+        "physical storage integrity is independent of the availability of catalogue projections"
+      ],
+      [
+        "Tests.Acceptance.RecordsAndArchives.VaultIdentityTest",
+        "an empty new Vault has no archived Items or Assets"
+      ]
+    ]
+  }
+}

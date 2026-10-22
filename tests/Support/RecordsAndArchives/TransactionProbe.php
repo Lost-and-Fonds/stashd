@@ -119,6 +119,7 @@ final class TransactionProbe
      * Reap the child within a deadline, killing it only after observing the requested boundary.
      *
      * Timeout and a missing boundary are failures, never successful crash proofs.
+     * Unreadable stdout or stderr fails explicitly after the process is reaped.
      *
      * @param array{process: resource, prefix: string, boundary: string} $child
      * @return array{exit: int, signal: int, out: string, err: string}
@@ -142,11 +143,15 @@ final class TransactionProbe
             proc_terminate($child['process'], 9);
         }
         $closed = proc_close($child['process']);
+        $out = file_get_contents($child['prefix'] . '.out');
+        $err = file_get_contents($child['prefix'] . '.err');
+        Assert::assertIsString($out, 'Could not read transaction child stdout log: ' . $child['prefix'] . '.out');
+        Assert::assertIsString($err, 'Could not read transaction child stderr log: ' . $child['prefix'] . '.err');
         $result = [
             'exit' => $status['exitcode'] >= 0 ? $status['exitcode'] : $closed,
             'signal' => $status['termsig'],
-            'out' => file_get_contents($child['prefix'] . '.out'),
-            'err' => file_get_contents($child['prefix'] . '.err'),
+            'out' => $out,
+            'err' => $err,
         ];
         Assert::assertFalse($status['running'], 'Transaction child timed out: ' . $result['err']);
         if ($child['boundary'] !== '') {
@@ -221,6 +226,9 @@ final class TransactionProbe
     /**
      * Read physical evidence as a JSON object, failing explicitly on absent or unreadable bytes.
      *
+     * Reject lists and top-level keys that PHP coerces into integers; nested values
+     * retain their existing associative decoding and JSON errors propagate unchanged.
+     *
      * @return array<string, mixed>
      */
     public static function json(string $path): array
@@ -230,7 +238,14 @@ final class TransactionProbe
         Assert::assertIsString($raw);
         $decoded = json_decode($raw, true, flags: JSON_THROW_ON_ERROR);
         Assert::assertIsArray($decoded);
-        return $decoded;
+        // Successful parsing makes the root token decisive, including for {} versus [].
+        Assert::assertSame('{', ltrim($raw)[0] ?? null, 'Evidence must contain a JSON object, not a list.');
+        $object = [];
+        foreach ($decoded as $key => $value) {
+            Assert::assertIsString($key, 'JSON object keys must remain strings when decoded by PHP.');
+            $object[$key] = $value;
+        }
+        return $object;
     }
 
     /**
