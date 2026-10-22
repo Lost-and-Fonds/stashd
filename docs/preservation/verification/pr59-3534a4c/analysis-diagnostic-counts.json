@@ -1,0 +1,39 @@
+{
+  "error": {
+    "mixed-method-access": 473,
+    "mixed-array-access": 473,
+    "missing-magic-method": 5,
+    "possibly-false-argument": 19,
+    "mixed-operand": 44,
+    "invalid-method-access": 30,
+    "less-specific-nested-argument-type": 10,
+    "possibly-null-argument": 24,
+    "possibly-invalid-argument": 19,
+    "template-constraint-violation": 1,
+    "less-specific-return-statement": 4,
+    "invalid-iterator": 20,
+    "undefined-variable": 15,
+    "mixed-property-access": 2,
+    "less-specific-argument": 17,
+    "mixed-array-assignment": 2,
+    "match-not-exhaustive": 2,
+    "invalid-return-statement": 2,
+    "invalid-callable": 1
+  },
+  "warning": {
+    "non-documented-property": 147,
+    "redundant-docblock-type": 2,
+    "ambiguous-instantiation-target": 1,
+    "unsafe-instantiation": 1,
+    "possibly-undefined-int-array-index": 20,
+    "possibly-false-operand": 11,
+    "possibly-null-array-access": 5,
+    "possibly-null-destructuring-source": 1,
+    "possibly-null-operand": 5
+  },
+  "help": {
+    "unevaluated-code": 7,
+    "redundant-type-comparison": 1,
+    "reference-to-undefined-variable": 3
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "verifier": "OpenAI Codex assistant, agent /root, in this conversation",
+  "independence": "Fresh execution and a separate Python physical reader after author reports; same conversation, local machine and Lerd runtime, not a separately identified human or external runner.",
+  "identity_limits": "No stable conversation/run identifier, external model attestation or cryptographic verifier signature is available in the evidence. Git author/committer identifies the uploader, not a human independent verifier.",
+  "verified_commit": "3534a4c37aa77f53d7f331d97808eb05859b1e00",
+  "frozen_commit": "680476b57f87b5d356275074688c35eaadea4313",
+  "original_bundle": "/tmp/stashd-pr59-verification-3534a4c",
+  "verification_date_local": "2026-10-22 Pacific/Auckland",
+  "preservation_date_local": "2026-10-22 Pacific/Auckland",
+  "original_report_sha256": "64ffe7f1fab83fa8cfdfded9ff6e674a84274ab8c880ea974c8066795cea56f8",
+  "original_manifest_verified_files": 517,
+  "original_physical_files_archived": 477,
+  "physical_archive_bytes": 71412,
+  "missing_evidence": "The interrupted first full run had session output but no separately retained full logfile, as already stated in the original report. No replacement was reconstructed.",
+  "secrets": "No private admin configuration or generated projection credential descriptors in original evidence. Private admin files and generated PostgreSQL databases/roles had been removed. No environment files are included.",
+  "qa_fix": "PR #61, e11eb3f8066dcbdf98b8e8bd5f1a89d6fd478ea0, based on dev 904524164ab216be9596ce3e3346b8595bc7ac99"
+}
