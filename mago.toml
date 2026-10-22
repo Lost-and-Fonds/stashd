@@ -3,6 +3,7 @@ php-version = "8.5.0"
 [source]
 paths = ["app", "tests"]
 includes = ["vendor"]
+patches = ["tools/mago/TempestStorage.php"]
 excludes = [
   "./vendor/symfony/cache/Traits/ValueWrapper.php",
   "./vendor/composer",
