@@ -1,0 +1,59 @@
+{
+  "phase1": {
+    "exit": 0,
+    "tests": [
+      "48 passed (7605 assertions)"
+    ],
+    "duration": [
+      "20.11s"
+    ]
+  },
+  "supplementary": {
+    "exit": 0,
+    "tests": [
+      "113 passed (5735 assertions)"
+    ],
+    "duration": [
+      "67.52s"
+    ]
+  },
+  "projection": {
+    "exit": 0,
+    "tests": [
+      "1 passed (83 assertions)"
+    ],
+    "duration": [
+      "0.32s"
+    ]
+  },
+  "lint": {
+    "exit": 0,
+    "tests": [],
+    "duration": []
+  },
+  "format": {
+    "exit": 0,
+    "tests": [],
+    "duration": []
+  },
+  "analyse": {
+    "exit": 1,
+    "tests": [],
+    "duration": []
+  },
+  "physical-producer": {
+    "exit": 0,
+    "tests": [],
+    "duration": []
+  },
+  "numeric-producer": {
+    "exit": 0,
+    "tests": [],
+    "duration": []
+  },
+  "physical-reader": {
+    "exit": 0,
+    "tests": [],
+    "duration": []
+  }
+}

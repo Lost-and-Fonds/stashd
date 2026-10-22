@@ -213,9 +213,11 @@ test('a restore never writes archival repairs or new authority into its source r
         new RecursiveDirectoryIterator($replica, FilesystemIterator::SKIP_DOTS),
     );
     foreach ($iterator as $file) {
-        if ($file->isFile()) {
-            $before[substr($file->getPathname(), strlen($replica) + 1)] = hash_file('sha256', $file->getPathname());
+        if (! $file->isFile()) {
+            continue;
         }
+
+        $before[substr($file->getPathname(), strlen($replica) + 1)] = hash_file('sha256', $file->getPathname());
     }
     ksort($before);
 
@@ -231,9 +233,11 @@ test('a restore never writes archival repairs or new authority into its source r
         new RecursiveDirectoryIterator($replica, FilesystemIterator::SKIP_DOTS),
     );
     foreach ($iterator as $file) {
-        if ($file->isFile()) {
-            $after[substr($file->getPathname(), strlen($replica) + 1)] = hash_file('sha256', $file->getPathname());
+        if (! $file->isFile()) {
+            continue;
         }
+
+        $after[substr($file->getPathname(), strlen($replica) + 1)] = hash_file('sha256', $file->getPathname());
     }
     ksort($after);
 

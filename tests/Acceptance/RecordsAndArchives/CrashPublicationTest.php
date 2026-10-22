@@ -55,9 +55,11 @@ function crash_snapshot(string $root): array
 {
     $files = [];
     foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)) as $file) {
-        if ($file->isFile()) {
-            $files[substr($file->getPathname(), strlen($root))] = hash_file('sha512', $file->getPathname());
+        if (! $file->isFile()) {
+            continue;
         }
+
+        $files[substr($file->getPathname(), strlen($root))] = hash_file('sha512', $file->getPathname());
     }
     ksort($files);
     return $files;
@@ -82,9 +84,11 @@ test('abrupt publication death preserves committed history and reports physical 
     expect($crashed['output'])->toBe('');
     $after = crash_snapshot($root);
     foreach ($before as $path => $digest) {
-        if (preg_match('~/v\d+/~', $path)) {
-            expect($after[$path] ?? null)->toBe($digest);
+        if (! preg_match('~/v\d+/~', $path)) {
+            continue;
         }
+
+        expect($after[$path] ?? null)->toBe($digest);
     }
     for ($attempt = 0; $attempt < 2; $attempt++) {
         $inspection = crash_process($root, 'inspect', $kind);

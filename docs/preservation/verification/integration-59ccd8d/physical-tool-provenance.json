@@ -1,0 +1,12 @@
+{
+  "candidate": "59ccd8d9d9161337329c27bcdcfd961d6cd41320",
+  "verifier": "OpenAI Codex assistant /root in this conversation; same local Lerd/PHP runtime, no separate human/external-runner attestation",
+  "reader_imports_stashd_or_test_oracle": false,
+  "producer_uses": "real production adapter and unchanged frozen child supervisor; reader checks raw filesystem independently",
+  "fixture_id_note": "Historical independent-3534a4c transaction IDs are reused by the preserved diagnostic scripts; all evidence in this run was freshly generated on the candidate, not replayed from the old archive.",
+  "tools": {
+    "physical-producer.php": "46b52949c2f065648c2dfd8e0e2df86552a1d21197e8299c2ba094438abb226b",
+    "numeric-producer.php": "4f33ec38fe24f868a932a4d9e7d3c5a3874e2d7cabb53058e0ccabccd494b7e6",
+    "read_physical_evidence.py": "31d688ad497edfe59da1f5c96e646fa8370402389424edff1a4b40fdc6fead48"
+  }
+}

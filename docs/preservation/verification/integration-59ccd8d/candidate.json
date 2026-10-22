@@ -1,0 +1,39 @@
+{
+  "branch": "test/recoverable-preservation-phase1",
+  "candidate": "59ccd8d9d9161337329c27bcdcfd961d6cd41320",
+  "implementation": "3534a4c37aa77f53d7f331d97808eb05859b1e00",
+  "frozen": "680476b57f87b5d356275074688c35eaadea4313",
+  "pr59_merge": "de9810d16fca960985c54f6e2f13c752ff043196",
+  "dev": "35a5c302e2f49f77a034dab1df46a78e3273d4fe",
+  "conflicts": false,
+  "production_diff_from_verified_implementation": false,
+  "unexpected_changed_files": false,
+  "frozen_files": [
+    {
+      "path": "tests/Acceptance/RecordsAndArchives/RecoverableTransactionTest.php",
+      "git_blob": "39489a759491a4aeb89b3c9922f05138dcd90514",
+      "sha256": "b136220b00096822c0c8ab030a2bbad2f1850c855efc3f1688802a505d8133fb"
+    },
+    {
+      "path": "tests/Support/RecordsAndArchives/transaction-process.php",
+      "git_blob": "5fd3d53baffaef65f40ba4a4e0cccf6917e7027e",
+      "sha256": "3b0760efbaaec6b3e56c8a29f3b1c2f9cf15599b85210fd97b6299efff9ec0eb"
+    },
+    {
+      "path": "tests/Support/RecordsAndArchives/TransactionProbe.php",
+      "git_blob": "848cee541f8ef121c5b1ee43ad9c6d0c0de196c5",
+      "sha256": "e266e7d5941e7bab8809620d619a74312d2c4655af5d3c2c454e2ee3a17cf096"
+    },
+    {
+      "path": "tests/Support/RecordsAndArchives/ProjectionProbe.php",
+      "git_blob": "1039d0884aa252354b47fc6b12066d1be1becacf",
+      "sha256": "de8d1e709c34cd3b324c82430e8d9803b4b1cf3d9d7e69e461781b59edb8ad3a"
+    },
+    {
+      "path": "tests/Support/RecordsAndArchives/ProjectionProbeProofTest.php",
+      "git_blob": "f146ce09eafdc519779e39b91346a0aba42f0749",
+      "sha256": "f94417dc6e6db6dd79dbc0be001e288613d8b1a52102026d26fd68a0c2b941b5"
+    }
+  ],
+  "phi_actor_sha256": "9d7099a25dc6e154d1c2d377aa7d691b399e42c1bbe8ea2f6ad9f83750bf44a0"
+}

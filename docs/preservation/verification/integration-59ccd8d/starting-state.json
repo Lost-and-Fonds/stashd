@@ -1,0 +1,248 @@
+{
+  "dev": "35a5c302e2f49f77a034dab1df46a78e3273d4fe",
+  "61": {
+    "baseRefName": "dev",
+    "commits": [
+      {
+        "authoredDate": "2026-10-22T07:55:46Z",
+        "authors": [
+          {
+            "email": "hazelfidecaro@gmail.com",
+            "id": "MDQ6VXNlcjIzMTM2MQ==",
+            "login": "hipsterjazzbo",
+            "name": "Hazel"
+          }
+        ],
+        "committedDate": "2026-10-22T07:55:46Z",
+        "messageBody": "",
+        "messageHeadline": "test: avoid unsafe finally control flow in lock cleanup",
+        "oid": "e11eb3f8066dcbdf98b8e8bd5f1a89d6fd478ea0"
+      }
+    ],
+    "headRefOid": "e11eb3f8066dcbdf98b8e8bd5f1a89d6fd478ea0",
+    "isDraft": false,
+    "mergeCommit": {
+      "oid": "620fb0cd4abd7c8f6a1052ba090b8405ed2b82a3"
+    },
+    "mergeStateStatus": "UNKNOWN",
+    "mergeable": "UNKNOWN",
+    "mergedAt": "2026-10-22T08:05:59Z",
+    "state": "MERGED",
+    "statusCheckRollup": []
+  },
+  "62": {
+    "baseRefName": "dev",
+    "commits": [
+      {
+        "authoredDate": "2026-10-22T07:59:19Z",
+        "authors": [
+          {
+            "email": "hazelfidecaro@gmail.com",
+            "id": "MDQ6VXNlcjIzMTM2MQ==",
+            "login": "hipsterjazzbo",
+            "name": "Hazel"
+          }
+        ],
+        "committedDate": "2026-10-22T07:59:19Z",
+        "messageBody": "",
+        "messageHeadline": "docs: preserve independent Phase 2 verification evidence",
+        "oid": "0c9442294a25a0c6eba1d11cd8e79920b5bb669b"
+      }
+    ],
+    "headRefOid": "0c9442294a25a0c6eba1d11cd8e79920b5bb669b",
+    "isDraft": false,
+    "mergeCommit": {
+      "oid": "35a5c302e2f49f77a034dab1df46a78e3273d4fe"
+    },
+    "mergeStateStatus": "UNKNOWN",
+    "mergeable": "UNKNOWN",
+    "mergedAt": "2026-10-22T08:06:57Z",
+    "state": "MERGED",
+    "statusCheckRollup": []
+  },
+  "59": {
+    "baseRefName": "test/recoverable-preservation-phase1",
+    "commits": [
+      {
+        "authoredDate": "2026-10-21T21:59:25Z",
+        "authors": [
+          {
+            "email": "hazelfidecaro@gmail.com",
+            "id": "MDQ6VXNlcjIzMTM2MQ==",
+            "login": "hipsterjazzbo",
+            "name": "Hazel"
+          }
+        ],
+        "committedDate": "2026-10-21T21:59:25Z",
+        "messageBody": "",
+        "messageHeadline": "feat: recover local multi-Object preservation transactions",
+        "oid": "e3dc212726a01277843ea5b8bbf92419d498de5e"
+      },
+      {
+        "authoredDate": "2026-10-21T22:22:45Z",
+        "authors": [
+          {
+            "email": "hazelfidecaro@gmail.com",
+            "id": "MDQ6VXNlcjIzMTM2MQ==",
+            "login": "hipsterjazzbo",
+            "name": "Hazel"
+          }
+        ],
+        "committedDate": "2026-10-21T22:22:45Z",
+        "messageBody": "",
+        "messageHeadline": "fix: release completed transaction custody without breaking replay",
+        "oid": "cf1ef8d8a271d8e64c9f1f238e70b447979d6871"
+      },
+      {
+        "authoredDate": "2026-10-21T22:51:52Z",
+        "authors": [
+          {
+            "email": "hazelfidecaro@gmail.com",
+            "id": "MDQ6VXNlcjIzMTM2MQ==",
+            "login": "hipsterjazzbo",
+            "name": "Hazel"
+          }
+        ],
+        "committedDate": "2026-10-21T22:51:52Z",
+        "messageBody": "",
+        "messageHeadline": "fix: prepare custody outside global publication authority",
+        "oid": "1339e3b65d0d1b6ccca18d04e6ee23d904e6ebd4"
+      },
+      {
+        "authoredDate": "2026-10-21T23:11:09Z",
+        "authors": [
+          {
+            "email": "hazelfidecaro@gmail.com",
+            "id": "MDQ6VXNlcjIzMTM2MQ==",
+            "login": "hipsterjazzbo",
+            "name": "Hazel"
+          }
+        ],
+        "committedDate": "2026-10-21T23:11:09Z",
+        "messageBody": "",
+        "messageHeadline": "fix: verify physical plan bindings and discovered journals",
+        "oid": "3534a4c37aa77f53d7f331d97808eb05859b1e00"
+      }
+    ],
+    "headRefOid": "3534a4c37aa77f53d7f331d97808eb05859b1e00",
+    "isDraft": true,
+    "mergeCommit": null,
+    "mergeStateStatus": "CLEAN",
+    "mergeable": "MERGEABLE",
+    "mergedAt": null,
+    "state": "OPEN",
+    "statusCheckRollup": []
+  },
+  "57": {
+    "baseRefName": "dev",
+    "commits": [
+      {
+        "authoredDate": "2026-10-21T21:14:30Z",
+        "authors": [
+          {
+            "email": "hazelfidecaro@gmail.com",
+            "id": "MDQ6VXNlcjIzMTM2MQ==",
+            "login": "hipsterjazzbo",
+            "name": "Hazel"
+          }
+        ],
+        "committedDate": "2026-10-21T21:14:30Z",
+        "messageBody": "",
+        "messageHeadline": "test: specify recoverable preservation transaction acceptance contracts",
+        "oid": "84bb3dab43cd26c3f92eefead4c9a4369b5f2f0f"
+      },
+      {
+        "authoredDate": "2026-10-21T21:31:36Z",
+        "authors": [
+          {
+            "email": "hazelfidecaro@gmail.com",
+            "id": "MDQ6VXNlcjIzMTM2MQ==",
+            "login": "hipsterjazzbo",
+            "name": "Hazel"
+          }
+        ],
+        "committedDate": "2026-10-21T21:32:11Z",
+        "messageBody": "",
+        "messageHeadline": "test: tighten preservation transaction review witnesses",
+        "oid": "9504eff600185b3b4e0b0fdd73064d6765e576af"
+      },
+      {
+        "authoredDate": "2026-10-21T21:37:03Z",
+        "authors": [
+          {
+            "email": "hazelfidecaro@gmail.com",
+            "id": "MDQ6VXNlcjIzMTM2MQ==",
+            "login": "hipsterjazzbo",
+            "name": "Hazel Fidecaro"
+          }
+        ],
+        "committedDate": "2026-10-21T21:37:03Z",
+        "messageBody": "",
+        "messageHeadline": "test: dispose transaction projection fixture after validation failures",
+        "oid": "680476b57f87b5d356275074688c35eaadea4313"
+      }
+    ],
+    "headRefOid": "680476b57f87b5d356275074688c35eaadea4313",
+    "isDraft": true,
+    "mergeCommit": null,
+    "mergeStateStatus": "CLEAN",
+    "mergeable": "MERGEABLE",
+    "mergedAt": null,
+    "state": "OPEN",
+    "statusCheckRollup": []
+  },
+  "threads": {
+    "p57": {
+      "reviewThreads": {
+        "nodes": [
+          {
+            "isResolved": true
+          },
+          {
+            "isResolved": true
+          },
+          {
+            "isResolved": true
+          },
+          {
+            "isResolved": true
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": false
+        }
+      }
+    },
+    "p59": {
+      "reviewThreads": {
+        "nodes": [
+          {
+            "isResolved": true
+          },
+          {
+            "isResolved": true
+          },
+          {
+            "isResolved": true
+          },
+          {
+            "isResolved": true
+          },
+          {
+            "isResolved": true
+          },
+          {
+            "isResolved": true
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": false
+        }
+      }
+    }
+  },
+  "rulesets": [],
+  "rules/branches/dev": [],
+  "rules/branches/test%2Frecoverable-preservation-phase1": [],
+  "transient_observation": "First check saw a transient GitHub mergeability recalculation; repeat confirmed CLEAN/MERGEABLE. No changed review or protection gate."
+}

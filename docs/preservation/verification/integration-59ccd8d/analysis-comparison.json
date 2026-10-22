@@ -1,0 +1,9 @@
+{
+  "baseline": "3534a4c independently preserved analyse.log.gz",
+  "candidate": "59ccd8d9d9161337329c27bcdcfd961d6cd41320",
+  "comparison": "severity, diagnostic code, first-line message and file; line/column ignored because cleanup edit shifts later locations",
+  "baseline_diagnostics": 1367,
+  "candidate_diagnostics": 1367,
+  "added": [],
+  "removed": []
+}

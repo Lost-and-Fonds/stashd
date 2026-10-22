@@ -1,0 +1,5 @@
+{
+  "Tests.Unit.TransactionProbeContractTest": 25,
+  "Tests.Acceptance.RecordsAndArchives.RecoverableTransactionTest": 48,
+  "Tests.Support.RecordsAndArchives.ProjectionProbeProofTest": 1
+}

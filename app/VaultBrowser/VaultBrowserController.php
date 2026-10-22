@@ -107,7 +107,6 @@ final readonly class VaultBrowserController
             }
             $record = $this->items->read($urn, $version);
             $pins = [];
-            /** @var list<array{object_id: string, version: string}> $references */
             $references = $record['pins'];
             foreach ($references as $pin) {
                 try {
