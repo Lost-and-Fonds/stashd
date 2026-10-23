@@ -1,0 +1,237 @@
+{
+  "totals": {
+    "warning": 193,
+    "error": 1163,
+    "help": 11
+  },
+  "by_component": [
+    {
+      "component": "acceptance tests",
+      "severity": "error",
+      "count": 1038
+    },
+    {
+      "component": "acceptance tests",
+      "severity": "help",
+      "count": 9
+    },
+    {
+      "component": "acceptance tests",
+      "severity": "warning",
+      "count": 175
+    },
+    {
+      "component": "production PHP",
+      "severity": "error",
+      "count": 7
+    },
+    {
+      "component": "production PHP",
+      "severity": "help",
+      "count": 1
+    },
+    {
+      "component": "production PHP",
+      "severity": "warning",
+      "count": 1
+    },
+    {
+      "component": "test support",
+      "severity": "error",
+      "count": 60
+    },
+    {
+      "component": "test support",
+      "severity": "help",
+      "count": 1
+    },
+    {
+      "component": "test support",
+      "severity": "warning",
+      "count": 17
+    },
+    {
+      "component": "view templates",
+      "severity": "error",
+      "count": 58
+    }
+  ],
+  "by_code": [
+    {
+      "severity": "error",
+      "code": "mixed-method-access",
+      "count": 473
+    },
+    {
+      "severity": "error",
+      "code": "mixed-array-access",
+      "count": 473
+    },
+    {
+      "severity": "warning",
+      "code": "non-documented-property",
+      "count": 147
+    },
+    {
+      "severity": "error",
+      "code": "mixed-operand",
+      "count": 44
+    },
+    {
+      "severity": "error",
+      "code": "invalid-method-access",
+      "count": 30
+    },
+    {
+      "severity": "error",
+      "code": "possibly-null-argument",
+      "count": 24
+    },
+    {
+      "severity": "warning",
+      "code": "possibly-undefined-int-array-index",
+      "count": 20
+    },
+    {
+      "severity": "error",
+      "code": "invalid-iterator",
+      "count": 20
+    },
+    {
+      "severity": "error",
+      "code": "possibly-false-argument",
+      "count": 19
+    },
+    {
+      "severity": "error",
+      "code": "possibly-invalid-argument",
+      "count": 19
+    },
+    {
+      "severity": "error",
+      "code": "less-specific-argument",
+      "count": 17
+    },
+    {
+      "severity": "error",
+      "code": "undefined-variable",
+      "count": 15
+    },
+    {
+      "severity": "warning",
+      "code": "possibly-false-operand",
+      "count": 11
+    },
+    {
+      "severity": "error",
+      "code": "less-specific-nested-argument-type",
+      "count": 10
+    },
+    {
+      "severity": "help",
+      "code": "unevaluated-code",
+      "count": 7
+    },
+    {
+      "severity": "error",
+      "code": "missing-magic-method",
+      "count": 5
+    },
+    {
+      "severity": "warning",
+      "code": "possibly-null-array-access",
+      "count": 5
+    },
+    {
+      "severity": "warning",
+      "code": "possibly-null-operand",
+      "count": 5
+    },
+    {
+      "severity": "error",
+      "code": "less-specific-return-statement",
+      "count": 4
+    },
+    {
+      "severity": "help",
+      "code": "reference-to-undefined-variable",
+      "count": 3
+    },
+    {
+      "severity": "warning",
+      "code": "redundant-docblock-type",
+      "count": 2
+    },
+    {
+      "severity": "error",
+      "code": "mixed-property-access",
+      "count": 2
+    },
+    {
+      "severity": "error",
+      "code": "mixed-array-assignment",
+      "count": 2
+    },
+    {
+      "severity": "error",
+      "code": "match-not-exhaustive",
+      "count": 2
+    },
+    {
+      "severity": "error",
+      "code": "invalid-return-statement",
+      "count": 2
+    },
+    {
+      "severity": "warning",
+      "code": "ambiguous-instantiation-target",
+      "count": 1
+    },
+    {
+      "severity": "warning",
+      "code": "unsafe-instantiation",
+      "count": 1
+    },
+    {
+      "severity": "error",
+      "code": "template-constraint-violation",
+      "count": 1
+    },
+    {
+      "severity": "help",
+      "code": "redundant-type-comparison",
+      "count": 1
+    },
+    {
+      "severity": "warning",
+      "code": "possibly-null-destructuring-source",
+      "count": 1
+    },
+    {
+      "severity": "error",
+      "code": "invalid-callable",
+      "count": 1
+    }
+  ],
+  "frozen_files": {
+    "tests/Acceptance/RecordsAndArchives/RecoverableTransactionTest.php": {
+      "warning": 22,
+      "error": 97
+    },
+    "tests/Support/RecordsAndArchives/transaction-process.php": {
+      "warning": 6,
+      "error": 7
+    },
+    "tests/Support/RecordsAndArchives/TransactionProbe.php": {
+      "help": 1,
+      "error": 11,
+      "warning": 3
+    },
+    "tests/Support/RecordsAndArchives/ProjectionProbe.php": {
+      "error": 11
+    },
+    "tests/Support/RecordsAndArchives/ProjectionProbeProofTest.php": {
+      "warning": 1
+    }
+  }
+}
