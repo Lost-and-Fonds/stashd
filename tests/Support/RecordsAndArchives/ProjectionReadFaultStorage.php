@@ -32,6 +32,7 @@ final readonly class ProjectionReadFaultStorage extends LocalArchiveStorage
         if (str_starts_with($location, $this->objectPath . '/') && str_ends_with($location, '/' . $this->filename)) {
             throw new RuntimeException('Injected inventory storage read failure.');
         }
+
         return parent::read($location);
     }
 }

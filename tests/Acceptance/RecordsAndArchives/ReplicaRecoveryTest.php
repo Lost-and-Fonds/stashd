@@ -219,6 +219,7 @@ test('a restore never writes archival repairs or new authority into its source r
 
         $before[substr($file->getPathname(), strlen($replica) + 1)] = hash_file('sha256', $file->getPathname());
     }
+
     ksort($before);
 
     $this->archive->run('replica.recover', [
@@ -239,6 +240,7 @@ test('a restore never writes archival repairs or new authority into its source r
 
         $after[substr($file->getPathname(), strlen($replica) + 1)] = hash_file('sha256', $file->getPathname());
     }
+
     ksort($after);
 
     expect($after)->toBe($before);

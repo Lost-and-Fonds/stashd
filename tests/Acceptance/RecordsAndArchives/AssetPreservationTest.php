@@ -236,6 +236,7 @@ test('rejected revisions leave committed history unchanged', function (string $k
         symlink(dirname($source), $this->archive->path('linked'));
         $files = ['linked.bin' => $this->archive->path('linked/safe.bin')];
     }
+
     expect(fn () => $this->archive->run('asset.preserve', [...$args, 'files' => $files]))->toThrow(ArchivesRejected::class);
     expect(file_get_contents($found['path']))
         ->toBe($before)
@@ -254,6 +255,7 @@ test('multi-file revisions replace the complete file set and retain historical f
     foreach (['a' => 'A', 'b' => 'B'] as $path => $bytes) {
         expect($this->archive->run('asset.read', ['object_id' => $first['object_id'], 'version' => 'v1', 'logical_path' => $path])['bytes'])->toBe($bytes);
     }
+
     expect(fn () => $this->archive->run('asset.read', ['object_id' => $first['object_id'], 'version' => 'v2', 'logical_path' => 'b']))
         ->toThrow(\App\RecordsAndArchives\InvalidAsset::class);
 });

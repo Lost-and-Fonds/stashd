@@ -59,6 +59,7 @@ test('a root inventory replaced during reading cannot authenticate different par
             if ($location === $this->inventory) {
                 ($this->publish)();
             }
+
             return $stream;
         }
 
@@ -73,6 +74,7 @@ test('a root inventory replaced during reading cannot authenticate different par
             if ($location === $this->inventory) {
                 ($this->publish)();
             }
+
             return $bytes;
         }
     };

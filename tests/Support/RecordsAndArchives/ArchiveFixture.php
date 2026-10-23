@@ -116,6 +116,7 @@ final class ArchiveFixture
     {
         if (is_link($path) || is_file($path)) {
             unlink($path);
+
             return;
         }
 

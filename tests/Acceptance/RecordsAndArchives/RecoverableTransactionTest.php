@@ -17,6 +17,7 @@ function transaction_request(ArchiveFixture $fixture, string $id = 'tx-a', array
     foreach ($bytes as $key => $value) {
         $changes[$key] = $fixture->input($id . '-' . $key . '.bin', $value);
     }
+
     return [
         'operation' => 'prepare',
         'transaction_id' => $id,
@@ -33,6 +34,7 @@ function transaction_request(ArchiveFixture $fixture, string $id = 'tx-a', array
 function transaction_workspace(ArchiveFixture $fixture): string
 {
     $fixture->run('vault.initialize');
+
     return dirname($fixture->path('vault'));
 }
 
@@ -76,6 +78,7 @@ test('PSC-T02 crash windows recover once and retain exact authoritative relation
     if (in_array($boundary, ['before-seal', 'after-seal', 'before-asset:master'], true)) {
         expect($objects)->toBe([]);
     }
+
     if (in_array($boundary, ['asset-verified:master', 'before-asset:sidecar', 'asset-verified:sidecar', 'before-item'], true)) {
         expect($itemIds)->toBe([]);
         $observed = [];
@@ -84,6 +87,7 @@ test('PSC-T02 crash windows recover once and retain exact authoritative relation
             $record = Probe::json(OcflInspector::payloadPath($root, $id, 'v1', '.stashd/asset.json'));
             $observed[$record['asset_key']] = file_get_contents(OcflInspector::payloadPath($root, $id, 'v1', 'data.bin'));
         }
+
         ksort($observed);
         expect($observed)->toBe(
             in_array($boundary, ['asset-verified:master', 'before-asset:sidecar'], true)
@@ -91,6 +95,7 @@ test('PSC-T02 crash windows recover once and retain exact authoritative relation
                 : ['master' => 'master bytes', 'sidecar' => 'sidecar bytes'],
         );
     }
+
     if (in_array($boundary, ['item-published', 'item-verified', 'before-ack', 'after-ack'], true)) {
         expect($itemIds)->toHaveCount(1);
         OcflInspector::assertAcknowledgedHistory($root, $itemIds[0], 'v1');
@@ -101,13 +106,16 @@ test('PSC-T02 crash windows recover once and retain exact authoritative relation
             OcflInspector::assertAcknowledgedHistory($root, $pin['object_id'], 'v1');
         }
     }
+
     $recovery = ['operation' => 'recover', 'transaction_id' => 'tx-a'];
     if ($boundary === 'before-seal') {
         $outcome = Probe::run($workspace, $recovery);
         expect($outcome['status'])->toBeIn(['absent', 'unsealed', 'quarantined']);
         expect(Probe::snapshot($root))->toBe($before);
+
         return;
     }
+
     // A sealed candidate must own its material; acquisition source paths are gone.
     $this->archive->destroy('inputs');
     $receipt = Probe::run($workspace, $recovery);
@@ -174,6 +182,7 @@ test('PSC-T05 two concurrent dispatchers cannot both publish the same candidate'
     foreach ($results as $index => $outcome) {
         expect($outcome['status'])->toBeIn($index === 0 && $killOwner ? ['owner-killed'] : ['complete', 'busy']);
     }
+
     $receipt = Probe::run($workspace, ['operation' => 'recover', 'transaction_id' => 'tx-a']);
     Probe::committed($workspace . '/vault', $receipt, 'tx-a', ['master' => 'master bytes']);
     expect($receipt['item']['version'])->toBe('v1');
@@ -295,6 +304,7 @@ test('PSC-T10 independent oracle detects false pins, lost relationships and corr
         $id = array_values(array_filter($id, static fn (string $id): bool => str_starts_with($id, 'urn:stashd:asset:')))[0];
         file_put_contents(OcflInspector::payloadPath($workspace . '/vault', $id, 'v1', 'data.bin'), 'corrupt bytes');
     }
+
     expect(fn () => Probe::committed($workspace . '/vault', $receipt, 'tx-a', ['master' => 'master bytes', 'sidecar' => 'sidecar bytes']))->toThrow(AssertionFailedError::class);
 })->with(['lost-relationship', 'false-receipt', 'corrupt-bytes']);
 
@@ -328,6 +338,7 @@ test('PSC-T12 invalid deltas never publish an Object', function (string $invalid
     } else {
         $request['uri'] = '../invalid-item';
     }
+
     $result = Probe::run($workspace, [...$request, 'operation' => 'execute']);
     expect($result['status'])->toBeIn(['rejected', 'quarantined']);
     expect($this->archive->run('vault.list_objects')['object_ids'])->toBe([]);
@@ -401,11 +412,13 @@ test('PSC-T17 different concurrent candidates preserve every acknowledged relati
         if (in_array($outcome['status'], ['busy', 'owner-killed'], true)) {
             $outcome = Probe::run($workspace, ['operation' => 'recover', 'transaction_id' => $index === 0 ? 'a' : 'b']);
         }
+
         expect($outcome['status'])->toBeIn(['complete', 'conflict', 'quarantined']);
         if ($outcome['status'] === 'complete') {
             $committed[$index === 0 ? 'a' : 'b'] = $outcome;
         }
     }
+
     expect($committed)->not->toBeEmpty();
     $last = array_reduce($committed, static fn (?array $latest, array $next): array => $latest === null
         || (int) substr($next['item']['version'], 1) > (int) substr($latest['item']['version'], 1)
@@ -417,6 +430,7 @@ test('PSC-T17 different concurrent candidates preserve every acknowledged relati
         $inventory = OcflInspector::inventoryFor($workspace . '/vault', $outcome['item']['object_id'])['inventory'];
         expect(isset($inventory['versions'][$outcome['item']['version']]))->toBeTrue();
     }
+
     Probe::committed($workspace . '/vault', $last, $last['transaction_id'], $expected);
 })->with([false, true]);
 
@@ -445,8 +459,10 @@ test('PSC-T20 authority supervisor observes real contention and detects a bypass
     $run = fn (): array => Probe::contend($workspace, ['operation' => 'probe.ownership'], ['operation' => 'probe.ownership', 'bypass_lock' => $bypass], $killOwner);
     if ($bypass) {
         expect($run)->toThrow(AssertionFailedError::class, 'Child exited before authority-contended');
+
         return;
     }
+
     $results = $run();
     expect($results[0]['status'])->toBe($killOwner ? 'owner-killed' : 'probe-complete');
     expect($results[1]['status'])->toBe('probe-complete');
@@ -467,6 +483,7 @@ test('PSC-T21 destructive projection connections reject wrong database role host
     } else {
         $projection[$field] = 'postgres';
     }
+
     expect(fn () => ProjectionProbe::connect($projection, $name))->toThrow(AssertionFailedError::class);
 })->with(['database', 'username', 'host', 'schema']);
 

@@ -22,6 +22,7 @@ function asset_cli(string $root, array $arguments): array
     if (! is_resource($process)) {
         throw new RuntimeException('Could not start Tempest CLI.');
     }
+
     $output = stream_get_contents($pipes[1]);
     $errors = stream_get_contents($pipes[2]);
     fclose($pipes[1]);
@@ -39,6 +40,7 @@ test('real CLI preserves and exports historical binary bytes in fresh processes 
     for ($i = 0; $i < 64; $i++) {
         fwrite($stream, $chunk);
     }
+
     fclose($stream);
     unset($chunk);
     $digest = hash_file('sha512', $source);
@@ -119,6 +121,7 @@ test('Item CLI reconstructs exact Asset pins and binary bytes across fresh appli
             ->and(hash_file('sha512', $destination))
             ->toBe($digest);
     }
+
     $latest = asset_cli($root, ['item:inspect', $item['object_id']]);
     expect($latest['code'])
         ->toBe(0)

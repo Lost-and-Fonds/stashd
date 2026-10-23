@@ -43,6 +43,7 @@ final readonly class ItemIdentity
         if (! preg_match('/^[a-zA-Z][a-zA-Z0-9+.-]*:.+$/D', $uri) || preg_match('/[^a-zA-Z0-9._~:\/?#\[\]@!$&\x27()*+,;=%-]/', $uri) || preg_match('/%(?![a-fA-F0-9]{2})/', $uri)) {
             throw new InvalidItemRevision('Canonical Item identity must be an absolute, ASCII URI with valid percent escapes.');
         }
+
         try {
             Uri::new($uri);
         } catch (SyntaxError $exception) {

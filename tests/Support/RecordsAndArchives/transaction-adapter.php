@@ -28,19 +28,23 @@ return static function (array $request, Closure $boundary): array {
             $request['projection_read_filename'] ?? 'inventory.json',
         );
     }
+
     $vault = new Vault($storage);
     if (isset($request['crash_boundary'])) {
         if (! is_string($request['crash_boundary']) || ! in_array($request['crash_target'] ?? null, ['asset', 'item'], true)) {
             throw new InvalidArgumentException('Crash fixture requires a boundary and Asset or Item target.');
         }
+
         $observe = $boundary;
         $boundary = static function (string $name) use ($request, $observe): void {
             if ($name === ($request['crash_target'] === 'item' ? 'before-item' : 'before-asset:master')) {
                 putenv('CRASH_BOUNDARY=' . $request['crash_boundary']);
             }
+
             $observe($name);
         };
     }
+
     $identity = new ItemIdentity($vault);
     $assets = new AssetArchive($vault, $identity);
     $items = new ItemArchive($vault, $identity, $assets);
@@ -48,12 +52,15 @@ return static function (array $request, Closure $boundary): array {
     if (str_starts_with($request['operation'], 'projection.')) {
         return new Tests\Support\RecordsAndArchives\TransactionProjectionFixture()->run($request, $vault, $items, $assets);
     }
+
     if ($request['operation'] === 'custody.release') {
         return $transactions->releaseCustody($request['transaction_id'], $boundary);
     }
+
     if ($request['operation'] === 'discover') {
         return $transactions->discover();
     }
+
     if (in_array($request['operation'], ['prepare', 'execute'], true)) {
         $prepared = $transactions->prepare($request['transaction_id'], $request['uri'], $request['changes'], $request['metadata'], $request['preconditions'], $boundary);
         if ($request['operation'] === 'prepare' || $prepared['status'] !== 'sealed') {
@@ -62,5 +69,6 @@ return static function (array $request, Closure $boundary): array {
     } elseif (! in_array($request['operation'], ['commit', 'recover'], true)) {
         throw new InvalidArgumentException('Unsupported transaction fixture operation.');
     }
+
     return $transactions->commit($request['transaction_id'], $boundary);
 };

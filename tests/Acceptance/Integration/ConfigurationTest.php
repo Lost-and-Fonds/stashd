@@ -1,100 +1,9 @@
 <?php
 
 use Tests\Support\RecordsAndArchives\ArchiveFixture;
-use Tests\Support\RecordsAndArchives\ProjectionProbe;
 use Tests\Support\RecordsAndArchives\TransactionProbe;
 
-/**
- * Run a configuration proof against an explicitly provisioned disposable database.
- *
- * The existing fixture creates an unprivileged owner and always removes its own
- * database/role. Production commands receive only that owner's connection settings.
- */
-function with_configuration_database(Closure $proof): void
-{
-    $archive = new ArchiveFixture();
-    $workspace = dirname($archive->path('vault'));
-    $name = 'stashd_tx_test_' . bin2hex(random_bytes(8));
-    $fixture = ['database' => $name, 'username' => $name, 'schema' => $name];
-    $created = false;
-    try {
-        $descriptor = TransactionProbe::run($workspace, ['operation' => 'projection.describe', 'fixture' => $fixture]);
-        $created = true;
-        $database = ProjectionProbe::connect($descriptor, $name);
-        try {
-            $proof($archive, $descriptor, $database);
-        } finally {
-            $database = null;
-        }
-    } finally {
-        if ($created) {
-            TransactionProbe::run($workspace, ['operation' => 'projection.dispose', 'fixture' => $fixture]);
-        }
-        $archive->dispose();
-    }
-}
-
-/**
- * Start a fresh Tempest process with isolated operational and Vault configuration.
- *
- * No internal services are mocked. Failure output is returned for explicit status
- * assertions; credentials are passed only through the child environment.
- */
-function configuration_cli(ArchiveFixture $archive, array $descriptor, array $arguments, array $overrides = []): array
-{
-    return finish_configuration_cli(start_configuration_cli($archive, $descriptor, $arguments, $overrides));
-}
-
-/**
- * Start the real command asynchronously so concurrent configuration can be observed.
- *
- * The caller must finish the child and close both output pipes.
- */
-function start_configuration_cli(ArchiveFixture $archive, array $descriptor, array $arguments, array $overrides = []): array
-{
-    $pipes = [];
-    $process = proc_open(
-        [PHP_BINARY, 'tempest', ...$arguments, '--no-interaction'],
-        [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-        $pipes,
-        dirname(__DIR__, 3),
-        [
-            ...getenv(),
-            'ENVIRONMENT' => 'testing',
-            'VAULT_ROOT' => $archive->path('vault'),
-            'STASHD_OPERATIONS_DSN' => $descriptor['dsn'],
-            'STASHD_OPERATIONS_USERNAME' => $descriptor['username'],
-            'STASHD_OPERATIONS_PASSWORD' => $descriptor['password'],
-            'STASHD_OPERATIONS_SCHEMA' => 'configuration_proof',
-            ...$overrides,
-        ],
-    );
-    if (! is_resource($process)) {
-        throw new RuntimeException('Could not start configuration CLI.');
-    }
-    return ['process' => $process, 'pipes' => $pipes];
-}
-
-/**
- * Collect a started command's exit status and close its process-owned pipes.
- */
-function finish_configuration_cli(array $child): array
-{
-    $output = stream_get_contents($child['pipes'][1]);
-    $errors = stream_get_contents($child['pipes'][2]);
-    fclose($child['pipes'][1]);
-    fclose($child['pipes'][2]);
-    return ['code' => proc_close($child['process']), 'output' => $output, 'errors' => $errors];
-}
-
-/**
- * Require a successful CLI invocation and decode its public JSON response.
- */
-function configuration_result(array $result): array
-{
-    expect($result['code'])->toBe(0, $result['output'] . $result['errors']);
-    return json_decode(trim($result['output']), true, flags: JSON_THROW_ON_ERROR);
-}
+require_once dirname(__DIR__, 2) . '/Support/Integration/configuration-cli.php';
 
 test('configuration survives fresh CLI processes without changing source destination Vault or projection', function (): void {
     with_configuration_database(function (ArchiveFixture $archive, array $descriptor, PDO $database): void {
@@ -102,7 +11,7 @@ test('configuration survives fresh CLI processes without changing source destina
         $source = dirname($sourceFile);
         $destination = $archive->path('output/<em>資料 with spaces');
         $vaultBefore = TransactionProbe::snapshot($archive->path('vault'));
-        // Witness an unrelated projection-like table to catch destructive bootstrap.
+        // Keep an unrelated table to check that initialization leaves other data alone.
         $database->exec("CREATE TABLE configuration_witness (value text); INSERT INTO configuration_witness VALUES ('retained')");
         configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
         $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', $source . '/']));
@@ -122,6 +31,7 @@ test('configuration survives fresh CLI processes without changing source destina
                 ->and(configuration_result(configuration_cli($archive, $descriptor, [$kind . ':create', 'filesystem', $record['settings']['root']])))
                 ->toBe($record);
         }
+
         $rows = $database->query('SELECT id::text, kind, component, settings FROM configuration_proof.configurations ORDER BY kind')->fetchAll(PDO::FETCH_ASSOC);
         expect(array_column($rows, 'id'))
             ->toBe([$broadcast['id'], $input['id']])
@@ -171,6 +81,7 @@ test('real configuration commands reject unsafe roots and unsupported components
             expect($failure['code'])->not->toBe(0, implode(' ', $command));
             expect((int) $database->query('SELECT count(*) FROM configuration_proof.configurations')->fetchColumn())->toBe(1);
         }
+
         // A common string prefix is not directory ancestry.
         configuration_result(configuration_cli($archive, $descriptor, ['broadcast:create', 'filesystem', $archive->path('inputs-sibling')]));
         expect(file_get_contents($source . '/file'))
@@ -199,6 +110,7 @@ test('operational setup refuses implicit connections and unsafe schema names', f
         ] as $override) {
             expect(configuration_cli($archive, $descriptor, ['integration:init'], $override)['code'])->not->toBe(0);
         }
+
         expect($database->query("SELECT to_regclass('configuration_proof.configurations')")->fetchColumn())->toBeNull();
     });
 });
@@ -220,17 +132,52 @@ test('concurrent CLI configuration waits for authority and retains one Input ide
                 if ($waiting === 2) {
                     break;
                 }
+
                 usleep(20_000);
             } while (microtime(true) < $deadline);
+
             expect($waiting)->toBe(2);
         } finally {
             $database->rollBack();
             $results = array_map(finish_configuration_cli(...), $children);
         }
+
         $first = configuration_result($results[0]);
         expect(configuration_result($results[1]))
             ->toBe($first)
             ->and((int) $database->query('SELECT count(*) FROM configuration_proof.configurations')->fetchColumn())
             ->toBe(1);
+    });
+});
+
+test('Tempest migrations adopt the PR1 configuration baseline without changing identities or constraints', function (): void {
+    with_configuration_database(function (ArchiveFixture $archive, array $descriptor, PDO $database): void {
+        $root = dirname($archive->input('legacy.bin', 'retained'));
+        $id = '019a0cbb-3fde-7000-8000-000000000028';
+        // This is the schema shipped in PR1, before a migration ledger existed.
+        $database->exec("CREATE SCHEMA configuration_proof;
+            CREATE TABLE configuration_proof.configurations (
+                id uuid PRIMARY KEY, kind text NOT NULL CHECK (kind IN ('input', 'broadcast')),
+                component text NOT NULL, settings jsonb NOT NULL CHECK (jsonb_typeof(settings) = 'object'))");
+        $statement = $database->prepare('INSERT INTO configuration_proof.configurations VALUES (?, ?, ?, ?)');
+        $statement->execute([$id, 'input', 'filesystem', json_encode(['root' => $root], JSON_THROW_ON_ERROR)]);
+        $before = $database
+            ->query("SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = 'configuration_proof.configurations'::regclass ORDER BY definition")
+            ->fetchAll(PDO::FETCH_COLUMN);
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
+            $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', $root]));
+            expect($input['id'])->toBe($id)->and($input['settings'])->toBe(['root' => $root]);
+            expect((int) $database->query('SELECT count(*) FROM configuration_proof.migrations')->fetchColumn())->toBe(3);
+            expect(
+                $database
+                    ->query("SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = 'configuration_proof.configurations'::regclass ORDER BY definition")
+                    ->fetchAll(PDO::FETCH_COLUMN),
+            )
+                ->toBe($before);
+        }
+
+        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $id]));
+        expect($run['status'])->toBe('finished')->and($run['discovered_count'])->toBe(1);
     });
 });

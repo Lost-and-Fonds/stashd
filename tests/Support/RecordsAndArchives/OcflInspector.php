@@ -106,6 +106,7 @@ final class OcflInspector
                 Assert::assertArrayHasKey($hash, $inventory['manifest']);
             }
         }
+
         foreach ($inventory['manifest'] as $hash => $paths) {
             foreach ($paths as $relative) {
                 Assert::assertSame($hash, hash_file($algorithm, $path . '/' . $relative));

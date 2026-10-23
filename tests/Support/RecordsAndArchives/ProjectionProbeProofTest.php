@@ -53,6 +53,7 @@ test('the PostgreSQL witness rejects response only rebuilds and incorrect persis
         if ($databaseCreated) {
             $admin->exec('DROP DATABASE "' . $name . '" WITH (FORCE)');
         }
+
         $admin->exec('DROP ROLE "' . $name . '"');
     }
 });

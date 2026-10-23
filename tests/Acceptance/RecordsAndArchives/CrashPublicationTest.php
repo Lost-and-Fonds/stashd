@@ -29,11 +29,14 @@ function crash_process(string $root, string $operation, string $kind, string $va
         if (! $status['running']) {
             break;
         }
+
         usleep(10_000);
     } while (microtime(true) < $deadline);
+
     if ($status['running']) {
         proc_terminate($process, 9);
     }
+
     $output .= stream_get_contents($pipes[1]);
     $error .= stream_get_contents($pipes[2]);
     fclose($pipes[1]);
@@ -42,6 +45,7 @@ function crash_process(string $root, string $operation, string $kind, string $va
     if ($status['running']) {
         throw new RuntimeException('Publication subprocess timed out: ' . $error);
     }
+
     return ['output' => $output, 'error' => $error, 'exit' => $status['exitcode'] >= 0 ? $status['exitcode'] : $exit, 'signal' => $status['termsig']];
 }
 
@@ -61,7 +65,9 @@ function crash_snapshot(string $root): array
 
         $files[substr($file->getPathname(), strlen($root))] = hash_file('sha512', $file->getPathname());
     }
+
     ksort($files);
+
     return $files;
 }
 
@@ -77,6 +83,7 @@ test('abrupt publication death preserves committed history and reports physical 
         $created = crash_process($root, 'write', $kind, $second);
         $this->assertSame(0, $created['exit'], $created['error'] . $created['output']);
     }
+
     $before = crash_snapshot($root);
     $crashed = crash_process($root, 'write', $kind, $next, $boundary);
     $this->assertStringContainsString('CRASH:' . $boundary, $crashed['error'], json_encode($crashed));
@@ -90,6 +97,7 @@ test('abrupt publication death preserves committed history and reports physical 
 
         expect($after[$path] ?? null)->toBe($digest);
     }
+
     for ($attempt = 0; $attempt < 2; $attempt++) {
         $inspection = crash_process($root, 'inspect', $kind);
         $this->assertSame(0, $inspection['exit'], $inspection['error'] . $inspection['output']);
@@ -99,6 +107,7 @@ test('abrupt publication death preserves committed history and reports physical 
         if (! $committed) {
             expect($state['issues'])->not->toBeEmpty();
         }
+
         if ($committed) {
             expect($state['records'][$state['head']][$kind === 'item' ? 'metadata' : 'files'])
                 ->toBe(
@@ -109,15 +118,19 @@ test('abrupt publication death preserves committed history and reports physical 
         } else {
             expect(crash_process($root, 'read-version', $kind, $update ? 'v3' : 'v1')['exit'])->not->toBe(0);
         }
+
         if ($state['head'] !== null) {
             OcflInspector::assertAcknowledgedHistory($root, $state['object_id'], $state['head']);
         }
+
         if ($update) {
             expect($state['records']['v2'][$kind === 'item' ? 'metadata' : 'version'])->toBe($kind === 'item' ? ['revision' => 'second'] : 'v2');
             expect($state['record'][$kind === 'item' ? 'metadata' : 'version'])->toBe($kind === 'item' ? ['revision' => 'first'] : 'v1');
         }
+
         expect(crash_snapshot($root))->toBe($after);
     }
+
     // No retry may remove evidence or reuse a stranded version number.
     if ($state['issues'] !== []) {
         $retry = crash_process($root, 'write', $kind, $next);
@@ -192,6 +205,7 @@ test('inspection rejects damaged acknowledged inventories and payloads and prese
         expect($state['issues'])->not->toBeEmpty();
         expect(crash_snapshot($root))->toBe($before);
     }
+
     expect(crash_process($root, 'write', 'item', 'retry')['exit'])->not->toBe(0);
     expect(crash_snapshot($root))->toBe($before);
 })->with(['inventory', 'sidecar', 'payload']);

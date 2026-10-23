@@ -115,6 +115,7 @@ final class ItemArchiveTest extends ArchiveTestCase
             $ids[] = $item['object_id'];
             expect($this->archive->run('item.read', ['object_id' => $item['object_id']])['uri'])->toBe($uri);
         }
+
         expect(array_unique($ids))->toHaveCount(count($uris));
     }
 
@@ -143,6 +144,7 @@ final class ItemArchiveTest extends ArchiveTestCase
             expect(fn () => $this->archive->run('item.record', ['uri' => $uri, ...$invalid]))->toThrow(ArchivesRejected::class);
             expect(file_get_contents($found['path']))->toBe($before);
         }
+
         $read = $this->archive->run('item.read', ['object_id' => $item['object_id']]);
         $this->assertIsArray($read['metadata']);
         expect($read['metadata']['title'])->toBe('Keep');
@@ -242,6 +244,7 @@ final class ItemArchiveTest extends ArchiveTestCase
                 ->and(hash_file('sha512', OcflInspector::payloadPath($this->archive->path('vault'), $pin['object_id'], $pin['version'], 'binary')))
                 ->toBe($digest);
         }
+
         expect(file_get_contents(dirname($oldInventory['path']) . '/v2/inventory.json'))
             ->toBe($oldVersionInventory)
             ->and($this->archive->run('item.read', ['object_id' => $first['object_id'], 'version' => 'v1'])['pins'])
@@ -288,6 +291,7 @@ final class ItemArchiveTest extends ArchiveTestCase
     public static function invalidPins(): array
     {
         $id = 'urn:stashd:asset:00000000-0000-4000-8000-000000000001';
+
         return array_map(static fn (array $pins): array => [$pins], [
             ['valid', 'valid'],
             ['key' => 'valid'],
@@ -369,6 +373,7 @@ final class ItemArchiveTest extends ArchiveTestCase
             $asset = $this->archive->run('asset.preserve', ['item_uri' => $uri, 'asset_key' => $key, 'files' => ['a' => $this->archive->input($key, $key)]]);
             $pins[] = ['object_id' => $asset['object_id'], 'version' => 'v1'];
         }
+
         $this->archive->run('item.record', ['uri' => $uri, 'pins' => $pins]);
         expect($this->archive->run('item.read', ['object_id' => $item['object_id']])['pins'])->toBe($pins);
         $foreign = $this->archive->run('asset.preserve', [

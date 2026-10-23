@@ -24,6 +24,7 @@ final class PreparationProbe
             Assert::assertTrue(proc_get_status($child['process'])['running'], 'Child exited before ' . $boundary . ': ' . (string) file_get_contents($child['prefix'] . '.err'));
             usleep(10_000);
         }
+
         Assert::assertFileExists($child['prefix'] . '.paused', 'Missing candidate boundary: ' . $boundary);
         Assert::assertSame($boundary, file_get_contents($child['prefix'] . '.paused'));
     }
@@ -79,6 +80,7 @@ final class PreparationProbe
             } else {
                 file_put_contents($a['prefix'] . '.resume', 'resume');
             }
+
             $first = TransactionProbe::finish($a);
             if ($killOwner) {
                 Assert::assertSame(9, $first['signal']);
@@ -87,9 +89,11 @@ final class PreparationProbe
                 Assert::assertSame(0, $first['exit'], $first['err']);
                 $first = TransactionProbe::json($a['prefix'] . '.out');
             }
+
             file_put_contents($b['prefix'] . '.resume', 'resume');
             $second = TransactionProbe::finish($b);
             Assert::assertSame(0, $second['exit'], $second['err']);
+
             return [$first, TransactionProbe::json($b['prefix'] . '.out')];
         } finally {
             self::cancel($children);

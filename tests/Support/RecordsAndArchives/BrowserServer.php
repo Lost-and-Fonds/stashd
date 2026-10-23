@@ -47,6 +47,7 @@ final class BrowserServer
         if (! is_resource($this->process)) {
             throw new \RuntimeException('Could not launch HTTP application.');
         }
+
         fclose($pipes[0]);
         for ($i = 0; $i < 100; $i++) {
             set_error_handler(static fn (): bool => true);
@@ -54,10 +55,13 @@ final class BrowserServer
             restore_error_handler();
             if ($ready !== false) {
                 fclose($ready);
+
                 return;
             }
+
             usleep(20_000);
         }
+
         throw new \RuntimeException('HTTP application did not start: ' . file_get_contents($log));
     }
 
@@ -82,7 +86,9 @@ final class BrowserServer
             fclose($output);
             $body = '';
         }
+
         fclose($input);
+
         return ['status' => (int) explode(' ', $headers[0])[1], 'body' => $body, 'headers' => implode("\n", $headers)];
     }
 

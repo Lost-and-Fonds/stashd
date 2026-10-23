@@ -1,3 +1,7 @@
+# Mago is Stashd's only formatter. The inherited profile translates the
+# shared hipsterjazzbo/php-style rules without installing PHP-CS-Fixer.
+extends = "config/php-style.mago.toml"
+
 php-version = "8.5.0"
 
 [source]
@@ -54,7 +58,11 @@ no-else-clause = { enabled = false }
 no-boolean-flag-parameter = { enabled = false }
 no-shorthand-ternary = { enabled = false }
 no-assign-in-condition = { enabled = false }
+# Legacy source files still need a strict-types/import migration before these
+# two inherited style rules can be enforced without breaking existing QA.
+# This is a temporary exception; remove both overrides as a focused follow-up.
 strict-types = { enabled = false }
+no-fully-qualified-global-class-like = { enabled = false }
 tagged-todo = { enabled = false }
 excessive-parameter-list = { enabled = false }
 halstead = { enabled = false }

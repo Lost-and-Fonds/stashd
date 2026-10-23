@@ -49,6 +49,7 @@ readonly class OcflFilesystemAdapter implements Filesystem
             if ($this->readFailures !== null) {
                 $this->readFailures[0] ??= $failure;
             }
+
             throw $failure;
         }
     }
@@ -104,6 +105,7 @@ readonly class OcflFilesystemAdapter implements Filesystem
             if (! is_resource($stream)) {
                 throw new ArchiveReadFailure('Could not open archived content stream.');
             }
+
             return $stream;
         });
     }
@@ -168,12 +170,14 @@ readonly class OcflFilesystemAdapter implements Filesystem
         if (! is_resource($stream)) {
             throw new RuntimeException('Could not verify adopted bytes.');
         }
+
         try {
             $context = hash_init('sha512');
             hash_update_stream($context, $stream);
             if (! feof($stream)) {
                 throw new ArchiveReadFailure('Could not read complete byte verification stream.');
             }
+
             if (! hash_equals($expected, hash_final($context))) {
                 throw new RuntimeException('Adopted bytes differ from the accepted source.');
             }

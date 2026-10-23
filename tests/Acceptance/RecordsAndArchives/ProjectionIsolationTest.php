@@ -38,6 +38,7 @@ test('projection rebuild isolates damaged history and replaces stale rows withou
             }
         }
     }
+
     $name = 'stashd_tx_test_' . bin2hex(random_bytes(8));
     $fixture = ['database' => $name, 'username' => $name, 'schema' => $name];
     $database = null;
@@ -61,24 +62,28 @@ test('projection rebuild isolates damaged history and replaces stale rows withou
         } else {
             $path = $inventory;
         }
+
         $original = file_get_contents($path);
         if ($damage === 'asset-missing') {
             unlink($path);
         } else {
             file_put_contents($path, '{damaged');
         }
+
         if ($damage === 'unidentified') {
             // Remove every discovery identity hint, retaining a physical damaged root.
             foreach (['v1', 'v2'] as $version) {
                 file_put_contents(dirname($inventory) . '/' . $version . '/inventory.json', '{damaged');
             }
         }
+
         $before = Probe::snapshot($root);
         $previous = null;
         for ($attempt = 0; $attempt < 3; $attempt++) {
             if ($attempt === 1) {
                 expect(Probe::run($workspace, ['operation' => 'projection.destroy', 'fixture' => $fixture])['verified_absent'])->toBeTrue();
             }
+
             $report = Probe::run($workspace, $rebuild);
             expect($report['items'])->toBe($expectedItems);
             $actualItems = $database->query('SELECT object_id, version FROM "' . $name . '".items ORDER BY version')->fetchAll(PDO::FETCH_ASSOC);
@@ -94,12 +99,15 @@ test('projection rebuild isolates damaged history and replaces stale rows withou
                 expect($incidents[0]['dependency_object_id'])->toBe($pin['object_id']);
                 expect($incidents[0]['dependency_version'])->toBe('v1');
             }
+
             if ($previous !== null) {
                 expect($report)->toBe($previous);
             }
+
             $previous = $report;
             expect(Probe::snapshot($root))->toBe($before);
         }
+
         // An SQL failure after deletion must roll back rows and incidents together.
         $database->exec('ALTER TABLE "' . $name . '".items ADD CONSTRAINT reject_new CHECK (version != \'v2\') NOT VALID');
         expect(fn () => Probe::run($workspace, $rebuild))->toThrow(\PHPUnit\Framework\AssertionFailedError::class, 'reject_new');
@@ -137,6 +145,7 @@ test('inventory provider read failure aborts rebuild and preserves existing SQL 
         ]);
         expect($receipts[$label]['status'])->toBe('complete');
     }
+
     $name = 'stashd_tx_test_' . bin2hex(random_bytes(8));
     $fixture = ['database' => $name, 'username' => $name, 'schema' => $name];
     $created = false;
@@ -153,6 +162,7 @@ test('inventory provider read failure aborts rebuild and preserves existing SQL 
         foreach (['items', 'pins', 'incidents'] as $table) {
             $beforeSql[$table] = $database->query('SELECT * FROM "' . $name . '".' . $table . ' ORDER BY 1')->fetchAll(PDO::FETCH_ASSOC);
         }
+
         $itemId = $receipts['unavailable']['item']['object_id'];
         $inventory = OcflInspector::inventoryFor($root, $itemId)['path'];
         $objectPath = ltrim(substr(dirname($inventory), strlen($root)), '/');
@@ -162,11 +172,13 @@ test('inventory provider read failure aborts rebuild and preserves existing SQL 
         foreach ($beforeSql as $table => $rows) {
             expect($database->query('SELECT * FROM "' . $name . '".' . $table . ' ORDER BY 1')->fetchAll(PDO::FETCH_ASSOC))->toBe($rows);
         }
+
         expect(Probe::snapshot($root))->toBe($beforeVault);
         // Readable malformed bytes still degrade only the affected Item.
         foreach ($filename === 'inventory.json' ? [$inventory, dirname($inventory) . '/v1/inventory.json'] : [$inventory . '.sha512'] as $path) {
             file_put_contents($path, '{damaged');
         }
+
         $damagedVault = Probe::snapshot($root);
         $report = Probe::run($workspace, $rebuild);
         expect($report['items'])->toBe([$receipts['healthy']['item']]);

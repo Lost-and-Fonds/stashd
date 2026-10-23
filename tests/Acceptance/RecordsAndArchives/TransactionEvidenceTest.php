@@ -28,6 +28,7 @@ function evidence_request(ArchiveFixture $archive, string $id = 'evidence'): arr
 function evidence_workspace(ArchiveFixture $archive): string
 {
     $archive->run('vault.initialize');
+
     return dirname($archive->path('vault'));
 }
 
@@ -40,6 +41,7 @@ function evidence_bytes(string $path): string
     if ($bytes === false) {
         throw new RuntimeException('Could not read fixture evidence.');
     }
+
     return $bytes;
 }
 
@@ -106,6 +108,7 @@ test('missing malformed or conflicting retained journal evidence cannot authoriz
         $json = json_encode($plan, JSON_THROW_ON_ERROR);
         file_put_contents($directory . '/plan.json', json_encode(['json' => $json, 'sha512' => hash('sha512', $json)], JSON_THROW_ON_ERROR));
     }
+
     $before = Probe::snapshot($workspace . '/vault');
     for ($attempt = 0; $attempt < 2; $attempt++) {
         expect(Probe::run($workspace, ['operation' => 'recover', 'transaction_id' => 'evidence'])['status'])->toBe('quarantined');
@@ -157,6 +160,7 @@ function evidence_paused(array $child, string $name): void
         expect(proc_get_status($child['process'])['running'])->toBeTrue();
         usleep(10_000);
     }
+
     expect(file_get_contents($child['prefix'] . '.paused'))->toBe($name);
 }
 
@@ -209,6 +213,7 @@ test('sealed numeric metadata keeps its exact JSON types through plan persistenc
     if (! is_callable($adapter)) {
         throw new RuntimeException('Transaction adapter is not callable.');
     }
+
     $previous = \Tempest\Container\GenericContainer::instance();
     try {
         /** @var array{status: string, item: array{object_id: string, version: string}} $receipt */
@@ -216,6 +221,7 @@ test('sealed numeric metadata keeps its exact JSON types through plan persistenc
     } finally {
         \Tempest\Container\GenericContainer::setInstance($previous);
     }
+
     expect($receipt['status'])->toBe('complete');
     $item = Probe::json(OcflInspector::payloadPath($workspace . '/vault', $receipt['item']['object_id'], $receipt['item']['version'], 'item.json'));
     expect($item['metadata'])->toBe($request['metadata']);
@@ -247,6 +253,7 @@ test('discovery contains damaged present journals while another candidate remain
     if (str_starts_with($damage, 'release')) {
         expect(Probe::run($workspace, ['operation' => 'custody.release', 'transaction_id' => 'bad'])['status'])->toBe('released');
     }
+
     $name = match (explode('-', $damage)[0]) {
         'completion' => 'complete',
         'release' => 'custody-release',
@@ -274,9 +281,11 @@ test('discovery contains damaged present journals while another candidate remain
         } else {
             $record['item'] = ['object_id' => 'urn:example:unrelated', 'version' => 'v99'];
         }
+
         $json = json_encode($record, JSON_THROW_ON_ERROR);
         file_put_contents($path, json_encode(['json' => $json, 'sha512' => hash('sha512', $json)], JSON_THROW_ON_ERROR));
     }
+
     $before = Probe::snapshot($workspace . '/vault');
     for ($attempt = 0; $attempt < 2; $attempt++) {
         $discovered = Probe::run($workspace, ['operation' => 'discover']);
@@ -288,6 +297,7 @@ test('discovery contains damaged present journals while another candidate remain
         expect($quarantined[0]['reason'])->not->toBe('');
         expect(Probe::snapshot($workspace . '/vault'))->toBe($before);
     }
+
     expect(Probe::run($workspace, ['operation' => 'recover', 'transaction_id' => 'healthy'])['status'])->toBe('complete');
 })->with([
     'plan-malformed',

@@ -31,19 +31,23 @@ final readonly class TransactionProjectionFixture
         if (! is_string($name) || ! preg_match('/^stashd_tx_test_[a-f0-9]{16}$/D', $name) || $fixture !== ['database' => $name, 'username' => $name, 'schema' => $name]) {
             throw new InvalidArgumentException('Only the exact generated test database, role and schema may be used.');
         }
+
         $path = dirname($request['root']) . '/projection-' . $name . '.json';
         if ($request['operation'] === 'projection.describe' || $request['operation'] === 'projection.dispose') {
             $configPath = dirname(__DIR__, 3) . '/tmp/transaction-projection-admin.json';
             if (! is_file($configPath)) {
                 throw new RuntimeException('An explicit private local projection test-admin configuration is required.');
             }
+
             $config = $this->readJson($configPath);
             if (! is_string($config['username'] ?? null) || ! is_string($config['password'] ?? null)) {
                 throw new InvalidArgumentException('Explicit test-admin credentials are required.');
             }
+
             if (($config['dsn'] ?? null) !== 'pgsql:host=lerd-postgres;port=5432;dbname=postgres') {
                 throw new InvalidArgumentException('Projection fixtures require the local PostgreSQL test administrator.');
             }
+
             $admin = new PDO($config['dsn'], $config['username'], $config['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
             if ($request['operation'] === 'projection.dispose') {
                 $admin->exec('DROP DATABASE IF EXISTS "' . $name . '" WITH (FORCE)');
@@ -51,13 +55,16 @@ final readonly class TransactionProjectionFixture
                 if (is_file($path)) {
                     unlink($path);
                 }
+
                 return ['status' => 'disposed'];
             }
+
             $password = bin2hex(random_bytes(24));
             $quotedPassword = $admin->quote($password);
             if ($quotedPassword === false) {
                 throw new RuntimeException('Could not quote disposable fixture password.');
             }
+
             $admin->exec('CREATE ROLE "' . $name . '" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD ' . $quotedPassword);
             try {
                 $admin->exec('CREATE DATABASE "' . $name . '" OWNER "' . $name . '"');
@@ -82,6 +89,7 @@ final readonly class TransactionProjectionFixture
                 file_put_contents($path, json_encode($descriptor, JSON_THROW_ON_ERROR));
                 chmod($path, 0o600);
                 ProjectionProbe::connect($descriptor, $name)->exec('CREATE SCHEMA "' . $name . '"');
+
                 return $descriptor;
             } catch (\Throwable $error) {
                 $admin->exec('DROP DATABASE IF EXISTS "' . $name . '" WITH (FORCE)');
@@ -89,6 +97,7 @@ final readonly class TransactionProjectionFixture
                 throw $error;
             }
         }
+
         $descriptor = $this->readJson($path);
         $database = ProjectionProbe::connect($descriptor, $name);
         if ($request['operation'] === 'projection.destroy') {
@@ -97,12 +106,16 @@ final readonly class TransactionProjectionFixture
             if ($exists === false) {
                 throw new RuntimeException('Could not query fixture schema existence.');
             }
+
             $exists->execute([$name]);
+
             return ['verified_absent' => (int) $exists->fetchColumn() === 0];
         }
+
         if ($request['operation'] === 'projection.rebuild') {
             return new ArchiveProjection($vault, $items, $assets)->rebuild($database, $name);
         }
+
         throw new InvalidArgumentException('Unsupported projection fixture operation.');
     }
 
@@ -115,10 +128,12 @@ final readonly class TransactionProjectionFixture
         if ($bytes === false) {
             throw new RuntimeException('Could not read private projection fixture configuration.');
         }
+
         $data = json_decode($bytes, true, flags: JSON_THROW_ON_ERROR);
         if (! is_array($data)) {
             throw new InvalidArgumentException('Fixture configuration must be a JSON object.');
         }
+
         return $data;
     }
 }

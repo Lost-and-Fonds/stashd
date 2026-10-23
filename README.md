@@ -29,7 +29,7 @@ Open the existing Tempest application through Lerd to browse canonical Items,
 select historical revisions and download their exact preserved Asset bytes.
 See [launch instructions, limitations and running screenshots](docs/vault-browser/README.md).
 
-Filesystem Input/Broadcast configuration is available through the CLI; see
+Filesystem Input/Broadcast configuration and manual Input discovery are available through the CLI; see
 [setup, safety rules and milestone limits](docs/filesystem-round-trip.md).
 
 ## Tests

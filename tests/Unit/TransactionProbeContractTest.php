@@ -50,6 +50,7 @@ function probe_contract_process(string $mode): array
         Assert::assertIsString($raw);
         $result = json_decode($raw, true, flags: JSON_THROW_ON_ERROR);
         Assert::assertIsArray($result);
+
         return compact('result', 'stdout', 'stderr');
     } finally {
         $fixture->dispose();

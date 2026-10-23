@@ -55,9 +55,11 @@ final readonly class ArchiveCommands
         } catch (JsonException $exception) {
             throw new InvalidItemRevision('Item metadata and pins must be valid JSON.', previous: $exception);
         }
+
         if (! is_array($metadataValues) || ! is_array($pinValues) || ! str_starts_with(ltrim($pins), '[')) {
             throw new InvalidItemRevision('Metadata must be a JSON object or array; pins must be a JSON list.');
         }
+
         $object = $this->items->commitRevision($uri, $metadataValues, $pinValues);
         $this->report(['object_id' => $object->id(), 'version' => $object->head()]);
     }
@@ -110,6 +112,7 @@ final readonly class ArchiveCommands
         if (! str_starts_with($destination, '/') || str_contains($destination, "\0")) {
             throw new InvalidAsset('Export destination must be an explicit absolute path.');
         }
+
         $id = Urn::fromString($objectId);
         $record = $this->assets->inspect($id, $version);
         $input = $this->assets->readStream($id, $version, $logicalPath);
@@ -118,11 +121,13 @@ final readonly class ArchiveCommands
             if ($output === false) {
                 throw new InvalidAsset('Export destination must be a new writable file; existing files are never overwritten.');
             }
+
             try {
                 $size = stream_copy_to_stream($input, $output);
                 if ($size === false || ! fflush($output) || ! rewind($output)) {
                     throw new RuntimeException('Could not complete export.');
                 }
+
                 $context = hash_init('sha512');
                 $read = hash_update_stream($context, $output);
                 $digest = hash_final($context);
@@ -135,10 +140,12 @@ final readonly class ArchiveCommands
                 unlink($destination);
                 throw $exception;
             }
+
             fclose($output);
         } finally {
             fclose($input);
         }
+
         $this->console->writeln(json_encode(['destination' => $destination, ...$expected], JSON_THROW_ON_ERROR));
     }
 

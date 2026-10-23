@@ -11,6 +11,7 @@ $mode = $argv[2] ?? null;
 if (! is_string($workspace) || ! is_string($mode)) {
     throw new InvalidArgumentException('The contract worker requires a workspace and mode.');
 }
+
 // Assertion formatting needs configuration; leave native PHP warning handling unchanged.
 \PHPUnit\TextUI\Configuration\Registry::loadFrom($workspace . '/phpunit.configuration');
 if (in_array($mode, ['empty', 'nonzero'], true)) {
@@ -35,21 +36,26 @@ try {
             if (! $status['running']) {
                 break;
             }
+
             usleep(10_000);
         } while (microtime(true) < $deadline);
+
         Assert::assertFalse($status['running'], 'Fixture child must finish before its log paths are removed.');
         foreach ($mode === 'missing-both' ? ['out', 'err'] : [$mode === 'missing-stdout' ? 'out' : 'err'] as $suffix) {
             Assert::assertTrue(unlink($child['prefix'] . '.' . $suffix));
         }
     }
+
     if ($mode === 'missing-boundary') {
         $child['boundary'] = 'never-reached';
     }
+
     try {
         $result = ['status' => 'returned', 'value' => TransactionProbe::finish($child)];
     } catch (AssertionFailedError $error) {
         $result = ['status' => 'rejected', 'message' => $error->getMessage()];
     }
+
     $result['process_closed'] = ! is_resource($child['process']);
     file_put_contents($workspace . '/result.json', json_encode($result, JSON_THROW_ON_ERROR));
 } finally {
