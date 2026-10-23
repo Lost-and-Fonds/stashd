@@ -60,6 +60,7 @@ final readonly class BrowserResponseSender implements ResponseSender
             if (function_exists('fastcgi_finish_request')) {
                 fastcgi_finish_request();
             }
+
             return $response;
         } finally {
             $response->close();

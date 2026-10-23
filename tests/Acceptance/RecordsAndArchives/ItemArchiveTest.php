@@ -288,6 +288,7 @@ final class ItemArchiveTest extends ArchiveTestCase
     public static function invalidPins(): array
     {
         $id = 'urn:stashd:asset:00000000-0000-4000-8000-000000000001';
+
         return array_map(static fn (array $pins): array => [$pins], [
             ['valid', 'valid'],
             ['key' => 'valid'],

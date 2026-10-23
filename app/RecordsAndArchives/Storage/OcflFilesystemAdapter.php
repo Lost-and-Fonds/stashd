@@ -104,6 +104,7 @@ readonly class OcflFilesystemAdapter implements Filesystem
             if (! is_resource($stream)) {
                 throw new ArchiveReadFailure('Could not open archived content stream.');
             }
+
             return $stream;
         });
     }

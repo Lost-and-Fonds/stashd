@@ -68,6 +68,7 @@ final class PublicationInspection
             }
         } catch (Throwable $exception) {
             $this->issues[] = $exception->getMessage();
+
             return;
         }
         $candidates = [$path . '/inventory.json'];

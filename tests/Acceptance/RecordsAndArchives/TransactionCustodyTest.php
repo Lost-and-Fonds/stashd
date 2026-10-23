@@ -22,6 +22,7 @@ function custody_workspace(ArchiveFixture $archive): array
         'metadata' => ['event' => 'custody'],
         'preconditions' => [],
     ]);
+
     return ['workspace' => $workspace, 'directory' => dirname($prepared['candidate_path'])];
 }
 

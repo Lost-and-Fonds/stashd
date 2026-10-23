@@ -36,6 +36,7 @@ final class ProjectionProbe
         Assert::assertFalse($identity['privileged']);
         Assert::assertSame(0, (int) $database->query('SELECT count(*) FROM pg_auth_members
             WHERE member = (SELECT oid FROM pg_roles WHERE rolname = current_user)')->fetchColumn());
+
         return $database;
     }
 
@@ -82,6 +83,7 @@ final class ProjectionProbe
         foreach ($fields as $field) {
             $columns[] = self::identifier($table['columns'][$field]) . ' AS ' . self::identifier($field);
         }
+
         return $database->query('SELECT ' . implode(', ', $columns) . ' FROM ' . self::identifier($schema) . '.' . self::identifier($table['name']))->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -91,6 +93,7 @@ final class ProjectionProbe
     private static function identifier(string $value): string
     {
         Assert::assertMatchesRegularExpression('/^[a-z_][a-z0-9_]*$/D', $value);
+
         return '"' . $value . '"';
     }
 }

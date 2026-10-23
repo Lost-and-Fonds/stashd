@@ -44,6 +44,7 @@ final class TransactionProbe
         if ($process === false) {
             throw new RuntimeException('Could not start transaction probe.');
         }
+
         return compact('process', 'prefix', 'boundary');
     }
 
@@ -106,6 +107,7 @@ final class TransactionProbe
             $second = self::finish($b);
             unset($children['b']);
             Assert::assertSame(0, $second['exit'], $second['err']);
+
             return [$first, json_decode($second['out'], true, flags: JSON_THROW_ON_ERROR)];
         } finally {
             foreach (array_filter($children, static fn (array $child): bool => is_resource($child['process'])) as $child) {
@@ -160,6 +162,7 @@ final class TransactionProbe
             Assert::assertSame(9, $result['signal']);
             Assert::assertSame('', $result['out'], 'A killed transaction must not have emitted a success receipt.');
         }
+
         return $result;
     }
 
@@ -177,6 +180,7 @@ final class TransactionProbe
         Assert::assertSame(0, $result['exit'], $result['err'] . $result['out']);
         $decoded = json_decode($result['out'], true, flags: JSON_THROW_ON_ERROR);
         Assert::assertIsArray($decoded, 'Process result must be a JSON object.');
+
         return $decoded;
     }
 
@@ -245,6 +249,7 @@ final class TransactionProbe
             Assert::assertIsString($key, 'JSON object keys must remain strings when decoded by PHP.');
             $object[$key] = $value;
         }
+
         return $object;
     }
 
@@ -265,6 +270,7 @@ final class TransactionProbe
             $files[substr($file->getPathname(), strlen($root))] = hash_file('sha512', $file->getPathname());
         }
         ksort($files);
+
         return $files;
     }
 }

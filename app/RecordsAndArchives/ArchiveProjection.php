@@ -41,6 +41,7 @@ final readonly class ArchiveProjection
         if (! preg_match('/^[a-z_][a-z0-9_]*$/D', $schema)) {
             throw new \InvalidArgumentException('Projection schema must be a plain identifier.');
         }
+
         return $this->vault->exclusivePublication(function () use ($database, $schema): array {
             $rows = [];
             $incidents = [];
@@ -144,6 +145,7 @@ final readonly class ArchiveProjection
                 $database->rollBack();
                 throw $error;
             }
+
             return ['items' => array_map(static fn (array $row): array => ['object_id' => $row['object_id'], 'version' => $row['version']], $rows), 'incidents' => $incidents];
         });
     }

@@ -22,6 +22,7 @@ test('unsafe logical paths are rejected before any Vault write and can safely re
             $files[$file->getPathname()] = $file->isFile() ? hash_file('sha256', $file->getPathname()) : null;
         }
         ksort($files);
+
         return $files;
     };
     $before = $snapshot();

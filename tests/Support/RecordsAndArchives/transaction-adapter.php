@@ -62,5 +62,6 @@ return static function (array $request, Closure $boundary): array {
     } elseif (! in_array($request['operation'], ['commit', 'recover'], true)) {
         throw new InvalidArgumentException('Unsupported transaction fixture operation.');
     }
+
     return $transactions->commit($request['transaction_id'], $boundary);
 };

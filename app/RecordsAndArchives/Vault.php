@@ -138,6 +138,7 @@ class Vault
             }
         }
         usort($objects, static fn (array $a, array $b): int => strcmp($a['path'], $b['path']));
+
         return $objects;
     }
 
@@ -274,6 +275,7 @@ class Vault
         if (! is_dir($directory) && ! @mkdir($directory, 0o700, true) && ! is_dir($directory)) {
             throw new RuntimeException('Could not create transaction evidence directory.');
         }
+
         return $directory;
     }
 
@@ -315,6 +317,7 @@ class Vault
             if ($boundary !== null) {
                 $boundary('authority-held');
             }
+
             return $operation();
         } finally {
             $this->publicationHeld = false;
@@ -367,6 +370,7 @@ class Vault
     {
         $root = $this->open();
         $path = '/' . $root->layout()->resolveObjectPath($id->toString());
+
         return new PublicationInspection($this->storage, $path, $id->toString(), $verifyContent);
     }
 
@@ -382,6 +386,7 @@ class Vault
         if ($state->issues !== []) {
             throw new \UnexpectedValueException('Publication requires reconciliation: ' . implode('; ', $state->issues));
         }
+
         return $state->object ?? $this->open()->getObject($id->toString());
     }
 

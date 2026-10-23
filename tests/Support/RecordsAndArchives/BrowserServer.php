@@ -54,6 +54,7 @@ final class BrowserServer
             restore_error_handler();
             if ($ready !== false) {
                 fclose($ready);
+
                 return;
             }
             usleep(20_000);
@@ -83,6 +84,7 @@ final class BrowserServer
             $body = '';
         }
         fclose($input);
+
         return ['status' => (int) explode(' ', $headers[0])[1], 'body' => $body, 'headers' => implode("\n", $headers)];
     }
 

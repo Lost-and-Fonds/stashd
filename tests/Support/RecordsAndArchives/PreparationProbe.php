@@ -90,6 +90,7 @@ final class PreparationProbe
             file_put_contents($b['prefix'] . '.resume', 'resume');
             $second = TransactionProbe::finish($b);
             Assert::assertSame(0, $second['exit'], $second['err']);
+
             return [$first, TransactionProbe::json($b['prefix'] . '.out')];
         } finally {
             self::cancel($children);

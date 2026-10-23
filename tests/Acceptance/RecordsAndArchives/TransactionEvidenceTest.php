@@ -28,6 +28,7 @@ function evidence_request(ArchiveFixture $archive, string $id = 'evidence'): arr
 function evidence_workspace(ArchiveFixture $archive): string
 {
     $archive->run('vault.initialize');
+
     return dirname($archive->path('vault'));
 }
 
@@ -40,6 +41,7 @@ function evidence_bytes(string $path): string
     if ($bytes === false) {
         throw new RuntimeException('Could not read fixture evidence.');
     }
+
     return $bytes;
 }
 

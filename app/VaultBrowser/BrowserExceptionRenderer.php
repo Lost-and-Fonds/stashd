@@ -38,6 +38,7 @@ final readonly class BrowserExceptionRenderer implements ExceptionRenderer
         if (! $throwable instanceof HttpRequestFailed || $throwable->cause === null) {
             throw new \LogicException('Expected a browser response failure.');
         }
+
         return $throwable->cause;
     }
 }

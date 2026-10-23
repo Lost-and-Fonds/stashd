@@ -44,6 +44,7 @@ readonly class LocalArchiveStorage implements ArchiveStorage
         if ($root === false || is_link($this->config->path)) {
             throw new RuntimeException('A real local Vault root is required.');
         }
+
         return $root;
     }
 

@@ -51,6 +51,7 @@ final readonly class TransactionProjectionFixture
                 if (is_file($path)) {
                     unlink($path);
                 }
+
                 return ['status' => 'disposed'];
             }
             $password = bin2hex(random_bytes(24));
@@ -82,6 +83,7 @@ final readonly class TransactionProjectionFixture
                 file_put_contents($path, json_encode($descriptor, JSON_THROW_ON_ERROR));
                 chmod($path, 0o600);
                 ProjectionProbe::connect($descriptor, $name)->exec('CREATE SCHEMA "' . $name . '"');
+
                 return $descriptor;
             } catch (\Throwable $error) {
                 $admin->exec('DROP DATABASE IF EXISTS "' . $name . '" WITH (FORCE)');
@@ -98,6 +100,7 @@ final readonly class TransactionProjectionFixture
                 throw new RuntimeException('Could not query fixture schema existence.');
             }
             $exists->execute([$name]);
+
             return ['verified_absent' => (int) $exists->fetchColumn() === 0];
         }
         if ($request['operation'] === 'projection.rebuild') {
@@ -119,6 +122,7 @@ final readonly class TransactionProjectionFixture
         if (! is_array($data)) {
             throw new InvalidArgumentException('Fixture configuration must be a JSON object.');
         }
+
         return $data;
     }
 }

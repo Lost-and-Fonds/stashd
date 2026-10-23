@@ -98,6 +98,7 @@ final readonly class PreservationTransaction
                 })];
             }
             $semantics = ['id' => $id, 'uri' => $uri, 'changes' => $accepted, 'metadata' => $metadata, 'preconditions' => $preconditions];
+
             return $this->exclusiveCandidate(
                 $id,
                 function () use ($id, $directory, $staging, $semantics, $itemId, $boundary): array {
@@ -110,6 +111,7 @@ final readonly class PreservationTransaction
                             if ($existing['delta'] !== $semantics) {
                                 return ['status' => 'conflict', 'transaction_id' => $id];
                             }
+
                             return $this->prepared($id, $existing);
                         } catch (UnexpectedValueException|JsonException $error) {
                             return $this->quarantined($id, $error);
@@ -131,8 +133,10 @@ final readonly class PreservationTransaction
                             throw new RuntimeException('Could not seal transaction custody.');
                         }
                         $boundary?->__invoke('after-seal');
+
                         return true;
                     });
+
                     return $sealed ? $this->prepared($id, $candidate) : ['status' => 'conflict', 'transaction_id' => $id];
                 },
                 $boundary,
@@ -253,6 +257,7 @@ final readonly class PreservationTransaction
                         $this->saveEvidence($directory . '/complete.json', $result);
                         $boundary?->__invoke('after-ack');
                     }
+
                     return $result;
                 } catch (UnexpectedValueException|JsonException|OcflException|OutOfBoundsException|InvalidAsset|InvalidItemRevision $error) {
                     return $this->quarantined($id, $error);
@@ -321,6 +326,7 @@ final readonly class PreservationTransaction
                                 $boundary?->__invoke('custody-released:' . $key);
                             }
                         }
+
                         return ['status' => 'released', 'transaction_id' => $id, 'item' => $completion['item']];
                     } catch (UnexpectedValueException|JsonException|InvalidItemRevision|InvalidAsset $error) {
                         return $this->quarantined($id, $error);
@@ -401,6 +407,7 @@ final readonly class PreservationTransaction
                 $quarantined[] = ['path' => $directory, 'reason' => $error->getMessage()];
             }
         }
+
         return ['ids' => $ids, 'quarantined' => $quarantined];
     }
 
@@ -432,6 +439,7 @@ final readonly class PreservationTransaction
                 }
             }
             $boundary?->__invoke('candidate-authority-held');
+
             return $operation();
         } finally {
             flock($lock, LOCK_UN);
@@ -482,6 +490,7 @@ final readonly class PreservationTransaction
                 'Malformed accepted byte evidence.',
             );
         }
+
         /** @var Candidate $candidate */
         return $candidate;
     }
@@ -583,10 +592,12 @@ final readonly class PreservationTransaction
         $head = $this->head($id);
         if ($head === null || ! in_array($step['version'], $this->vault->getObject($id)->versionNames(), true)) {
             $this->require($head === $step['before'], 'Publication predecessor changed.');
+
             return false;
         }
         $record = json_decode($this->vault->readObjectContent($id, $step['version'], $path), true, flags: JSON_THROW_ON_ERROR);
         $this->require(($record['transaction'] ?? null) === $binding, 'Exact OCFL revision has another transaction binding.');
+
         return true;
     }
 
@@ -617,6 +628,7 @@ final readonly class PreservationTransaction
         $this->head($id);
         $record = $this->assets->inspect($id, $pin['version']);
         $this->require($record['item_uri'] === $uri, 'Pinned Asset belongs to another Item.');
+
         return $record;
     }
 
@@ -633,6 +645,7 @@ final readonly class PreservationTransaction
         }
         $state = $this->vault->inspectObject($id, $verifyContent);
         $this->require($state['issues'] === [], 'Object publication requires reconciliation: ' . implode('; ', $state['issues']));
+
         return $state['head'];
     }
 
@@ -689,6 +702,7 @@ final readonly class PreservationTransaction
         if ($digest === false) {
             throw new RuntimeException('Could not hash accepted custody bytes.');
         }
+
         return ['size' => $size, 'digest' => $digest];
     }
 
@@ -742,6 +756,7 @@ final readonly class PreservationTransaction
         $this->vault->open();
         $identity = $this->vault->getIdentity();
         $this->require($identity !== null, 'Vault identity is absent.');
+
         return $identity->identifier->toString();
     }
 
@@ -754,6 +769,7 @@ final readonly class PreservationTransaction
     {
         $directory = $this->directory($id);
         $first = reset($candidate['delta']['changes']);
+
         return [
             'status' => 'sealed',
             'transaction_id' => $id,
@@ -769,6 +785,7 @@ final readonly class PreservationTransaction
     private function next(?string $head): string
     {
         $this->require($head === null || preg_match('/^v[1-9][0-9]*$/D', $head) === 1, 'Malformed predecessor version.');
+
         return 'v' . ($head === null ? 1 : (int) substr($head, 1) + 1);
     }
 
@@ -782,6 +799,7 @@ final readonly class PreservationTransaction
         if ($bytes === false) {
             throw new RuntimeException('Could not read transaction evidence.');
         }
+
         return $bytes;
     }
 
@@ -826,6 +844,7 @@ final readonly class PreservationTransaction
         );
         $data = json_decode($envelope['json'], true, flags: JSON_THROW_ON_ERROR);
         $this->require(is_array($data), 'Transaction evidence must be a JSON object.');
+
         return $data;
     }
 

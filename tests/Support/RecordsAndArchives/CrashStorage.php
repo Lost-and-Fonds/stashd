@@ -50,6 +50,7 @@ readonly class CrashStorage extends LocalArchiveStorage
         if (str_ends_with($location, '/inventory.json.sha512') && preg_match('~/v\d+\.tmp-[^/]+/~', $location)) {
             $this->stop('version-ready');
         }
+
         return $this;
     }
 
@@ -67,6 +68,7 @@ readonly class CrashStorage extends LocalArchiveStorage
         }
         parent::writeStream($location, $contents);
         $this->stop('content-complete');
+
         return $this;
     }
 
@@ -85,6 +87,7 @@ readonly class CrashStorage extends LocalArchiveStorage
         } elseif (str_ends_with($destination, '/inventory.json.sha512')) {
             $this->stop(preg_match('~/v\d+\.tmp-[^/]+/~', $destination) ? 'version-ready' : 'root-sidecar-published');
         }
+
         return $this;
     }
 
@@ -96,6 +99,7 @@ readonly class CrashStorage extends LocalArchiveStorage
         if (str_ends_with($location, '/.ocfl-pending-meta.json')) {
             $this->stop('before-cleanup');
         }
+
         return parent::fileExists($location);
     }
 
@@ -105,6 +109,7 @@ readonly class CrashStorage extends LocalArchiveStorage
     public function delete(string $location): static
     {
         $this->stop('before-cleanup');
+
         return parent::delete($location);
     }
 }

@@ -76,6 +76,7 @@ final readonly class VaultBrowserController
             }
         } catch (Throwable $error) {
             $new = $error::class === \Exception::class && $error->getMessage() === 'Vault identity does not exist';
+
             return $this->page(
                 [
                     'kind' => 'Vault',
@@ -85,6 +86,7 @@ final readonly class VaultBrowserController
                 $new ? Status::OK : Status::SERVICE_UNAVAILABLE,
             );
         }
+
         return $this->page([
             'kind' => 'Vault',
             'state' => 'Vault connected',
@@ -127,6 +129,7 @@ final readonly class VaultBrowserController
                     $pins[] = [...$pin, 'error' => 'Pinned Asset unavailable or failed verification.'];
                 }
             }
+
             return $this->page(['kind' => 'Item', 'record' => $record, 'selected' => $version, 'versions' => $object->inventory->versions, 'pins' => $pins]);
         } catch (\InvalidArgumentException) {
             return $this->error(Status::BAD_REQUEST, 'Invalid Item ID or revision');
@@ -147,6 +150,7 @@ final readonly class VaultBrowserController
         try {
             self::version($version);
             $record = $this->assets->inspect(self::id(rawurldecode($id), 'asset'), $version);
+
             return $this->page(['kind' => 'Asset', 'record' => $record, 'selected' => $version]);
         } catch (\InvalidArgumentException) {
             return $this->error(Status::BAD_REQUEST, 'Invalid Asset ID or version');
@@ -188,6 +192,7 @@ final readonly class VaultBrowserController
             if (! feof($copy) || $size !== $evidence['size'] || hash_final($hash) !== $evidence['digest']) {
                 throw new \RuntimeException('Download copy failed verification.');
             }
+
             return new VerifiedDownload($copy, basename($path), $size);
         } catch (\InvalidArgumentException) {
             return $this->error(Status::BAD_REQUEST, 'Invalid download request');
@@ -195,6 +200,7 @@ final readonly class VaultBrowserController
             if (is_resource($copy)) {
                 fclose($copy);
             }
+
             return $this->error(Status::NOT_FOUND, 'Download unavailable or failed verification');
         } finally {
             if (is_resource($input)) {
@@ -213,6 +219,7 @@ final readonly class VaultBrowserController
         if (! preg_match('/^urn:stashd:' . $type . ':[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/D', $id)) {
             throw new \InvalidArgumentException('Invalid archival ID.');
         }
+
         return Urn::fromString($id);
     }
 

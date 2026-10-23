@@ -17,6 +17,7 @@ function transaction_request(ArchiveFixture $fixture, string $id = 'tx-a', array
     foreach ($bytes as $key => $value) {
         $changes[$key] = $fixture->input($id . '-' . $key . '.bin', $value);
     }
+
     return [
         'operation' => 'prepare',
         'transaction_id' => $id,
@@ -33,6 +34,7 @@ function transaction_request(ArchiveFixture $fixture, string $id = 'tx-a', array
 function transaction_workspace(ArchiveFixture $fixture): string
 {
     $fixture->run('vault.initialize');
+
     return dirname($fixture->path('vault'));
 }
 
@@ -106,6 +108,7 @@ test('PSC-T02 crash windows recover once and retain exact authoritative relation
         $outcome = Probe::run($workspace, $recovery);
         expect($outcome['status'])->toBeIn(['absent', 'unsealed', 'quarantined']);
         expect(Probe::snapshot($root))->toBe($before);
+
         return;
     }
     // A sealed candidate must own its material; acquisition source paths are gone.
@@ -445,6 +448,7 @@ test('PSC-T20 authority supervisor observes real contention and detects a bypass
     $run = fn (): array => Probe::contend($workspace, ['operation' => 'probe.ownership'], ['operation' => 'probe.ownership', 'bypass_lock' => $bypass], $killOwner);
     if ($bypass) {
         expect($run)->toThrow(AssertionFailedError::class, 'Child exited before authority-contended');
+
         return;
     }
     $results = $run();

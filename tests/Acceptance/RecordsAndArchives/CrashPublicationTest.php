@@ -42,6 +42,7 @@ function crash_process(string $root, string $operation, string $kind, string $va
     if ($status['running']) {
         throw new RuntimeException('Publication subprocess timed out: ' . $error);
     }
+
     return ['output' => $output, 'error' => $error, 'exit' => $status['exitcode'] >= 0 ? $status['exitcode'] : $exit, 'signal' => $status['termsig']];
 }
 
@@ -62,6 +63,7 @@ function crash_snapshot(string $root): array
         $files[substr($file->getPathname(), strlen($root))] = hash_file('sha512', $file->getPathname());
     }
     ksort($files);
+
     return $files;
 }
 
