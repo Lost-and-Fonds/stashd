@@ -70,16 +70,19 @@ final readonly class AssetArchive
         if ($files === []) {
             throw new InvalidAsset('An Asset must contain at least one logical file.');
         }
+
         foreach ($files as $path => $source) {
             self::validatePath($path);
             if ($path === '.stashd' || str_starts_with($path, '.stashd/')) {
                 throw new InvalidAsset('The .stashd namespace is reserved for archival metadata.');
             }
+
             foreach (array_keys($files) as $other) {
                 if (str_starts_with($other, $path . '/')) {
                     throw new InvalidAsset('A logical file cannot also be a directory.');
                 }
             }
+
             self::validateSource($source);
         }
 
@@ -88,6 +91,7 @@ final readonly class AssetArchive
         if (! mkdir($directory, 0o700)) {
             throw new RuntimeException('Could not create private acquisition staging.');
         }
+
         $staging = new GenericStorage(new LocalStorageConfig(path: $directory));
         try {
             $accepted = [];
@@ -97,6 +101,7 @@ final readonly class AssetArchive
                 if ($input === false) {
                     throw new InvalidAsset('Could not open acquisition source.');
                 }
+
                 try {
                     self::validateSource($source);
                     $before = fstat($input);
@@ -104,6 +109,7 @@ final readonly class AssetArchive
                     if ($before === false || $current === false || $before['ino'] !== $current['ino'] || $before['dev'] !== $current['dev']) {
                         throw new InvalidAsset('Acquisition source changed while opening.');
                     }
+
                     $name = (string) count($accepted);
                     $staging->writeStream($name, $input);
                     $after = fstat($input);
@@ -116,10 +122,12 @@ final readonly class AssetArchive
                 } finally {
                     fclose($input);
                 }
+
                 $stream = $staging->readStream($name);
                 $accepted[$path] = self::evidence($stream);
                 $staged[$path] = $directory . '/' . $name;
             }
+
             ksort($accepted);
             $record = [
                 'format' => 'stashd-asset',
@@ -138,6 +146,7 @@ final readonly class AssetArchive
                 if ($existing !== null && $existing->id() !== $id->toString()) {
                     throw new UnexpectedValueException('OCFL identity does not match the Asset.');
                 }
+
                 if ($existing !== null && $existing->head() !== '') {
                     $record = $this->inspect($id, $existing->head());
                     if ($record['item_uri'] !== $itemUri || $record['asset_key'] !== $assetKey) {
@@ -174,6 +183,7 @@ final readonly class AssetArchive
         if (! is_array($record)) {
             throw new UnexpectedValueException('Unsupported or inconsistent archived Asset identity.');
         }
+
         $objectId = $record['object_id'] ?? null;
         $itemObjectId = $record['item_object_id'] ?? null;
         $itemUri = $record['item_uri'] ?? null;
@@ -192,11 +202,13 @@ final readonly class AssetArchive
         ) {
             throw new UnexpectedValueException('Unsupported or inconsistent archived Asset identity.');
         }
+
         $paths = [...array_keys($record['files']), self::RECORD];
         sort($paths);
         if ($paths !== $object->logicalPaths($version)) {
             throw new UnexpectedValueException('Asset file set differs from OCFL version.');
         }
+
         $verified = [];
         foreach ($paths as $path) {
             $stream = $this->vault->readObjectStream($id, $version, $path);
@@ -204,9 +216,11 @@ final readonly class AssetArchive
             if ($path !== self::RECORD && $actual !== $record['files'][$path]) {
                 throw new UnexpectedValueException('Archived bytes differ from accepted byte evidence.');
             }
+
             if ($path !== self::RECORD) {
                 $verified[$path] = $actual;
             }
+
             $digest = $actual['digest'];
             if ($object->inventory->digestAlgorithm->value !== 'sha512' || ! in_array($path, $object->inventory->versions[$version]->state[$digest] ?? [], true)) {
                 throw new UnexpectedValueException('Archived bytes differ from OCFL inventory.');
@@ -274,11 +288,13 @@ final readonly class AssetArchive
         if (! is_string($source) || ! str_starts_with($source, '/') || str_contains($source, "\0")) {
             throw new InvalidAsset('Acquisition source must be an absolute local file path.');
         }
+
         for ($cursor = $source; $cursor !== '/'; $cursor = dirname($cursor)) {
             if (is_link($cursor)) {
                 throw new InvalidAsset('Acquisition sources may not traverse symbolic links.');
             }
         }
+
         if (! is_file($source) || ! is_readable($source)) {
             throw new InvalidAsset('Acquisition source must be a readable regular file.');
         }
@@ -298,6 +314,7 @@ final readonly class AssetArchive
         if (! is_resource($stream)) {
             throw new \App\RecordsAndArchives\Storage\ArchiveReadFailure('Could not open byte verification stream.');
         }
+
         try {
             $context = hash_init('sha512');
             $size = hash_update_stream($context, $stream);

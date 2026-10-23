@@ -57,9 +57,11 @@ final readonly class ArchiveProjection
                     ];
                     continue;
                 }
+
                 if (! str_starts_with($objectId, 'urn:stashd:item:')) {
                     continue;
                 }
+
                 $version = null;
                 $dependency = null;
                 $itemRows = [];
@@ -68,6 +70,7 @@ final readonly class ArchiveProjection
                     if ($this->vault->inspectObject($id)['issues'] !== []) {
                         throw new UnexpectedValueException('Cannot project unreconciled Item publication.');
                     }
+
                     foreach ($this->vault->getObject($id)->versionNames() as $version) {
                         $dependency = null;
                         $record = $this->items->read($id, $version);
@@ -78,12 +81,14 @@ final readonly class ArchiveProjection
                                 throw new UnexpectedValueException('Cannot project unverified Item relationships.');
                             }
                         }
+
                         $itemRows[] = ['object_id' => $objectId, 'version' => $version, 'pins' => $record['pins']];
                     }
                 } catch (\Exception $error) {
                     if ($error instanceof \App\RecordsAndArchives\Storage\ArchiveReadFailure) {
                         throw $error;
                     }
+
                     $incidents[] = [
                         ...$entry,
                         'item_version' => $version,
@@ -93,8 +98,10 @@ final readonly class ArchiveProjection
                     ];
                     continue;
                 }
+
                 array_push($rows, ...$itemRows);
             }
+
             $schema = '"' . $schema . '"';
             $database->beginTransaction();
             try {
@@ -117,6 +124,7 @@ final readonly class ArchiveProjection
                 if ($insertIncident === false) {
                     throw new \RuntimeException('Could not prepare incident statement.');
                 }
+
                 foreach ($incidents as $incident) {
                     $insertIncident->execute([
                         $incident['object_id'],
@@ -127,6 +135,7 @@ final readonly class ArchiveProjection
                         $incident['reason'],
                     ]);
                 }
+
                 $database->exec('DELETE FROM ' . $schema . '.pins');
                 $database->exec('DELETE FROM ' . $schema . '.items');
                 $insertItem = $database->prepare('INSERT INTO ' . $schema . '.items VALUES (?, ?)');
@@ -134,12 +143,14 @@ final readonly class ArchiveProjection
                 if ($insertItem === false || $insertPin === false) {
                     throw new \RuntimeException('Could not prepare projection statements.');
                 }
+
                 foreach ($rows as $row) {
                     $insertItem->execute([$row['object_id'], $row['version']]);
                     foreach ($row['pins'] as $pin) {
                         $insertPin->execute([$row['object_id'], $row['version'], $pin['object_id'], $pin['version']]);
                     }
                 }
+
                 $database->commit();
             } catch (\Throwable $error) {
                 $database->rollBack();

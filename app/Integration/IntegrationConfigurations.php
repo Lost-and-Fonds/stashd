@@ -52,6 +52,7 @@ final readonly class IntegrationConfigurations
             if (($catalog['name'] ?? null) === null) {
                 $this->migrations->executeUp(new CreateMigrationsTable());
             }
+
             $this->migrations->up();
         });
     }
@@ -70,9 +71,11 @@ final readonly class IntegrationConfigurations
         if (! in_array($kind, ['input', 'broadcast'], true) || $component !== 'filesystem') {
             throw new InvalidArgumentException('Only the in-process filesystem Input and Broadcast are registered.');
         }
+
         if ($this->vault->provider !== 'local') {
             throw new InvalidArgumentException('Filesystem configuration currently requires a local Vault.');
         }
+
         $database = $this->database->connect();
 
         return $this->database->transaction(function () use ($database, $kind, $component, $root): array {
@@ -86,18 +89,22 @@ final readonly class IntegrationConfigurations
                 if ($record['component'] !== 'filesystem') {
                     continue;
                 }
+
                 $otherRoot = $record['settings']['root'] ?? null;
                 if (! is_string($otherRoot)) {
                     throw new RuntimeException('Stored Filesystem configuration has no root.');
                 }
+
                 $otherRoot = $this->roots->canonical($otherRoot, allowMissing: true);
                 $this->roots->requireSeparate($otherRoot, $vault);
                 if ($record['kind'] === $kind && $otherRoot === $root) {
                     $existing = $record;
                     continue;
                 }
+
                 $this->roots->requireSeparate($root, $otherRoot);
             }
+
             $record = $existing ?? ['id' => Uuid::v7()->toString(), 'kind' => $kind, 'component' => $component, 'settings' => ['root' => $root]];
             if ($existing === null) {
                 $database->execute(query('configurations')->insert(
@@ -124,6 +131,7 @@ final readonly class IntegrationConfigurations
         if (! Uuid::isValid($id)) {
             throw new InvalidArgumentException('A valid configuration UUID is required.');
         }
+
         $row = $this->database->connect()->fetchFirst(query('configurations')->select('id', 'kind', 'component', 'settings')->where('id', $id)->where('kind', $kind));
         if ($row === null) {
             throw new InvalidArgumentException('Configuration not found for the requested lifecycle.');
@@ -166,6 +174,7 @@ final readonly class IntegrationConfigurations
         if (! is_string($row['id'] ?? null) || ! is_string($row['kind'] ?? null) || ! is_string($row['component'] ?? null) || ! is_string($row['settings'] ?? null)) {
             throw new RuntimeException('Invalid stored operational configuration.');
         }
+
         $settings = json_decode($row['settings'], true, flags: JSON_THROW_ON_ERROR);
         if (! is_array($settings)) {
             throw new RuntimeException('Stored component settings must be a JSON object.');

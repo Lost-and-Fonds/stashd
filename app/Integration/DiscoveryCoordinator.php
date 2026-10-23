@@ -60,6 +60,7 @@ final readonly class DiscoveryCoordinator
                     if (! $active) {
                         throw new RuntimeException('Discovery acknowledgment is outside its invocation.');
                     }
+
                     $batch = $this->batches->validate($values, self::BATCH_SIZE);
                     $this->store->commit($id, $continuation, $batch);
                     $continuation = $batch->progress['more'] ?? null;
@@ -75,6 +76,7 @@ final readonly class DiscoveryCoordinator
                 if ($result['status'] === 'finished') {
                     return $result;
                 }
+
                 $this->store->fail($id, $error->getMessage());
                 throw new RuntimeException('Discovery run ' . $id . ' remains resumable: ' . $error->getMessage(), previous: $error);
             } finally {

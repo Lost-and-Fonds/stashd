@@ -35,9 +35,11 @@ test('manual CLI discovery keeps stable associations and observes rescans withou
         for ($index = 0; $index < 205; $index++) {
             $manifest[sprintf('file-%03d.dat', $index)] = 'contents-' . $index;
         }
+
         foreach ($manifest as $path => $bytes) {
             $archive->input($path, $bytes);
         }
+
         $root = $archive->path('inputs');
         $beforeVault = TransactionProbe::snapshot($archive->path('vault'));
         $beforeSource = TransactionProbe::snapshot($root);
@@ -75,6 +77,7 @@ test('manual CLI discovery keeps stable associations and observes rescans withou
                 ->and(json_decode($item['metadata'][0]['json'], true, flags: JSON_THROW_ON_ERROR)['input_id'])
                 ->toBe($input['id']);
         }
+
         sort($paths);
         $expected = array_keys($manifest);
         sort($expected);
@@ -186,6 +189,7 @@ test('discovery rechecks live roots and retains a failed run for retry after the
             unlink($root);
             rename($archive->path('moved'), $root);
         }
+
         $resumed = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
         expect($resumed['id'])
             ->toBe($row['id'])
@@ -248,6 +252,7 @@ test('a killed real CLI retains its first batch and resumes without duplicate as
         for ($index = 0; $index < 205; $index++) {
             $archive->input(sprintf('file-%03d', $index), 'file-' . $index);
         }
+
         configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
         $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', $archive->path('inputs')]));
         $database->exec(<<<'SQL'
@@ -267,8 +272,10 @@ test('a killed real CLI retains its first batch and resumes without duplicate as
                 if ($waiting === 1) {
                     break;
                 }
+
                 usleep(20_000);
             } while (microtime(true) < $deadline);
+
             expect($waiting)->toBe(1);
             $checkpoint = $database->query('SELECT id::text, batches, continuation FROM configuration_proof.discovery_runs')->fetch(PDO::FETCH_ASSOC);
             expect((int) $checkpoint['batches'])
@@ -297,11 +304,13 @@ test('a killed real CLI retains its first batch and resumes without duplicate as
                     }
                 } while ($status['running'] && microtime(true) < $deadline);
             }
+
             $database->query('SELECT pg_advisory_unlock(7861, 28)');
             if ($child !== null) {
                 finish_configuration_cli($child);
             }
         }
+
         expect($status['signaled'])->toBeTrue()->and($status['termsig'])->toBe(9);
         // Wait for the disconnected PostgreSQL transaction to release its row lock.
         $database->query('SELECT id FROM configuration_proof.discovery_runs FOR UPDATE')->fetchAll();
@@ -328,6 +337,7 @@ test('a killed real CLI retains its first batch and resumes without duplicate as
                 $continuation->execute([$checkpoint['continuation'], $checkpoint['id']]);
             }
         }
+
         $update = $database->prepare('UPDATE configuration_proof.configurations SET settings = ? WHERE id = ?');
         $update->execute([json_encode(['root' => $archive->path('changed-root')], JSON_THROW_ON_ERROR), $input['id']]);
         try {
@@ -340,6 +350,7 @@ test('a killed real CLI retains its first batch and resumes without duplicate as
         } finally {
             $update->execute([json_encode($input['settings'], JSON_THROW_ON_ERROR), $input['id']]);
         }
+
         $resumed = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
         expect($resumed['id'])
             ->toBe($checkpoint['id'])

@@ -21,6 +21,7 @@ test('unsafe logical paths are rejected before any Vault write and can safely re
         foreach ($iterator as $file) {
             $files[$file->getPathname()] = $file->isFile() ? hash_file('sha256', $file->getPathname()) : null;
         }
+
         ksort($files);
 
         return $files;
@@ -92,6 +93,7 @@ test('rejected acquisition sources leave no committed version and preserve histo
     } elseif ($kind === 'ancestor') {
         symlink(dirname($source), dirname($rejected));
     }
+
     $arguments = [
         'type' => 'asset',
         'uuid' => '123e4567-e89b-12d3-a456-426614174211',
@@ -125,6 +127,7 @@ test('rejected acquisition sources leave no committed version and preserve histo
         expect(is_file($objectRoot . '/inventory.json'))->toBeFalse();
         expect(is_dir($objectRoot . '/v1'))->toBeFalse();
     }
+
     $retried = $this->archive->run($operation, [
         ...$write,
         'files' => ['safe.bin' => $source],

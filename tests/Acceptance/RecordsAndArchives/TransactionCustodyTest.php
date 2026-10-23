@@ -61,6 +61,7 @@ test('completed custody release retains permanent evidence and replays exact his
     foreach (array_intersect_key($before, $after) as $path => $digest) {
         expect($after[$path])->toBe($digest);
     }
+
     $authorization = Probe::json($directory . '/custody-release.json');
     expect(hash('sha512', $authorization['json']))->toBe($authorization['sha512']);
     /** @var array{completion: array, candidate: string} $authorization */
@@ -76,6 +77,7 @@ test('completed custody release retains permanent evidence and replays exact his
             /** @var array{status: string, transaction_id: string, item: array{object_id: string, version: string}} $again */
             custody_committed($workspace, $again);
         }
+
         expect(Probe::snapshot($workspace . '/vault'))->toBe($after);
     }
 });
@@ -85,6 +87,7 @@ test('unfinished custody cannot be released or advanced by cleanup', function (s
     if ($boundary !== 'sealed') {
         Probe::finish(Probe::start($workspace, ['operation' => 'commit', 'transaction_id' => 'custody'], $boundary));
     }
+
     $before = Probe::snapshot($workspace . '/vault');
     for ($attempt = 0; $attempt < 2; $attempt++) {
         expect(Probe::run($workspace, ['operation' => 'custody.release', 'transaction_id' => 'custody'])['status'])->toBe('not-complete');
@@ -113,6 +116,7 @@ test('process death during custody release preserves completed replay and permit
         custody_committed($workspace, $again);
         expect(Probe::snapshot($workspace . '/vault'))->toBe($interrupted);
     }
+
     expect(Probe::run($workspace, ['operation' => 'custody.release', 'transaction_id' => 'custody'])['status'])->toBe('released');
     expect(file_exists($directory . '/custody-0'))->toBeFalse();
     expect(file_exists($directory . '/custody-1'))->toBeFalse();
@@ -128,6 +132,7 @@ test('damaged authoritative or journal evidence prevents custody deletion and re
     if ($damage === 'asset-after-release') {
         Probe::run($workspace, ['operation' => 'custody.release', 'transaction_id' => 'custody']);
     }
+
     $item = $receipt['item'];
     /** @var array{pins: list<array{object_id: string, version: string}>} $record */
     $record = Probe::json(OcflInspector::payloadPath($workspace . '/vault', $item['object_id'], $item['version'], 'item.json'));
@@ -153,6 +158,7 @@ test('forged completion cannot authorize unfinished custody release', function (
     if ($partial) {
         Probe::finish(Probe::start($workspace, ['operation' => 'commit', 'transaction_id' => 'custody'], 'asset-verified:master'));
     }
+
     $json = json_encode(['status' => 'complete', 'transaction_id' => 'custody', 'item' => ['object_id' => 'urn:example:invented', 'version' => 'v99']], JSON_THROW_ON_ERROR);
     file_put_contents($directory . '/complete.json', json_encode(['json' => $json, 'sha512' => hash('sha512', $json)], JSON_THROW_ON_ERROR));
     $before = Probe::snapshot($workspace . '/vault');
@@ -186,6 +192,7 @@ test('concurrent cleanup reuses one release authorization under actual publicati
         expect($result['status'])->toBe('released');
         expect($result['item'])->toBe($receipt['item']);
     }
+
     $before = Probe::snapshot($workspace . '/vault');
     expect(Probe::run($workspace, $release)['status'])->toBe('released');
     expect(Probe::snapshot($workspace . '/vault'))->toBe($before);

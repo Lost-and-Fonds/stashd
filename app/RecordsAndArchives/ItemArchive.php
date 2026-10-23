@@ -60,6 +60,7 @@ final readonly class ItemArchive
             } catch (OcflException|OutOfBoundsException|UnexpectedValueException|JsonException|InvalidAsset $exception) {
                 throw new InvalidItemRevision('Pinned Asset version is missing, incompatible or corrupt.', previous: $exception);
             }
+
             if (($asset['item_uri'] ?? null) !== $uri || ($asset['item_object_id'] ?? null) !== $id->toString()) {
                 throw new InvalidItemRevision('Pinned Asset belongs to a different canonical Item.');
             }
@@ -80,6 +81,7 @@ final readonly class ItemArchive
         } catch (JsonException $exception) {
             throw new InvalidItemRevision('Item metadata must contain valid JSON values.', previous: $exception);
         }
+
         $this->validateMetadata($metadata);
         $files = [self::RECORD_PATH => ['contents' => $json]];
         $root = $this->vault->open();
@@ -115,6 +117,7 @@ final readonly class ItemArchive
         if (! in_array(self::RECORD_PATH, $object->inventory->versions[$version]->state[$digest] ?? [], true)) {
             throw new UnexpectedValueException('Archived Item record differs from its OCFL inventory.');
         }
+
         $record = json_decode(
             $json,
             associative: true,
@@ -132,6 +135,7 @@ final readonly class ItemArchive
         ) {
             throw new UnexpectedValueException('Unsupported or inconsistent archived Item record.');
         }
+
         if ($this->objectIdForUri($record['uri'])->toString() !== $objectId->toString()) {
             throw new UnexpectedValueException('Archived Item URI does not match its Object identity.');
         }
@@ -175,6 +179,7 @@ final readonly class ItemArchive
         if (! array_is_list($pins)) {
             throw new InvalidItemRevision('Asset pins must be a list of exact Object/version references.');
         }
+
         $references = [];
         $seen = [];
         foreach ($pins as $pin) {
@@ -189,10 +194,12 @@ final readonly class ItemArchive
             ) {
                 throw new InvalidItemRevision('Each pin requires a canonical Asset Object ID and an exact OCFL version.');
             }
+
             $key = $pin['object_id'];
             if (isset($seen[$key])) {
                 throw new InvalidItemRevision('Each Asset Object may be pinned only once per Item revision.');
             }
+
             $seen[$key] = true;
             $references[] = ['object_id' => $pin['object_id'], 'version' => $pin['version']];
         }

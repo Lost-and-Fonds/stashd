@@ -35,6 +35,7 @@ test('Tempest discovery rules accept coherent empty nullable and terminal covera
         $validator->validate(['items' => [], 'progress' => ['finished' => $finish]], 100);
         $validator->validate(['items' => [$item], 'progress' => ['finished' => $finish]], 100);
     }
+
     $validator->validate(['items' => [$item], 'progress' => ['more' => 'opaque-continuation']], 100);
     expect(true)->toBeTrue();
 });
@@ -48,6 +49,7 @@ test('Tempest discovery rules reject missing nullable keys coercible scalars and
         unset($missing[$field]);
         expect(fn () => $validator->validate(['items' => [$missing], 'progress' => $progress], 100))->toThrow(RuntimeException::class);
     }
+
     foreach ([
         ['size_bytes', '0'],
         ['size_bytes', 0.0],
@@ -64,6 +66,7 @@ test('Tempest discovery rules reject missing nullable keys coercible scalars and
         $invalid = [...$item, $field => $value];
         expect(fn () => $validator->validate(['items' => [$invalid], 'progress' => $progress], 100))->toThrow(RuntimeException::class);
     }
+
     expect(fn () => $validator->validate(['items' => [[...$item, 'source.uri' => 'injected']], 'progress' => $progress], 100))->toThrow(RuntimeException::class);
     expect(fn () => $validator->validate(['items' => [[...$item, 'size_estimated.extra' => true]], 'progress' => $progress], 100))->toThrow(RuntimeException::class);
     expect(fn () => $validator->validate(['items' => [$item], 'progress' => $progress, 'items.0.size_bytes' => '1'], 100))->toThrow(RuntimeException::class);
@@ -108,9 +111,11 @@ test('typed Filesystem cursors retain exact positions and reject coercion missin
     foreach (['../outside', '/absolute', 'nested//empty', 'nested/./dot', 'back\\slash', "new\nline"] as $path) {
         $badValues[] = [...$values, 'frames' => [['path' => $path, 'position' => 1]]];
     }
+
     foreach (['1', -1, 1.0] as $position) {
         $badValues[] = [...$values, 'frames' => [['path' => 'nested', 'position' => $position]]];
     }
+
     foreach ($badValues as $invalid) {
         expect(fn () => FilesystemCursor::decode(json_encode($invalid, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), $validator, $roots))
             ->toThrow(InvalidArgumentException::class);

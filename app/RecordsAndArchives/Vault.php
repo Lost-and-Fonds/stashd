@@ -106,11 +106,13 @@ class Vault
 
                     $candidates[] = $path . '/' . $name . '/inventory.json';
                 }
+
                 $id = null;
                 foreach ($candidates as $candidate) {
                     if (! $fs->fileExists($candidate)) {
                         continue;
                     }
+
                     $json = $fs->read($candidate);
                     try {
                         $inventory = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
@@ -118,25 +120,30 @@ class Vault
                         // Readable malformed bytes cannot provide an identity hint.
                         continue;
                     }
+
                     $hint = is_array($inventory) ? $inventory['id'] ?? null : null;
                     if (is_string($hint) && trim($root->layout()->resolveObjectPath($hint), '/') === $path) {
                         $id = $hint;
                         break;
                     }
                 }
+
                 $objects[] = ['object_id' => $id, 'path' => $path];
                 continue;
             }
+
             foreach ($names as $name) {
                 if ($path === '' && $name === 'extensions') {
                     continue;
                 }
+
                 $child = ltrim($path . '/' . $name, '/');
                 if ($fs->directoryExists($child)) {
                     $pending[] = $child;
                 }
             }
         }
+
         usort($objects, static fn (array $a, array $b): int => strcmp($a['path'], $b['path']));
 
         return $objects;
@@ -268,10 +275,12 @@ class Vault
         if (! $this->storage instanceof \App\RecordsAndArchives\Storage\Providers\LocalArchiveStorage) {
             throw new RuntimeException('Preservation transactions require local archival storage.');
         }
+
         $directory = $this->storage->rootPath() . '/extensions/stashd-transactions';
         if (is_link($directory) || is_link(dirname($directory))) {
             throw new RuntimeException('Transaction evidence may not traverse symbolic links.');
         }
+
         if (! is_dir($directory) && ! @mkdir($directory, 0o700, true) && ! is_dir($directory)) {
             throw new RuntimeException('Could not create transaction evidence directory.');
         }
@@ -296,23 +305,28 @@ class Vault
         if ($this->publicationHeld) {
             return $operation();
         }
+
         $path = $this->transactionDirectory() . '/authority.lock';
         if (is_link($path)) {
             throw new RuntimeException('Publication authority may not be a symbolic link.');
         }
+
         $lock = fopen($path, 'c+b');
         if ($lock === false) {
             throw new RuntimeException('Could not open publication authority.');
         }
+
         try {
             if (! flock($lock, LOCK_EX | LOCK_NB)) {
                 if ($boundary !== null) {
                     $boundary('authority-contended');
                 }
+
                 if (! flock($lock, LOCK_EX)) {
                     throw new RuntimeException('Could not claim publication authority.');
                 }
             }
+
             $this->publicationHeld = true;
             if ($boundary !== null) {
                 $boundary('authority-held');
@@ -354,9 +368,11 @@ class Vault
         if ($state->object !== null) {
             return $state->object;
         }
+
         if ($state->issues === []) {
             return $this->open()->getObject($id->toString());
         }
+
         throw new OcflException(ErrorCode::E060, implode('; ', $state->issues));
     }
 

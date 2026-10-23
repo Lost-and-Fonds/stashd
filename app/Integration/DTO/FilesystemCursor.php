@@ -47,6 +47,7 @@ final class FilesystemCursor
             if (! is_array($values) || $validator->validateValue($values, new IsDiscoveryRecord()) !== [] || $validator->validateValuesForClass(self::class, $values) !== []) {
                 throw new InvalidArgumentException('Invalid Filesystem discovery continuation.');
             }
+
             /** @var list<mixed> $frames */
             $frames = $values['frames'];
             foreach ($frames as $frame) {
@@ -57,10 +58,12 @@ final class FilesystemCursor
                 ) {
                     throw new InvalidArgumentException('Invalid Filesystem discovery frame.');
                 }
+
                 /** @var FilesystemFrame $frame */
                 $frame = map($frame)->to(FilesystemFrame::class);
                 $roots->relative($frame->path, allowEmpty: true);
             }
+
             /** @var self $cursor */
             $cursor = map($values)->to(self::class);
             if ($cursor->skipped > 0 && $cursor->first === null) {

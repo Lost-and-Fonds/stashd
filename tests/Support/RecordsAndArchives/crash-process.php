@@ -38,9 +38,11 @@ try {
             foreach ($state['versions'] as $version) {
                 $result['records'][$version] = $kind === 'item' ? $items->read($id, $version) : $assets->inspect($id, $version);
             }
+
             $result['record'] = $kind === 'item' ? $items->read($id, 'v1') : $assets->inspect($id, 'v1');
         }
     }
+
     echo json_encode($result, JSON_THROW_ON_ERROR);
 } catch (Throwable $exception) {
     fwrite(STDERR, $exception::class . ': ' . $exception->getMessage());

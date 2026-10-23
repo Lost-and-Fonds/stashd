@@ -73,28 +73,33 @@ final readonly class FilesystemDiscovery implements InputDiscovery
                         array_pop($cursor->frames);
                         continue;
                     }
+
                     $iterators[$depth] = $iterator;
                 } catch (InvalidArgumentException|UnexpectedValueException $error) {
                     if ($depth === 0) {
                         throw $error;
                     }
+
                     $skip($frame->path, 'Directory unavailable or unsafe', true);
                     array_pop($cursor->frames);
                     continue;
                 }
             }
+
             $iterator = $iterators[$depth];
             if (! $iterator->valid()) {
                 unset($iterators[$depth]);
                 array_pop($cursor->frames);
                 continue;
             }
+
             $name = $iterator->getFilename();
             $iterator->next();
             $cursor->frames[$depth]->position++;
             if ($name === '.' || $name === '..') {
                 continue;
             }
+
             $visited++;
             $relative = ltrim($frame->path . '/' . $name, '/');
             $path = $root . '/' . $relative;
@@ -104,6 +109,7 @@ final readonly class FilesystemDiscovery implements InputDiscovery
             } catch (InvalidArgumentException) {
                 $supported = false;
             }
+
             if (! $supported) {
                 $skip($relative, 'Unsupported relative filename', false);
             } else {
@@ -140,6 +146,7 @@ final readonly class FilesystemDiscovery implements InputDiscovery
                     $skip($relative, 'Entry unavailable or unsafe', true);
                 }
             }
+
             if ($visited >= $request->maximum_items_per_batch) {
                 $this->root($request);
                 $commit(['items' => $items, 'progress' => ['more' => map($cursor)->toJson()]]);
@@ -147,6 +154,7 @@ final readonly class FilesystemDiscovery implements InputDiscovery
                 $visited = 0;
             }
         }
+
         $this->root($request);
         $finish = $cursor->skipped === 0
             ? ['kind' => 'exhaustive', 'refresh_state' => null]
@@ -176,6 +184,7 @@ final readonly class FilesystemDiscovery implements InputDiscovery
         if (! is_string($path) || $this->vault->provider !== 'local') {
             throw new InvalidArgumentException('Filesystem discovery requires a configured local source and Vault.');
         }
+
         $root = $this->roots->canonical($path);
         $vault = $this->roots->canonical($this->vault->root, allowMissing: true);
         $this->roots->requireSeparate($root, $vault);
@@ -183,10 +192,12 @@ final readonly class FilesystemDiscovery implements InputDiscovery
             if ($configuration['id'] === $request->input_id || $configuration['component'] !== 'filesystem') {
                 continue;
             }
+
             $other = $configuration['settings']['root'] ?? null;
             if (! is_string($other)) {
                 throw new RuntimeException('Stored Filesystem configuration has no root.');
             }
+
             $other = $this->roots->canonical($other, allowMissing: true);
             $this->roots->requireSeparate($root, $other);
             $this->roots->requireSeparate($vault, $other);

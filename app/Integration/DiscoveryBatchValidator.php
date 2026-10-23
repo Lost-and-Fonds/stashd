@@ -43,6 +43,7 @@ final readonly class DiscoveryBatchValidator
         if ($this->validator->validateValue($batch['items'], new HasCount(max: $maximumItems)) !== []) {
             throw new RuntimeException('Discovery batch exceeds the host limit.');
         }
+
         /** @var list<array{metadata: array}> $items */
         $items = $batch['items'];
         foreach ($items as $item) {
@@ -53,6 +54,7 @@ final readonly class DiscoveryBatchValidator
                 throw new RuntimeException('A discovery size estimate requires a numeric size.');
             }
         }
+
         /** @var array $progress */
         $progress = $batch['progress'];
         if (array_keys($progress) === ['more']) {
@@ -89,12 +91,14 @@ final readonly class DiscoveryBatchValidator
         if ($keys !== $expected) {
             throw new RuntimeException('Terminal coverage must contain exactly its variant fields.');
         }
+
         if ($result->kind === 'indeterminate') {
             $this->diagnostic($result->diagnostic);
         } elseif ($result->kind === 'partial') {
             if ($this->validator->validateValue($result->deficiencies, [new IsArrayList(), new HasCount(min: 1)]) !== []) {
                 throw new RuntimeException('Partial coverage requires a nonempty deficiency list.');
             }
+
             foreach ($result->deficiencies ?? [] as $values) {
                 $deficiency = $this->record(DiscoveryDeficiency::class, $values);
                 $this->diagnostic($deficiency->diagnostic);

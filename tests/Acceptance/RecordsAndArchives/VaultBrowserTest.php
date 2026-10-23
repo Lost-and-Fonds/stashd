@@ -62,6 +62,7 @@ test('HTTP browser reconstructs exact historical pins and streams real archived 
                 ->and($download['headers'])
                 ->toContain('application/octet-stream', 'attachment;', 'nosniff');
         }
+
         foreach ([
             browser_item_url($item['object_id'], 'v999'),
             browser_asset_url($asset['object_id'], 'v999'),
@@ -73,6 +74,7 @@ test('HTTP browser reconstructs exact historical pins and streams real archived 
         ] as $path) {
             expect($server->request($path)['status'])->toBeGreaterThanOrEqual(400);
         }
+
         expect($server->request('/items/import', method: 'POST')['status'])->toBeGreaterThanOrEqual(400);
         $found = OcflInspector::inventoryFor($root, $asset['object_id']);
         $physical = dirname($found['path']) . '/' . $found['inventory']['manifest'][$digest1][0];
@@ -94,6 +96,7 @@ test('HTTP browser streams a file larger than its PHP memory limit', function ()
     for ($i = 0; $i < 64; $i++) {
         fwrite($stream, $chunk);
     }
+
     fclose($stream);
     unset($chunk);
     $digest = hash_file('sha512', $source);
@@ -173,6 +176,7 @@ test('HTTP browser denies every route before reading the Vault unless explicitly
     } finally {
         $server->stop();
     }
+
     // Positive control: the same HTTP route can read this real Vault when locally opted in.
     $server = new BrowserServer($root, $this->archive->path('enabled.log'));
     try {

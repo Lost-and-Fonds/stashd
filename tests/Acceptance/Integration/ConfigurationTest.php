@@ -31,6 +31,7 @@ test('configuration survives fresh CLI processes without changing source destina
                 ->and(configuration_result(configuration_cli($archive, $descriptor, [$kind . ':create', 'filesystem', $record['settings']['root']])))
                 ->toBe($record);
         }
+
         $rows = $database->query('SELECT id::text, kind, component, settings FROM configuration_proof.configurations ORDER BY kind')->fetchAll(PDO::FETCH_ASSOC);
         expect(array_column($rows, 'id'))
             ->toBe([$broadcast['id'], $input['id']])
@@ -80,6 +81,7 @@ test('real configuration commands reject unsafe roots and unsupported components
             expect($failure['code'])->not->toBe(0, implode(' ', $command));
             expect((int) $database->query('SELECT count(*) FROM configuration_proof.configurations')->fetchColumn())->toBe(1);
         }
+
         // A common string prefix is not directory ancestry.
         configuration_result(configuration_cli($archive, $descriptor, ['broadcast:create', 'filesystem', $archive->path('inputs-sibling')]));
         expect(file_get_contents($source . '/file'))
@@ -108,6 +110,7 @@ test('operational setup refuses implicit connections and unsafe schema names', f
         ] as $override) {
             expect(configuration_cli($archive, $descriptor, ['integration:init'], $override)['code'])->not->toBe(0);
         }
+
         expect($database->query("SELECT to_regclass('configuration_proof.configurations')")->fetchColumn())->toBeNull();
     });
 });
@@ -129,13 +132,16 @@ test('concurrent CLI configuration waits for authority and retains one Input ide
                 if ($waiting === 2) {
                     break;
                 }
+
                 usleep(20_000);
             } while (microtime(true) < $deadline);
+
             expect($waiting)->toBe(2);
         } finally {
             $database->rollBack();
             $results = array_map(finish_configuration_cli(...), $children);
         }
+
         $first = configuration_result($results[0]);
         expect(configuration_result($results[1]))
             ->toBe($first)
@@ -170,6 +176,7 @@ test('Tempest migrations adopt the PR1 configuration baseline without changing i
             )
                 ->toBe($before);
         }
+
         $run = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $id]));
         expect($run['status'])->toBe('finished')->and($run['discovered_count'])->toBe(1);
     });

@@ -41,12 +41,15 @@ final class OperationsDatabase
         if ($this->connection !== null) {
             return $this->connection;
         }
+
         if (! str_starts_with($this->config->dsn, 'pgsql:')) {
             throw new InvalidArgumentException('Set STASHD_OPERATIONS_DSN to an explicit PostgreSQL connection before integration:init.');
         }
+
         if ($this->config->username === '') {
             throw new InvalidArgumentException('Set STASHD_OPERATIONS_USERNAME to an explicit application owner.');
         }
+
         $this->container->config(new OperationsConnectionConfig($this->config));
         $database = $this->container->get(Database::class);
         $database->execute(new Query('SET search_path TO "' . $this->config->schema . '"'));

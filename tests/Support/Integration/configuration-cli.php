@@ -30,6 +30,7 @@ function with_configuration_database(Closure $proof): void
         if ($created) {
             TransactionProbe::run($workspace, ['operation' => 'projection.dispose', 'fixture' => $fixture]);
         }
+
         $archive->dispose();
     }
 }

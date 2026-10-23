@@ -58,11 +58,13 @@ final readonly class PreservationTransaction
             if ($id === '' || strlen($id) > 512 || preg_match('/[\x00-\x1f\x7f]/', $id)) {
                 throw new InvalidItemRevision('A bounded nonempty transaction identity is required.');
             }
+
             $itemId = $this->items->objectIdForUri($uri);
             json_encode([$metadata, $preconditions], JSON_THROW_ON_ERROR);
             if (array_diff(array_keys($preconditions), ['pins']) !== []) {
                 throw new InvalidItemRevision('Unsupported transaction precondition.');
             }
+
             $this->validatePreconditions($preconditions);
             $this->items->validateMetadata($metadata);
             foreach ($metadata as $key => $value) {
@@ -70,16 +72,19 @@ final readonly class PreservationTransaction
                     throw new InvalidItemRevision('Metadata deltas require named fields.');
                 }
             }
+
             foreach ($changes as $key => $source) {
                 if (! is_string($key)) {
                     throw new InvalidAsset('Asset keys must be strings.');
                 }
+
                 $this->assets->objectId($uri, $key);
                 AssetArchive::validateSource($source);
             }
         } catch (InvalidAsset|InvalidItemRevision|JsonException|UnexpectedValueException $error) {
             return ['status' => 'rejected', 'transaction_id' => $id, 'reason' => $error->getMessage()];
         }
+
         /** @var array<string, string> $changes */
         /** @var array<string, mixed> $metadata */
         $directory = $this->directory($id);
@@ -87,6 +92,7 @@ final readonly class PreservationTransaction
         if (! mkdir($staging, 0o700)) {
             throw new RuntimeException('Could not create transaction custody.');
         }
+
         $copies = new \Tempest\Storage\GenericStorage(new \Tempest\Storage\Config\LocalStorageConfig(path: $staging));
         try {
             ksort($changes);
@@ -97,6 +103,7 @@ final readonly class PreservationTransaction
                     $boundary?->__invoke('custody-copying:' . $key);
                 })];
             }
+
             $semantics = ['id' => $id, 'uri' => $uri, 'changes' => $accepted, 'metadata' => $metadata, 'preconditions' => $preconditions];
 
             return $this->exclusiveCandidate(
@@ -108,6 +115,7 @@ final readonly class PreservationTransaction
                             if (! is_file($directory . '/complete.json')) {
                                 $this->verifyCustody($id, $existing);
                             }
+
                             if ($existing['delta'] !== $semantics) {
                                 return ['status' => 'conflict', 'transaction_id' => $id];
                             }
@@ -117,6 +125,7 @@ final readonly class PreservationTransaction
                             return $this->quarantined($id, $error);
                         }
                     }
+
                     // Verify the observed predecessor and encode the manifest before claiming global authority.
                     $head = $this->head($itemId);
                     $candidate = ['format' => 'stashd-transaction-1', 'vault' => $this->vaultId(), 'base' => $head, 'delta' => $semantics];
@@ -128,10 +137,12 @@ final readonly class PreservationTransaction
                         if ($this->head($itemId, verifyContent: false) !== $head) {
                             return false;
                         }
+
                         $boundary?->__invoke('before-seal');
                         if (! rename($staging, $directory)) {
                             throw new RuntimeException('Could not seal transaction custody.');
                         }
+
                         $boundary?->__invoke('after-seal');
 
                         return true;
@@ -169,11 +180,13 @@ final readonly class PreservationTransaction
                 if (! is_dir($directory)) {
                     return ['status' => 'absent', 'transaction_id' => $id];
                 }
+
                 try {
                     $candidate = $this->candidate($id);
                     if (! is_file($directory . '/complete.json')) {
                         $this->verifyCustody($id, $candidate);
                     }
+
                     $delta = $candidate['delta'];
                     $itemId = $this->items->objectIdForUri($delta['uri']);
                     if (is_file($directory . '/plan.json')) {
@@ -184,6 +197,7 @@ final readonly class PreservationTransaction
                         if ($this->head($itemId) !== $candidate['base']) {
                             return ['status' => 'conflict', 'transaction_id' => $id];
                         }
+
                         $this->requireNoLostPlan($id, $delta);
                         $current = $candidate['base'] === null ? ['metadata' => [], 'pins' => []] : $this->items->read($itemId, $candidate['base']);
                         foreach ($delta['preconditions']['pins'] ?? [] as $pin) {
@@ -191,6 +205,7 @@ final readonly class PreservationTransaction
                                 return ['status' => 'conflict', 'transaction_id' => $id];
                             }
                         }
+
                         $pins = array_column($current['pins'], null, 'object_id');
                         $steps = [];
                         foreach ($delta['changes'] as $key => $change) {
@@ -199,6 +214,7 @@ final readonly class PreservationTransaction
                             $steps[$key] = ['object_id' => $assetId->toString(), 'before' => $before, 'version' => $this->next($before)];
                             $pins[$assetId->toString()] = ['object_id' => $assetId->toString(), 'version' => $steps[$key]['version']];
                         }
+
                         $plan = [
                             'candidate' => $this->digest($id),
                             'assets' => $steps,
@@ -210,8 +226,10 @@ final readonly class PreservationTransaction
                         foreach ($current['pins'] as $pin) {
                             $this->verifiedAsset($pin, $delta['uri']);
                         }
+
                         $this->saveEvidence($directory . '/plan.json', $plan);
                     }
+
                     $this->validatePlan($candidate, $plan);
                     $binding = ['id' => $id, 'candidate' => $this->digest($id), 'plan' => hash('sha512', json_encode($plan, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION))];
                     // Inspect every planned Object before writing anything, including damaged later steps.
@@ -222,6 +240,7 @@ final readonly class PreservationTransaction
                             $this->verifyChangedAsset($step, $delta, $key);
                         }
                     }
+
                     $itemPublished = $this->published($plan['item'], 'item.json', $binding);
                     $this->require(! $itemPublished || ! in_array(false, $published, true), 'Item exists without every required Asset.');
                     $this->require(
@@ -233,21 +252,25 @@ final readonly class PreservationTransaction
                             $boundary?->__invoke('before-asset:' . $key);
                             $this->assets->preserve($delta['uri'], $key, ['data.bin' => $directory . '/' . $delta['changes'][$key]['file']], $binding);
                         }
+
                         $this->require($this->published($step, '.stashd/asset.json', $binding), 'Asset publication is absent.');
                         $this->verifyChangedAsset($step, $delta, $key);
                         $boundary?->__invoke('asset-verified:' . $key);
                     }
+
                     if (! $itemPublished) {
                         $boundary?->__invoke('before-item');
                         $this->items->commitRevision($delta['uri'], $plan['metadata'], $plan['pins'], $binding);
                         $boundary?->__invoke('item-published');
                     }
+
                     $this->require($this->published($plan['item'], 'item.json', $binding), 'Item publication is absent.');
                     $record = $this->items->read($itemId, $plan['item']['version']);
                     $this->require($record['metadata'] === $plan['metadata'] && $record['pins'] === $plan['pins'], 'Published Item differs from the plan.');
                     foreach ($record['pins'] as $pin) {
                         $this->verifiedAsset($pin, $delta['uri']);
                     }
+
                     $boundary?->__invoke('item-verified');
                     $result = ['status' => 'complete', 'transaction_id' => $id, 'item' => array_intersect_key($plan['item'], array_flip(['object_id', 'version']))];
                     if (is_file($directory . '/complete.json')) {
@@ -287,10 +310,12 @@ final readonly class PreservationTransaction
                     if (! is_file($directory . '/complete.json')) {
                         return ['status' => 'not-complete', 'transaction_id' => $id];
                     }
+
                     $completion = $this->commit($id);
                     if ($completion['status'] !== 'complete') {
                         return $completion;
                     }
+
                     try {
                         $candidate = $this->candidate($id);
                         $authorization = ['completion' => $completion, 'candidate' => $this->digest($id)];
@@ -299,6 +324,7 @@ final readonly class PreservationTransaction
                         if ($authorized) {
                             $this->require($this->readEvidence($path) === $authorization, 'Custody release contradicts completed evidence.');
                         }
+
                         // Validate every remaining entry before deleting any of them.
                         foreach ($candidate['delta']['changes'] as $change) {
                             $file = $directory . '/' . $change['file'];
@@ -309,13 +335,16 @@ final readonly class PreservationTransaction
                                 if ($digest === false || $size === false) {
                                     throw new RuntimeException('Could not verify redundant custody.');
                                 }
+
                                 $this->require($digest === $change['digest'] && $size === $change['size'], 'Changed custody requires containment.');
                             }
                         }
+
                         if (! file_exists($path)) {
                             $boundary?->__invoke('before-custody-release');
                             $this->saveEvidence($path, $authorization);
                         }
+
                         $boundary?->__invoke('custody-release-authorized');
                         foreach ($candidate['delta']['changes'] as $key => $change) {
                             $file = $directory . '/' . $change['file'];
@@ -323,6 +352,7 @@ final readonly class PreservationTransaction
                                 if (! unlink($file)) {
                                     throw new RuntimeException('Could not release redundant custody.');
                                 }
+
                                 $boundary?->__invoke('custody-released:' . $key);
                             }
                         }
@@ -357,10 +387,12 @@ final readonly class PreservationTransaction
         if ($directories === false) {
             throw new RuntimeException('Could not discover transaction evidence.');
         }
+
         foreach ($directories as $directory) {
             if (str_contains(basename($directory), '.preparing-')) {
                 continue;
             }
+
             try {
                 $data = json_decode($this->read($directory . '/candidate.json'), true, flags: JSON_THROW_ON_ERROR);
                 $this->require(is_array($data) && is_array($data['delta'] ?? null), 'Candidate delta is missing.');
@@ -373,6 +405,7 @@ final readonly class PreservationTransaction
                     $path = $directory . '/' . $name . '.json';
                     $journal[$name] = file_exists($path) || is_link($path) ? $this->readEvidence($path) : null;
                 }
+
                 if ($journal['plan'] !== null) {
                     $this->require(($journal['plan']['candidate'] ?? null) === $this->digest($id), 'Discovered plan does not bind the sealed candidate.');
                     $this->require(is_array($journal['plan']['item'] ?? null), 'Discovered plan has no Item identity.');
@@ -382,6 +415,7 @@ final readonly class PreservationTransaction
                         'Discovered plan Item identity differs from the candidate.',
                     );
                 }
+
                 if ($journal['complete'] !== null) {
                     $this->require($journal['plan'] !== null, 'Discovered completion has no publication plan.');
                     $this->require(
@@ -393,15 +427,18 @@ final readonly class PreservationTransaction
                         'Discovered completion contradicts the candidate and plan.',
                     );
                 }
+
                 if ($journal['custody-release'] !== null) {
                     $this->require(
                         $journal['complete'] !== null && $journal['custody-release'] === ['completion' => $journal['complete'], 'candidate' => $this->digest($id)],
                         'Discovered custody release contradicts completion evidence.',
                     );
                 }
+
                 if ($journal['complete'] === null) {
                     $this->verifyCustody($id, $candidate);
                 }
+
                 $ids[] = $id;
             } catch (UnexpectedValueException|JsonException|InvalidItemRevision|InvalidAsset $error) {
                 $quarantined[] = ['path' => $directory, 'reason' => $error->getMessage()];
@@ -431,6 +468,7 @@ final readonly class PreservationTransaction
         if ($lock === false) {
             throw new RuntimeException('Could not open candidate authority.');
         }
+
         try {
             if (! flock($lock, LOCK_EX | LOCK_NB)) {
                 $boundary?->__invoke('candidate-authority-contended');
@@ -438,6 +476,7 @@ final readonly class PreservationTransaction
                     throw new RuntimeException('Could not claim candidate authority.');
                 }
             }
+
             $boundary?->__invoke('candidate-authority-held');
 
             return $operation();
@@ -480,6 +519,7 @@ final readonly class PreservationTransaction
         foreach ($delta['metadata'] as $key => $value) {
             $this->require(is_string($key), 'Metadata delta requires named fields.');
         }
+
         $this->items->validateMetadata($delta['metadata']);
         foreach ($delta['changes'] as $key => $change) {
             $this->require(is_string($key), 'Asset key must be a string.');
@@ -513,6 +553,7 @@ final readonly class PreservationTransaction
             if ($digest === false || $size === false) {
                 throw new RuntimeException('Could not verify custody bytes.');
             }
+
             $this->require($digest === $change['digest'] && $size === $change['size'], 'Custody bytes differ.');
         }
     }
@@ -530,10 +571,12 @@ final readonly class PreservationTransaction
         foreach ($delta['changes'] as $key => $change) {
             $objects[] = [$this->assets->objectId($delta['uri'], $key), '.stashd/asset.json'];
         }
+
         foreach ($objects as [$objectId, $path]) {
             if ($this->head($objectId) === null) {
                 continue;
             }
+
             foreach ($this->vault->getObject($objectId)->versionNames() as $version) {
                 $record = json_decode($this->vault->readObjectContent($objectId, $version, $path), true, flags: JSON_THROW_ON_ERROR);
                 $this->require(($record['transaction']['id'] ?? null) !== $id, 'Published transaction has lost its immutable plan.');
@@ -572,6 +615,7 @@ final readonly class PreservationTransaction
             );
             $pins[$step['object_id']] = ['object_id' => $step['object_id'], 'version' => $step['version']];
         }
+
         $this->require(
             ($plan['metadata'] ?? null) === array_replace($base['metadata'], $delta['metadata']) && ($plan['pins'] ?? null) === array_values($pins),
             'Plan is not the sealed delta applied to its predecessor.',
@@ -595,6 +639,7 @@ final readonly class PreservationTransaction
 
             return false;
         }
+
         $record = json_decode($this->vault->readObjectContent($id, $step['version'], $path), true, flags: JSON_THROW_ON_ERROR);
         $this->require(($record['transaction'] ?? null) === $binding, 'Exact OCFL revision has another transaction binding.');
 
@@ -643,6 +688,7 @@ final readonly class PreservationTransaction
         if (! $this->vault->open()->hasObject($id->toString())) {
             return null;
         }
+
         $state = $this->vault->inspectObject($id, $verifyContent);
         $this->require($state['issues'] === [], 'Object publication requires reconciliation: ' . implode('; ', $state['issues']));
 
@@ -667,11 +713,14 @@ final readonly class PreservationTransaction
             if (is_resource($input)) {
                 fclose($input);
             }
+
             if (is_resource($output)) {
                 fclose($output);
             }
+
             throw new RuntimeException('Could not open custody streams.');
         }
+
         try {
             AssetArchive::validateSource($source);
             $before = fstat($input);
@@ -681,11 +730,13 @@ final readonly class PreservationTransaction
             if ($first === false) {
                 throw new RuntimeException('Could not copy custody bytes.');
             }
+
             $duringCopy();
             $rest = stream_copy_to_stream($input, $output);
             if ($rest === false) {
                 throw new RuntimeException('Could not finish custody transfer.');
             }
+
             $size = $first + $rest;
             $after = fstat($input);
             $this->require(
@@ -698,6 +749,7 @@ final readonly class PreservationTransaction
             fclose($input);
             fclose($output);
         }
+
         $digest = hash_file('sha512', $destination);
         if ($digest === false) {
             throw new RuntimeException('Could not hash accepted custody bytes.');

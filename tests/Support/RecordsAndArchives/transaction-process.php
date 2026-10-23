@@ -23,6 +23,7 @@ $boundary = static function (string $name) use ($prefix, $stop, $pause): void {
             usleep(10_000);
         }
     }
+
     if ($name === $pause) {
         file_put_contents($prefix . '.paused', $name);
         $deadline = microtime(true) + 30;
@@ -30,6 +31,7 @@ $boundary = static function (string $name) use ($prefix, $stop, $pause): void {
             if (microtime(true) > $deadline) {
                 throw new RuntimeException('Authority pause timed out.');
             }
+
             usleep(10_000);
         }
     }
@@ -44,6 +46,7 @@ try {
                 throw new RuntimeException('Could not acquire probe lock.');
             }
         }
+
         $boundary('authority-held');
         $result = ['status' => 'probe-complete'];
         flock($lock, LOCK_UN);
@@ -54,6 +57,7 @@ try {
             fwrite(STDERR, 'UNIMPLEMENTED: recoverable preservation transaction boundary: ' . $request['operation']);
             exit(78);
         }
+
         $execute = require $adapter;
         $result = $execute($request, $boundary);
     } else {
@@ -72,10 +76,12 @@ try {
             $pins[] = ['object_id' => $asset['object_id'], 'version' => $asset['version']];
             $boundary('asset-verified:' . $key);
         }
+
         $item = $items->commitRevision($request['uri'], $request['metadata'], $pins);
         $boundary('item-verified');
         $result = ['item' => ['object_id' => $item->id(), 'version' => $item->head()]];
     }
+
     echo json_encode($result, JSON_THROW_ON_ERROR);
 } catch (Throwable $error) {
     fwrite(STDERR, $error::class . ': ' . $error->getMessage());

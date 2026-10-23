@@ -62,6 +62,7 @@ final class TransactionProbe
             Assert::assertTrue($status['running'], 'Child exited before ' . $boundary . ': ' . file_get_contents($child['prefix'] . '.err'));
             usleep(10_000);
         }
+
         Assert::assertFileExists($child['prefix'] . '.paused', 'Missing authority boundary: ' . $boundary);
         Assert::assertSame($boundary, file_get_contents($child['prefix'] . '.paused'));
     }
@@ -93,6 +94,7 @@ final class TransactionProbe
             } else {
                 file_put_contents($a['prefix'] . '.resume', 'resume');
             }
+
             $first = self::finish($a);
             unset($children['a']);
             if ($killOwner) {
@@ -103,6 +105,7 @@ final class TransactionProbe
                 Assert::assertSame(0, $first['exit'], $first['err']);
                 $first = json_decode($first['out'], true, flags: JSON_THROW_ON_ERROR);
             }
+
             file_put_contents($b['prefix'] . '.resume', 'resume');
             $second = self::finish($b);
             unset($children['b']);
@@ -135,15 +138,19 @@ final class TransactionProbe
                 proc_terminate($child['process'], 9);
                 $killed = true;
             }
+
             $status = proc_get_status($child['process']);
             if (! $status['running']) {
                 break;
             }
+
             usleep(10_000);
         } while (microtime(true) < $deadline);
+
         if ($status['running']) {
             proc_terminate($child['process'], 9);
         }
+
         $closed = proc_close($child['process']);
         $out = file_get_contents($child['prefix'] . '.out');
         $err = file_get_contents($child['prefix'] . '.err');
@@ -223,6 +230,7 @@ final class TransactionProbe
                     $matches[] = file_get_contents(OcflInspector::payloadPath($root, $pin['object_id'], $pin['version'], 'data.bin'));
                 }
             }
+
             Assert::assertSame([$bytes], $matches, 'Missing, duplicate or wrong exact Asset pin: ' . $key);
         }
     }
@@ -269,6 +277,7 @@ final class TransactionProbe
 
             $files[substr($file->getPathname(), strlen($root))] = hash_file('sha512', $file->getPathname());
         }
+
         ksort($files);
 
         return $files;

@@ -23,10 +23,12 @@ final readonly class FilesystemRoots
         if (! str_starts_with($path, '/')) {
             throw new InvalidArgumentException('Filesystem roots must be absolute local directory paths.');
         }
+
         $path = rtrim($path, '/');
         if ($path === '') {
             return '/';
         }
+
         $this->relative(substr($path, 1));
         $parts = explode('/', substr($path, 1));
         $resolved = '';
@@ -36,19 +38,23 @@ final readonly class FilesystemRoots
             if (is_link($resolved)) {
                 throw new InvalidArgumentException('Filesystem roots may not traverse symbolic links.');
             }
+
             if (file_exists($resolved)) {
                 if (! is_dir($resolved) || ! is_readable($resolved) || ! is_executable($resolved)) {
                     throw new InvalidArgumentException('Filesystem root components must be accessible directories.');
                 }
+
                 $real = realpath($resolved);
                 if ($real === false) {
                     throw new InvalidArgumentException('Could not resolve Filesystem root.');
                 }
+
                 $resolved = $real;
             } elseif (! $allowMissing) {
                 throw new InvalidArgumentException('Filesystem input must be an existing readable directory.');
             }
         }
+
         if (! $allowMissing && ! is_readable($resolved)) {
             throw new InvalidArgumentException('Filesystem input must be an existing readable directory.');
         }
@@ -67,12 +73,15 @@ final readonly class FilesystemRoots
         if ($path === '' && $allowEmpty) {
             return;
         }
+
         if (str_starts_with($path, '/') || str_contains($path, '\\')) {
             throw new InvalidArgumentException('Filesystem names must be relative paths with slash separators.');
         }
+
         if (preg_match('//u', $path) !== 1 || preg_match('/[\x00-\x1f\x7f]/', $path)) {
             throw new InvalidArgumentException('Filesystem names require supported UTF-8 bytes.');
         }
+
         if (array_intersect(explode('/', $path), ['', '.', '..']) !== []) {
             throw new InvalidArgumentException('Filesystem paths may not contain traversal or empty components.');
         }

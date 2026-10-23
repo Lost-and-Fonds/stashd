@@ -61,6 +61,7 @@ final class ProjectionProbe
                 'asset_version' => $pin['version'],
             ];
         }
+
         $actual = self::rows($database, $projection['schema'], $projection['tables']['pins'], ['item_object_id', 'item_version', 'asset_object_id', 'asset_version']);
         sort($expected);
         sort($actual);

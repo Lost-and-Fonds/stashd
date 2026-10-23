@@ -43,10 +43,12 @@ readonly class CrashStorage extends LocalArchiveStorage
             parent::write($location, substr($contents, 0, max(1, intdiv(strlen($contents), 2))));
             $this->stop("{$kind}-partial");
         }
+
         parent::write($location, $contents);
         if (str_contains($location, '/v') && str_contains($location, '/content/')) {
             $this->stop('content-complete');
         }
+
         if (str_ends_with($location, '/inventory.json.sha512') && preg_match('~/v\d+\.tmp-[^/]+/~', $location)) {
             $this->stop('version-ready');
         }
@@ -66,6 +68,7 @@ readonly class CrashStorage extends LocalArchiveStorage
             parent::write($location, (string) fread($contents, 3));
             $this->stop('content-partial');
         }
+
         parent::writeStream($location, $contents);
         $this->stop('content-complete');
 

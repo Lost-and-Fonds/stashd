@@ -72,6 +72,7 @@ final readonly class DiscoveryStore
 
             return ['id' => $row['id'], 'continuation' => $row['continuation']];
         }
+
         $id = Uuid::v7()->toString();
         $database->execute(query('discovery_runs')->insert(
             id: $id,
@@ -98,6 +99,7 @@ final readonly class DiscoveryStore
             if ($row === null || $row['status'] !== 'running' || $row['continuation'] !== $expected) {
                 throw new RuntimeException('Discovery batch no longer belongs to the active checkpoint.');
             }
+
             foreach ($batch->items as $item) {
                 $database->execute(new Query(
                     'INSERT INTO source_associations (input_id, source_id, first_run, last_run) VALUES (?, ?, ?, ?)
@@ -110,6 +112,7 @@ final readonly class DiscoveryStore
                     [$id, $item->id, json_encode($item, JSON_THROW_ON_ERROR)],
                 ));
             }
+
             $finished = isset($batch->progress['finished']);
             $database->execute(new Query(
                 'UPDATE discovery_runs SET status = ?, continuation = ?, coverage = ?, batches = batches + 1, error = NULL WHERE id = ?',
@@ -134,6 +137,7 @@ final readonly class DiscoveryStore
         if (! Uuid::isValid($id)) {
             throw new InvalidArgumentException('A valid discovery run UUID is required.');
         }
+
         $row = $this->database
             ->connect()
             ->fetchFirst(new Query(
@@ -145,13 +149,16 @@ final readonly class DiscoveryStore
         if ($row === null) {
             throw new InvalidArgumentException('Discovery run not found.');
         }
+
         if ($row['coverage'] !== null) {
             $coverage = json_decode($row['coverage'], true, flags: JSON_THROW_ON_ERROR);
             if (! is_array($coverage)) {
                 throw new RuntimeException('Malformed persisted discovery record.');
             }
+
             $row['coverage'] = $coverage;
         }
+
         $row['batches'] = (int) $row['batches'];
         $row['discovered_count'] = (int) $row['discovered_count'];
 
@@ -166,6 +173,7 @@ final readonly class DiscoveryStore
         if ($limit < 1) {
             throw new InvalidArgumentException('A positive discovery page limit is required.');
         }
+
         $this->read($id);
         /** @var list<array{source_id: string, item: string}> $rows */
         $rows = $this->database

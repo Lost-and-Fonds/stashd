@@ -36,6 +36,7 @@ test('an unrelated Item commits before a paused custody copy resumes', function 
         if ($copies === false || count($copies) !== 1) {
             throw new RuntimeException('Expected exactly one private copy in progress.');
         }
+
         expect($copies)->toHaveCount(1);
         expect(filesize($copies[0]))->toBe(65_536);
         expect(file_get_contents($copies[0]))->toBe(substr($bytes, 0, 65_536));
@@ -82,10 +83,12 @@ test('concurrent same ID preparations seal one candidate without clobbering acce
     if (! $different && ! $killOwner) {
         expect($b)->toBe($a);
     }
+
     $candidates = glob($workspace . '/vault/extensions/stashd-transactions/*/candidate.json');
     if ($candidates === false) {
         throw new RuntimeException('Could not inspect candidate directories.');
     }
+
     $sealed = array_values(array_filter($candidates, static fn (string $path): bool => ! str_contains($path, '.preparing-')));
     expect($sealed)->toHaveCount(1);
     $directory = dirname($sealed[0]);
