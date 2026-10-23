@@ -76,6 +76,72 @@ class Vault
     }
 
     /**
+     * Discover physical Object roots without requiring readable inventories.
+     *
+     * IDs are untrusted discovery hints from root or historical inventories, accepted
+     * only when the configured layout maps them back to the observed path. Callers
+     * must verify history before using it. Unidentifiable roots retain a null ID.
+     * Listing, existence-check, read and layout failures propagate: an incomplete
+     * scan cannot authorize replacement. Confirmed missing files and readable
+     * malformed JSON provide no hint and allow other candidates to be checked.
+     * No Object or Vault bytes are changed; extension directories are not Objects.
+     *
+     * @return list<array{path: string, object_id: ?string}>
+     */
+    public function discoverObjects(): array
+    {
+        $root = $this->open();
+        $fs = new OcflFilesystemAdapter($this->storage);
+        $pending = [''];
+        $objects = [];
+        while ($pending !== []) {
+            $path = array_pop($pending);
+            $names = $fs->listDirectory($path);
+            if (in_array('0=ocfl_object_1.1', $names, true) || in_array('inventory.json', $names, true)) {
+                $candidates = [$path . '/inventory.json'];
+                foreach ($names as $name) {
+                    if (! preg_match('/^v[1-9][0-9]*$/D', $name)) {
+                        continue;
+                    }
+
+                    $candidates[] = $path . '/' . $name . '/inventory.json';
+                }
+                $id = null;
+                foreach ($candidates as $candidate) {
+                    if (! $fs->fileExists($candidate)) {
+                        continue;
+                    }
+                    $json = $fs->read($candidate);
+                    try {
+                        $inventory = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+                    } catch (\JsonException) {
+                        // Readable malformed bytes cannot provide an identity hint.
+                        continue;
+                    }
+                    $hint = is_array($inventory) ? $inventory['id'] ?? null : null;
+                    if (is_string($hint) && trim($root->layout()->resolveObjectPath($hint), '/') === $path) {
+                        $id = $hint;
+                        break;
+                    }
+                }
+                $objects[] = ['object_id' => $id, 'path' => $path];
+                continue;
+            }
+            foreach ($names as $name) {
+                if ($path === '' && $name === 'extensions') {
+                    continue;
+                }
+                $child = ltrim($path . '/' . $name, '/');
+                if ($fs->directoryExists($child)) {
+                    $pending[] = $child;
+                }
+            }
+        }
+        usort($objects, static fn (array $a, array $b): int => strcmp($a['path'], $b['path']));
+        return $objects;
+    }
+
+    /**
      * Initialize a new OCFL root and persist a newly generated Vault identity.
      *
      * Use only for a new, empty root. OCFL rejects an existing nonempty root;
@@ -388,8 +454,8 @@ class Vault
         try {
             $contents = stream_get_contents($stream);
 
-            if ($contents === false) {
-                throw new RuntimeException('Could not read archived content stream.');
+            if ($contents === false || ! feof($stream)) {
+                throw new \App\RecordsAndArchives\Storage\ArchiveReadFailure('Could not read archived content stream.');
             }
 
             return $contents;
@@ -408,17 +474,12 @@ class Vault
         $object = $this->getObject($objectUrn);
         $physicalPath = $object->path . '/' . $object->resolveContentPath($version, $logicalPath);
 
-        if (! $this->storage->fileExists($physicalPath)) {
+        $fs = new OcflFilesystemAdapter($this->storage);
+        if (! $fs->fileExists($physicalPath)) {
             throw new OcflException(ErrorCode::E092, "Archived content missing at '{$physicalPath}'.");
         }
 
-        $stream = $this->storage->readStream($physicalPath);
-
-        if (! is_resource($stream)) {
-            throw new RuntimeException("Could not open archived content stream for '{$logicalPath}'.");
-        }
-
-        return $stream;
+        return $fs->readStream($physicalPath);
     }
 
     /**

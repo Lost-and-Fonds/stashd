@@ -322,3 +322,7 @@ Acceptance-correction verification (22 October 2026, local Lerd/PHP):
 The oracle/discovery corrections are ready for independent acceptance re-review.
 No CI or independent test-owner certification is claimed; #59 remains draft and
 unmerged, and projection isolation remains tracked separately in #60.
+
+## Projection isolation follow-up
+
+The historical all-or-nothing limitation above is superseded by [the #60 contract](projection-isolation.md). Rebuild now returns verified Items and current-scan incidents, with whole-Item exclusion and atomic SQL replacement.

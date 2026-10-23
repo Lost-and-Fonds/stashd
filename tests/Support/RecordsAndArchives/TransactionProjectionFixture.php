@@ -101,7 +101,7 @@ final readonly class TransactionProjectionFixture
             return ['verified_absent' => (int) $exists->fetchColumn() === 0];
         }
         if ($request['operation'] === 'projection.rebuild') {
-            return ['items' => new ArchiveProjection($vault, $items, $assets)->rebuild($database, $name)];
+            return new ArchiveProjection($vault, $items, $assets)->rebuild($database, $name);
         }
         throw new InvalidArgumentException('Unsupported projection fixture operation.');
     }

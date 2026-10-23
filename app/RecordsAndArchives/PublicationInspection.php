@@ -2,8 +2,10 @@
 
 namespace App\RecordsAndArchives;
 
+use App\RecordsAndArchives\Storage\ArchiveReadFailure;
 use App\RecordsAndArchives\Storage\ArchiveStorage;
 use App\RecordsAndArchives\Storage\OcflFilesystemAdapter;
+use ArrayObject;
 use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\Inventory\InventoryReader;
 use Ottosmops\Ocfl\Inventory\InventorySidecar;
@@ -30,12 +32,35 @@ final class PublicationInspection
      * Inspect inventory candidates, historical prefixes and optional content fixity.
      *
      * Candidate validation errors are collected as issues rather than establishing
-     * unverified history. Directory-listing failures before inspection propagate.
+     * unverified history. Provider observation failures propagate even when an
+     * upstream validator converts them into issues, preventing false degradation.
      * Content verification may be skipped for readers; no storage mutation occurs.
      */
     public function __construct(ArchiveStorage $storage, string $path, string $id, bool $verifyContent = true)
     {
-        $fs = new OcflFilesystemAdapter($storage);
+        /** @var ArrayObject<int, ArchiveReadFailure> $readFailures */
+        $readFailures = new ArrayObject();
+        try {
+            $this->inspect($storage, $path, $id, $verifyContent, $readFailures);
+        } catch (Throwable $error) {
+            throw $readFailures[0] ?? $error;
+        }
+        if (isset($readFailures[0])) {
+            throw $readFailures[0];
+        }
+    }
+
+    /**
+     * Collect corruption findings while sharing provider failures across validation views.
+     *
+     * The constructor rethrows recorded I/O failures even if the OCFL library has
+     * swallowed or wrapped them while validating otherwise readable evidence.
+     *
+     * @param ArrayObject<int, ArchiveReadFailure> $readFailures
+     */
+    private function inspect(ArchiveStorage $storage, string $path, string $id, bool $verifyContent, ArrayObject $readFailures): void
+    {
+        $fs = new OcflFilesystemAdapter($storage, $readFailures);
         $names = $fs->listDirectory($path);
         try {
             if (Namaste::find($fs, $path) !== NamasteType::ObjectRoot) {
@@ -78,19 +103,21 @@ final class PublicationInspection
                      *
                      * Only the inspection view substitutes root inventory bytes and filters stranded
                      * root entries. Content and historical inventories still come from real storage.
-                     */ readonly class($storage, $path, $json, $inventory->versionSequence()) extends OcflFilesystemAdapter {
+                     */ readonly class($storage, $path, $json, $inventory->versionSequence(), $readFailures) extends OcflFilesystemAdapter {
                         /**
                          * Capture the acknowledged root bytes and version names for this validation view.
                          *
                          * @param list<string> $versions
+                         * @param ArrayObject<int, ArchiveReadFailure> $readFailures
                          */
                         public function __construct(
                             ArchiveStorage $storage,
                             private string $root,
                             private string $json,
                             private array $versions,
+                            ArrayObject $readFailures,
                         ) {
-                            parent::__construct($storage);
+                            parent::__construct($storage, $readFailures);
                         }
 
                         /**

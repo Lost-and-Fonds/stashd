@@ -296,13 +296,13 @@ final readonly class AssetArchive
     private static function evidence(mixed $stream): array
     {
         if (! is_resource($stream)) {
-            throw new RuntimeException('Could not open byte verification stream.');
+            throw new \App\RecordsAndArchives\Storage\ArchiveReadFailure('Could not open byte verification stream.');
         }
         try {
             $context = hash_init('sha512');
             $size = hash_update_stream($context, $stream);
             if (! feof($stream)) {
-                throw new RuntimeException('Could not read complete verification stream.');
+                throw new \App\RecordsAndArchives\Storage\ArchiveReadFailure('Could not read complete verification stream.');
             }
 
             return ['size' => $size, 'algorithm' => 'sha512', 'digest' => hash_final($context)];
