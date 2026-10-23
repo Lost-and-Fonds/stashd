@@ -1,0 +1,34 @@
+# Local copy of https://github.com/hipsterjazzbo/php-style/blob/main/mago.toml
+# Stashd inherits these rules through its root mago.toml. This is NOT a
+# PHP-CS-Fixer dependency; Mago is our only formatter.
+# When updating shared rules, sync this small file and review the differences.
+
+# Shared HipsterJazzbo PHP style for Mago 1.57+.
+#
+# Use Mago alone for formatting, linting, and analysis. This profile translates
+# the rules from src/PhpStyle.php where Mago provides a suitable option.
+# Projects set their own php-version, source paths, and any justified overrides.
+#
+# Differences from PHP-CS-Fixer:
+# - Mago's PER-CS preset covers most of @PER-CS3x0.
+# - Mago can place a blank line before return, but cannot currently reproduce
+#   every statement-specific blank_line_before_statement rule.
+# - Mago sorts and expands imports, but does not automatically import every
+#   fully-qualified class reference in the same way as the fixer.
+# - Mago's strict-types linter detects missing declarations; it does not
+#   necessarily insert them during formatting.
+# - Mago cannot guarantee useful multi-line PHPDoc. Keep a separate documentation
+#   policy and declaration check when that is a project requirement.
+
+[formatter]
+preset = "default"
+empty-line-before-return = true
+sort-uses = "alphanumeric-ascending"
+expand-use-groups = true
+separate-use-types = true
+empty-line-after-use = true
+
+[linter.rules]
+strict-types = { enabled = true }
+no-redundant-use = { enabled = true }
+no-fully-qualified-global-class-like = { enabled = true }
