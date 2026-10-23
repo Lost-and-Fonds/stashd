@@ -10,3 +10,4 @@ services:
 workers:
   - command_bus
   - schedule
+runtime: frankenphp
