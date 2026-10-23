@@ -26,17 +26,18 @@ final readonly class IntegrationConfigurations
         private OperationsConfig $config,
         private VaultConfig $vault,
         private FilesystemRoots $roots,
+        private OperationsDatabase $database,
     ) {}
 
     /**
-     * Bootstrap only the operational schema and configuration table, preserving rows.
+     * Bootstrap operational configuration and discovery tables, preserving rows.
      *
      * The operator must provision the database and grant schema creation first.
      * No archive projection tables are created, replaced or read.
      */
     public function initialize(): void
     {
-        $database = $this->connect();
+        $database = $this->database->connect();
         $database->beginTransaction();
         try {
             $this->lock($database);
@@ -45,6 +46,40 @@ final readonly class IntegrationConfigurations
                 'CREATE TABLE IF NOT EXISTS ' . $this->table() . " (
                 id uuid PRIMARY KEY, kind text NOT NULL CHECK (kind IN ('input', 'broadcast')),
                 component text NOT NULL, settings jsonb NOT NULL CHECK (jsonb_typeof(settings) = 'object'))",
+            );
+            $database->exec(
+                'CREATE TABLE IF NOT EXISTS '
+                . $this->table('discovery_runs')
+                . ' (
+                id uuid PRIMARY KEY, input_id uuid NOT NULL REFERENCES '
+                . $this->table()
+                . '(id), configuration jsonb NOT NULL,
+                status text NOT NULL CHECK (status IN (\'running\', \'finished\')), continuation text,
+                coverage jsonb, batches integer NOT NULL DEFAULT 0, error text)',
+            );
+            $database->exec('CREATE UNIQUE INDEX IF NOT EXISTS discovery_active_input ON ' . $this->table('discovery_runs') . ' (input_id) WHERE status = \'running\'');
+            $database->exec(
+                'CREATE TABLE IF NOT EXISTS '
+                . $this->table('source_associations')
+                . ' (
+                input_id uuid NOT NULL REFERENCES '
+                . $this->table()
+                . '(id), source_id text NOT NULL,
+                first_run uuid NOT NULL REFERENCES '
+                . $this->table('discovery_runs')
+                . '(id),
+                last_run uuid NOT NULL REFERENCES '
+                . $this->table('discovery_runs')
+                . '(id), PRIMARY KEY (input_id, source_id))',
+            );
+            $database->exec(
+                'CREATE TABLE IF NOT EXISTS '
+                . $this->table('discovery_items')
+                . ' (
+                run_id uuid NOT NULL REFERENCES '
+                . $this->table('discovery_runs')
+                . '(id), source_id text NOT NULL,
+                item jsonb NOT NULL, PRIMARY KEY (run_id, source_id))',
             );
             $database->commit();
         } catch (\Throwable $error) {
@@ -70,7 +105,7 @@ final readonly class IntegrationConfigurations
         if ($this->vault->provider !== 'local') {
             throw new InvalidArgumentException('Filesystem configuration currently requires a local Vault.');
         }
-        $database = $this->connect();
+        $database = $this->database->connect();
         $database->beginTransaction();
         try {
             $this->lock($database);
@@ -87,7 +122,7 @@ final readonly class IntegrationConfigurations
                 if ($record['component'] !== 'filesystem') {
                     continue;
                 }
-                $otherRoot = $record['settings']['root'];
+                $otherRoot = $record['settings']['root'] ?? null;
                 if (! is_string($otherRoot)) {
                     throw new RuntimeException('Stored Filesystem configuration has no root.');
                 }
@@ -127,7 +162,7 @@ final readonly class IntegrationConfigurations
         if (! Uuid::isValid($id)) {
             throw new InvalidArgumentException('A valid configuration UUID is required.');
         }
-        $statement = $this->connect()->prepare('SELECT id, kind, component, settings FROM ' . $this->table() . ' WHERE id = ? AND kind = ?');
+        $statement = $this->database->connect()->prepare('SELECT id, kind, component, settings FROM ' . $this->table() . ' WHERE id = ? AND kind = ?');
         if ($statement === false) {
             throw new RuntimeException('Could not prepare configuration lookup.');
         }
@@ -140,17 +175,21 @@ final readonly class IntegrationConfigurations
     }
 
     /**
-     * Open only an explicitly configured PostgreSQL connection when a command needs it.
+     * Read configured components so Filesystem can recheck all roots before execution.
+     *
+     * @return list<Configuration>
      */
-    private function connect(): PDO
+    public function all(): array
     {
-        if (! str_starts_with($this->config->dsn, 'pgsql:')) {
-            throw new InvalidArgumentException('Set STASHD_OPERATIONS_DSN to an explicit PostgreSQL connection before integration:init.');
+        $rows = $this->database->connect()->query('SELECT id, kind, component, settings FROM ' . $this->table());
+        if ($rows === false) {
+            throw new RuntimeException('Could not read operational configurations.');
         }
-        if ($this->config->username === '') {
-            throw new InvalidArgumentException('Set STASHD_OPERATIONS_USERNAME to an explicit application owner.');
+        $records = [];
+        foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $records[] = $this->decode($row);
         }
-        return new PDO($this->config->dsn, $this->config->username, $this->config->password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        return $records;
     }
 
     /**
@@ -166,11 +205,11 @@ final readonly class IntegrationConfigurations
     }
 
     /**
-     * Qualify the table using the schema identifier validated by OperationsConfig.
+     * Qualify an internal table name using the schema validated by OperationsConfig.
      */
-    private function table(): string
+    private function table(string $name = 'configurations'): string
     {
-        return '"' . $this->config->schema . '".configurations';
+        return '"' . $this->config->schema . '".' . $name;
     }
 
     /**
