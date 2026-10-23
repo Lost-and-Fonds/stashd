@@ -308,6 +308,25 @@ test('a killed real CLI retains its first batch and resumes without duplicate as
             ->toBe(100)
             ->and((int) $database->query('SELECT count(*) FROM configuration_proof.source_associations')->fetchColumn())
             ->toBe(100);
+        $continuation = $database->prepare('UPDATE configuration_proof.discovery_runs SET continuation = ? WHERE id = ?');
+        $unsafe = json_decode($checkpoint['continuation'], true, flags: JSON_THROW_ON_ERROR);
+        $unsafe['frames'][0]['path'] = '../outside';
+        $alias = [...json_decode($checkpoint['continuation'], true, flags: JSON_THROW_ON_ERROR), 'frames.0' => ['path' => '', 'position' => 0]];
+        foreach ([$unsafe, $alias] as $invalid) {
+            $continuation->execute([json_encode($invalid, JSON_THROW_ON_ERROR), $checkpoint['id']]);
+            try {
+                $rejected = configuration_cli($archive, $descriptor, ['input:discover', $input['id']]);
+                expect($rejected['code'])
+                    ->not
+                    ->toBe(0)
+                    ->and($rejected['output'] . $rejected['errors'])
+                    ->toContain('Invalid Filesystem discovery continuation')
+                    ->and((int) $database->query('SELECT count(*) FROM configuration_proof.discovery_items')->fetchColumn())
+                    ->toBe(100);
+            } finally {
+                $continuation->execute([$checkpoint['continuation'], $checkpoint['id']]);
+            }
+        }
         $update = $database->prepare('UPDATE configuration_proof.configurations SET settings = ? WHERE id = ?');
         $update->execute([json_encode(['root' => $archive->path('changed-root')], JSON_THROW_ON_ERROR), $input['id']]);
         try {

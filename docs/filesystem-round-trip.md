@@ -3,6 +3,8 @@
 Filesystem is a first-party, in-process Core integration. The first two increments
 configure Inputs/Broadcasts and manually discover files. Acquisition and
 publication are not implemented yet.
+The [Tempest alignment note](filesystem-tempest-decisions.md) records the PR1
+retrospective, installed APIs and narrow exceptions retained after review.
 The lifecycle work follows [issue #28](https://github.com/Lost-and-Fonds/stashd/issues/28).
 
 ## Configure through the CLI
@@ -150,11 +152,13 @@ checks and configuration authority each made its CLI proof fail; source was
 restored before final verification. All 27 new named declarations passed a
 token-based multiline PHPDoc check. These are local results, not CI certification.
 
-Discovery increment verification (24 October 2026): focused CLI wrapper **9
-passed, 1,651 assertions**; Tempest validation wrapper **2 passed, 24 assertions**.
-Full `composer qa` **369 passed, 33 existing incomplete, 21,828 assertions**;
+Post-review discovery verification (24 October 2026): focused CLI wrapper **10
+passed, 1,691 assertions**; typed validation/cursor wrapper **3 passed, 47
+assertions**. Full `composer qa` **371 passed, 33 existing incomplete**;
 formatting/lint/analysis passed. Negative controls for lost continuation,
-nontransactional adoption and false exhaustive coverage each failed their CLI
-proof; weaker boolean validation failed the rejection test. All mutations were
-restored. A token-based check covered all 62 named declarations in the touched
-Integration code/tests/helpers and validator tests. These are local results.
+nontransactional adoption, false exhaustive coverage, missing nullable fields
+and dotted-field aliases failed their relevant proofs. All mutations were
+restored. A token-based check covered all 92 named declarations in the affected
+Integration code, migrations, tests and helpers. These are local results, not CI
+certification. See the linked Tempest alignment note for installed APIs,
+remaining exceptions and revisit conditions.

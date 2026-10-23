@@ -20,17 +20,15 @@ final readonly class FilesystemRoots
      */
     public function canonical(string $path, bool $allowMissing = false): string
     {
-        if (! str_starts_with($path, '/') || str_contains($path, '\\') || preg_match('/[\x00-\x1f\x7f]/', $path)) {
+        if (! str_starts_with($path, '/')) {
             throw new InvalidArgumentException('Filesystem roots must be absolute local directory paths.');
         }
         $path = rtrim($path, '/');
         if ($path === '') {
             return '/';
         }
+        $this->relative(substr($path, 1));
         $parts = explode('/', substr($path, 1));
-        if (array_intersect($parts, ['', '.', '..']) !== []) {
-            throw new InvalidArgumentException('Filesystem roots may not contain traversal or empty components.');
-        }
         $resolved = '';
         foreach ($parts as $part) {
             $resolved .= '/' . $part;
@@ -55,6 +53,28 @@ final readonly class FilesystemRoots
             throw new InvalidArgumentException('Filesystem input must be an existing readable directory.');
         }
         return $resolved;
+    }
+
+    /**
+     * Require an exact supported relative name without filesystem access or sanitization.
+     *
+     * The empty path is permitted only for the traversal's root frame. All other
+     * callers reject absolute names, traversal, ambiguous separators and unsupported bytes.
+     */
+    public function relative(string $path, bool $allowEmpty = false): void
+    {
+        if ($path === '' && $allowEmpty) {
+            return;
+        }
+        if (str_starts_with($path, '/') || str_contains($path, '\\')) {
+            throw new InvalidArgumentException('Filesystem names must be relative paths with slash separators.');
+        }
+        if (preg_match('//u', $path) !== 1 || preg_match('/[\x00-\x1f\x7f]/', $path)) {
+            throw new InvalidArgumentException('Filesystem names require supported UTF-8 bytes.');
+        }
+        if (array_intersect(explode('/', $path), ['', '.', '..']) !== []) {
+            throw new InvalidArgumentException('Filesystem paths may not contain traversal or empty components.');
+        }
     }
 
     /**

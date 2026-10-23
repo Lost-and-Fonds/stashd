@@ -143,3 +143,34 @@ test('concurrent CLI configuration waits for authority and retains one Input ide
             ->toBe(1);
     });
 });
+
+test('Tempest migrations adopt the PR1 configuration baseline without changing identities or constraints', function (): void {
+    with_configuration_database(function (ArchiveFixture $archive, array $descriptor, PDO $database): void {
+        $root = dirname($archive->input('legacy.bin', 'retained'));
+        $id = '019a0cbb-3fde-7000-8000-000000000028';
+        // This is the schema shipped in PR1, before a migration ledger existed.
+        $database->exec("CREATE SCHEMA configuration_proof;
+            CREATE TABLE configuration_proof.configurations (
+                id uuid PRIMARY KEY, kind text NOT NULL CHECK (kind IN ('input', 'broadcast')),
+                component text NOT NULL, settings jsonb NOT NULL CHECK (jsonb_typeof(settings) = 'object'))");
+        $statement = $database->prepare('INSERT INTO configuration_proof.configurations VALUES (?, ?, ?, ?)');
+        $statement->execute([$id, 'input', 'filesystem', json_encode(['root' => $root], JSON_THROW_ON_ERROR)]);
+        $before = $database
+            ->query("SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = 'configuration_proof.configurations'::regclass ORDER BY definition")
+            ->fetchAll(PDO::FETCH_COLUMN);
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
+            $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', $root]));
+            expect($input['id'])->toBe($id)->and($input['settings'])->toBe(['root' => $root]);
+            expect((int) $database->query('SELECT count(*) FROM configuration_proof.migrations')->fetchColumn())->toBe(3);
+            expect(
+                $database
+                    ->query("SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = 'configuration_proof.configurations'::regclass ORDER BY definition")
+                    ->fetchAll(PDO::FETCH_COLUMN),
+            )
+                ->toBe($before);
+        }
+        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $id]));
+        expect($run['status'])->toBe('finished')->and($run['discovered_count'])->toBe(1);
+    });
+});

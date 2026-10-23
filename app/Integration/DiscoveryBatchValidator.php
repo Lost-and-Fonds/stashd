@@ -3,128 +3,144 @@
 namespace App\Integration;
 
 use RuntimeException;
-use Tempest\Validation\Rule;
-use Tempest\Validation\Rules;
+use Tempest\Validation\Rules\HasCount;
+use Tempest\Validation\Rules\IsArrayList;
 use Tempest\Validation\Validator;
+use Throwable;
+
+use function Tempest\Mapper\map;
 
 /**
- * Validate discovery value records before the host starts a batch transaction.
+ * Validate raw protocol values before mapping them into named discovery records.
  *
- * Tempest field rules describe envelopes; strict scalar closures preserve protocol
- * types without coercion. Component-owned metadata payloads remain opaque strings.
- *
- * @phpstan-import-type Batch from InputDiscovery
- * @phpstan-import-type Item from InputDiscovery
- * @phpstan-import-type ValidationRule from Validator
- * @phpstan-import-type ValidationClosure from Validator
+ * Tempest Strict mapping owns required-vs-null checks; declarative rules reject
+ * coercible scalars before casters run. Only protocol variant invariants are manual.
  */
 final readonly class DiscoveryBatchValidator
 {
     /**
-     * Bind the application's validator while keeping lifecycle state outside validation.
+     * Bind the application's real validator rather than duplicating field validation.
      */
     public function __construct(
         private Validator $validator,
     ) {}
 
     /**
-     * Reject invalid records, oversized batches and inconsistent terminal variants.
-     *
-     * Required nullable fields must be present, not merely defaulted to null.
-     * Transaction ownership, active-run checks and acknowledgment remain Core duties.
+     * Return typed observations only after complete nested validation and boundedness.
      */
-    public function validate(array $batch, int $maximumItems): void
+    public function validate(array $batch, int $maximumItems): DiscoveryBatch
     {
-        /** @var Batch $batch */
-        $batch = $this->fields($batch, [
-            'items' => [new Rules\IsArrayList(), new Rules\HasCount(max: $maximumItems)],
-            'progress' => new Rules\IsArray(),
-        ]);
-        foreach ($batch['items'] as $item) {
-            /** @var Item $item */
-            $item = $this->fields($item, [
-                'id' => new Rules\IsNotEmptyString(),
-                'reference' => is_string(...),
-                'source' => new Rules\IsArray(orNull: true),
-                'size_bytes' => static fn (mixed $value): bool => $value === null || is_int($value) && $value >= 0,
-                'size_estimated' => is_bool(...),
-                'metadata' => new Rules\IsArrayList(),
-            ]);
-            if ($item['size_bytes'] === null && $item['size_estimated']) {
+        $this->check(DiscoveryBatch::class, $batch);
+        if ($this->validator->validateValue($batch['items'], new HasCount(max: $maximumItems)) !== []) {
+            throw new RuntimeException('Discovery batch exceeds the host limit.');
+        }
+        /** @var list<array{metadata: array}> $items */
+        $items = $batch['items'];
+        foreach ($items as $item) {
+            $this->check(DiscoveredItem::class, $item);
+            $this->metadata($item['metadata']);
+            $observation = $this->record(DiscoveredItem::class, $item);
+            if ($observation->size_bytes === null && $observation->size_estimated) {
                 throw new RuntimeException('A discovery size estimate requires a numeric size.');
             }
-            $this->metadata($item['metadata']);
         }
+        /** @var array $progress */
         $progress = $batch['progress'];
         if (array_keys($progress) === ['more']) {
-            $this->fields($progress, ['more' => new Rules\IsNotEmptyString()]);
-            return;
-        }
-        $progress = $this->fields($progress, ['finished' => new Rules\IsArray()]);
-        $finish = $this->fields($progress['finished'], ['kind' => new Rules\IsIn(['exhaustive', 'partial', 'indeterminate'])]);
-        if (count($progress) !== 1 || count($finish) !== 2) {
+            if ($this->validator->validateValue($progress['more'], new \Tempest\Validation\Rules\IsNotEmptyString()) !== []) {
+                throw new RuntimeException('Discovery continuation must be a nonempty string.');
+            }
+        } elseif (array_keys($progress) === ['finished']) {
+            $this->finish($progress['finished']);
+        } else {
             throw new RuntimeException('Discovery progress must contain exactly one coherent variant.');
         }
-        if ($finish['kind'] === 'exhaustive') {
-            $this->fields($finish, ['refresh_state' => static fn (mixed $value): bool => $value === null || is_string($value)]);
-            return;
-        }
-        if ($finish['kind'] === 'indeterminate') {
-            $this->fields($finish, ['diagnostic' => new Rules\IsArray()]);
-            $this->diagnostic($finish['diagnostic']);
-            return;
-        }
-        $this->fields($finish, ['deficiencies' => [new Rules\IsArrayList(), new Rules\HasCount(min: 1)]]);
-        /** @var list<array> $deficiencies */
-        $deficiencies = $finish['deficiencies'];
-        foreach ($deficiencies as $deficiency) {
-            $deficiency = $this->fields($deficiency, [
-                'disposition' => new Rules\IsIn(['retryable', 'terminal', 'unknown']),
-                'diagnostic' => new Rules\IsArray(),
-            ]);
-            $this->diagnostic($deficiency['diagnostic']);
-        }
+        return $this->record(DiscoveryBatch::class, $batch);
     }
 
     /**
-     * Require a complete diagnostic envelope without interpreting provider evidence.
+     * Check variant field membership separately from each named record's value rules.
      */
-    private function diagnostic(array $value): void
+    private function finish(mixed $values): void
     {
-        $this->fields($value, ['message' => is_string(...), 'evidence' => new Rules\IsArrayList()]);
-        $this->metadata($value['evidence']);
+        $result = $this->record(DiscoveryResult::class, $values);
+        $detail = match ($result->kind) {
+            'exhaustive' => 'refresh_state',
+            'partial' => 'deficiencies',
+            'indeterminate' => 'diagnostic',
+            default => throw new RuntimeException('Unrecognized terminal coverage.'),
+        };
+        $keys = array_keys($values);
+        sort($keys);
+        $expected = ['kind', $detail];
+        sort($expected);
+        if ($keys !== $expected) {
+            throw new RuntimeException('Terminal coverage must contain exactly its variant fields.');
+        }
+        if ($result->kind === 'indeterminate') {
+            $this->diagnostic($result->diagnostic);
+        } elseif ($result->kind === 'partial') {
+            if ($this->validator->validateValue($result->deficiencies, [new IsArrayList(), new HasCount(min: 1)]) !== []) {
+                throw new RuntimeException('Partial coverage requires a nonempty deficiency list.');
+            }
+            foreach ($result->deficiencies ?? [] as $values) {
+                $deficiency = $this->record(DiscoveryDeficiency::class, $values);
+                $this->diagnostic($deficiency->diagnostic);
+            }
+        }
     }
 
     /**
-     * Validate facet envelopes while retaining their component-owned string payloads.
+     * Validate evidence envelopes before any nested mapper can coerce their scalars.
+     */
+    private function diagnostic(mixed $value): void
+    {
+        $this->check(DiscoveryDiagnostic::class, $value);
+        /** @var array{evidence: array} $value */
+        $this->metadata($value['evidence']);
+        $this->record(DiscoveryDiagnostic::class, $value);
+    }
+
+    /**
+     * Keep component JSON opaque while strictly validating each facet envelope.
      */
     private function metadata(array $values): void
     {
         foreach ($values as $value) {
-            $this->fields($value, ['schema' => is_string(...), 'json' => is_string(...)]);
+            $this->record(DiscoveryMetadata::class, $value);
         }
     }
 
     /**
-     * Require every named field before applying Tempest's field-rule map.
+     * Apply installed class/property validation before Tempest's potentially coercing casters.
      *
-     * validateValues examines supplied keys only; checking presence separately
-     * prevents missing nullable fields from passing as explicit null values.
-     *
-     * @param array<string, Rule|ValidationClosure|array<ValidationRule>> $rules
+     * @param class-string $class
      */
-    private function fields(mixed $value, array $rules): array
+    private function check(string $class, mixed $value): void
     {
-        if (! is_array($value) || array_diff(array_keys($rules), array_keys($value)) !== []) {
-            throw new RuntimeException('Rejected malformed discovery fields: ' . implode(', ', array_keys($rules)));
+        if (! is_array($value) || $this->validator->validateValue($value, new IsDiscoveryRecord()) !== [] || $this->validator->validateValuesForClass($class, $value) !== []) {
+            throw new RuntimeException('Rejected malformed discovery record: ' . $class);
         }
-        $fields = [];
-        foreach ($rules as $name => $rule) {
-            $fields[$name] = $value[$name];
+    }
+
+    /**
+     * Let Strict mapping enforce required nullable properties without a custom field walker.
+     *
+     * @template T of object
+     * @param class-string<T> $class
+     * @return T
+     */
+    private function record(string $class, mixed $value): object
+    {
+        $this->check($class, $value);
+        try {
+            $record = map($value)->to($class);
+            if (! $record instanceof $class) {
+                throw new RuntimeException('Mapper did not produce the requested discovery record.');
+            }
+            return $record;
+        } catch (Throwable $error) {
+            throw new RuntimeException('Rejected malformed discovery record: ' . $class, previous: $error);
         }
-        if ($this->validator->validateValues($fields, $rules) !== []) {
-            throw new RuntimeException('Rejected malformed discovery fields: ' . implode(', ', array_keys($rules)));
-        }
-        return $value;
     }
 }

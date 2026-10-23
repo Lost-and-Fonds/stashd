@@ -4,9 +4,14 @@ namespace App\Integration;
 
 use App\Administration\VaultConfig;
 use InvalidArgumentException;
-use PDO;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
+use Tempest\Database\Database;
+use Tempest\Database\Migrations\CreateMigrationsTable;
+use Tempest\Database\Migrations\MigrationManager;
+use Tempest\Database\Query;
+
+use function Tempest\Database\query;
 
 /**
  * Persist generic Input and Broadcast configuration in a separate operational schema.
@@ -27,6 +32,7 @@ final readonly class IntegrationConfigurations
         private VaultConfig $vault,
         private FilesystemRoots $roots,
         private OperationsDatabase $database,
+        private MigrationManager $migrations,
     ) {}
 
     /**
@@ -38,54 +44,16 @@ final readonly class IntegrationConfigurations
     public function initialize(): void
     {
         $database = $this->database->connect();
-        $database->beginTransaction();
-        try {
+        $this->database->transaction(function () use ($database): void {
             $this->lock($database);
-            $database->exec('CREATE SCHEMA IF NOT EXISTS "' . $this->config->schema . '"');
-            $database->exec(
-                'CREATE TABLE IF NOT EXISTS ' . $this->table() . " (
-                id uuid PRIMARY KEY, kind text NOT NULL CHECK (kind IN ('input', 'broadcast')),
-                component text NOT NULL, settings jsonb NOT NULL CHECK (jsonb_typeof(settings) = 'object'))",
-            );
-            $database->exec(
-                'CREATE TABLE IF NOT EXISTS '
-                . $this->table('discovery_runs')
-                . ' (
-                id uuid PRIMARY KEY, input_id uuid NOT NULL REFERENCES '
-                . $this->table()
-                . '(id), configuration jsonb NOT NULL,
-                status text NOT NULL CHECK (status IN (\'running\', \'finished\')), continuation text,
-                coverage jsonb, batches integer NOT NULL DEFAULT 0, error text)',
-            );
-            $database->exec('CREATE UNIQUE INDEX IF NOT EXISTS discovery_active_input ON ' . $this->table('discovery_runs') . ' (input_id) WHERE status = \'running\'');
-            $database->exec(
-                'CREATE TABLE IF NOT EXISTS '
-                . $this->table('source_associations')
-                . ' (
-                input_id uuid NOT NULL REFERENCES '
-                . $this->table()
-                . '(id), source_id text NOT NULL,
-                first_run uuid NOT NULL REFERENCES '
-                . $this->table('discovery_runs')
-                . '(id),
-                last_run uuid NOT NULL REFERENCES '
-                . $this->table('discovery_runs')
-                . '(id), PRIMARY KEY (input_id, source_id))',
-            );
-            $database->exec(
-                'CREATE TABLE IF NOT EXISTS '
-                . $this->table('discovery_items')
-                . ' (
-                run_id uuid NOT NULL REFERENCES '
-                . $this->table('discovery_runs')
-                . '(id), source_id text NOT NULL,
-                item jsonb NOT NULL, PRIMARY KEY (run_id, source_id))',
-            );
-            $database->commit();
-        } catch (\Throwable $error) {
-            $database->rollBack();
-            throw $error;
-        }
+            $database->execute(new Query('CREATE SCHEMA IF NOT EXISTS "' . $this->config->schema . '"'));
+            // Avoid MigrationManager's missing-table probe aborting this PostgreSQL transaction.
+            $catalog = $database->fetchFirst(new Query("SELECT to_regclass('migrations') AS name"));
+            if (($catalog['name'] ?? null) === null) {
+                $this->migrations->executeUp(new CreateMigrationsTable());
+            }
+            $this->migrations->up();
+        });
     }
 
     /**
@@ -106,18 +74,13 @@ final readonly class IntegrationConfigurations
             throw new InvalidArgumentException('Filesystem configuration currently requires a local Vault.');
         }
         $database = $this->database->connect();
-        $database->beginTransaction();
-        try {
+        return $this->database->transaction(function () use ($database, $kind, $component, $root): array {
             $this->lock($database);
             $root = $this->roots->canonical($root, allowMissing: $kind === 'broadcast');
             $vault = $this->roots->canonical($this->vault->root, allowMissing: true);
             $this->roots->requireSeparate($root, $vault);
             $existing = null;
-            $rows = $database->query('SELECT id, kind, component, settings FROM ' . $this->table());
-            if ($rows === false) {
-                throw new RuntimeException('Could not read operational configurations.');
-            }
-            foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            foreach ($database->fetch(query('configurations')->select('id', 'kind', 'component', 'settings')) as $row) {
                 $record = $this->decode($row);
                 if ($record['component'] !== 'filesystem') {
                     continue;
@@ -136,18 +99,15 @@ final readonly class IntegrationConfigurations
             }
             $record = $existing ?? ['id' => Uuid::v7()->toString(), 'kind' => $kind, 'component' => $component, 'settings' => ['root' => $root]];
             if ($existing === null) {
-                $statement = $database->prepare('INSERT INTO ' . $this->table() . ' (id, kind, component, settings) VALUES (?, ?, ?, ?)');
-                if ($statement === false) {
-                    throw new RuntimeException('Could not prepare configuration insertion.');
-                }
-                $statement->execute([$record['id'], $kind, $component, json_encode($record['settings'], JSON_THROW_ON_ERROR)]);
+                $database->execute(query('configurations')->insert(
+                    id: $record['id'],
+                    kind: $kind,
+                    component: $component,
+                    settings: json_encode($record['settings'], JSON_THROW_ON_ERROR),
+                ));
             }
-            $database->commit();
             return $record;
-        } catch (\Throwable $error) {
-            $database->rollBack();
-            throw $error;
-        }
+        });
     }
 
     /**
@@ -162,13 +122,8 @@ final readonly class IntegrationConfigurations
         if (! Uuid::isValid($id)) {
             throw new InvalidArgumentException('A valid configuration UUID is required.');
         }
-        $statement = $this->database->connect()->prepare('SELECT id, kind, component, settings FROM ' . $this->table() . ' WHERE id = ? AND kind = ?');
-        if ($statement === false) {
-            throw new RuntimeException('Could not prepare configuration lookup.');
-        }
-        $statement->execute([$id, $kind]);
-        $row = $statement->fetch(PDO::FETCH_ASSOC);
-        if ($row === false) {
+        $row = $this->database->connect()->fetchFirst(query('configurations')->select('id', 'kind', 'component', 'settings')->where('id', $id)->where('kind', $kind));
+        if ($row === null) {
             throw new InvalidArgumentException('Configuration not found for the requested lifecycle.');
         }
         return $this->decode($row);
@@ -181,12 +136,8 @@ final readonly class IntegrationConfigurations
      */
     public function all(): array
     {
-        $rows = $this->database->connect()->query('SELECT id, kind, component, settings FROM ' . $this->table());
-        if ($rows === false) {
-            throw new RuntimeException('Could not read operational configurations.');
-        }
         $records = [];
-        foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        foreach ($this->database->connect()->fetch(query('configurations')->select('id', 'kind', 'component', 'settings')) as $row) {
             $records[] = $this->decode($row);
         }
         return $records;
@@ -195,27 +146,15 @@ final readonly class IntegrationConfigurations
     /**
      * Serialize configuration checks and insertion within this database and schema.
      */
-    private function lock(PDO $database): void
+    private function lock(Database $database): void
     {
-        $statement = $database->prepare('SELECT pg_advisory_xact_lock(hashtext(current_database()), hashtext(?))');
-        if ($statement === false) {
-            throw new RuntimeException('Could not prepare operational configuration lock.');
-        }
-        $statement->execute([$this->config->schema]);
-    }
-
-    /**
-     * Qualify an internal table name using the schema validated by OperationsConfig.
-     */
-    private function table(string $name = 'configurations'): string
-    {
-        return '"' . $this->config->schema . '".' . $name;
+        $database->execute(new Query('SELECT pg_advisory_xact_lock(hashtext(current_database()), hashtext(?))', [$this->config->schema]));
     }
 
     /**
      * Decode component settings without exposing connection settings in public records.
      *
-     * @param array<string, mixed> $row
+     * @param array $row
      * @return Configuration
      */
     private function decode(array $row): array
