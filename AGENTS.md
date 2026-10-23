@@ -3,6 +3,51 @@
 - All documentation for Tempest can be found in vendor/tempest/framework/docs
 - Use `php tempest make:` commands to create framework-specific classes.
 
+## Tempest-first engineering policy
+
+Stashd is a Tempest application. **Use a relevant Tempest facility by default when the
+installed version provides one.** Do not reimplement framework infrastructure
+merely because direct PHP, raw PDO/SQL, or handwritten validation is familiar.
+
+Before adding or substantially changing infrastructure, inspect the documentation
+in `vendor/tempest/framework/docs` **and the installed implementation** for
+the relevant facility. Confirm actual APIs and behavior in this project's
+installed version; do not rely on remembered examples from another release.
+Use `php tempest make:` generators for framework constructs where applicable.
+
+This applies especially to validation, typed input/mapping, database models,
+query building, migrations, transactions, storage, configuration, dependency
+injection, events, jobs/scheduling, processes, HTTP, and console commands.
+
+- Express structured records as named, typed values when their shape or invariants
+  matter. Prefer Tempest validation/mapping and reusable rules to long chains of
+  manual array-key checks, nested anonymous arrays, or duplicated path checks.
+  Protocol variants and genuine domain invariants may still require explicit code.
+- Use Tempest's database facilities for ordinary persistence and schema evolution
+  when they fit. Keep deliberately database-specific operations (for example
+  PostgreSQL advisory locks or atomic SQL not correctly expressible by the
+  framework) small, isolated, parameterized, and transactionally tested.
+  Do not put long `CREATE TABLE` strings and ad hoc CRUD in coordinators by default.
+- Keep domain decisions in Core, rather than forcing them into framework layers.
+  Conversely, do not build a second generic validation, persistence, serialization,
+  or orchestration framework inside Core.
+- If a relevant Tempest facility is **not** used, give a **specific, reviewable
+  justification** in the PR description or a linked decision note, covering:
+  (1) which installed Tempest facility was examined;
+  (2) the concrete requirement it cannot meet or why it is a worse fit;
+  (3) why the chosen alternative is preferable and how it is tested; and
+  (4) the condition, if any, under which we should revisit the decision.
+  Do not scatter boilerplate apologies across code comments.
+- If Tempest has no suitable facility, prefer an established maintained PHP library
+  over inventing generic infrastructure. Ordinary PHP language constructs and
+  application-specific business logic do not each need an exception report.
+- **A missing justification for bypassing an available relevant Tempest facility
+  is a review defect.** Reviewers must ask for the framework-based solution or
+  the documented exception before approving.
+
+Keep existing correctness, safety, and acceptance-test contracts intact when
+refactoring toward Tempest; a framework rewrite is not permission to weaken them.
+
 ## QA
 
 - When your work is done, run a series of QA tools by running `composer qa`.
