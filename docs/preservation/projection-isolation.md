@@ -40,6 +40,12 @@ absent inventory file is skipped; readable malformed JSON supplies no identity
 hint, so discovery tries historical candidates or reports the unidentified root.
 A file disappearing between its existence check and read aborts conservatively.
 Infrastructure exceptions are never evidence of corrupt inventory bytes.
+The same rule applies during publication/content verification: the OCFL adapter
+marks provider observations with `ArchiveReadFailure`. Inspection shares the first
+failure with its validation view and rethrows it even if the OCFL library catches
+or wraps it as a validation issue. Projection lets that failure abort replacement.
+Confirmed missing paths and successfully read bytes with invalid checksums or
+formats remain corruption findings and continue to isolate the affected Item.
 Extension directories are not scanned as Objects.
 
 ## Incident and SQL contract
@@ -104,3 +110,13 @@ Focused isolation suite: **6 passed, 1,019 assertions**. Required `composer qa`:
 **357 passed, 33 existing incomplete, 20,053 assertions**, exit 0. Changed-file
 analysis found no issues. Generated fixture databases/roles and private test-admin
 configuration were removed again.
+
+The next review added the same fault at `inventory.json.sha512`, after discovery
+has succeeded. It reproduced silent degraded replacement on `6ab752c`, then passed
+with typed provider failures retained across the OCFL validation views. The same
+test independently checks all three populated SQL tables and the physical Vault
+remain unchanged on I/O failure; a readable malformed sidecar still excludes only
+its affected Item. Focused isolation suite: **7 passed, 1,109 assertions**. Final
+`composer qa`: **358 passed, 33 existing incomplete, 20,058 assertions**, exit 0;
+formatting, lint and analysis passed. Generated fixture databases/roles and private
+test credentials were removed. No independent external execution is claimed.

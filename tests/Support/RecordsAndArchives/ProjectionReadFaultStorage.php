@@ -19,6 +19,7 @@ final readonly class ProjectionReadFaultStorage extends LocalArchiveStorage
         Storage $storage,
         LocalStorageConfig $config,
         private string $objectPath,
+        private string $filename = 'inventory.json',
     ) {
         parent::__construct($storage, $config);
     }
@@ -28,7 +29,7 @@ final readonly class ProjectionReadFaultStorage extends LocalArchiveStorage
      */
     public function read(string $location): string
     {
-        if (str_starts_with($location, $this->objectPath . '/') && str_ends_with($location, '/inventory.json')) {
+        if (str_starts_with($location, $this->objectPath . '/') && str_ends_with($location, '/' . $this->filename)) {
             throw new RuntimeException('Injected inventory storage read failure.');
         }
         return parent::read($location);

@@ -2,6 +2,8 @@
 
 namespace App\RecordsAndArchives\Storage;
 
+use ArrayObject;
+use Closure;
 use Ottosmops\Ocfl\DigestAlgorithm;
 use Ottosmops\Ocfl\Filesystem\Filesystem;
 use RuntimeException;
@@ -16,11 +18,40 @@ use RuntimeException;
 readonly class OcflFilesystemAdapter implements Filesystem
 {
     /**
-     * Bind the storage provider used for all OCFL reads and publication operations.
+     * Bind the provider and an optional shared record of failed storage observations.
+     *
+     * Inspection shares this record with its validation view so upstream validators
+     * cannot hide provider failures by converting exceptions into validation issues.
+     *
+     * @param null|ArrayObject<int, ArchiveReadFailure> $readFailures
      */
     public function __construct(
         private ArchiveStorage $storage,
+        private ?ArrayObject $readFailures = null,
     ) {}
+
+    /**
+     * Preserve provider failures as unavailable observations, never corruption evidence.
+     *
+     * The optional shared record survives third-party exception swallowing. Confirmed
+     * absence and readable invalid bytes remain ordinary values for validation.
+     *
+     * @template T
+     * @param Closure(): T $operation
+     * @return T
+     */
+    private function observe(Closure $operation): mixed
+    {
+        try {
+            return $operation();
+        } catch (\Throwable $error) {
+            $failure = new ArchiveReadFailure('Archive storage observation failed: ' . $error->getMessage(), previous: $error);
+            if ($this->readFailures !== null) {
+                $this->readFailures[0] ??= $failure;
+            }
+            throw $failure;
+        }
+    }
 
     /**
      * Strip leading slashes so OCFL root paths address the configured storage root.
@@ -56,7 +87,25 @@ readonly class OcflFilesystemAdapter implements Filesystem
      */
     public function read(string $path): string
     {
-        return $this->storage->read(self::normalizePath($path));
+        return $this->observe(fn (): string => $this->storage->read(self::normalizePath($path)));
+    }
+
+    /**
+     * Open archived bytes while preserving provider failures for recovery callers.
+     *
+     * The caller owns the returned stream and must close it after verification.
+     *
+     * @return resource
+     */
+    public function readStream(string $path): mixed
+    {
+        return $this->observe(function () use ($path) {
+            $stream = $this->storage->readStream(self::normalizePath($path));
+            if (! is_resource($stream)) {
+                throw new ArchiveReadFailure('Could not open archived content stream.');
+            }
+            return $stream;
+        });
     }
 
     /**
@@ -123,7 +172,7 @@ readonly class OcflFilesystemAdapter implements Filesystem
             $context = hash_init('sha512');
             hash_update_stream($context, $stream);
             if (! feof($stream)) {
-                throw new RuntimeException('Could not read complete byte verification stream.');
+                throw new ArchiveReadFailure('Could not read complete byte verification stream.');
             }
             if (! hash_equals($expected, hash_final($context))) {
                 throw new RuntimeException('Adopted bytes differ from the accepted source.');
@@ -175,7 +224,7 @@ readonly class OcflFilesystemAdapter implements Filesystem
      */
     public function fileExists(string $path): bool
     {
-        return $this->storage->fileExists(self::normalizePath($path));
+        return $this->observe(fn (): bool => $this->storage->fileExists(self::normalizePath($path)));
     }
 
     /**
@@ -183,7 +232,7 @@ readonly class OcflFilesystemAdapter implements Filesystem
      */
     public function directoryExists(string $path): bool
     {
-        return $this->storage->directoryExists(self::normalizePath($path));
+        return $this->observe(fn (): bool => $this->storage->directoryExists(self::normalizePath($path)));
     }
 
     /**
@@ -198,7 +247,7 @@ readonly class OcflFilesystemAdapter implements Filesystem
     {
         $names = [];
 
-        foreach ($this->storage->list(self::normalizePath($path))->toArray() as $item) {
+        foreach ($this->observe(fn (): array => $this->storage->list(self::normalizePath($path))->toArray()) as $item) {
             $names[] = basename($item->path());
         }
 
@@ -219,7 +268,7 @@ readonly class OcflFilesystemAdapter implements Filesystem
 
         $files = [];
 
-        foreach ($this->storage->list($path, deep: true)->toArray() as $item) {
+        foreach ($this->observe(fn (): array => $this->storage->list($path, deep: true)->toArray()) as $item) {
             if (! $item->isFile()) {
                 continue;
             }
@@ -245,24 +294,26 @@ readonly class OcflFilesystemAdapter implements Filesystem
         if (str_starts_with($path, '/') && is_file($path)) {
             $stream = fopen($path, 'rb');
         } else {
-            $stream = $this->storage->readStream(self::normalizePath($path));
+            $stream = $this->observe(fn () => $this->storage->readStream(self::normalizePath($path)));
         }
 
-        if (! is_resource($stream)) {
-            throw new RuntimeException('Could not open file stream');
-        }
-
-        try {
-            $context = hash_init($algorithm->hashAlgorithm());
-
-            hash_update_stream($context, $stream);
-            if (! feof($stream)) {
-                throw new RuntimeException('Could not read complete byte verification stream.');
+        return $this->observe(function () use ($stream, $algorithm): string {
+            if (! is_resource($stream)) {
+                throw new ArchiveReadFailure('Could not open file stream');
             }
 
-            return hash_final($context);
-        } finally {
-            fclose($stream);
-        }
+            try {
+                $context = hash_init($algorithm->hashAlgorithm());
+
+                hash_update_stream($context, $stream);
+                if (! feof($stream)) {
+                    throw new ArchiveReadFailure('Could not read complete byte verification stream.');
+                }
+
+                return hash_final($context);
+            } finally {
+                fclose($stream);
+            }
+        });
     }
 }

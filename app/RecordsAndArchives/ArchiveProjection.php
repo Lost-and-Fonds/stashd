@@ -80,6 +80,9 @@ final readonly class ArchiveProjection
                         $itemRows[] = ['object_id' => $objectId, 'version' => $version, 'pins' => $record['pins']];
                     }
                 } catch (\Exception $error) {
+                    if ($error instanceof \App\RecordsAndArchives\Storage\ArchiveReadFailure) {
+                        throw $error;
+                    }
                     $incidents[] = [
                         ...$entry,
                         'item_version' => $version,

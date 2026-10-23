@@ -454,8 +454,8 @@ class Vault
         try {
             $contents = stream_get_contents($stream);
 
-            if ($contents === false) {
-                throw new RuntimeException('Could not read archived content stream.');
+            if ($contents === false || ! feof($stream)) {
+                throw new \App\RecordsAndArchives\Storage\ArchiveReadFailure('Could not read archived content stream.');
             }
 
             return $contents;
@@ -474,17 +474,12 @@ class Vault
         $object = $this->getObject($objectUrn);
         $physicalPath = $object->path . '/' . $object->resolveContentPath($version, $logicalPath);
 
-        if (! $this->storage->fileExists($physicalPath)) {
+        $fs = new OcflFilesystemAdapter($this->storage);
+        if (! $fs->fileExists($physicalPath)) {
             throw new OcflException(ErrorCode::E092, "Archived content missing at '{$physicalPath}'.");
         }
 
-        $stream = $this->storage->readStream($physicalPath);
-
-        if (! is_resource($stream)) {
-            throw new RuntimeException("Could not open archived content stream for '{$logicalPath}'.");
-        }
-
-        return $stream;
+        return $fs->readStream($physicalPath);
     }
 
     /**

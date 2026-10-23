@@ -121,7 +121,7 @@ test('projection rebuild isolates damaged history and replaces stale rows withou
     }
 })->with(['item-payload', 'item-inventory', 'asset-payload', 'asset-missing', 'unidentified']);
 
-test('inventory provider read failure aborts rebuild and preserves existing SQL projection', function (): void {
+test('inventory provider read failure aborts rebuild and preserves existing SQL projection', function (string $filename): void {
     $this->archive->run('vault.initialize');
     $workspace = dirname($this->archive->path('vault'));
     $root = $workspace . '/vault';
@@ -157,21 +157,21 @@ test('inventory provider read failure aborts rebuild and preserves existing SQL 
         $inventory = OcflInspector::inventoryFor($root, $itemId)['path'];
         $objectPath = ltrim(substr(dirname($inventory), strlen($root)), '/');
         $beforeVault = Probe::snapshot($root);
-        expect(fn () => Probe::run($workspace, [...$rebuild, 'projection_read_fault' => $objectPath]))
+        expect(fn () => Probe::run($workspace, [...$rebuild, 'projection_read_fault' => $objectPath, 'projection_read_filename' => $filename]))
             ->toThrow(\PHPUnit\Framework\AssertionFailedError::class, 'Injected inventory storage read failure.');
         foreach ($beforeSql as $table => $rows) {
             expect($database->query('SELECT * FROM "' . $name . '".' . $table . ' ORDER BY 1')->fetchAll(PDO::FETCH_ASSOC))->toBe($rows);
         }
         expect(Probe::snapshot($root))->toBe($beforeVault);
         // Readable malformed bytes still degrade only the affected Item.
-        foreach ([$inventory, dirname($inventory) . '/v1/inventory.json'] as $path) {
+        foreach ($filename === 'inventory.json' ? [$inventory, dirname($inventory) . '/v1/inventory.json'] : [$inventory . '.sha512'] as $path) {
             file_put_contents($path, '{damaged');
         }
         $damagedVault = Probe::snapshot($root);
         $report = Probe::run($workspace, $rebuild);
         expect($report['items'])->toBe([$receipts['healthy']['item']]);
         expect($report['incidents'])->toHaveCount(1);
-        expect($report['incidents'][0]['object_id'])->toBeNull();
+        expect($report['incidents'][0]['object_id'])->toBe($filename === 'inventory.json' ? null : $itemId);
         expect($report['incidents'][0]['path'])->toBe($objectPath);
         $record = Probe::json(OcflInspector::payloadPath($root, $receipts['healthy']['item']['object_id'], 'v1', 'item.json'));
         ProjectionProbe::assertRebuilt($database, $projection, $receipts['healthy']['item'], $record['pins']);
@@ -183,4 +183,4 @@ test('inventory provider read failure aborts rebuild and preserves existing SQL 
             Probe::run($workspace, ['operation' => 'projection.dispose', 'fixture' => $fixture]);
         }
     }
-});
+})->with(['inventory.json', 'inventory.json.sha512']);

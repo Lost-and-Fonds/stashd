@@ -21,7 +21,12 @@ return static function (array $request, Closure $boundary): array {
         ? new Tests\Support\RecordsAndArchives\CrashStorage(new GenericStorage($config), $config)
         : new LocalArchiveStorage(new GenericStorage($config), $config);
     if (isset($request['projection_read_fault'])) {
-        $storage = new Tests\Support\RecordsAndArchives\ProjectionReadFaultStorage(new GenericStorage($config), $config, $request['projection_read_fault']);
+        $storage = new Tests\Support\RecordsAndArchives\ProjectionReadFaultStorage(
+            new GenericStorage($config),
+            $config,
+            $request['projection_read_fault'],
+            $request['projection_read_filename'] ?? 'inventory.json',
+        );
     }
     $vault = new Vault($storage);
     if (isset($request['crash_boundary'])) {
