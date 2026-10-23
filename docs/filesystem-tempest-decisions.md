@@ -11,26 +11,31 @@ Paths are relative to `vendor/tempest/framework/packages/` unless stated otherwi
 
 ## Changes and PR1 retrospective
 
-PR1's Tempest console commands, discovered configuration object and domain path
-policy remain appropriate. Its direct PDO connection, inline table bootstrap and
-routine SQL were avoidable framework substitutes. PR2 now adapts the existing
-explicit DSN to `DatabaseConfig`, opens Tempest's nonpersistent application
-connection lazily, uses the table query builder for ordinary configuration/run
-CRUD, and applies generated `MigratesUp` migrations through `MigrationManager`.
-The private schema is the connection's sole search path; projection schemas and
-canonical Vault storage remain separate. `integration:init` remains the explicit
-bootstrap/upgrade command. Existing IDs/settings/constraints survive adoption of
-PR1's table without a migration ledger; repeated upgrades retain the same ledger.
+PR1's Tempest console commands, automatically loaded configuration and path
+checks remain appropriate. Its direct PDO connection, table creation in services and
+routine SQL duplicated facilities Tempest already provides. PR2 now adapts the existing
+explicit connection string to `DatabaseConfig`, opens a nonpersistent Tempest
+connection only when needed, uses the table query builder for ordinary reads and
+writes, and applies generated `MigratesUp` migrations through `MigrationManager`.
+Table names resolve only in the private operational schema. Archive projections
+and canonical Vault storage remain separate. `integration:init` remains the explicit
+setup/upgrade command. It keeps PR1's existing IDs, settings and table constraints
+while adding the migration ledger; repeating the command preserves both.
 
 Tempest `#[Autowire]` replaces the single-line Input initializer.
 `DiscoveryCoordinator` now owns the Input lifecycle, not persistence. The small
 `DiscoveryStore` owns checkpoint SQL. Named request, observation, batch, result,
-metadata, diagnostic, deficiency, cursor and frame records replace anonymous
-structural checks. Tempest `#[Strict]` mapping enforces required nullable fields;
-class/property rules validate raw values **before** mapping can coerce them.
+metadata, diagnostic, deficiency, cursor and frame DTOs live in
+`app/Integration/DTO/` under `App\Integration\DTO`. They replace anonymous
+array checks. Services, configuration and validation rules stay in `Integration`.
+`FilesystemCursor::decode()` validates saved JSON and restores frames; it owns no
+storage or orchestration. Fully qualified DTO names in collection PHPDoc let
+Tempest map nested records after the move. Tempest `#[Strict]` mapping enforces
+required nullable fields;
+class/property rules check raw values **before** mapping can convert them.
 Collection elements are checked explicitly because class validation does not
 recurse through typed array elements. The shared Filesystem policy validates
-relative names both in enumeration and when restoring frames.
+relative paths both during a scan and when restoring saved directory positions.
 
 ## Narrow exceptions and revisit conditions
 
@@ -69,9 +74,9 @@ relative names both in enumeration and when restoring frames.
   manager's missing-ledger probe aborting the surrounding PostgreSQL transaction;
   Tempest creates and records its own ledger. Revisit each exception when the
   installed builder/manager can express it without weakening schema isolation,
-  serialization or atomic acknowledgment. CLI proofs cover repeatable legacy
-  upgrade, configuration authority, live invocation exclusion, SQL failure and
-  SIGKILL/resume.
+  configuration locking or saving a whole batch together. CLI tests cover repeated
+  upgrades from PR1, concurrent configuration checks,
+  one scan per Input, SQL failure and restarting after SIGKILL.
 - **Existing explicit DSN.** Evaluated `Config/PostgresConfig.php`,
   `Config/DatabaseConfig.php`, `DatabaseInitializer.php` and `Connection/PDOConnection.php`.
   `PostgresConfig` builds a DSN from host/port/database fields; parsing the existing
@@ -96,12 +101,29 @@ relative names both in enumeration and when restoring frames.
   and `ProcessResult.php`. The API can signal a child but its result does not expose
   final OS `signaled`/`termsig` evidence; waiting on a signaled process exposes
   Symfony's exception instead. Keep the small existing native-process helper for
-  fresh CLI proofs and direct SIGKILL/status assertions. Production discovery
+  fresh-process CLI tests and direct SIGKILL/status assertions. Production discovery
   launches no process. Revisit when the framework exposes that termination evidence
   directly. The crash test asserts signal 9, committed row counts and continuation
-  adoption after a fresh invocation.
+  reuse in a fresh process.
 
 No scheduling, jobs, HTTP write surface or external process runtime is introduced.
 No dependency changes or parallel framework are needed. Existing continuation
 JSON and CLI output shapes remain compatible; scans still require a stable tree
 for reliable entry-position continuation.
+
+## Review cleanup and style limits
+
+Discovery DTOs use the department's `DTO/` namespace throughout callers, tests and
+Tempest mapping annotations. The CLI and saved JSON formats are unchanged.
+Comments explain the scan and retry behavior without changing its safety rules.
+
+Mago is the only formatter, linter and analyzer. `mago.toml` inherits the local
+`config/php-style.mago.toml` profile. The temporary local `strict-types` and
+`no-fully-qualified-global-class-like` exceptions remain: remove them in a focused
+repository-wide cleanup. The profile cannot express every blank-line or PHPDoc
+rule, so passing Mago does not establish full parity with PHP-CS-Fixer. Useful
+multiline PHPDoc still needs review and a separate declaration check.
+
+The migrations currently select PostgreSQL by dialect. If another PostgreSQL
+connection is added, select the operational database by tag before running these
+migrations against multiple connections.

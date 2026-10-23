@@ -13,10 +13,10 @@ use Tempest\Database\Transactions\GenericTransactionManager;
 use Throwable;
 
 /**
- * Resolve Tempest's operational database lazily within its private PostgreSQL schema.
+ * Open the application database only when needed and use its private PostgreSQL schema.
  *
- * The framework owns connections, queries and transaction primitives. This is the
- * application's SQL connection; canonical Vault storage and projections stay separate.
+ * Tempest manages the connection, queries and transactions. This database holds
+ * working configuration and scan state, separate from the Vault and archive projections.
  */
 #[Singleton]
 final class OperationsDatabase
@@ -24,7 +24,7 @@ final class OperationsDatabase
     private ?Database $connection = null;
 
     /**
-     * Retain explicit settings and the real container without connecting at boot.
+     * Keep the settings and application container ready without connecting at startup.
      */
     public function __construct(
         private OperationsConfig $config,
@@ -32,7 +32,9 @@ final class OperationsDatabase
     ) {}
 
     /**
-     * Open Tempest's nonpersistent connection and confine unqualified tables to our schema.
+     * Open Tempest's connection and resolve table names only within our private schema.
+     *
+     * The connection is not reused across processes, so session locks end on process exit.
      */
     public function connect(): Database
     {
@@ -48,14 +50,16 @@ final class OperationsDatabase
         $this->container->config(new OperationsConnectionConfig($this->config));
         $database = $this->container->get(Database::class);
         $database->execute(new Query('SET search_path TO "' . $this->config->schema . '"'));
+
         return $this->connection = $database;
     }
 
     /**
-     * Use Tempest transaction primitives while preserving the callback result and error.
+     * Commit the callback's work together, or roll it all back and rethrow its error.
      *
-     * Database::withinTransaction swallows Throwable and returns only a boolean;
-     * retry diagnostics require the original failure. Nested calls are not supported.
+     * Tempest's Database::withinTransaction returns only a boolean and hides the
+     * error needed to explain a retry. This uses its transaction manager instead,
+     * keeping the result and error. Callers must not nest these transactions.
      *
      * @template T
      * @param Closure(): T $work
@@ -69,6 +73,7 @@ final class OperationsDatabase
         try {
             $result = $work();
             $transactions->commit();
+
             return $result;
         } catch (Throwable $error) {
             $transactions->rollback();

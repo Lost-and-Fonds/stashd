@@ -11,9 +11,9 @@ use Tempest\Database\Tables\NamingStrategy;
 use Tempest\Database\Tables\PluralizedSnakeCaseStrategy;
 
 /**
- * Adapt the existing explicit DSN to Tempest without parsing away PostgreSQL options.
+ * Give Tempest the operator's connection string without changing PostgreSQL options.
  *
- * Registered lazily by operational commands; Vault-only commands need no database.
+ * Register this only when database commands need it; Vault-only commands do not connect.
  */
 final class OperationsConnectionConfig implements DatabaseConfig
 {
@@ -46,7 +46,7 @@ final class OperationsConnectionConfig implements DatabaseConfig
     }
 
     /**
-     * Retain operator-supplied connection settings without opening SQL storage.
+     * Keep the supplied connection settings without opening the database.
      */
     public function __construct(
         private readonly OperationsConfig $operations,

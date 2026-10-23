@@ -3,6 +3,9 @@
 namespace App\Integration;
 
 use App\Administration\VaultConfig;
+use App\Integration\DTO\DiscoveryRequest;
+use App\Integration\DTO\FilesystemCursor;
+use App\Integration\DTO\FilesystemFrame;
 use App\RecordsAndArchives\AssetArchive;
 use Closure;
 use DirectoryIterator;
@@ -16,19 +19,17 @@ use UnexpectedValueException;
 use function Tempest\Mapper\map;
 
 /**
- * Enumerate regular files recursively through the shared acknowledged Input port.
+ * Find regular files in a directory tree using Core's shared Input interface.
  *
- * Directory-entry positions and a depth-first stack form an opaque restart token;
- * memory is bounded by one batch and traversal depth, not collection cardinality.
- * Positions are best-effort under directory mutation, not a snapshot or rename index.
- * A later full scan observes changes missed by a concurrently changing directory.
- *
+ * Keep only one batch and the active directory positions in memory. Save those
+ * positions to resume after a restart. Changes to a directory can reorder its
+ * entries, so this is not a snapshot: run a new full scan after changing the tree.
  */
 #[Autowire]
 final readonly class FilesystemDiscovery implements InputDiscovery
 {
     /**
-     * Bind existing root/source checks and configuration inspection for use-time safety.
+     * Use shared path checks and saved settings to recheck directories while scanning.
      */
     public function __construct(
         private FilesystemRoots $roots,
@@ -38,11 +39,11 @@ final readonly class FilesystemDiscovery implements InputDiscovery
     ) {}
 
     /**
-     * Stream bounded observations, checkpointing skipped entries with the traversal.
+     * Send found files in small batches, saving skipped-entry counts with the scan position.
      *
-     * Unsafe or unreadable entries are omitted with terminal partial coverage, never
-     * followed. Root/storage failures throw and preserve earlier acknowledgments.
-     * No file contents are read or hashed and no canonical identity is minted.
+     * Skip unsafe or unreadable entries and report the scan as partial. If the root
+     * becomes unsafe or storage fails, throw and leave earlier batches available for
+     * retry. Read no file contents, compute no content hashes, and create no Item URIs.
      */
     public function discover(DiscoveryRequest $request, Closure $commit): void
     {
@@ -62,12 +63,12 @@ final readonly class FilesystemDiscovery implements InputDiscovery
             if (! isset($iterators[$depth])) {
                 try {
                     $directory = $this->roots->canonical($root . ($frame->path === '' ? '' : '/' . $frame->path));
-                    // shortcut: resume replays directory entries to the saved position; use an index/snapshot for costly repeated restarts or lossless concurrent mutation.
+                    // shortcut: resuming re-reads directory entries up to the saved position; use an index or snapshot if restarts become costly or scans must handle concurrent changes without omissions.
                     $iterator = new DirectoryIterator($directory);
                     try {
                         $iterator->seek($frame->position);
                     } catch (OutOfBoundsException) {
-                        // A changed directory may now end before the acknowledged offset.
+                        // The directory may have fewer entries than when we saved this position.
                         $skip($frame->path, 'Directory shortened before resume', true);
                         array_pop($cursor->frames);
                         continue;
@@ -163,11 +164,11 @@ final readonly class FilesystemDiscovery implements InputDiscovery
     }
 
     /**
-     * Recheck live Input, Vault and destination roots before enumeration or acknowledgment.
+     * Check that the source, Vault and configured destinations are still safe and separate.
      *
-     * The component owns root semantics; the generic coordinator passes settings
-     * unchanged. These checks assume operator-controlled directory entries.
-     *
+     * Check before scanning and before saving each batch. The Filesystem adapter
+     * interprets these paths; Core passes settings unchanged. The operator must
+     * control the directories: these checks cannot prevent concurrent path swaps.
      */
     private function root(DiscoveryRequest $request): string
     {
@@ -190,11 +191,12 @@ final readonly class FilesystemDiscovery implements InputDiscovery
             $this->roots->requireSeparate($root, $other);
             $this->roots->requireSeparate($vault, $other);
         }
+
         return $root;
     }
 
     /**
-     * Restore typed traversal state and coverage through the shared mapping boundary.
+     * Restore a checked scan position and skipped-entry summary from the saved JSON.
      */
     private function cursor(?string $value): FilesystemCursor
     {

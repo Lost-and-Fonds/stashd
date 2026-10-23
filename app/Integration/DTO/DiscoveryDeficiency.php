@@ -1,12 +1,13 @@
 <?php
 
-namespace App\Integration;
+namespace App\Integration\DTO;
 
+use App\Integration\IsProtocolValue;
 use Tempest\Mapper\Strict;
 use Tempest\Validation\Rules;
 
 /**
- * Classify one known coverage gap without pretending that enumeration was exhaustive.
+ * Describe why part of a scan is incomplete and whether trying again may help.
  */
 #[Strict]
 final class DiscoveryDeficiency

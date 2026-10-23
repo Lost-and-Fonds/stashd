@@ -5,12 +5,12 @@ namespace App\Integration;
 use Tempest\Validation\Rule;
 
 /**
- * Keep protocol record keys literal rather than accepting Tempest form-field aliases.
+ * Require literal field names in adapter output instead of Tempest's dotted form names.
  */
 final readonly class IsDiscoveryRecord implements Rule
 {
     /**
-     * Reject dotted keys before the mapper's undot expansion can rewrite validated fields.
+     * Reject dotted names before mapping can turn them into nested fields and overwrite checked values.
      */
     public function isValid(mixed $value): bool
     {

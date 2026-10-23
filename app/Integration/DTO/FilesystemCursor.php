@@ -1,7 +1,10 @@
 <?php
 
-namespace App\Integration;
+namespace App\Integration\DTO;
 
+use App\Integration\FilesystemRoots;
+use App\Integration\IsDiscoveryRecord;
+use App\Integration\IsProtocolValue;
 use InvalidArgumentException;
 use Tempest\Mapper\Strict;
 use Tempest\Validation\Rules;
@@ -11,14 +14,14 @@ use Throwable;
 use function Tempest\Mapper\map;
 
 /**
- * Retain traversal positions and known coverage gaps across acknowledged process restarts.
+ * Remember which directories we were scanning, where we stopped, and what we skipped.
  */
 #[Strict]
 final class FilesystemCursor
 {
     #[Rules\IsIn([1])]
     public int $version;
-    /** @var list<\App\Integration\FilesystemFrame> */
+    /** @var list<\App\Integration\DTO\FilesystemFrame> */
     #[Rules\IsArrayList]
     public array $frames;
     #[IsProtocolValue('nonnegative-integer')]
@@ -29,10 +32,11 @@ final class FilesystemCursor
     public bool $retryable;
 
     /**
-     * Deserialize a self-contained checkpoint through Tempest's strict typed mapper.
+     * Restore a saved scan position, or start at the root when no position was saved.
      *
-     * Validate scalars before coercing casters; Strict mapping distinguishes omitted
-     * nullable fields from explicit null. The shared filesystem policy owns paths.
+     * Check field types before mapping so strings cannot become numbers or booleans.
+     * Required fields must be present even when null is allowed. Reject unsafe paths
+     * using the same rules as the scan itself; invalid state throws before scanning.
      */
     public static function decode(?string $value, Validator $validator, FilesystemRoots $roots): self
     {
@@ -62,6 +66,7 @@ final class FilesystemCursor
             if ($cursor->skipped > 0 && $cursor->first === null) {
                 throw new InvalidArgumentException('A known discovery gap requires its diagnostic.');
             }
+
             return $cursor;
         } catch (Throwable $error) {
             throw new InvalidArgumentException('Invalid Filesystem discovery continuation: ' . $error->getMessage(), previous: $error);

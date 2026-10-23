@@ -11,7 +11,7 @@ test('configuration survives fresh CLI processes without changing source destina
         $source = dirname($sourceFile);
         $destination = $archive->path('output/<em>資料 with spaces');
         $vaultBefore = TransactionProbe::snapshot($archive->path('vault'));
-        // Witness an unrelated projection-like table to catch destructive bootstrap.
+        // Keep an unrelated table to check that initialization leaves other data alone.
         $database->exec("CREATE TABLE configuration_witness (value text); INSERT INTO configuration_witness VALUES ('retained')");
         configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
         $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', $source . '/']));

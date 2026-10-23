@@ -71,17 +71,20 @@ php tempest input:discoveries <run UUID> <next cursor>
 `input:discover` recursively enumerates every eligible regular file, including
 binary, media, document, hidden and zero-byte files. It returns compact JSON run
 status/counts and coverage. `finished` means the enumeration ended coherently;
-inspect `coverage.kind` for `exhaustive` or `partial`. Neither means preserved.
+inspect `coverage.kind` for `exhaustive` (no known skips) or `partial` (some entries
+were skipped). Neither means preserved.
 The inspection command returns at most 100 observations and an opaque `next`
 cursor; it never assembles the collection into one CLI response.
 
 Filesystem implements the `InputDiscovery` port directly. Its host callback uses
 the canonical plugin-api bounded-batch/progress semantics without RPC or SDK
-dependencies. Each batch atomically commits observations, source associations
-and its continuation or terminal coverage. Core rejects oversized/malformed,
-stale and post-terminal batches. The run fixes complete-enumeration intent and
-configuration; efficient refresh/scheduling is deferred. PostgreSQL session locks
-exclude simultaneous invocations for one Input and release on process death.
+dependencies. Transfer records live in `app/Integration/DTO/`; the adapter and
+Core services use the same `App\Integration\DTO` types. Each batch saves the found
+files, source locations and next position or finished result in one transaction.
+Core rejects oversized or malformed batches, outdated scan positions, and batches
+received after the run finishes. The run keeps its original configuration and
+complete-scan intent; efficient refresh and scheduling are deferred. PostgreSQL
+session locks prevent simultaneous scans of one Input and release on process death.
 
 On failure the command exits nonzero, retaining earlier checkpoints and an
 operational error. Repeat `input:discover` for the same Input to resume its
@@ -162,3 +165,16 @@ restored. A token-based check covered all 92 named declarations in the affected
 Integration code, migrations, tests and helpers. These are local results, not CI
 certification. See the linked Tempest alignment note for installed APIs,
 remaining exceptions and revisit conditions.
+
+DTO/readability review verification (24 October 2026): the combined CLI and
+typed-validation wrapper passed **13 tests, 1,738 assertions**. Restoring the old
+`DiscoveredItem` namespace in a collection annotation made the real manual-scan
+CLI test fail with a missing-class error; the correct annotation was restored.
+Full `composer qa` passed with Mago **1.57.0** and the inherited profile: **371
+passed, 33 existing incomplete, 21,889 assertions**. The test stage used the
+canonical wrapper, invoked with `sh` because the Lerd container has no `bash`;
+the temporary Composer routing was removed afterward. An AST-based check covered
+all **92 declarations** with no multiline PHPDoc failures. Tempest's partial
+discovery cache regenerated successfully. Unrelated Mago return-spacing changes
+are isolated in their own commit; the two temporary lint exceptions and style
+limits are recorded in the linked alignment note. These are local results.

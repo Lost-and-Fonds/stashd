@@ -12,14 +12,17 @@ use Tempest\Database\QueryStatements\RawStatement;
 use Tempest\Database\ShouldMigrate;
 
 /**
- * Add durable discovery runs, observations and associations without destructive upgrades.
+ * Add tables for scan runs, found files and source locations without replacing saved data.
  */
 final class CreateDiscoveryTablesTable implements MigratesUp, ShouldMigrate
 {
     public string $name = '2026-10-23_02_create_discovery_tables';
 
     /**
-     * Retain exact foreign keys, composite identities and the one-running-run constraint.
+     * Create scan tables with references to their Input and run.
+     *
+     * Source IDs are unique within each Input or run, and only one unfinished run
+     * may exist per Input. Keep existing tables and add the index if it is missing.
      */
     public function up(): QueryStatement
     {
@@ -55,11 +58,14 @@ final class CreateDiscoveryTablesTable implements MigratesUp, ShouldMigrate
             $tables,
         );
         $statements[] = new RawStatement("CREATE UNIQUE INDEX IF NOT EXISTS discovery_active_input ON discovery_runs (input_id) WHERE status = 'running'");
+
         return new CompoundStatement(...$statements);
     }
 
     /**
-     * Apply this PostgreSQL-specific operational migration only on PostgreSQL.
+     * Run this migration only on PostgreSQL.
+     *
+     * If Core adds another PostgreSQL connection, select the operational connection by tag.
      */
     public function shouldMigrate(Database $database): bool
     {

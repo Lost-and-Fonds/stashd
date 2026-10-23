@@ -6,10 +6,10 @@ use Tests\Support\RecordsAndArchives\TransactionProbe;
 require_once dirname(__DIR__, 2) . '/Support/Integration/configuration-cli.php';
 
 /**
- * Collect bounded public CLI pages, requiring every cursor to advance.
+ * Read all CLI result pages and check that each page advances to a new source ID.
  *
- * Only the test collects the complete result to compare its independent fixture;
- * production discovery and inspection remain bounded.
+ * Only the test collects every file to compare with its fixture. The application
+ * reads one page at a time instead of loading the whole scan into memory.
  */
 function discovered_items(ArchiveFixture $archive, array $descriptor, string $runId): array
 {
@@ -25,6 +25,7 @@ function discovered_items(ArchiveFixture $archive, array $descriptor, string $ru
             $after = $next;
         }
     } while ($next !== null);
+
     return $items;
 }
 

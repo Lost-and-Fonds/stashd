@@ -6,13 +6,13 @@ use Attribute;
 use Tempest\Validation\Rule;
 
 /**
- * Reject wire-value coercion that Tempest's general-purpose scalar rules permit.
+ * Check exact adapter field types where Tempest's general rules allow conversions.
  */
 #[Attribute(Attribute::TARGET_PROPERTY)]
 final readonly class IsProtocolValue implements Rule
 {
     /**
-     * Select a strict protocol value and whether explicit null is valid.
+     * Choose the required field type and whether null is allowed.
      *
      * @param 'string'|'boolean'|'nonnegative-integer'|'array' $type
      */
@@ -22,13 +22,16 @@ final readonly class IsProtocolValue implements Rule
     ) {}
 
     /**
-     * Keep protocol types distinct while accepting Tempest's internal array view during class validation.
+     * Reject lookalike values such as a numeric string where an integer is required.
+     *
+     * Also accept Tempest's array views, which it uses while validating nested arrays.
      */
     public function isValid(mixed $value): bool
     {
         if ($value === null) {
             return $this->orNull;
         }
+
         return match ($this->type) {
             'string' => is_string($value),
             'boolean' => is_bool($value),

@@ -1,14 +1,18 @@
 <?php
 
-namespace App\Integration;
+namespace App\Integration\DTO;
 
 /**
- * Fix the host-owned Input identity, options and bounds for one discovery invocation.
+ * Give an Input adapter the settings and saved position for one scan attempt.
+ *
+ * Core chooses the Input ID, scan intent and maximum batch size.
  */
 final readonly class DiscoveryRequest
 {
     /**
-     * Bind complete-enumeration intent and the last durably acknowledged continuation.
+     * Carry the requested scan settings and the last position saved in the database.
+     *
+     * The adapter must honor the batch limit and resume from the supplied position.
      *
      * @param array<string, mixed> $options
      */

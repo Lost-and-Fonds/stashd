@@ -2,6 +2,12 @@
 
 namespace App\Integration;
 
+use App\Integration\DTO\DiscoveredItem;
+use App\Integration\DTO\DiscoveryBatch;
+use App\Integration\DTO\DiscoveryDeficiency;
+use App\Integration\DTO\DiscoveryDiagnostic;
+use App\Integration\DTO\DiscoveryMetadata;
+use App\Integration\DTO\DiscoveryResult;
 use RuntimeException;
 use Tempest\Validation\Rules\HasCount;
 use Tempest\Validation\Rules\IsArrayList;
@@ -11,22 +17,25 @@ use Throwable;
 use function Tempest\Mapper\map;
 
 /**
- * Validate raw protocol values before mapping them into named discovery records.
+ * Check adapter output before turning it into discovery DTOs that Core can save.
  *
- * Tempest Strict mapping owns required-vs-null checks; declarative rules reject
- * coercible scalars before casters run. Only protocol variant invariants are manual.
+ * Tempest rules reject wrong field types before mapping can convert them. Strict
+ * mapping requires fields even when null is allowed. The checks below also ensure
+ * that progress describes either a next scan position or one finished result.
  */
 final readonly class DiscoveryBatchValidator
 {
     /**
-     * Bind the application's real validator rather than duplicating field validation.
+     * Use Tempest's validator for field checks on discovery DTOs.
      */
     public function __construct(
         private Validator $validator,
     ) {}
 
     /**
-     * Return typed observations only after complete nested validation and boundedness.
+     * Validate every file and result, enforce the batch limit, and return a discovery DTO.
+     *
+     * Invalid output throws before any of the batch is saved.
      */
     public function validate(array $batch, int $maximumItems): DiscoveryBatch
     {
@@ -55,11 +64,14 @@ final readonly class DiscoveryBatchValidator
         } else {
             throw new RuntimeException('Discovery progress must contain exactly one coherent variant.');
         }
+
         return $this->record(DiscoveryBatch::class, $batch);
     }
 
     /**
-     * Check variant field membership separately from each named record's value rules.
+     * Require exactly the details that belong to this finished result.
+     *
+     * A partial scan needs at least one explanation; an uncertain result needs a diagnostic.
      */
     private function finish(mixed $values): void
     {
@@ -91,7 +103,7 @@ final readonly class DiscoveryBatchValidator
     }
 
     /**
-     * Validate evidence envelopes before any nested mapper can coerce their scalars.
+     * Check a problem description and its supporting metadata before mapping can convert values.
      */
     private function diagnostic(mixed $value): void
     {
@@ -102,7 +114,7 @@ final readonly class DiscoveryBatchValidator
     }
 
     /**
-     * Keep component JSON opaque while strictly validating each facet envelope.
+     * Check metadata field types without interpreting the integration-specific JSON.
      */
     private function metadata(array $values): void
     {
@@ -112,7 +124,7 @@ final readonly class DiscoveryBatchValidator
     }
 
     /**
-     * Apply installed class/property validation before Tempest's potentially coercing casters.
+     * Check literal field names and types before the mapper can convert values.
      *
      * @param class-string $class
      */
@@ -124,7 +136,7 @@ final readonly class DiscoveryBatchValidator
     }
 
     /**
-     * Let Strict mapping enforce required nullable properties without a custom field walker.
+     * Map checked values to a DTO and reject missing fields, including fields that allow null.
      *
      * @template T of object
      * @param class-string<T> $class
@@ -138,6 +150,7 @@ final readonly class DiscoveryBatchValidator
             if (! $record instanceof $class) {
                 throw new RuntimeException('Mapper did not produce the requested discovery record.');
             }
+
             return $record;
         } catch (Throwable $error) {
             throw new RuntimeException('Rejected malformed discovery record: ' . $class, previous: $error);

@@ -1,12 +1,15 @@
 <?php
 
-namespace App\Integration;
+namespace App\Integration\DTO;
 
+use App\Integration\IsProtocolValue;
 use Tempest\Mapper\Strict;
 use Tempest\Validation\Rules;
 
 /**
- * Describe terminal coverage; the boundary enforces which fields belong to each variant.
+ * Report whether a finished scan found everything, skipped known entries, or cannot say.
+ *
+ * The batch validator checks that each result includes only its required details.
  */
 #[Strict]
 final class DiscoveryResult

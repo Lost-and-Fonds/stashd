@@ -5,18 +5,18 @@ namespace App\Integration;
 use InvalidArgumentException;
 
 /**
- * Validate local Filesystem roots without creating directories or following links.
+ * Check local directory paths without creating directories or following links.
  *
- * Configuration checks assume operator-controlled paths. Execution must recheck
- * confinement because these checks do not freeze directory entries against mutation.
+ * The operator must control these paths. Check again when using them because
+ * a successful configuration check cannot prevent later changes on disk.
  */
 final readonly class FilesystemRoots
 {
     /**
-     * Resolve an absolute directory, permitting missing suffixes only when requested.
+     * Resolve an absolute directory path, allowing missing trailing directories when requested.
      *
-     * Existing components must be real directories. Reject traversal and links
-     * before realpath can hide them; missing suffixes inherit their resolved parent.
+     * Every existing part must be an accessible directory. Reject links and dot
+     * components before resolving the path, so resolution cannot hide an unsafe part.
      */
     public function canonical(string $path, bool $allowMissing = false): string
     {
@@ -52,14 +52,15 @@ final readonly class FilesystemRoots
         if (! $allowMissing && ! is_readable($resolved)) {
             throw new InvalidArgumentException('Filesystem input must be an existing readable directory.');
         }
+
         return $resolved;
     }
 
     /**
-     * Require an exact supported relative name without filesystem access or sanitization.
+     * Check a relative path without changing its name or accessing the filesystem.
      *
-     * The empty path is permitted only for the traversal's root frame. All other
-     * callers reject absolute names, traversal, ambiguous separators and unsupported bytes.
+     * Reject absolute paths, dot components, ambiguous separators and unsupported
+     * bytes. Allow an empty path only when requested for the scan's root frame.
      */
     public function relative(string $path, bool $allowEmpty = false): void
     {
@@ -78,7 +79,9 @@ final readonly class FilesystemRoots
     }
 
     /**
-     * Reject equal roots and ancestry in either direction using directory boundaries.
+     * Reject directories that are equal or nested within each other.
+     *
+     * Compare whole directory names so a shared text prefix alone is allowed.
      */
     public function requireSeparate(string $left, string $right): void
     {

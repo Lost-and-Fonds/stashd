@@ -6,12 +6,12 @@ use Tempest\Console\Console;
 use Tempest\Console\ConsoleCommand;
 
 /**
- * Expose manual discovery and bounded inspection through real Tempest CLI commands.
+ * Provide CLI commands to scan an Input and inspect saved results a page at a time.
  */
 final readonly class DiscoveryCommands
 {
     /**
-     * Bind Core orchestration without opening an Input or database at console boot.
+     * Connect the console to discovery without opening the source or database at startup.
      */
     public function __construct(
         private Console $console,
@@ -19,7 +19,7 @@ final readonly class DiscoveryCommands
     ) {}
 
     /**
-     * Start or resume an Input's current manual scan and print its durable coverage.
+     * Start or resume an Input's scan and print its saved status and completeness result.
      */
     #[ConsoleCommand(name: 'input:discover', description: 'Recursively discover a configured Input, resuming its unfinished run after interruption.')]
     public function discover(string $inputId): void
@@ -28,7 +28,7 @@ final readonly class DiscoveryCommands
     }
 
     /**
-     * Inspect a run without requiring its source to remain online.
+     * Print saved run status even when the source directory is unavailable.
      */
     #[ConsoleCommand(name: 'input:discovery', description: 'Read durable discovery status and coverage by run UUID.')]
     public function inspect(string $runId): void
@@ -37,7 +37,7 @@ final readonly class DiscoveryCommands
     }
 
     /**
-     * Print one page of persisted observations and a cursor for the next page.
+     * Print one page of saved files and the value to pass when requesting the next page.
      */
     #[ConsoleCommand(name: 'input:discoveries', description: 'Read at most 100 discovered Items from one run; pass the returned cursor to continue.')]
     public function items(string $runId, string $after = ''): void

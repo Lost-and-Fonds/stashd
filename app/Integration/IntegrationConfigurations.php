@@ -14,18 +14,18 @@ use Tempest\Database\Query;
 use function Tempest\Database\query;
 
 /**
- * Persist generic Input and Broadcast configuration in a separate operational schema.
+ * Save Input and Broadcast settings in a separate database schema.
  *
- * Filesystem is the sole registered in-process integration in this increment.
- * Configuration never creates source, destination or Vault contents. Schema and
- * root checks are serialized across cooperating local configuration writers.
+ * Filesystem is the only integration available here so far. Saving settings never
+ * creates source, destination or Vault contents. Database locks make callers check
+ * and save one configuration at a time, preventing conflicting roots.
  *
  * @phpstan-type Configuration array{id: string, kind: string, component: string, settings: array<string, mixed>}
  */
 final readonly class IntegrationConfigurations
 {
     /**
-     * Bind explicit SQL settings and the local Filesystem policy without opening storage.
+     * Keep connection settings and path checks ready without opening the database.
      */
     public function __construct(
         private OperationsConfig $config,
@@ -36,10 +36,10 @@ final readonly class IntegrationConfigurations
     ) {}
 
     /**
-     * Bootstrap operational configuration and discovery tables, preserving rows.
+     * Create or upgrade configuration and discovery tables without replacing existing rows.
      *
-     * The operator must provision the database and grant schema creation first.
-     * No archive projection tables are created, replaced or read.
+     * The operator must create the database and allow schema creation first.
+     * This does not read, create or replace archive projection tables.
      */
     public function initialize(): void
     {
@@ -47,7 +47,7 @@ final readonly class IntegrationConfigurations
         $this->database->transaction(function () use ($database): void {
             $this->lock($database);
             $database->execute(new Query('CREATE SCHEMA IF NOT EXISTS "' . $this->config->schema . '"'));
-            // Avoid MigrationManager's missing-table probe aborting this PostgreSQL transaction.
+            // Create the migration ledger first; probing a missing table would abort this transaction.
             $catalog = $database->fetchFirst(new Query("SELECT to_regclass('migrations') AS name"));
             if (($catalog['name'] ?? null) === null) {
                 $this->migrations->executeUp(new CreateMigrationsTable());
@@ -57,11 +57,11 @@ final readonly class IntegrationConfigurations
     }
 
     /**
-     * Configure a Filesystem Input or Broadcast after checking all roots under one SQL lock.
+     * Check all directory roots and save a Filesystem Input or Broadcast under one lock.
      *
-     * Repeating identical configuration returns its existing identity. Other equal
-     * or nested roots are refused before insertion, including a changed Vault root.
-     * Root lives in component settings, never in the generic record's columns.
+     * Repeating the same configuration returns its existing ID. Reject equal or
+     * nested roots, including conflicts with a changed Vault path, before saving.
+     * The root belongs in Filesystem settings, not in the generic table columns.
      *
      * @return Configuration
      */
@@ -74,6 +74,7 @@ final readonly class IntegrationConfigurations
             throw new InvalidArgumentException('Filesystem configuration currently requires a local Vault.');
         }
         $database = $this->database->connect();
+
         return $this->database->transaction(function () use ($database, $kind, $component, $root): array {
             $this->lock($database);
             $root = $this->roots->canonical($root, allowMissing: $kind === 'broadcast');
@@ -106,14 +107,15 @@ final readonly class IntegrationConfigurations
                     settings: json_encode($record['settings'], JSON_THROW_ON_ERROR),
                 ));
             }
+
             return $record;
         });
     }
 
     /**
-     * Read persisted configuration without requiring the source to remain online.
+     * Read saved settings even when the source directory is unavailable.
      *
-     * This is configuration inspection, not authorization to execute against a root.
+     * Reading settings does not establish that a path is still safe to use.
      *
      * @return Configuration
      */
@@ -126,11 +128,12 @@ final readonly class IntegrationConfigurations
         if ($row === null) {
             throw new InvalidArgumentException('Configuration not found for the requested lifecycle.');
         }
+
         return $this->decode($row);
     }
 
     /**
-     * Read configured components so Filesystem can recheck all roots before execution.
+     * Read all saved settings so Filesystem can check for conflicting roots before use.
      *
      * @return list<Configuration>
      */
@@ -140,11 +143,12 @@ final readonly class IntegrationConfigurations
         foreach ($this->database->connect()->fetch(query('configurations')->select('id', 'kind', 'component', 'settings')) as $row) {
             $records[] = $this->decode($row);
         }
+
         return $records;
     }
 
     /**
-     * Serialize configuration checks and insertion within this database and schema.
+     * Allow one caller at a time to check and save configuration in this schema.
      */
     private function lock(Database $database): void
     {
@@ -152,7 +156,7 @@ final readonly class IntegrationConfigurations
     }
 
     /**
-     * Decode component settings without exposing connection settings in public records.
+     * Decode saved integration settings without including database credentials in the result.
      *
      * @param array $row
      * @return Configuration
@@ -166,6 +170,7 @@ final readonly class IntegrationConfigurations
         if (! is_array($settings)) {
             throw new RuntimeException('Stored component settings must be a JSON object.');
         }
+
         /** @var array<string, mixed> $settings */
         return [
             'id' => $row['id'],

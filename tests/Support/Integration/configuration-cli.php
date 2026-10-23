@@ -5,10 +5,10 @@ use Tests\Support\RecordsAndArchives\ProjectionProbe;
 use Tests\Support\RecordsAndArchives\TransactionProbe;
 
 /**
- * Run a configuration proof against an explicitly provisioned disposable database.
+ * Run a CLI test against a new disposable database with an unprivileged owner.
  *
- * The existing fixture creates an unprivileged owner and always removes its own
- * database/role. Production commands receive only that owner's connection settings.
+ * Give application commands only that owner's credentials. The fixture removes
+ * its own database and role afterward, including when the test fails.
  */
 function with_configuration_database(Closure $proof): void
 {
@@ -35,10 +35,10 @@ function with_configuration_database(Closure $proof): void
 }
 
 /**
- * Start a fresh Tempest process with isolated operational and Vault configuration.
+ * Run a fresh Tempest process with the test's database and Vault settings.
  *
- * No internal services are mocked. Failure output is returned for explicit status
- * assertions; credentials are passed only through the child environment.
+ * Use real application services and return failure output for assertions. Pass
+ * credentials through the child environment rather than command-line arguments.
  */
 function configuration_cli(ArchiveFixture $archive, array $descriptor, array $arguments, array $overrides = []): array
 {
@@ -46,7 +46,7 @@ function configuration_cli(ArchiveFixture $archive, array $descriptor, array $ar
 }
 
 /**
- * Start the real command asynchronously so concurrent configuration can be observed.
+ * Start a CLI command without waiting, so tests can check concurrent callers.
  *
  * The caller must finish the child and close both output pipes.
  */
@@ -72,11 +72,12 @@ function start_configuration_cli(ArchiveFixture $archive, array $descriptor, arr
     if (! is_resource($process)) {
         throw new RuntimeException('Could not start configuration CLI.');
     }
+
     return ['process' => $process, 'pipes' => $pipes];
 }
 
 /**
- * Collect a started command's exit status and close its process-owned pipes.
+ * Read a command's output and exit status, then close its pipes and process.
  */
 function finish_configuration_cli(array $child): array
 {
@@ -84,14 +85,16 @@ function finish_configuration_cli(array $child): array
     $errors = stream_get_contents($child['pipes'][2]);
     fclose($child['pipes'][1]);
     fclose($child['pipes'][2]);
+
     return ['code' => proc_close($child['process']), 'output' => $output, 'errors' => $errors];
 }
 
 /**
- * Require a successful CLI invocation and decode its public JSON response.
+ * Check that the command succeeded and decode the JSON it printed.
  */
 function configuration_result(array $result): array
 {
     expect($result['code'])->toBe(0, $result['output'] . $result['errors']);
+
     return json_decode(trim($result['output']), true, flags: JSON_THROW_ON_ERROR);
 }

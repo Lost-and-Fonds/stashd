@@ -2,22 +2,23 @@
 
 namespace App\Integration;
 
+use App\Integration\DTO\DiscoveryRequest;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
 
 /**
- * Run the acknowledged Input lifecycle independently of SQL storage mechanics.
+ * Start or resume an Input scan, validate its output, and ask the store to save it.
  *
- * Runs fix configuration and complete-enumeration intent across invocations. Only
- * a validated batch reaches the store; discovery never mints canonical Item URIs.
+ * An unfinished run keeps its original configuration and complete-scan intent.
+ * Discovery records source locations; it does not create canonical Item URIs.
  */
 final readonly class DiscoveryCoordinator
 {
     private const int BATCH_SIZE = 100;
 
     /**
-     * Bind configuration, discovery, value validation and operational persistence.
+     * Connect Input settings, the adapter, batch validation and the discovery store.
      */
     public function __construct(
         private IntegrationConfigurations $configurations,
@@ -27,10 +28,11 @@ final readonly class DiscoveryCoordinator
     ) {}
 
     /**
-     * Start or resume manual discovery and return durable status.
+     * Start or resume a manual scan and return the status saved in the database.
      *
-     * Earlier acknowledgments survive failures; terminal acknowledgment wins over
-     * a later exception. The session lock is released normally or by process death.
+     * A failure keeps earlier saved batches for retry. Once a finished result is
+     * saved, a later adapter error cannot undo it. Only one caller may scan this
+     * Input at a time; the database releases its lock when the process exits.
      */
     public function discover(string $inputId): array
     {
@@ -66,6 +68,7 @@ final readonly class DiscoveryCoordinator
                 if ($result['status'] !== 'finished') {
                     throw new RuntimeException('Discovery returned without an acknowledged terminal batch.');
                 }
+
                 return $result;
             } catch (Throwable $error) {
                 $result = $this->store->read($id);
@@ -83,7 +86,7 @@ final readonly class DiscoveryCoordinator
     }
 
     /**
-     * Inspect durable coverage without contacting the source filesystem.
+     * Read saved scan status without opening the source directory.
      */
     public function read(string $runId): array
     {
@@ -91,7 +94,9 @@ final readonly class DiscoveryCoordinator
     }
 
     /**
-     * Return one bounded page; the opaque cursor is a source ID, never an Item URI.
+     * Read at most one page of saved files.
+     *
+     * Pass the returned source ID to read the next page; it is not an Item URI.
      */
     public function items(string $runId, string $after = ''): array
     {

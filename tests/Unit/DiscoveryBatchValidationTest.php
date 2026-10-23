@@ -1,16 +1,21 @@
 <?php
 
 use App\Integration\DiscoveryBatchValidator;
+use App\Integration\DTO\FilesystemCursor;
+use App\Integration\DTO\FilesystemFrame;
+use App\Integration\FilesystemRoots;
 use Tempest\Core\FrameworkKernel;
+use Tempest\Validation\Validator;
 
 use function Tempest\Container\get;
+use function Tempest\Mapper\map;
 
 beforeAll(static function (): void {
     FrameworkKernel::boot(root: dirname(__DIR__, 2));
 });
 
 /**
- * Supply a canonical Item observation for focused protocol value rejection tests.
+ * Supply a discovered file record to test which adapter values Core accepts.
  */
 function validation_discovered_item(): array
 {
@@ -79,17 +84,17 @@ test('Tempest discovery rules reject missing nullable keys coercible scalars and
 });
 
 test('typed Filesystem cursors retain exact positions and reject coercion missing fields and unsafe frame paths', function (): void {
-    $validator = get(\Tempest\Validation\Validator::class);
-    $roots = get(\App\Integration\FilesystemRoots::class);
+    $validator = get(Validator::class);
+    $roots = get(FilesystemRoots::class);
     $values = ['version' => 1, 'frames' => [['path' => 'nested/資料', 'position' => 100]], 'skipped' => 1, 'first' => 'Known gap', 'retryable' => false];
-    $cursor = \App\Integration\FilesystemCursor::decode(json_encode($values, JSON_THROW_ON_ERROR), $validator, $roots);
+    $cursor = FilesystemCursor::decode(json_encode($values, JSON_THROW_ON_ERROR), $validator, $roots);
     expect($cursor->frames[0])
-        ->toBeInstanceOf(\App\Integration\FilesystemFrame::class)
+        ->toBeInstanceOf(FilesystemFrame::class)
         ->and($cursor->frames[0]->path)
         ->toBe('nested/資料')
         ->and($cursor->frames[0]->position)
         ->toBe(100);
-    expect(\Tempest\Mapper\map($cursor)->toArray())->toBe($values);
+    expect(map($cursor)->toArray())->toBe($values);
     $missing = $values;
     unset($missing['first']);
     $badValues = [
@@ -107,7 +112,7 @@ test('typed Filesystem cursors retain exact positions and reject coercion missin
         $badValues[] = [...$values, 'frames' => [['path' => 'nested', 'position' => $position]]];
     }
     foreach ($badValues as $invalid) {
-        expect(fn () => \App\Integration\FilesystemCursor::decode(json_encode($invalid, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), $validator, $roots))
+        expect(fn () => FilesystemCursor::decode(json_encode($invalid, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), $validator, $roots))
             ->toThrow(InvalidArgumentException::class);
     }
 });

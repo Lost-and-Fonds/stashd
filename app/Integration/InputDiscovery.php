@@ -2,14 +2,15 @@
 
 namespace App\Integration;
 
+use App\Integration\DTO\DiscoveryRequest;
 use Closure;
 
 /**
- * Discover through bounded acknowledged batches using canonical Input semantics.
+ * Let an Input adapter send small batches of found files to Core for saving.
  *
- * PHP arrays mirror plugin-api Input value records, not an RPC runtime. IDs,
- * references, metadata and continuation remain component-owned opaque values.
- * Only the host callback may durably accept Items and their progress together.
+ * The arrays follow the plugin-api Input format without requiring a plugin runtime.
+ * Core does not interpret adapter-specific IDs, references, metadata or scan positions.
+ * Only Core's callback may accept a batch and save its files and progress together.
  *
  * @phpstan-type Item array{id: string, reference: string, source: ?array, size_bytes: ?int, size_estimated: bool, metadata: list<array{schema: string, json: string}>}
  * @phpstan-type Batch array{items: list<Item>, progress: array}
@@ -17,12 +18,12 @@ use Closure;
 interface InputDiscovery
 {
     /**
-     * Emit batches and return normally only after an acknowledged terminal finish.
+     * Send batches and return only after Core has saved the finished result.
      *
-     * An exception does not undo earlier acknowledgments. The next invocation
-     * receives the last committed continuation; no process-local state is required.
+     * An error does not undo earlier saved batches. A retry receives the last saved
+     * scan position and must work in a fresh process, without relying on memory.
      *
-     * @param Closure(Batch): void $commit Host acknowledgment, throwing on rejection or storage failure.
+     * @param Closure(Batch): void $commit Core's save callback; throws if validation or storage fails.
      */
     public function discover(DiscoveryRequest $request, Closure $commit): void;
 }

@@ -2,6 +2,7 @@
 
 namespace App\Integration;
 
+use App\Integration\DTO\DiscoveryBatch;
 use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
@@ -10,15 +11,16 @@ use Tempest\Database\Query;
 use function Tempest\Database\query;
 
 /**
- * Persist discovery runs and atomic checkpoints through Tempest's operational database.
+ * Save scan runs, found files, and the source locations seen across runs.
  *
- * PostgreSQL-specific locks, JSON equality and conflict handling stay at this boundary.
- * Source associations remain operational observations, never canonical Item identities.
+ * Files and scan progress are saved together so a restart cannot lose a batch.
+ * This class owns the PostgreSQL locks and queries; these records describe source
+ * locations and do not establish canonical Item identities.
  */
 final readonly class DiscoveryStore
 {
     /**
-     * Bind the lazy application connection and schema-scoped lock namespace.
+     * Use the application database and schema name to keep scan locks separate.
      */
     public function __construct(
         private OperationsDatabase $database,
@@ -26,7 +28,9 @@ final readonly class DiscoveryStore
     ) {}
 
     /**
-     * Exclude another invocation until unlock or process death releases this session lock.
+     * Prevent another caller from scanning the same Input until this connection releases its lock.
+     *
+     * PostgreSQL also releases the lock if the process dies.
      */
     public function lock(string $inputId): void
     {
@@ -37,7 +41,7 @@ final readonly class DiscoveryStore
     }
 
     /**
-     * Release only the session lock owned by this cooperating invocation.
+     * Release the lock held by this connection for the Input.
      */
     public function unlock(string $inputId): void
     {
@@ -45,9 +49,10 @@ final readonly class DiscoveryStore
     }
 
     /**
-     * Resume immutable configuration or create a new run after terminal completion.
+     * Resume an unfinished run if its settings still match, or create a new run.
      *
-     * The caller must hold the Input session lock for the entire invocation.
+     * Changed settings are rejected rather than mixed into an unfinished scan.
+     * The caller must hold the Input lock until this scan attempt ends.
      *
      * @param array{id: string, kind: string, component: string, settings: array<string, mixed>} $configuration
      * @return array{id: string, continuation: ?string}
@@ -64,6 +69,7 @@ final readonly class DiscoveryStore
             if ($row['matches'] !== true) {
                 throw new RuntimeException('Cannot resume discovery under changed Input configuration.');
             }
+
             return ['id' => $row['id'], 'continuation' => $row['continuation']];
         }
         $id = Uuid::v7()->toString();
@@ -73,14 +79,16 @@ final readonly class DiscoveryStore
             configuration: json_encode($configuration, JSON_THROW_ON_ERROR),
             status: 'running',
         ));
+
         return ['id' => $id, 'continuation' => null];
     }
 
     /**
-     * Atomically adopt a validated batch's observations, associations and progress.
+     * Save the files we found and our scan position in the same database transaction.
      *
-     * Row locking rejects stale or post-terminal checkpoints. SQL failure rolls back
-     * every write; repeated source IDs update observations without duplicating identity.
+     * After a crash, we can resume without losing or duplicating a batch. Reject a
+     * batch if the run has finished or its saved position has changed. Any SQL error
+     * rolls back the whole batch. A repeated source ID updates the existing record.
      */
     public function commit(string $id, ?string $expected, DiscoveryBatch $batch): void
     {
@@ -111,7 +119,7 @@ final readonly class DiscoveryStore
     }
 
     /**
-     * Retain a resumable diagnostic without changing acknowledged progress.
+     * Save the error for retry without changing the last successfully saved scan position.
      */
     public function fail(string $id, string $message): void
     {
@@ -119,7 +127,7 @@ final readonly class DiscoveryStore
     }
 
     /**
-     * Read status and its distinct Item count from one coherent SQL statement.
+     * Read run status and its file count in one query so they describe the same saved state.
      */
     public function read(string $id): array
     {
@@ -146,11 +154,12 @@ final readonly class DiscoveryStore
         }
         $row['batches'] = (int) $row['batches'];
         $row['discovered_count'] = (int) $row['discovered_count'];
+
         return $row;
     }
 
     /**
-     * Inspect at most one persisted page without opening the source filesystem.
+     * Read one page of saved files without opening the source directory.
      */
     public function items(string $id, string $after, int $limit): array
     {
@@ -169,12 +178,14 @@ final readonly class DiscoveryStore
                     ->orderBy('source_id')
                     ->limit($limit),
             );
+
         return [
             'items' => array_map(static function (array $row): array {
                 $item = json_decode($row['item'], true, flags: JSON_THROW_ON_ERROR);
                 if (! is_array($item)) {
                     throw new RuntimeException('Malformed persisted discovery record.');
                 }
+
                 return $item;
             }, $rows),
             'next' => count($rows) === $limit ? $rows[$limit - 1]['source_id'] : null,
