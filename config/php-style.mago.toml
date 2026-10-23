@@ -23,6 +23,7 @@
 [formatter]
 preset = "default"
 empty-line-before-return = true
+empty-line-after-control-structure = true
 sort-uses = "alphanumeric-ascending"
 expand-use-groups = true
 separate-use-types = true
