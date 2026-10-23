@@ -48,6 +48,40 @@ injection, events, jobs/scheduling, processes, HTTP, and console commands.
 Keep existing correctness, safety, and acceptance-test contracts intact when
 refactoring toward Tempest; a framework rewrite is not permission to weaken them.
 
+## DTO layout and readable explanations
+
+- Give every department a `DTO/` directory for data-transfer objects. For
+  example, discovery records live in `app/Integration/DTO/` under the
+  `App\\Integration\\DTO` namespace. Use the same rule in other departments.
+  Keep domain entities, services, persistence and filesystem policies outside
+  `DTO/`; do not call a class a DTO just because it is small.
+- Write comments, PHPDoc and technical explanations in **plain English**. Assume
+  the reader knows PHP but does not already know this part of Stashd. Say what
+  happens and why it matters, using everyday language.
+- Prefer "Save the files and scan position together so a restart won't lose
+  track" to "Atomically acknowledge observations and terminal coverage".
+  Keep precise terms such as transaction, Item, Asset and Vault where they are
+  needed, but explain unfamiliar terms instead of piling them up.
+- Good documentation explains purpose, safety limits, important side effects,
+  and surprising decisions. Do not narrate obvious syntax, invent jargon,
+  or use dense sentences just to sound technical. Make ideas simpler to read,
+  not less accurate. Existing PHPDoc coverage requirements still apply.
+
+## PHP formatting standard
+
+- **Mago is the only PHP formatter, linter and static analyzer in Stashd.**
+  Do not add or run PHP-CS-Fixer alongside it.
+- `mago.toml` extends `config/php-style.mago.toml`, a local copy of the
+  translated `hipsterjazzbo/php-style` rules. Update the local copy when the
+  shared rules change, reviewing any differences that Mago cannot express.
+- Some PHP-CS-Fixer rules do not translate exactly. Record limitations rather
+  than introducing a second formatter. The multiline, useful-PHPDoc policy
+  still needs independent review/checks.
+- The existing codebase temporarily overrides strict-types and fully-qualified
+  class import warnings until it can be migrated safely. Do not treat these
+  temporary exceptions as the desired style for new code. After migration,
+  remove the two overrides and run `composer qa`.
+
 ## QA
 
 - When your work is done, run a series of QA tools by running `composer qa`.
