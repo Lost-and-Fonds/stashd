@@ -6,6 +6,7 @@ use App\Integration\BroadcastCoordinator;
 use App\Integration\BroadcastInvocation;
 use App\Integration\BroadcastPublisher;
 use App\Integration\DTO\PublishedFile;
+use App\Integration\FileReportStatus;
 use Tempest\Core\FrameworkKernel;
 
 use function Tempest\Container\get;
@@ -14,7 +15,9 @@ require dirname(__DIR__, 3) . '/vendor/autoload.php';
 FrameworkKernel::boot(root: dirname(__DIR__, 3));
 
 try {
-    $publisher = new class($argv[2] ?? 'success') implements BroadcastPublisher {
+    $publisher = new /**
+     * Exercise real publication capabilities with deterministic success and failure scenarios.
+     */ class($argv[2] ?? 'success') implements BroadcastPublisher {
         public array $bytes = [];
         public ?BroadcastInvocation $retained = null;
         public ?\App\Integration\BroadcastStream $stream = null;
@@ -30,7 +33,7 @@ try {
         /**
          * Exercise real collection grants, streams and provisional reporting.
          */
-        public function publish(BroadcastInvocation $invocation, array $settings): string
+        public function publish(BroadcastInvocation $invocation, array $settings): FileReportStatus
         {
             $this->retained = $invocation;
             expect_denied(static fn () => $invocation->openAsset('fabricated', PHP_INT_MAX));
@@ -43,19 +46,23 @@ try {
                     $invocation->reportFiles(new PublishedFile('file-' . $position));
                 }
 
-                return 'complete';
+                return FileReportStatus::Complete;
             }
 
             if ($this->mode === 'no-eof') {
                 $invocation->reportFiles(new PublishedFile('provisional'));
 
-                return 'complete';
+                return FileReportStatus::Complete;
             }
 
             while (($items = $invocation->next(1)) !== null) {
                 foreach ($items as $item) {
                     foreach ($item['assets'] as $asset) {
                         $this->reference = $asset['reference'];
+                        if ($this->mode === 'duplicate') {
+                            verify_reader_release($invocation, $asset['reference']);
+                        }
+
                         expect_denied(static fn () => $invocation->openAsset($asset['id']));
                         $stream = $invocation->openAsset($asset['reference']);
                         $this->stream = $stream;
@@ -98,10 +105,10 @@ try {
             }
 
             if ($this->mode === 'not-applicable') {
-                return 'not-applicable';
+                return FileReportStatus::NotApplicable;
             }
 
-            return 'complete';
+            return FileReportStatus::Complete;
         }
     };
     $result = get(BroadcastCoordinator::class)->execute($argv[1], $publisher);
@@ -131,4 +138,31 @@ function expect_denied(Closure $operation): void
     }
 
     throw new LogicException('Unauthorized operation succeeded.');
+}
+
+/**
+ * Open more readers than a typical descriptor limit, dropping drained and abandoned readers.
+ */
+function verify_reader_release(BroadcastInvocation $invocation, string $reference): void
+{
+    $baseline = count(get_resources('stream'));
+    for ($opened = 0; $opened < 2048; $opened++) {
+        $temporary = $invocation->openAsset($reference);
+        if (($opened % 2) === 0) {
+            $bytes = 0;
+            while (($chunk = $temporary->read()) !== null) {
+                $bytes += strlen($chunk);
+            }
+
+            if ($bytes === 0) {
+                throw new RuntimeException('Lifetime proof did not read preserved bytes.');
+            }
+        }
+
+        $weak = WeakReference::create($temporary);
+        unset($temporary);
+        if ($weak->get() !== null || count(get_resources('stream')) !== $baseline) {
+            throw new RuntimeException('Dropped Broadcast readers retained file handles.');
+        }
+    }
 }

@@ -6,10 +6,16 @@ use App\Integration\DTO\PublishedFile;
 
 test('publication paths reject unsafe names', function (string $path): void {
     expect(fn () => new PublishedFile($path))->toThrow(InvalidArgumentException::class);
-})->with(['', '/', '../outside', 'a/../b', 'a//b', './a', 'a/', 'C:drive', 'a\\b', "a\0b"]);
+})->with(['', '/', '../outside', 'a/../b', 'a//b', './a', 'a/', 'C:drive', 'a\\b', "a\0b", "bad\xFF", "surrogate\xED\xA0\x80"]);
 
 test('publication paths retain supported Unicode and spaces', function (): void {
     expect(new PublishedFile('nested/é space.bin')->relativePath)->toBe('nested/é space.bin');
+});
+
+test('generic publication names leave control-character restrictions to Filesystem policy', function (): void {
+    $path = "nested/control\x1F.bin";
+    expect(new PublishedFile($path)->relativePath)->toBe($path);
+    expect(fn () => new \App\Integration\FilesystemRoots()->relative($path))->toThrow(InvalidArgumentException::class);
 });
 
 test('selection requires explicit Item identity and version', function (string $id, string $version): void {

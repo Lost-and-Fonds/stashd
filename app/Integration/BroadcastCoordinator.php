@@ -64,7 +64,7 @@ final readonly class BroadcastCoordinator
                 $status = $publisher->publish($invocation, json_decode($run['settings'], true, flags: JSON_THROW_ON_ERROR));
                 $invocation->finish($status);
                 $invocation->close();
-                $this->store->complete($id, $status);
+                $this->store->complete($id, $status->value);
             } catch (Throwable $error) {
                 $this->store->fail($id, $error->getMessage());
                 throw $error;

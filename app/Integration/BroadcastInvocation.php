@@ -9,6 +9,7 @@ use App\RecordsAndArchives\AssetArchive;
 use InvalidArgumentException;
 use League\Uri\Urn;
 use RuntimeException;
+use WeakMap;
 
 /**
  * Limit one publisher to delivered exact Assets and provisional bounded reports.
@@ -30,9 +31,9 @@ final class BroadcastInvocation
      */
     private array $grants = [];
     /**
-     * @var list<BroadcastStream> Readers closed when the invocation ends.
+     * @var WeakMap<BroadcastStream, bool> Live readers revoked when the invocation ends.
      */
-    private array $streams = [];
+    private WeakMap $streams;
 
     /**
      * Bind this capability object to one persisted attempt without granting any reads yet.
@@ -42,7 +43,9 @@ final class BroadcastInvocation
         private AssetArchive $assets,
         private string $run,
         private string $attempt,
-    ) {}
+    ) {
+        $this->streams = new WeakMap();
+    }
 
     /**
      * Deliver up to 100 selected Items and grant their Assets; null is sticky EOF.
@@ -104,7 +107,7 @@ final class BroadcastInvocation
 
         $extent = $asset['size'] - $offset;
         $reader = new BroadcastStream($stream, $length === null ? $extent : min($length, $extent), $this->authorize(...));
-        $this->streams[] = $reader;
+        $this->streams[$reader] = true;
 
         return $reader;
     }
@@ -145,10 +148,10 @@ final class BroadcastInvocation
     /**
      * Require observed collection EOF and a valid final file-completeness assertion.
      */
-    public function finish(string $status): void
+    public function finish(FileReportStatus $status): void
     {
         $this->authorize();
-        if (! $this->eof || ! in_array($status, ['complete', 'not-applicable'], true) || $status === 'not-applicable' && $this->files !== 0) {
+        if (! $this->eof || $status === FileReportStatus::NotApplicable && $this->files !== 0) {
             throw new RuntimeException('Publication requires collection EOF and a consistent complete file report.');
         }
     }
@@ -160,11 +163,11 @@ final class BroadcastInvocation
     {
         $this->active = false;
         $this->grants = [];
-        foreach ($this->streams as $stream) {
+        foreach ($this->streams as $stream => $live) {
             $stream->close();
         }
 
-        $this->streams = [];
+        $this->streams = new WeakMap();
     }
 
     /**

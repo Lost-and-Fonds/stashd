@@ -159,6 +159,14 @@ final EOF read. Streams enforce requested byte ranges and are closed/revoked whe
 the invocation ends. No Vault filesystem path or source access is passed to the
 publisher. The in-process adapter is trusted application code, not a sandbox.
 
+Published relative names must be valid UTF-8 and satisfy Core's relative-name
+shape checks. This value does not authorize local filesystem access. The canonical
+publication contract does not universally prohibit control characters; the
+Filesystem adapter must additionally call `FilesystemRoots::relative()` before
+using or reporting a local path, including its stricter control-character policy.
+These policies intentionally remain separate rather than coupling every destination
+to a local filesystem validator. Publishers return the typed `FileReportStatus` enum.
+
 File and destination-metadata reports are provisional bounded batches. Duplicate
 file paths reject the entire batch; successful corrected batches may follow.
 Only a valid successful lifecycle response with EOF and consistent file status

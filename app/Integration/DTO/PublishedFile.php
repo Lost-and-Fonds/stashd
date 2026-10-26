@@ -21,6 +21,7 @@ final readonly class PublishedFile
     ) {
         if (
             $relativePath === ''
+            || preg_match('//u', $relativePath) !== 1
             || str_contains($relativePath, "\0")
             || str_contains($relativePath, '\\')
             || str_starts_with($relativePath, '/')

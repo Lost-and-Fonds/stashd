@@ -15,5 +15,5 @@ interface BroadcastPublisher
      * Throw on failure. Destination side effects may remain, but reports are discarded.
      * Staged output adoption is outside this copy-only integration slice.
      */
-    public function publish(BroadcastInvocation $invocation, array $settings): string;
+    public function publish(BroadcastInvocation $invocation, array $settings): FileReportStatus;
 }
