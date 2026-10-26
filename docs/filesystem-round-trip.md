@@ -1,8 +1,8 @@
-# Filesystem configuration and manual discovery
+# Filesystem integration
 
-Filesystem is a first-party, in-process Core integration. The first two increments
-configure Inputs/Broadcasts and manually discover files. Acquisition and
-publication are not implemented yet.
+Filesystem is a first-party, in-process Core integration. Configuration, discovery,
+acquisition and the generic Broadcast execution seam are implemented. The
+Filesystem destination publisher and `broadcast:build` remain the next increment.
 The [Tempest alignment note](filesystem-tempest-decisions.md) records the PR1
 retrospective, installed APIs and narrow exceptions retained after review.
 The lifecycle work follows [issue #28](https://github.com/Lost-and-Fonds/stashd/issues/28).
@@ -134,7 +134,56 @@ An unchanged rescan compares SHA-512, size and namespaced preservation metadata
 against the verified exact current Asset pin. Equal files add no archival revision;
 changed files retain identity and create new exact versions. Old acquisition runs
 replay their saved result rather than reacquiring current source bytes. Missing
-paths do not remove history. Broadcast execution remains a later increment.
+paths do not remove history. Filesystem destination publication remains a later increment.
+
+## Broadcast execution seam
+
+Run `integration:init` again to install the publication tables. Freeze a selection
+through `php tempest broadcast:select <broadcast UUID> <selection.jsonl>`. Each
+line is an object with string `item_id` (the canonical Item Object URN) and explicit
+`version` (for example `v1`). JSON lines allow a large selection to be read without
+loading the whole file. Duplicate Item identities and invalid or missing revisions
+reject the entire selection. Empty selections are valid.
+
+`broadcast:publication <run UUID> [after-position]` exposes status and at most 100
+committed reports. `BroadcastCoordinator::execute` invokes an in-process
+`BroadcastPublisher`; no production Filesystem publisher is registered yet. PR4
+proofs use a deterministic publisher against the real public service in fresh
+Tempest processes, not a source-to-output copy or a substitute archive service.
+
+Selection verifies explicit Item revisions and their exact Asset pins. This slice
+accepts one byte representation per Asset; multi-file Asset representations fail
+explicitly. Execution never substitutes current heads. Collection reads deliver at
+most 100 Items, grant opaque Asset references only when delivered, and require a
+final EOF read. Streams enforce requested byte ranges and are closed/revoked when
+the invocation ends. No Vault filesystem path or source access is passed to the
+publisher. The in-process adapter is trusted application code, not a sandbox.
+
+Published relative names must be valid UTF-8 and satisfy Core's relative-name
+shape checks. This value does not authorize local filesystem access. The canonical
+publication contract does not universally prohibit control characters; the
+Filesystem adapter must additionally call `FilesystemRoots::relative()` before
+using or reporting a local path, including its stricter control-character policy.
+These policies intentionally remain separate rather than coupling every destination
+to a local filesystem validator. Publishers return the typed `FileReportStatus` enum.
+
+File and destination-metadata reports are provisional bounded batches. Duplicate
+file paths reject the entire batch; successful corrected batches may follow.
+Only a valid successful lifecycle response with EOF and consistent file status
+exposes reports. Exceptions discard them. A killed process can leave hidden
+provisional SQL rows and `running` status; retry under the destination lock clears
+those rows and replays the same selection with fresh grants. Completed runs are
+idempotent; create a new run to deliberately publish again. Destination side effects
+are not rolled back by this seam.
+
+Tempest supplies discovered migrations, ordinary queries, transactions, console
+commands and dependency injection. Session advisory locks follow the existing
+PostgreSQL discovery pattern because a publisher must serialize across processes
+without holding a database transaction for the whole publication. Native stream
+reads/seeks retain verified `AssetArchive` handles and enforce ranges without
+exposing those handles to destinations. No external runtime, RPC, SDK, staged-output
+adoption, watcher, pruning or hardlinks are introduced. Selection/report rows are
+operational state and do not establish preservation or survive SQL loss by design.
 
 ## Identity recovery requirement for the acquisition increment
 
