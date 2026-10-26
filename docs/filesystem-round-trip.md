@@ -111,11 +111,33 @@ never delete associations. New paths create associations. Every regular file is
 enumerated again: size/mtime are observations, not an unchanged-content decision.
 Acquisition must still snapshot/hash bytes and compare canonical evidence.
 
+## Acquisition
+
+After `vault:init` and `integration:init`, run `input:acquire <discovery-run-id>`.
+Retry that same command after interruption. `input:acquisitions <run-id> [after]`
+returns at most 100 persisted attempts and the next cursor. Acquisition is serial,
+uses the Input's discovery lock, and saves the transaction UUID before staging.
+Only verified Vault completion establishes preservation; failed source reads retain
+the same attempt for retry. Finish an earlier failed run before acquiring another.
+
+Each regular file receives a minted Item URI and an `original` Asset. Host-owned
+private staging is streamed, hashed and checked against a second source read and
+opened/path inode evidence. Access-time changes are ignored. Sources must remain
+operator-controlled and quiescent; these checks are not an atomic snapshot or
+protection against hostile concurrent writers. Normal exits discard invocation
+staging. Abrupt death can leave an unadopted private system temporary directory.
+
+An unchanged rescan compares SHA-512, size and namespaced preservation metadata
+against the verified exact current Asset pin. Equal files add no archival revision;
+changed files retain identity and create new exact versions. Old acquisition runs
+replay their saved result rather than reacquiring current source bytes. Missing
+paths do not remove history. Broadcast execution remains a later increment.
+
 ## Identity recovery requirement for the acquisition increment
 
 Configuration/discovery SQL is operational state, not archival identity evidence.
-Neither increment mints Items or claims recovery of preserved source associations.
-The acquisition PR must store namespaced `stashd.filesystem.source` provenance
+Configuration and discovery do not mint Items. Acquisition stores namespaced
+`stashd.filesystem.source` provenance
 in each canonical Item revision: schema version, configured Input UUID, exact
 relative path and observed source root. The minted Item URI remains the existing
 Item record's `uri`; source locations do not become that URI.
