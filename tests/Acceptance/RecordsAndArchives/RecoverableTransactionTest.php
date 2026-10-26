@@ -480,12 +480,18 @@ test('PSC-T21 destructive projection connections reject wrong database role host
         $projection['dsn'] = 'pgsql:host=lerd-postgres;port=5432;dbname=core';
     } elseif ($field === 'host') {
         $projection['dsn'] = 'pgsql:host=elsewhere;port=5432;dbname=' . $name;
+    } elseif ($field === 'loopback') {
+        $projection['dsn'] = 'pgsql:host=127.0.0.1;port=5432;dbname=' . $name;
+    } elseif ($field === 'port') {
+        $projection['dsn'] = 'pgsql:host=lerd-postgres;port=5433;dbname=' . $name;
+    } elseif ($field === 'extra-dsn') {
+        $projection['dsn'] .= ';host=elsewhere';
     } else {
         $projection[$field] = 'postgres';
     }
 
     expect(fn () => ProjectionProbe::connect($projection, $name))->toThrow(AssertionFailedError::class);
-})->with(['database', 'username', 'host', 'schema']);
+})->with(['database', 'username', 'host', 'schema', 'loopback', 'port', 'extra-dsn']);
 
 test('PSC-T22 prohibited writes include additional OCFL files with all earlier bytes unchanged', function (): void {
     $workspace = transaction_workspace($this->archive);
