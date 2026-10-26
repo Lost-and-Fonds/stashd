@@ -369,6 +369,41 @@ final readonly class PreservationTransaction
     }
 
     /**
+     * Read intact sealed identities without recovering or validating unrelated journals.
+     *
+     * Damaged candidates remain available through discover() diagnostics and are
+     * never promoted here. A caller must use commit() to verify relevant work.
+     *
+     * @return list<array{id: string, uri: string, metadata: array<string, mixed>}>
+     */
+    public function candidates(): array
+    {
+        $directories = glob($this->vault->transactionDirectory() . '/*', GLOB_ONLYDIR);
+        if ($directories === false) {
+            throw new RuntimeException('Could not discover transaction evidence.');
+        }
+
+        $candidates = [];
+        foreach ($directories as $directory) {
+            if (str_contains(basename($directory), '.preparing-')) {
+                continue;
+            }
+
+            try {
+                $data = json_decode($this->read($directory . '/candidate.json'), true, flags: JSON_THROW_ON_ERROR);
+                $id = $data['delta']['id'] ?? null;
+                $this->require(is_string($id) && $directory === $this->directory($id), 'Candidate directory identity differs.');
+                $candidate = $this->candidate($id);
+                $candidates[] = ['id' => $id, 'uri' => $candidate['delta']['uri'], 'metadata' => $candidate['delta']['metadata']];
+            } catch (UnexpectedValueException|JsonException|InvalidItemRevision|InvalidAsset) {
+                continue;
+            }
+        }
+
+        return $candidates;
+    }
+
+    /**
      * Discover intact candidates and journal envelopes for authoritative recovery.
      *
      * SQL is never consulted. One quarantined bucket cannot hide other recoverable
