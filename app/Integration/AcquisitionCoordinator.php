@@ -15,8 +15,17 @@ use Throwable;
 
 use function Tempest\Mapper\map;
 
+/**
+ * Preserve saved discoveries through recoverable Vault transactions, one file at a time.
+ *
+ * Source locations never become Item identity. Operational attempts retain their
+ * transaction IDs across retries; only verified archival evidence proves success.
+ */
 final readonly class AcquisitionCoordinator
 {
+    /**
+     * Bind acquisition, operational persistence and archive services without starting work.
+     */
     public function __construct(
         private IntegrationConfigurations $configurations,
         private DiscoveryStore $discovery,
@@ -29,6 +38,12 @@ final readonly class AcquisitionCoordinator
         private FilesystemRoots $roots,
     ) {}
 
+    /**
+     * Acquire a finished scan under its Input lock and report saved outcome counts.
+     *
+     * Earlier unfinished work is recovered first. Failures retain retry identities,
+     * release the lock, and propagate rather than inventing preservation success.
+     */
     public function acquire(string $runId): array
     {
         $run = $this->discovery->read($runId);
@@ -54,6 +69,7 @@ final readonly class AcquisitionCoordinator
                     throw new RuntimeException('Retry the earlier acquisition run before starting another run.');
                 }
 
+                $this->release($pending['id']);
                 $this->store->save($pending['id'], 'preserved', $recovered);
             }
 
@@ -87,6 +103,9 @@ final readonly class AcquisitionCoordinator
         }
     }
 
+    /**
+     * Inspect one bounded attempt page even when the original source is unavailable.
+     */
     public function read(string $run, string $after = ''): array
     {
         $this->discovery->read($run);
@@ -97,10 +116,18 @@ final readonly class AcquisitionCoordinator
         return ['items' => $rows, 'next' => count($rows) === 100 && is_array($last) ? $last['source_id'] : null];
     }
 
+    /**
+     * Replay an exact result or stage and preserve one observation with stable identity.
+     *
+     * Unchanged decisions verify exact Item pins and byte evidence. Normal exits
+     * discard invocation staging; verified completion releases redundant custody.
+     */
     private function one(array $input, DiscoveredItem $item, array $attempt): array
     {
         $recovered = $this->transactions->commit($attempt['id']);
         if ($recovered['status'] === 'complete') {
+            $this->release($attempt['id']);
+
             return [...$recovered, 'status' => 'preserved'];
         }
 
@@ -170,6 +197,9 @@ final readonly class AcquisitionCoordinator
             }
 
             $result = $this->transactions->commit($attempt['id']);
+            if ($result['status'] === 'complete') {
+                $this->release($attempt['id']);
+            }
 
             return [...$result, 'status' => $result['status'] === 'complete' ? 'preserved' : $result['status']];
         } finally {
@@ -177,6 +207,24 @@ final readonly class AcquisitionCoordinator
         }
     }
 
+    /**
+     * Remove only redundant custody after the engine verifies canonical completion.
+     *
+     * A failure leaves the saved attempt retryable; it never erases Vault history.
+     */
+    private function release(string $transaction): void
+    {
+        $result = $this->transactions->releaseCustody($transaction);
+        if ($result['status'] !== 'released') {
+            throw new RuntimeException('Verified custody release failed for acquisition ' . $transaction);
+        }
+    }
+
+    /**
+     * Read the verified current Item, returning null only when its Object is absent.
+     *
+     * Existing damaged history is an error, never permission to mint a replacement.
+     */
     private function current(string $uri): ?array
     {
         $id = $this->items->objectIdForUri($uri);
@@ -184,53 +232,73 @@ final readonly class AcquisitionCoordinator
         return $this->vault->open()->hasObject($id->toString()) ? $this->items->read($id) : null;
     }
 
+    /**
+     * Restore this Input's source claims without advancing another Input's work.
+     *
+     * Sealed candidate metadata identifies relevant transactions even if later
+     * journals or Item history are damaged. Those failures block this Input.
+     * Unreadable unrelated Objects remain isolated and are never rewritten.
+     */
     private function reassociate(string $input): void
     {
-        $journals = $this->transactions->discover();
-        if ($journals['quarantined'] !== []) {
-            throw new RuntimeException('Resolve quarantined transaction evidence before recovering source identities.');
-        }
-
-        foreach ($journals['ids'] as $transactionId) {
-            $recovered = $this->transactions->commit($transactionId);
-            if ($recovered['status'] !== 'complete') {
-                throw new RuntimeException('Resolve unfinished transaction evidence before recovering source identities.');
-            }
-        }
-
-        foreach ($this->vault->discoverObjects() as $object) {
-            $id = $object['object_id'];
-            if ($id === null) {
-                throw new RuntimeException('Cannot recover source identities while a Vault Object has unreadable identity.');
-            }
-
-            if (! str_starts_with($id, 'urn:stashd:item:')) {
+        $relevant = [];
+        foreach ($this->transactions->candidates() as $candidate) {
+            $source = $candidate['metadata']['stashd.filesystem.source'] ?? null;
+            if (! is_array($source) || ($source['input_id'] ?? null) !== $input) {
                 continue;
             }
 
-            $urn = Urn::fromString($id);
-            foreach (array_keys($this->vault->getObject($urn)->inventory->versions) as $version) {
-                $record = $this->items->read($urn, $version);
-                $source = $record['metadata']['stashd.filesystem.source'] ?? null;
-                if ($source === null) {
-                    continue;
+            $relevant[$this->items->objectIdForUri($candidate['uri'])->toString()] = true;
+            $result = $this->transactions->commit($candidate['id']);
+            if ($result['status'] !== 'complete') {
+                throw new RuntimeException('Relevant acquisition evidence requires recovery: ' . $candidate['id']);
+            }
+
+            $this->release($candidate['id']);
+        }
+
+        $claims = [];
+        foreach ($this->vault->discoverObjects() as $object) {
+            $id = $object['object_id'];
+            if ($id === null || ! str_starts_with($id, 'urn:stashd:item:')) {
+                continue;
+            }
+
+            $records = [];
+            try {
+                $urn = Urn::fromString($id);
+                foreach ($this->vault->getObject($urn)->versionNames() as $version) {
+                    $record = $this->items->read($urn, $version);
+                    $source = $record['metadata']['stashd.filesystem.source'] ?? null;
+                    if (! is_array($source) || ($source['input_id'] ?? null) !== $input) {
+                        continue;
+                    }
+
+                    $relevant[$id] = true;
+                    if (($source['version'] ?? null) !== 1 || ! is_string($source['path'] ?? null) || ! is_string($source['root'] ?? null)) {
+                        throw new RuntimeException('Malformed canonical Filesystem provenance blocks identity recovery.');
+                    }
+
+                    $this->roots->relative($source['path']);
+                    $records[] = ['source' => hash('sha256', $source['path']), 'uri' => $record['uri']];
+                }
+            } catch (\Exception $error) {
+                if (isset($relevant[$id]) || $error instanceof \App\RecordsAndArchives\Storage\ArchiveReadFailure) {
+                    throw $error;
                 }
 
-                if (
-                    ! is_array($source)
-                    || ($source['version'] ?? null) !== 1
-                    || ! is_string($source['input_id'] ?? null)
-                    || ! is_string($source['path'] ?? null)
-                    || ! is_string($source['root'] ?? null)
-                ) {
-                    throw new RuntimeException('Malformed canonical Filesystem provenance blocks identity recovery.');
+                continue;
+            }
+
+            foreach ($records as $record) {
+                if (isset($claims[$record['source']]) && $claims[$record['source']] !== $record['uri']) {
+                    throw new RuntimeException('Canonical source claims identify different Items.');
                 }
 
-                $this->roots->relative($source['path']);
-                if ($source['input_id'] === $input) {
-                    $this->store->associate($input, hash('sha256', $source['path']), $record['uri']);
-                }
+                $claims[$record['source']] = $record['uri'];
             }
         }
+
+        $this->store->restore($input, $claims);
     }
 }

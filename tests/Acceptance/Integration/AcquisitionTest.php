@@ -24,6 +24,9 @@ test('CLI acquisition preserves bytes, skips equal rescans and recovers identiti
             $bytes = file_get_contents(OcflInspector::payloadPath($archive->path('vault'), $pin['object_id'], $pin['version'], 'data.bin'));
             expect($bytes)->toBe($attempt['source_id'] === hash('sha256', 'empty') ? '' : "first\0bytes");
             expect($record['uri'])->toBe($attempt['item_uri']);
+            $directory = $archive->path('vault/extensions/stashd-transactions/' . hash('sha256', $attempt['id']));
+            expect(glob($directory . '/custody-[0-9]*'))->toBe([]);
+            expect(is_file($directory . '/custody-release.json'))->toBeTrue();
         }
 
         $before = TransactionProbe::snapshot($archive->path('vault'));
@@ -47,6 +50,13 @@ test('CLI acquisition preserves bytes, skips equal rescans and recovers identiti
         expect($counts['preserved'])->toBe(1)->and($counts['unchanged'])->toBe(1);
         $archive->destroy('inputs');
         expect(configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $next['id']]))['counts'])->toBe($counts);
+        foreach ($attempts as $attempt) {
+            $result = json_decode($attempt['result'], true, flags: JSON_THROW_ON_ERROR);
+            $record = TransactionProbe::json(OcflInspector::payloadPath($archive->path('vault'), $result['item']['object_id'], 'v1', 'item.json'));
+            $pin = $record['pins'][0];
+            expect(file_get_contents(OcflInspector::payloadPath($archive->path('vault'), $pin['object_id'], $pin['version'], 'data.bin')))
+                ->toBe($attempt['source_id'] === hash('sha256', 'empty') ? '' : "first\0bytes");
+        }
     });
 });
 
@@ -150,6 +160,62 @@ test('killed acquisition after Vault commit retries without source bytes or dupl
         expect($status['signaled'])->toBeTrue()->and($status['termsig'])->toBe(9);
         $database->query('SELECT id FROM configuration_proof.acquisition_attempts FOR UPDATE')->fetchAll();
         expect(configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $run['id']]))['counts'])->toBe(['preserved' => 1]);
+        expect(TransactionProbe::snapshot($archive->path('vault')))->toBe($before);
+    });
+});
+
+test('healthy acquisition and reassociation isolate unrelated damaged Items and journals without advancing sealed work', function (): void {
+    with_configuration_database(function (ArchiveFixture $archive, array $descriptor, PDO $database): void {
+        $path = $archive->input('healthy.bin', 'healthy');
+        configuration_cli($archive, $descriptor, ['vault:init']);
+        configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
+        $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', dirname($path)]));
+        $workspace = dirname($archive->path('vault'));
+        $request = [
+            'operation' => 'execute',
+            'transaction_id' => 'unrelated-damaged',
+            'uri' => 'urn:example:unrelated',
+            'changes' => ['original' => $path],
+            'metadata' => ['unrelated' => true],
+            'preconditions' => [],
+        ];
+        $completed = TransactionProbe::run($workspace, $request);
+        $itemPath = OcflInspector::payloadPath($archive->path('vault'), $completed['item']['object_id'], 'v1', 'item.json');
+        file_put_contents($itemPath, 'damaged unrelated Item');
+        $journal = $archive->path('vault/extensions/stashd-transactions/' . hash('sha256', 'unrelated-damaged'));
+        file_put_contents($journal . '/complete.json', '{damaged');
+        $sealed = [...$request, 'operation' => 'prepare', 'transaction_id' => 'unrelated-sealed', 'uri' => 'urn:example:unrelated-sealed'];
+        expect(TransactionProbe::run($workspace, $sealed)['status'])->toBe('sealed');
+        $sealedDirectory = $archive->path('vault/extensions/stashd-transactions/' . hash('sha256', 'unrelated-sealed'));
+        $beforeJournal = TransactionProbe::snapshot($journal);
+        $beforeSealed = TransactionProbe::snapshot($sealedDirectory);
+        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $run['id']]))['counts'])->toBe(['preserved' => 1]);
+        $database->exec('DELETE FROM configuration_proof.acquisition_attempts; DELETE FROM configuration_proof.acquisition_sources');
+        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $next['id']]))['counts'])->toBe(['unchanged' => 1]);
+        expect(TransactionProbe::snapshot($journal))->toBe($beforeJournal);
+        expect(TransactionProbe::snapshot($sealedDirectory))->toBe($beforeSealed);
+        expect(file_get_contents($itemPath))->toBe('damaged unrelated Item');
+    });
+});
+
+test('relevant damaged journals cannot mint replacement identities after association loss', function (): void {
+    with_configuration_database(function (ArchiveFixture $archive, array $descriptor, PDO $database): void {
+        $path = $archive->input('relevant.bin', 'preserved');
+        configuration_cli($archive, $descriptor, ['vault:init']);
+        configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
+        $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', dirname($path)]));
+        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $run['id']]));
+        $attempt = configuration_result(configuration_cli($archive, $descriptor, ['input:acquisitions', $run['id']]))['items'][0];
+        $journal = $archive->path('vault/extensions/stashd-transactions/' . hash('sha256', $attempt['id']));
+        file_put_contents($journal . '/complete.json', '{damaged');
+        $database->exec('DELETE FROM configuration_proof.acquisition_attempts; DELETE FROM configuration_proof.acquisition_sources');
+        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        $before = TransactionProbe::snapshot($archive->path('vault'));
+        expect(configuration_cli($archive, $descriptor, ['input:acquire', $next['id']])['code'])->not->toBe(0);
+        expect((int) $database->query('SELECT count(*) FROM configuration_proof.acquisition_sources')->fetchColumn())->toBe(0);
         expect(TransactionProbe::snapshot($archive->path('vault')))->toBe($before);
     });
 });

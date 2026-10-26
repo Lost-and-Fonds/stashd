@@ -10,10 +10,18 @@ use Tempest\Database\QueryStatements\CompoundStatement;
 use Tempest\Database\QueryStatements\CreateTableStatement;
 use Tempest\Database\ShouldMigrate;
 
+/**
+ * Add operational source identities and durable acquisition attempts without changing archives.
+ */
 final class CreateAcquisitionTablesTable implements MigratesUp, ShouldMigrate
 {
     public string $name = '2026-10-26_03_create_acquisition_tables';
 
+    /**
+     * Create source and attempt uniqueness constraints so retries retain one identity.
+     *
+     * The migration ledger applies these additions once without replacing existing rows.
+     */
     public function up(): QueryStatement
     {
         return new CompoundStatement(
@@ -35,6 +43,11 @@ final class CreateAcquisitionTablesTable implements MigratesUp, ShouldMigrate
         );
     }
 
+    /**
+     * Restrict these operational tables to the existing PostgreSQL connection.
+     *
+     * Select by connection tag if another PostgreSQL connection is introduced.
+     */
     public function shouldMigrate(Database $database): bool
     {
         return $database->dialect === DatabaseDialect::POSTGRESQL;

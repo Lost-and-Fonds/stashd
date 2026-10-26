@@ -10,12 +10,24 @@ use Tempest\Database\Query;
 
 use function Tempest\Database\query;
 
+/**
+ * Keep operational source associations and retry identities separate from the Vault.
+ *
+ * SQL records coordinate work but never prove preservation. Callers hold the
+ * Input lock while creating attempts or restoring canonical source claims.
+ */
 final readonly class AcquisitionStore
 {
+    /**
+     * Retain the lazy operational connection without opening it at application startup.
+     */
     public function __construct(
         private OperationsDatabase $database,
     ) {}
 
+    /**
+     * Save a source claim or reject a conflicting URI without replacing its identity.
+     */
     public function associate(string $input, string $source, string $uri): void
     {
         $database = $this->database->connect();
@@ -28,6 +40,27 @@ final readonly class AcquisitionStore
         }
     }
 
+    /**
+     * Install verified source claims together, rolling back every insertion on conflict.
+     *
+     * The caller holds the Input lock and validates the complete claim set first.
+     *
+     * @param array<string, string> $claims Source ID to canonical Item URI.
+     */
+    public function restore(string $input, array $claims): void
+    {
+        $this->database->transaction(function () use ($input, $claims): void {
+            foreach ($claims as $source => $uri) {
+                $this->associate($input, $source, $uri);
+            }
+        });
+    }
+
+    /**
+     * Save an Item URI and transaction UUID atomically before any bytes are staged.
+     *
+     * Retries return the existing attempt. The caller must hold the Input lock.
+     */
     public function start(string $run, string $input, string $source): array
     {
         return $this->database->transaction(function () use ($run, $input, $source): array {
@@ -53,6 +86,13 @@ final readonly class AcquisitionStore
         });
     }
 
+    /**
+     * Save the verified outcome after archival work, retaining the attempt's identity.
+     *
+     * A failed SQL acknowledgement is retried against the same Vault transaction.
+     *
+     * @param array $result Verified completion, unchanged evidence, or failure details.
+     */
     public function save(string $id, string $status, array $result): void
     {
         $this->database
@@ -60,11 +100,17 @@ final readonly class AcquisitionStore
             ->execute(query('acquisition_attempts')->update(status: $status, result: json_encode($result, JSON_THROW_ON_ERROR), error: null)->where('id', $id));
     }
 
+    /**
+     * Retain the error for retry without deleting the attempt or canonical evidence.
+     */
     public function fail(string $id, string $error): void
     {
         $this->database->connect()->execute(query('acquisition_attempts')->update(status: 'retryable_failure', error: $error)->where('id', $id));
     }
 
+    /**
+     * Read at most 100 saved attempts after a source cursor without opening source files.
+     */
     public function items(string $run, string $after = ''): array
     {
         return $this->database
@@ -79,6 +125,9 @@ final readonly class AcquisitionStore
             );
     }
 
+    /**
+     * Find unfinished work belonging only to this Input before beginning another run.
+     */
     public function pending(string $input): array
     {
         return $this->database

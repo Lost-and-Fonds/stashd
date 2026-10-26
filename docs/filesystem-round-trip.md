@@ -119,6 +119,9 @@ returns at most 100 persisted attempts and the next cursor. Acquisition is seria
 uses the Input's discovery lock, and saves the transaction UUID before staging.
 Only verified Vault completion establishes preservation; failed source reads retain
 the same attempt for retry. Finish an earlier failed run before acquiring another.
+Successful completion and replay release redundant sealed custody through the
+transaction engine's verified release API before acknowledging operational success.
+Canonical versions and retained journals remain readable without source or custody.
 
 Each regular file receives a minted Item URI and an `original` Asset. Host-owned
 private staging is streamed, hashed and checked against a second source read and
@@ -153,6 +156,14 @@ archival identity to reconstruct. Restore configuration from an operational
 backup until that step exists. A focused SQL-loss/retry proof is required in the
 acquisition PR before claiming recoverability; there is no general recovery
 subsystem in these increments.
+
+Reconciliation uses intact sealed candidate provenance to recover only this Input's
+transactions. Unrelated sealed work is not advanced; unrelated damaged journals
+and Items are isolated. Relevant journal failures and conflicting canonical claims
+stop acquisition, and recovered associations are saved in one SQL transaction.
+Unreadable candidate seals cannot establish ownership. If both canonical provenance
+and operational identity records are lost or unreadable, restore known evidence
+before acquisition; automatic recovery cannot infer the missing source identity.
 
 ## Focused proof
 

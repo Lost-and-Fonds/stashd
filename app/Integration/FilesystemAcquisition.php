@@ -10,14 +10,32 @@ use App\Integration\DTO\DiscoveredItem;
 use App\RecordsAndArchives\AssetArchive;
 use RuntimeException;
 
+/**
+ * Capture a regular local file without moving or deleting the original source.
+ *
+ * Roots are operator-controlled and must remain quiescent. Inode and digest checks
+ * detect observed mutation but do not provide an atomic filesystem snapshot.
+ */
 final readonly class FilesystemAcquisition implements InputAcquisition
 {
+    /**
+     * Retain path policy and configuration for use-time confinement checks.
+     */
     public function __construct(
         private FilesystemRoots $roots,
         private IntegrationConfigurations $configurations,
         private VaultConfig $vault,
     ) {}
 
+    /**
+     * Return a host-staged receipt only after complete reads and source agreement.
+     *
+     * Reject unsafe paths, changed configuration, links and observed mutation.
+     * This method owns and closes the opened source stream; the coordinator owns
+     * staging cleanup and decides whether accepted bytes become preserved history.
+     *
+     * @param array<string, mixed> $options Filesystem settings from the configured Input.
+     */
     public function acquire(string $inputId, array $options, DiscoveredItem $item, AcquisitionStaging $staging): AcquiredFile
     {
         $reference = json_decode($item->reference, true, flags: JSON_THROW_ON_ERROR);
