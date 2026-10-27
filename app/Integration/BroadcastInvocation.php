@@ -27,9 +27,10 @@ final class BroadcastInvocation
     private int $reports = 0;
     private int $files = 0;
     /**
-     * @var array<string, FrozenAsset> Assets delivered during this invocation only.
+     * @var resource|null Disk-backed grants keep collection preflight memory bounded.
      */
-    private array $grants = [];
+    private mixed $grants;
+    private string $grantKey;
     /**
      * @var WeakMap<BroadcastStream, bool> Live readers revoked when the invocation ends.
      */
@@ -45,14 +46,24 @@ final class BroadcastInvocation
         private string $attempt,
     ) {
         $this->streams = new WeakMap();
+        $grants = tmpfile();
+        if ($grants === false) {
+            throw new RuntimeException('Could not create invocation grant storage.');
+        }
+
+        $this->grants = $grants;
+        $this->grantKey = random_bytes(32);
     }
 
     /**
      * Deliver up to 100 selected Items and grant their Assets; null is sticky EOF.
+     *
+     * @return list<array{id: string, assets: list<array{id: string, reference: string, size_bytes: int, media_type: null, metadata: array}>, metadata: list<array{schema: string, json: string}>}>|null
      */
     public function next(int $maximum): ?array
     {
         $this->authorize();
+        assert(is_resource($this->grants), 'Active invocations own an open grant stream.');
         if ($maximum < 1) {
             throw new InvalidArgumentException('Collection batch size must be positive.');
         }
@@ -74,8 +85,18 @@ final class BroadcastInvocation
             $record = json_decode($row['record'], true, flags: JSON_THROW_ON_ERROR);
             $delivered = [];
             foreach ($record['assets'] as $asset) {
-                $reference = bin2hex(random_bytes(32));
-                $this->grants[$reference] = $asset;
+                fseek($this->grants, 0, SEEK_END);
+                $position = ftell($this->grants);
+                if ($position === false) {
+                    throw new RuntimeException('Could not locate invocation grant storage.');
+                }
+
+                $reference = $position . ':' . hash_hmac('sha256', (string) $position, $this->grantKey);
+                $encoded = json_encode($asset, JSON_THROW_ON_ERROR) . "\n";
+                if (fwrite($this->grants, $encoded) !== strlen($encoded)) {
+                    throw new RuntimeException('Could not save invocation grant.');
+                }
+
                 $delivered[] = ['id' => $asset['id'], 'reference' => $reference, 'size_bytes' => $asset['size'], 'media_type' => null, 'metadata' => []];
             }
 
@@ -94,7 +115,18 @@ final class BroadcastInvocation
     public function openAsset(string $reference, int $offset = 0, ?int $length = null): BroadcastStream
     {
         $this->authorize();
-        $asset = $this->grants[$reference] ?? throw new RuntimeException('denied: Asset was not delivered by this invocation.');
+        assert(is_resource($this->grants), 'Active invocations own an open grant stream.');
+        $parts = explode(':', $reference);
+        if (count($parts) !== 2 || ! ctype_digit($parts[0]) || ! hash_equals(hash_hmac('sha256', $parts[0], $this->grantKey), $parts[1])) {
+            throw new RuntimeException('denied: Asset was not delivered by this invocation.');
+        }
+
+        if (fseek($this->grants, (int) $parts[0]) !== 0 || ($encoded = fgets($this->grants)) === false) {
+            throw new RuntimeException('Could not read invocation grant.');
+        }
+
+        /** @var FrozenAsset $asset */
+        $asset = json_decode($encoded, true, flags: JSON_THROW_ON_ERROR);
         if ($offset < 0 || $offset > $asset['size'] || $length !== null && $length < 0) {
             throw new RuntimeException('denied: Invalid Asset range.');
         }
@@ -162,7 +194,11 @@ final class BroadcastInvocation
     public function close(): void
     {
         $this->active = false;
-        $this->grants = [];
+        if (is_resource($this->grants)) {
+            fclose($this->grants);
+        }
+
+        $this->grants = null;
         foreach ($this->streams as $stream => $live) {
             $stream->close();
         }
