@@ -22,6 +22,7 @@ final readonly class BroadcastCommands
         private Console $console,
         private BroadcastCoordinator $broadcast,
         private BroadcastStore $store,
+        private FilesystemPublisher $filesystem,
     ) {}
 
     /**
@@ -32,6 +33,16 @@ final readonly class BroadcastCommands
     {
         $id = $this->broadcast->select($broadcastId, $this->selections($selectionFile));
         $this->console->writeRaw(json_encode(['id' => $id, 'status' => 'ready'], JSON_THROW_ON_ERROR) . PHP_EOL);
+    }
+
+    /**
+     * Execute or retry an existing frozen run without creating a replacement selection.
+     */
+    #[ConsoleCommand(name: 'broadcast:build', description: 'Publish an existing frozen run from verified Vault bytes.')]
+    public function build(string $runId): void
+    {
+        $run = $this->broadcast->execute($runId, $this->filesystem);
+        $this->console->writeRaw(json_encode($run, JSON_THROW_ON_ERROR) . PHP_EOL);
     }
 
     /**

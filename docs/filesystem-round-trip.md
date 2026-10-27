@@ -1,8 +1,7 @@
 # Filesystem integration
 
 Filesystem is a first-party, in-process Core integration. Configuration, discovery,
-acquisition and the generic Broadcast execution seam are implemented. The
-Filesystem destination publisher and `broadcast:build` remain the next increment.
+acquisition and Vault-only Filesystem Broadcast publication are implemented.
 The [Tempest alignment note](filesystem-tempest-decisions.md) records the PR1
 retrospective, installed APIs and narrow exceptions retained after review.
 The lifecycle work follows [issue #28](https://github.com/Lost-and-Fonds/stashd/issues/28).
@@ -38,7 +37,7 @@ Create/inspect commands print JSON containing `id`, `kind`, `component` and
 component-specific `settings`. Filesystem settings contain the canonical `root`;
 there is no generic destination-root column. `filesystem` is the only registered
 component. No external plugin package/runtime is involved. Invalid configuration
-exits nonzero. No command creates source, destination or Vault directories.
+exits nonzero. Configuration commands never create source, destination or Vault directories.
 
 A must exist and be a readable/searchable directory. B and the configured local
 Vault may have missing directory suffixes. Roots must be absolute and cannot
@@ -51,10 +50,8 @@ bootstrap across cooperating writers. Inspection reads saved configuration even
 when A is offline; it does not authorize filesystem execution.
 
 These checks assume operator-controlled local paths and cannot freeze directory
-entries. Discovery rechecks confinement at use; acquisition/publication must do
-the same when added. B will
-be copy-only, with byte-identical skip and differing-file refusal; publication
-is not implemented here.
+entries. Discovery, acquisition and publication recheck confinement at use.
+B is copy-only, with byte-identical skip and differing-file refusal.
 
 ## Discover through the CLI
 
@@ -134,7 +131,7 @@ An unchanged rescan compares SHA-512, size and namespaced preservation metadata
 against the verified exact current Asset pin. Equal files add no archival revision;
 changed files retain identity and create new exact versions. Old acquisition runs
 replay their saved result rather than reacquiring current source bytes. Missing
-paths do not remove history. Filesystem destination publication remains a later increment.
+paths do not remove history. Publication does not require the source to remain online.
 
 ## Broadcast execution seam
 
@@ -146,10 +143,10 @@ loading the whole file. Duplicate Item identities and invalid or missing revisio
 reject the entire selection. Empty selections are valid.
 
 `broadcast:publication <run UUID> [after-position]` exposes status and at most 100
-committed reports. `BroadcastCoordinator::execute` invokes an in-process
-`BroadcastPublisher`; no production Filesystem publisher is registered yet. PR4
-proofs use a deterministic publisher against the real public service in fresh
-Tempest processes, not a source-to-output copy or a substitute archive service.
+committed reports. `broadcast:build <run UUID>` executes that existing selection
+through `BroadcastCoordinator::execute` and `FilesystemPublisher`. Failure exits
+nonzero and saves an operational diagnostic. Retry the same UUID; completed runs
+return without touching destination files. Create another selection/run to publish again.
 
 Selection verifies explicit Item revisions and their exact Asset pins. This slice
 accepts one byte representation per Asset; multi-file Asset representations fail
@@ -184,6 +181,95 @@ reads/seeks retain verified `AssetArchive` handles and enforce ranges without
 exposing those handles to destinations. No external runtime, RPC, SDK, staged-output
 adoption, watcher, pruning or hardlinks are introduced. Selection/report rows are
 operational state and do not establish preservation or survive SQL loss by design.
+
+## Publish the round trip
+
+```sh
+php tempest vault:init
+php tempest integration:init
+php tempest input:create filesystem /absolute/directory-A
+php tempest input:discover <input UUID>
+php tempest input:acquire <discovery-run UUID>
+php tempest input:acquisitions <discovery-run UUID>
+php tempest broadcast:create filesystem /absolute/directory-B
+php tempest broadcast:select <broadcast UUID> selection.jsonl
+php tempest broadcast:build <publication-run UUID>
+php tempest broadcast:publication <publication-run UUID>
+```
+
+Populate selection JSON lines with the exact preserved Item `object_id` and
+`version` returned by acquisition, as `item_id` and `version`. Preservation and
+selection complete before publication; A can be removed by the operator/test
+harness at that point. Stashd never removes or moves original source files.
+Historical revisions reconstruct into separate fresh destinations when their
+bytes differ. Titles, media facets and internal `data.bin` names are not output names.
+
+The publisher requires complete version-1 `stashd.filesystem.source` provenance
+and one selected Asset. It preserves the canonical revision's exact supported
+relative path, including Unicode and spaces. Missing/invalid provenance fails.
+It drains bounded collection batches to explicit EOF before writing payloads,
+using a disk-backed plan and case-folded prefix index to reject duplicate names,
+file/directory conflicts and case aliases. Grants are invocation-authenticated
+references into an automatically removed temporary stream, not an in-memory
+collection-sized map. Temporary disk usage scales with the selection and one file.
+
+Each file is copied solely through `openAsset()` into a private destination-local
+workspace. SHA-512 and byte count of the verified stream must match a second read
+of staging. Existing regular files are hashed and matching files are skipped;
+differing files, symlinks, special entries and unsafe parents fail. Unrelated
+files stay untouched. Same-device checks reject nested mount destinations rather
+than permit PHP's cross-device rename fallback. Rename exposes only complete
+files; the resulting inode and size are checked before reporting success.
+
+The existing destination lock serializes cooperating Stashd invocations. Roots
+and components are rechecked at use, allowing missing Input suffixes but never
+root overlap. This is not protection against hostile external directory/rename
+races: operators must exclusively manage B during publication. Atomicity is per
+file, not per tree. No power-loss durability, filesystem metadata/ACL fidelity,
+empty-directory preservation or atomic no-replace guarantee is claimed.
+
+Failure can leave complete files but no successful invocation reports. Retry
+verifies/skips matching files from the same frozen selection and publishes the
+rest. Normal exit removes only its private workspace. SIGKILL may leave a hidden
+`.stashd-publication-*` workspace; after confirming its process is dead, operators
+may remove that specific workspace. Retry never broadly cleans/prunes B. Lost
+acknowledgement after rename safely reuses complete files.
+
+Tempest's installed Storage/GenericStorage and Filesystem helpers were examined:
+`move` offers no atomic/no-replace contract, checksum does not select SHA-512,
+and its temporary-directory helper is not destination-local. Narrow native
+exclusive stream creation, hashing, device/inode checks and rename are used for
+these requirements; real CLI/Vault/PostgreSQL tests cover them. Revisit if Tempest
+adds equivalent verified local publication primitives. No dependency is added.
+
+Deferred: watchers, scheduling, templates, external runtimes/RPC/SDK/OCI,
+hardlinks/reflinks, pruning/sync, rename inference, remote storage and per-Item
+partial success. Reports retain the 0.19 whole-invocation provisional contract.
+
+## Publication verification
+
+Local PR5 verification: complete canonical wrapper **417 passed, 33 existing
+incomplete, 23,245 assertions**; full `composer qa` **417 passed, 33 existing
+incomplete, 23,249 assertions**. Formatting and lint pass; analysis retains three
+pre-existing informational suggestions. Incomplete contracts cover broader fixity,
+replica, metadata, evidence, concurrency and catalogue capabilities, not passes.
+
+The 13 publication cases use real fresh Tempest processes, generated unprivileged
+PostgreSQL fixtures, physical Item/pin inspection and released-custody checks.
+They reconstruct binary/document/media/nested/Unicode/spaced/empty files after
+source removal, publish v1 and v2 separately, retain completed-run inode identity,
+verify export isolation, and reject unsafe paths, differing bytes, duplicate/case/
+structural collisions and missing/corrupt payloads. SIGSTOP/SIGKILL during an
+observed partial staging write leaves no final filename; a SQL test-only gate
+also permits SIGKILL after rename before report acknowledgement. Fresh retries
+succeed, and the latter reuses the existing complete inode.
+
+A temporary negative control forcing all Asset reads to v2 made the historical
+proof fail (unchanged Assets correctly have no v2); restoring exact pinned reads
+passed again. This is not a complete latest-head substitution mutation proof.
+Invalid-provenance/collision cases mutate disposable frozen SQL records to exercise
+publisher validation; they do not establish new canonical provenance authority.
+No million-Item performance, hostile-writer safety or power-loss test is claimed.
 
 ## Identity recovery requirement for the acquisition increment
 
