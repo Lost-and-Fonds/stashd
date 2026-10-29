@@ -41,7 +41,7 @@
             "composer fmt",
             "composer lint",
             "composer analyse",
-            "composer test"
+            "composer test -- --parallel --processes=8"
         ],
         "github:lint": "vendor/bin/mago lint --potentially-unsafe --minimum-fail-level=note --reporting-format=github",
         "github:fmt": "vendor/bin/mago fmt --check",
