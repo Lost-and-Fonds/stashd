@@ -168,7 +168,7 @@ test('Tempest migrations adopt the PR1 configuration baseline without changing i
             configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
             $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', $root]));
             expect($input['id'])->toBe($id)->and($input['settings'])->toBe(['root' => $root]);
-            expect((int) $database->query('SELECT count(*) FROM configuration_proof.migrations')->fetchColumn())->toBe(5);
+            expect((int) $database->query('SELECT count(*) FROM configuration_proof.migrations')->fetchColumn())->toBe(6);
             expect(
                 $database
                     ->query("SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = 'configuration_proof.configurations'::regclass ORDER BY definition")
