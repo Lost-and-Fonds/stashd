@@ -1,0 +1,209 @@
+{
+  "schema": 1,
+  "baseline": "passed",
+  "fixture_regression": {
+    "result": "verification error",
+    "evidence": {
+      "reason": "Unexpected exit status or multiple failures"
+    },
+    "expected_result": "verification error",
+    "supporting_output": "RuntimeException: An explicit private local projection test-admin configuration is required."
+  },
+  "controls": [
+    {
+      "id": "split-admission-transaction",
+      "path": "app/Operations/JobRuntime.php",
+      "test": "outbox insert rejection",
+      "invariant": "A rejected outbox insert must leave zero persisted Jobs.",
+      "result": "detected",
+      "evidence": {
+        "persisted_job_ids": [
+          "01a18baa-69ba-74c7-9505-ec661d7733da"
+        ],
+        "terminal": false
+      },
+      "assertion": {
+        "file": "tests/Acceptance/OperationsDelivery/DurableDeliveryTest.php",
+        "line": 21
+      },
+      "supporting_output": "{\"persisted_job_ids\": [\"01a18baa-69ba-74c7-9505-ec661d7733da\"], \"terminal\": false}"
+    },
+    {
+      "id": "missing-commit-barrier",
+      "path": "tests/Support/OperationsDelivery/LocalDurableDeliveryDriver.php",
+      "test": "killing admission before commit",
+      "invariant": "Admission must still be running at the observed COMMIT barrier.",
+      "result": "detected",
+      "evidence": {
+        "child_killed": false,
+        "child_exit": 0,
+        "barrier_reached": false
+      },
+      "assertion": {
+        "file": "tests/Support/OperationsDelivery/LocalDurableDeliveryDriver.php",
+        "line": 322
+      },
+      "supporting_output": "{\"barrier_reached\": false, \"child_exit\": 0, \"child_killed\": false}"
+    },
+    {
+      "id": "ack-without-forwarding",
+      "path": "vendor/symfony/messenger/Transport/Sender/OutboxSender.php",
+      "test": "relay crash after forwarding",
+      "invariant": "A destination envelope must exist before the relay acknowledgment barrier.",
+      "result": "detected",
+      "evidence": {
+        "missing_destination_job_id": "01a18baa-73c8-76c6-af15-b29416aff1e2"
+      },
+      "assertion": {
+        "file": "tests/Acceptance/OperationsDelivery/DurableDeliveryTest.php",
+        "line": 113
+      },
+      "supporting_output": "{\"missing_destination_job_id\": \"01a18baa-73c8-76c6-af15-b29416aff1e2\"}"
+    },
+    {
+      "id": "drop-outbox-on-restart",
+      "path": "tests/Support/OperationsDelivery/LocalDurableDeliveryDriver.php",
+      "test": "committed Job intent survives",
+      "invariant": "A committed queued Job must retain delivery intent and eventually produce its effect.",
+      "result": "detected",
+      "evidence": {
+        "jobs": [
+          {
+            "id": "01a18baa-7956-7cc0-a57f-e1efe448fa0f",
+            "status": "queued"
+          }
+        ],
+        "envelopes": 0,
+        "effects": 0
+      },
+      "assertion": {
+        "file": "tests/Support/OperationsDelivery/LocalDurableDeliveryDriver.php",
+        "line": 223
+      },
+      "supporting_output": "{\"effects\": 0, \"envelopes\": 0, \"jobs\": [{\"id\": \"01a18baa-7956-7cc0-a57f-e1efe448fa0f\", \"status\": \"queued\"}]}"
+    },
+    {
+      "id": "completed-job-can-run-again",
+      "path": "app/Operations/JobRuntime.php",
+      "test": "completed Job redelivery",
+      "invariant": "Redelivery after persisted completion must not append another probe effect.",
+      "result": "detected",
+      "evidence": {
+        "expected_effect_job_ids": [
+          "01a18baa-a84e-73b6-8daa-55d40051237a"
+        ],
+        "actual_effect_job_ids": [
+          "01a18baa-a84e-73b6-8daa-55d40051237a",
+          "01a18baa-a84e-73b6-8daa-55d40051237a"
+        ]
+      },
+      "assertion": {
+        "file": "tests/Acceptance/OperationsDelivery/DurableDeliveryTest.php",
+        "line": 151
+      },
+      "supporting_output": "{\"actual_effect_job_ids\": [\"01a18baa-a84e-73b6-8daa-55d40051237a\", \"01a18baa-a84e-73b6-8daa-55d40051237a\"], \"expected_effect_job_ids\": [\"01a18baa-a84e-73b6-8daa-55d40051237a\"]}"
+    },
+    {
+      "id": "repeated-effect-visible",
+      "path": "tests/Support/Operations/ProbeExecutor.php",
+      "test": "committed Job intent survives",
+      "invariant": "The independent effect observer must expose a second INSERT for the same Job.",
+      "result": "detected",
+      "evidence": {
+        "expected_effect_job_ids": [
+          "01a18baa-afbc-761b-9349-42b7d87c4584"
+        ],
+        "actual_effect_job_ids": [
+          "01a18baa-afbc-761b-9349-42b7d87c4584",
+          "01a18baa-afbc-761b-9349-42b7d87c4584"
+        ]
+      },
+      "assertion": {
+        "file": "tests/Acceptance/OperationsDelivery/DurableDeliveryTest.php",
+        "line": 72
+      },
+      "supporting_output": "{\"actual_effect_job_ids\": [\"01a18baa-afbc-761b-9349-42b7d87c4584\", \"01a18baa-afbc-761b-9349-42b7d87c4584\"], \"expected_effect_job_ids\": [\"01a18baa-afbc-761b-9349-42b7d87c4584\"]}"
+    },
+    {
+      "id": "fault-does-not-reject",
+      "path": "tests/Support/OperationsDelivery/LocalDurableDeliveryDriver.php",
+      "test": "outbox insert rejection",
+      "invariant": "The armed outbox rejection must make the real admission child fail.",
+      "result": "detected",
+      "evidence": {
+        "admission_child_exit": 0
+      },
+      "assertion": {
+        "file": "tests/Support/OperationsDelivery/LocalDurableDeliveryDriver.php",
+        "line": 83
+      },
+      "supporting_output": "{\"admission_child_exit\": 0}"
+    },
+    {
+      "id": "implicit-forward-order",
+      "path": "tests/Support/OperationsDelivery/LocalDurableDeliveryDriver.php",
+      "test": "changed forwarding order",
+      "invariant": "Physical destination insertion order must equal the requested reverse order.",
+      "result": "detected",
+      "evidence": {
+        "requested_job_ids": [
+          "01a18baa-ba3c-7d9d-a6bb-178875f9fa73",
+          "01a18baa-b9e3-7d25-8890-782293f5bc07"
+        ],
+        "physical_destination_job_ids": [
+          "01a18baa-b9e3-7d25-8890-782293f5bc07",
+          "01a18baa-ba3c-7d9d-a6bb-178875f9fa73"
+        ]
+      },
+      "assertion": {
+        "file": "tests/Acceptance/OperationsDelivery/DurableDeliveryTest.php",
+        "line": 174
+      },
+      "supporting_output": "{\"physical_destination_job_ids\": [\"01a18baa-b9e3-7d25-8890-782293f5bc07\", \"01a18baa-ba3c-7d9d-a6bb-178875f9fa73\"], \"requested_job_ids\": [\"01a18baa-ba3c-7d9d-a6bb-178875f9fa73\", \"01a18baa-b9e3-7d25-8890-782293f5bc07\"]}"
+    }
+  ],
+  "restored_contracts": "passed",
+  "baseline_assertions": 177,
+  "restored_assertions": 177,
+  "source_hashes_before": {
+    "app/Operations/JobRuntime.php": "88fb159f13d405d67bb66287798f6a692ac8a55b0fbaa292013d0695cc6739d4",
+    "tests/Acceptance/OperationsDelivery/DurableDeliveryTest.php": "ee2d0fb3facaec2a6008bfdb47741ce24d54bf08c0ac8a58dcf14a2885e365fc",
+    "tests/Support/Operations/ProbeExecutor.php": "3523cb2d083d4cf23d40e1c01d0aab3a26c97057a9985feb219391f432849457",
+    "tests/Support/OperationsDelivery/LocalDurableDeliveryDriver.php": "4d24f11a1ef98472d77790fa49536e14d0a91dc32f8904358fa90ba866bad7a0",
+    "tests/Support/RecordsAndArchives/TransactionProjectionFixture.php": "d25ff8d0671fa17104651149af89ef172fbfc4b8a8152e4d5b69edf78fb4ab68",
+    "tools/verification/ops_c02_negative.py": "f6ab287382ee0c57059fb365595541bb777fbb2b91f2de6e369cd1cced6b15ce",
+    "tools/verification/test_ops_c02_negative.py": "17933b1bf3b95344377c338a9ab7fdb55c06c732074a9ba5e2fc9fbd1d4ea2a3",
+    "vendor/symfony/messenger/Transport/Sender/OutboxSender.php": "02dcc228a6fbd8a5171cf409efda876042b1bb276d55b38c9922010b40732699"
+  },
+  "source_hashes_after": {
+    "app/Operations/JobRuntime.php": "88fb159f13d405d67bb66287798f6a692ac8a55b0fbaa292013d0695cc6739d4",
+    "tests/Acceptance/OperationsDelivery/DurableDeliveryTest.php": "ee2d0fb3facaec2a6008bfdb47741ce24d54bf08c0ac8a58dcf14a2885e365fc",
+    "tests/Support/Operations/ProbeExecutor.php": "3523cb2d083d4cf23d40e1c01d0aab3a26c97057a9985feb219391f432849457",
+    "tests/Support/OperationsDelivery/LocalDurableDeliveryDriver.php": "4d24f11a1ef98472d77790fa49536e14d0a91dc32f8904358fa90ba866bad7a0",
+    "tests/Support/RecordsAndArchives/TransactionProjectionFixture.php": "d25ff8d0671fa17104651149af89ef172fbfc4b8a8152e4d5b69edf78fb4ab68",
+    "tools/verification/ops_c02_negative.py": "f6ab287382ee0c57059fb365595541bb777fbb2b91f2de6e369cd1cced6b15ce",
+    "tools/verification/test_ops_c02_negative.py": "17933b1bf3b95344377c338a9ab7fdb55c06c732074a9ba5e2fc9fbd1d4ea2a3",
+    "vendor/symfony/messenger/Transport/Sender/OutboxSender.php": "02dcc228a6fbd8a5171cf409efda876042b1bb276d55b38c9922010b40732699"
+  },
+  "source_integrity": true,
+  "worktrees_preserved": true,
+  "worktree_status_hashes_before": [
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "c9e0b637b42708e9d2c7de3474fe567a1948de0164fde17beaad4bb090a96225",
+    "9ea1fe2a6a35f36b8f65de9017c8d1e5d54e72281bd13968dc50a56c513774e8",
+    "976059696feb2e400428e7e514c5c58e4214bfffbb7188a22c99ee135c3a3939",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  ],
+  "worktree_status_hashes_after": [
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "c9e0b637b42708e9d2c7de3474fe567a1948de0164fde17beaad4bb090a96225",
+    "9ea1fe2a6a35f36b8f65de9017c8d1e5d54e72281bd13968dc50a56c513774e8",
+    "976059696feb2e400428e7e514c5c58e4214bfffbb7188a22c99ee135c3a3939",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  ],
+  "overall": "passed"
+}

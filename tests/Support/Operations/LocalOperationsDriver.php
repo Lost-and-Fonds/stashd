@@ -30,7 +30,7 @@ final class LocalOperationsDriver implements OperationsDriver
     public function run(string $action, array $arguments): array
     {
         $workspace = $arguments['workspace'];
-        if (realpath($workspace) !== $workspace || ! preg_match('~/stashd-archives-[a-f0-9]{24}/operations$~D', $workspace)) {
+        if (realpath($workspace) !== $workspace || ! preg_match('~/stashd-archives-[a-f0-9]{24}/(?:operations|operations-delivery)$~D', $workspace)) {
             throw new RuntimeException('Operations tests require their private disposable workspace.');
         }
 
