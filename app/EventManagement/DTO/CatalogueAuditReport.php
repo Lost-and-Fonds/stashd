@@ -12,12 +12,12 @@ final readonly class CatalogueAuditReport
 {
     /**
      * Holds catalogue differences, contract violations and coverage observations.
-     * Defined is checked by reflection. False for other stages means unverified, not proven absent.
+     * Defined is checked by reflection. Null for other stages means unmeasured. True or false requires explicit integration evidence.
      *
      * @param list<string> $missingClasses
      * @param list<string> $unexpectedClasses
      * @param list<string> $contractViolations
-     * @param array<string, array{defined: bool, emitted: bool, verified: bool, consumed: bool}> $coverage
+     * @param array<string, array{defined: bool, emitted: ?bool, verified: ?bool, consumed: ?bool}> $coverage
      */
     public function __construct(
         public array $missingClasses,

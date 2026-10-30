@@ -11,9 +11,9 @@ printf("Defined: %d\n", count($report->coverage));
 printf("Missing: %d\n", count($report->missingClasses));
 printf("Unexpected: %d\n", count($report->unexpectedClasses));
 printf("Contract violations: %d\n", count($report->contractViolations));
-printf("Emitted (proven): %d\n", count(array_filter($report->coverage, static fn (array $row): bool => $row['emitted'])));
-printf("Verified (proven): %d\n", count(array_filter($report->coverage, static fn (array $row): bool => $row['verified'])));
-printf("Consumed (proven): %d\n", count(array_filter($report->coverage, static fn (array $row): bool => $row['consumed'])));
+printf("Emitted: unmeasured (no integration evidence mechanism)\n");
+printf("Verified: unmeasured (no integration evidence mechanism)\n");
+printf("Consumed: unmeasured (no integration evidence mechanism)\n");
 foreach ([...$report->missingClasses, ...$report->unexpectedClasses, ...$report->contractViolations] as $issue) {
     fwrite(STDERR, "- {$issue}\n");
 }
@@ -22,9 +22,9 @@ foreach ($report->coverage as $class => $stages) {
         "%s defined=%s emitted=%s verified=%s consumed=%s\n",
         $class,
         $stages['defined'] ? 'yes' : 'unverified',
-        $stages['emitted'] ? 'yes' : 'unverified',
-        $stages['verified'] ? 'yes' : 'unverified',
-        $stages['consumed'] ? 'yes' : 'unverified',
+        match ($stages['emitted']) { true => 'yes', false => 'no', null => 'unknown' },
+        match ($stages['verified']) { true => 'yes', false => 'no', null => 'unknown' },
+        match ($stages['consumed']) { true => 'yes', false => 'no', null => 'unknown' },
     );
 }
 exit($report->isComplete() ? 0 : 1);

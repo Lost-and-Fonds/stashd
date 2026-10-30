@@ -27,7 +27,7 @@ final readonly class ItemVersionCommitted
      * @param string $transactionId Preservation transaction responsible for the archival operation.
      * @param string $itemId Canonical Item affected by this fact.
      * @param string $itemVersion Exact historical OCFL Item revision.
-     * @param array<array-key, mixed> $assetVersionReferences Exact Asset identity and version pairs pinned by this Item revision.
+     * @param list<AssetVersionReference> $assetVersionReferences Exact Asset identity and version pairs pinned by this Item revision.
      */
     public function __construct(
         public string $transactionId,
@@ -36,6 +36,8 @@ final readonly class ItemVersionCommitted
         array $assetVersionReferences,
         public EventMetadata $metadata = new EventMetadata(),
     ) {
+        // PHPDoc cannot prevent untyped callers from supplying malformed pins.
+        /** @var array<array-key, mixed> $assetVersionReferences */
         if (! array_is_list($assetVersionReferences)) {
             throw new InvalidArgumentException('Item version pins must be a list.');
         }

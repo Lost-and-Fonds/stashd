@@ -91,9 +91,9 @@ final readonly class EventCatalogueAudit
             }
 
             // Source references alone cannot prove emission timing, acceptance coverage or consumption.
-            $emitted = false;
-            $verified = false;
-            $consumed = false;
+            $emitted = null;
+            $verified = null;
+            $consumed = null;
 
             $coverage[$class] = [
                 'defined' => true,

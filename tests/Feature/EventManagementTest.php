@@ -358,11 +358,11 @@ test('assertions about one event never certify coverage for another event', func
     $report = new EventCatalogueAudit()->audit($root);
     foreach ($report->coverage as $stages) {
         expect($stages['verified'])
-            ->toBeFalse()
+            ->toBeNull()
             ->and($stages['emitted'])
-            ->toBeFalse()
+            ->toBeNull()
             ->and($stages['consumed'])
-            ->toBeFalse();
+            ->toBeNull();
     }
 
     $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
