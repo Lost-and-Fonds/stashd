@@ -1,0 +1,37 @@
+{
+  "baseline": "65eb0388378d827e8874162c2255722e7c3a4e99",
+  "candidate": "ecotone/dbal 2.0.0-beta.7",
+  "positive": {
+    "exit": 0,
+    "tests": 5,
+    "assertions": 124,
+    "seconds": 10.61
+  },
+  "negative_tempest": {
+    "exit": 1,
+    "observation": "Injected Connection identity assertion fails without PR2326"
+  },
+  "negative_priority": {
+    "exit": 1,
+    "observation": "WorkAdmissionTest.php:87 next Job ordering fails without DBAL priority patch"
+  },
+  "ops_c02_unchanged": {
+    "exit": 2,
+    "failed": 7,
+    "assertions": 78,
+    "status": "Messenger-specific driver fails against replacement; no native crash acceptance claimed"
+  },
+  "qa": {
+    "format": "pass",
+    "lint": "pass",
+    "analysis": "3 pre-existing help messages; no errors"
+  },
+  "sha256": {
+    "tests/Acceptance/Operations/WorkAdmissionTest.php": "28906ad7d92177b153c11d6216d2186df8fb3f66af402d8843d66b88eb1f5aed",
+    "tests/Acceptance/OperationsDelivery/DurableDeliveryTest.php": "ee2d0fb3facaec2a6008bfdb47741ce24d54bf08c0ac8a58dcf14a2885e365fc",
+    "tools/evaluations/tempest-2326.patch": "320eebaf55b2da39a6cb18f1606477bd02ec3b96878c70fb4a0a4ea4f71df60e",
+    "tools/evaluations/ecotone-dbal-priority.patch": "2c6e6062e2166be4a637f73586d987858d6124a24d9b958242c92da1ffb1557d",
+    "composer.lock": "0441ed6a1469d160124e3169f4f358250120fbdb355281cdeb4bb2f89bc490fa"
+  },
+  "protected_assertions_unchanged": true
+}

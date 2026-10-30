@@ -114,7 +114,7 @@ final class LocalOperationsDriver implements OperationsDriver
                 }
 
                 $pending = (int) $database->query("SELECT count(*) FROM jobs WHERE status <> 'completed'")->fetchColumn();
-                $messages = (int) $database->query('SELECT count(*) FROM messenger_messages')->fetchColumn();
+                $messages = (int) $database->query('SELECT count(*) FROM enqueue')->fetchColumn();
                 if ($pending === 0 && $messages === 0 && $action === 'work.execute_all') {
                     return [];
                 }
@@ -157,6 +157,7 @@ final class LocalOperationsDriver implements OperationsDriver
             throw new RuntimeException('Operations initialization exited ' . $result->exitCode . ': ' . $result->output . $result->errorOutput);
         }
 
+        $this->finish($this->start($descriptor, ['action' => 'initialize']));
         $database = self::connect($descriptor);
         $database->exec('CREATE TABLE probe_scopes (id UUID PRIMARY KEY, name TEXT NOT NULL)');
         $database->exec(

@@ -7,48 +7,32 @@ use App\Operations\DTO\ExecutionContext;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Ecotone\Api\Attribute\Asynchronous;
+use Ecotone\Api\Attribute\CommandHandler;
+use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
+use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
+use Ecotone\Api\Dbal\ExtensionObject\DbalConnectionReference;
+use Ecotone\Api\ExtensionObject\ExecutionPollingMetadata;
+use Ecotone\Api\Lite\EcotoneLite;
+use Ecotone\Api\Messaging\ConfiguredMessagingSystem;
+use Ecotone\Api\Messaging\MessageHeaders;
+use Ecotone\Dbal\Database\EnqueueTableManager;
+use Ecotone\Dbal\DbalConnection;
 use InvalidArgumentException;
-use Psr\Container\ContainerInterface;
 use RuntimeException;
-use Symfony\Component\EventDispatcher\EventDispatcher;
-use Symfony\Component\Messenger\Bridge\Doctrine\Transport\Connection as TransportConnection;
-use Symfony\Component\Messenger\Bridge\Doctrine\Transport\DoctrineTransport;
-use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\EventListener\SendFailedMessageForRetryListener;
-use Symfony\Component\Messenger\EventListener\SendFailedMessageToFailureTransportListener;
-use Symfony\Component\Messenger\EventListener\StopWorkerOnMessageLimitListener;
-use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
-use Symfony\Component\Messenger\Failure\FailedMessageRepository;
-use Symfony\Component\Messenger\Handler\HandlersLocator;
-use Symfony\Component\Messenger\MessageBus;
-use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
-use Symfony\Component\Messenger\Middleware\SendMessageMiddleware;
-use Symfony\Component\Messenger\Retry\MultiplierRetryStrategy;
-use Symfony\Component\Messenger\Stamp\DelayStamp;
-use Symfony\Component\Messenger\Stamp\OutboxStamp;
-use Symfony\Component\Messenger\Stamp\RedeliveryStamp;
-use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
-use Symfony\Component\Messenger\Transport\Sender\OutboxSender;
-use Symfony\Component\Messenger\Transport\Sender\SendersLocator;
-use Symfony\Component\Messenger\Transport\Serialization\PhpSerializer;
-use Symfony\Component\Messenger\Worker;
 use Symfony\Component\Uid\Uuid;
 use Throwable;
 
 /**
- * Admit durable Jobs and run them through the transactional Messenger outbox.
+ * Evaluate durable Jobs on a native Ecotone PostgreSQL channel.
  *
- * Job and outbox writes share this DBAL connection, not the separate Tempest
+ * Job and channel writes share this DBAL connection, not the separate Tempest
  * connection. Claims fence state changes but cannot fence external effects.
  */
 final class JobRuntime
 {
     private Connection $database;
-    private DoctrineTransport $outbox;
-    private DoctrineTransport $queue;
-    private DoctrineTransport $failed;
-    private DoctrineTransport $interactive;
-    private MessageBus $bus;
+    private ConfiguredMessagingSystem $messaging;
 
     /**
      * Build real transports on one connection; domain Work requires an executor.
@@ -56,6 +40,7 @@ final class JobRuntime
     public function __construct(
         OperationsConfig $config,
         private ?WorkExecutor $executor = null,
+        ?Connection $connection = null,
     ) {
         if (! str_starts_with($config->dsn, 'pgsql:') || $config->username === '') {
             throw new InvalidArgumentException('Explicit PostgreSQL operations credentials are required.');
@@ -75,23 +60,22 @@ final class JobRuntime
             $parts[$pair[0]] = $pair[1];
         }
 
-        $this->database = DriverManager::getConnection([...$parts, 'driver' => 'pdo_pgsql', 'user' => $config->username, 'password' => $config->password]);
+        $this->database = $connection ?? DriverManager::getConnection([...$parts, 'driver' => 'pdo_pgsql', 'user' => $config->username, 'password' => $config->password]);
         $this->database->executeStatement('SET search_path TO "' . $config->schema . '"');
-        $serializer = new PhpSerializer();
-        $this->outbox = new DoctrineTransport(new TransportConnection(['queue_name' => 'outbox', 'auto_setup' => false, 'redeliver_timeout' => 60], $this->database), $serializer);
-        $this->queue = new DoctrineTransport(new TransportConnection(['queue_name' => 'jobs', 'auto_setup' => false, 'redeliver_timeout' => 60], $this->database), $serializer);
-        $this->failed = new DoctrineTransport(new TransportConnection(['queue_name' => 'failed', 'auto_setup' => false], $this->database), $serializer);
-        $this->interactive = new DoctrineTransport(new TransportConnection([
-            'queue_name' => 'jobs_interactive',
-            'auto_setup' => false,
-            'redeliver_timeout' => 60,
-        ], $this->database), $serializer);
-        $sender = new OutboxSender($this->queue, $this->outbox, 'jobs', 'outbox', 'failed');
-        $senders = new JobServices(['jobs' => $sender, 'jobs_interactive' => new OutboxSender($this->interactive, $this->outbox, 'jobs_interactive', 'outbox', 'failed')]);
-        $this->bus = new MessageBus([
-            new SendMessageMiddleware(new SendersLocator([ExecuteJob::class => ['jobs']], $senders)),
-            new HandleMessageMiddleware(new HandlersLocator([ExecuteJob::class => [$this->handle(...)]])),
-        ]);
+        // Spike only: production must provision Ecotone tables before starting consumers.
+        new EnqueueTableManager('enqueue', true)->createTable($this->database);
+        $this->messaging = EcotoneLite::bootstrap(
+            classesToResolve: [self::class],
+            containerOrAvailableServices: [self::class => $this, DbalConnectionReference::DEFAULT => DbalConnection::create($this->database)],
+            extensionObjects: [
+                DbalBackedMessageChannelBuilder::create('jobs')->withReceiveTimeout(1),
+                DbalConfiguration::createWithDefaults()
+                    ->withTransactionOnAsynchronousEndpoints(false)
+                    ->withTransactionOnCommandBus(false)
+                    ->withDeduplication(false)
+                    ->withDeadLetter(false),
+            ],
+        );
     }
 
     /**
@@ -119,7 +103,7 @@ final class JobRuntime
                 return (string) $existing['id'];
             }
 
-            $this->bus->dispatch(new ExecuteJob($id));
+            $this->dispatchWork($id, 0, 'routine');
 
             return $id;
         });
@@ -177,10 +161,10 @@ final class JobRuntime
      */
     private function dispatchWork(string $id, int $generation, string $priority, int $delay = 0): void
     {
-        $this->bus->dispatch(new Envelope(new ExecuteJob($id, $generation), [
-            new TransportNamesStamp([$priority === 'interactive' ? 'jobs_interactive' : 'jobs']),
-            new DelayStamp($delay),
-        ]));
+        $this->messaging->getCommandBus()->send(new ExecuteJob($id, $generation), metadata: [
+            MessageHeaders::PRIORITY => $priority === 'interactive' ? 10 : 0,
+            MessageHeaders::DELIVERY_DELAY => $delay,
+        ]);
     }
 
     /**
@@ -189,6 +173,8 @@ final class JobRuntime
      * Old generations and completed Jobs cannot start another Attempt. Expired
      * claims remain recoverable; an expired process may still affect remote systems.
      */
+    #[Asynchronous('jobs')]
+    #[CommandHandler(endpointId: 'operations.execute')]
     public function handle(ExecuteJob $message): void
     {
         $token = Uuid::v7()->toString();
@@ -207,7 +193,7 @@ final class JobRuntime
         if ($job === false) {
             $status = $this->database->fetchOne('SELECT status FROM jobs WHERE id = ? AND generation = ?', [$message->id, $message->generation]);
             if ($status === 'running') {
-                throw new RecoverableMessageHandlingException('Job is already claimed.', retryDelay: 60_000);
+                throw new RuntimeException('Job is already claimed.');
             }
 
             if ($status === false && $this->database->fetchOne('SELECT id FROM jobs WHERE id = ?', [$message->id]) === false) {
@@ -245,7 +231,7 @@ final class JobRuntime
                     ],
                 );
                 if ($updated !== 1) {
-                    throw new RecoverableMessageHandlingException('Job claim expired before recording failure.', retryDelay: 60_000);
+                    throw new RuntimeException('Job claim expired before recording failure.');
                 }
 
                 $database->executeStatement("UPDATE job_attempts SET ended_at = clock_timestamp(), outcome = 'failed' WHERE id = ?", [$token]);
@@ -253,7 +239,7 @@ final class JobRuntime
                     $priority = (string) $database->fetchOne('SELECT desired_priority FROM jobs WHERE id = ?', [$message->id]);
                     $this->dispatchWork($message->id, $message->generation + 1, $priority, 1000);
                 } elseif (! $failed) {
-                    $this->bus->dispatch(new Envelope(new ExecuteJob($message->id, $message->generation + 1), [new DelayStamp(1000)]));
+                    $this->dispatchWork($message->id, $message->generation + 1, 'routine', 1000);
                 }
             });
 
@@ -267,7 +253,7 @@ final class JobRuntime
                     $token,
                 ]) !== 1
             ) {
-                throw new RecoverableMessageHandlingException('Job claim expired before completion.', retryDelay: 60_000);
+                throw new RuntimeException('Job claim expired before completion.');
             }
 
             $database->executeStatement("UPDATE job_attempts SET ended_at = clock_timestamp(), outcome = 'completed' WHERE id = ?", [$token]);
@@ -275,84 +261,26 @@ final class JobRuntime
     }
 
     /**
-     * Redispatch a retained transport failure atomically with its removal.
-     */
-
-    public function retryFailed(string $id): void
-    {
-        $this->database->transactional(function (Connection $database) use ($id): void {
-            $row = $database->fetchOne("SELECT id FROM messenger_messages WHERE id = ? AND queue_name = 'failed' FOR UPDATE", [$id]);
-            if ($row === false) {
-                throw new InvalidArgumentException('Failed message not found.');
-            }
-
-            $envelope = $this->failed->find($id);
-            if ($envelope === null) {
-                throw new RuntimeException('Failed message could not be decoded.');
-            }
-
-            $this->bus->dispatch(
-                FailedMessageRepository::prepareForRedispatch($envelope)->withoutAll(OutboxStamp::class)->withoutAll(RedeliveryStamp::class)->withoutAll(DelayStamp::class),
-            );
-            $this->failed->ack($envelope);
-        });
-    }
-
-    /**
-     * Drain real transports, preferring interactive deliveries at each dequeue.
+     * Run the native database consumer without a relay process.
      *
-     * A limit counts messages, including obsolete deliveries, rather than effects.
+     * This spike leaves transport failure recovery unconfigured; do not deploy it.
      */
     public function work(string $receiver, bool $once = false, ?int $limit = null): void
     {
-        $transports = match ($receiver) {
-            'outbox' => ['outbox' => $this->outbox],
-            'jobs' => ['jobs_interactive' => $this->interactive, 'jobs' => $this->queue],
-            default => throw new InvalidArgumentException('Use outbox or jobs.'),
-        };
-        $events = new EventDispatcher();
-        $strategies = [];
-        $failures = [];
-        foreach ($transports as $name => $transport) {
-            $strategies[$name] = new MultiplierRetryStrategy(10, 1000, 2, 60_000, 0);
-            $failures[$name] = $this->failed;
+        if ($receiver !== 'jobs') {
+            throw new InvalidArgumentException('Ecotone uses jobs directly; there is no relay.');
         }
 
-        $events->addSubscriber(new SendFailedMessageForRetryListener(new JobServices($transports), new JobServices($strategies)));
-        $events->addSubscriber(new SendFailedMessageToFailureTransportListener(new JobServices($failures)));
+        $metadata = ExecutionPollingMetadata::createWithDefaults()
+            ->withStopOnError(true);
+        if ($once && $limit === null) {
+            $metadata = $metadata->withFinishWhenNoMessages(true);
+        }
+
         if ($limit !== null) {
-            $events->addSubscriber(new StopWorkerOnMessageLimitListener($limit));
+            $metadata = $metadata->withHandledMessageLimit($limit)->withExecutionTimeLimitInMilliseconds(2000);
         }
 
-        new Worker($transports, $this->bus, $events)->run(['stop_when_empty' => $once]);
-    }
-}
-
-/**
- * Supply Messenger's transport services without a second application container.
- */
-final readonly class JobServices implements ContainerInterface
-{
-    /**
-     * Retain the finite transport and retry services for this runtime.
-     */
-    public function __construct(
-        private array $services,
-    ) {}
-
-    /**
-     * Resolve the service requested by Messenger's configured routing.
-     */
-    public function get(string $id): mixed
-    {
-        return $this->services[$id];
-    }
-
-    /**
-     * Report whether the runtime has registered this transport name.
-     */
-    public function has(string $id): bool
-    {
-        return isset($this->services[$id]);
+        $this->messaging->run('jobs', $metadata);
     }
 }

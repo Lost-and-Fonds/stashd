@@ -1,0 +1,10 @@
+--- a/src/DbalOutboundChannelAdapter.php
++++ b/src/DbalOutboundChannelAdapter.php
+@@ -76,6 +76,7 @@
+             $headers[MessageHeaders::CONTENT_TYPE] = $outboundMessage->getContentType();
+ 
+             $messageToSend = $context->createMessage($outboundMessage->getPayload(), $headers, []);
++            $messageToSend->setPriority($outboundMessage->getPriority());
+             $messageToSend->setDeliveryDelay($outboundMessage->getDeliveryDelay());
+             $messageToSend->setTimeToLive($outboundMessage->getTimeToLive());
+ 

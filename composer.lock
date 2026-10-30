@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bc652e0511a6cce449b85d5f913c0d2f",
+    "content-hash": "91c93345c91c3b224019990785cbea3e",
     "packages": [
         {
             "name": "composer/semver",
@@ -663,6 +663,279 @@
             "time": "2026-10-03T14:15:35+00:00"
         },
         {
+            "name": "ecotone/dbal",
+            "version": "2.0.0-beta.7",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ecotoneframework/dbal.git",
+                "reference": "630374177e3e4edf01aafbc0a891ed10530ab45b"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ecotoneframework/dbal/zipball/630374177e3e4edf01aafbc0a891ed10530ab45b",
+                "reference": "630374177e3e4edf01aafbc0a891ed10530ab45b",
+                "shasum": ""
+            },
+            "require": {
+                "doctrine/dbal": "^4.0",
+                "ecotone/enqueue": "~2.0.0-beta.7",
+                "enqueue/dsn": "^0.10.4"
+            },
+            "require-dev": {
+                "doctrine/annotations": "^1.13|^2.0",
+                "doctrine/cache": "^1.0.0|^2.0",
+                "doctrine/orm": "^3.0",
+                "doctrine/persistence": "^3.4|^4.0",
+                "ecotone/jms-converter": "~2.0.0-beta.7",
+                "phpstan/phpstan": "^2.1",
+                "phpunit/phpunit": "^10.5|^11.0|^12.0",
+                "symfony/expression-language": "^6.4|^7.0|^8.0"
+            },
+            "type": "library",
+            "extra": {
+                "ecotone": {
+                    "repository": "dbal"
+                },
+                "branch-alias": {
+                    "dev-main": "2.0.x-dev"
+                },
+                "license-info": {
+                    "Apache-2.0": {
+                        "url": "https://github.com/ecotoneframework/ecotone-dev/blob/main/LICENSE",
+                        "name": "Apache License 2.0",
+                        "description": "Allows to use non Enterprise features of Ecotone. For more information please write to support@simplycodedsoftware.com"
+                    },
+                    "proprietary": {
+                        "name": "Enterprise License",
+                        "description": "Allows to use Enterprise features of Ecotone. For more information please write to support@simplycodedsoftware.com"
+                    }
+                },
+                "release-time": "2026-10-28 18:55:11"
+            },
+            "autoload": {
+                "psr-4": {
+                    "Ecotone\\Dbal\\": "src",
+                    "Ecotone\\Api\\Dbal\\": "Api/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0",
+                "proprietary"
+            ],
+            "authors": [
+                {
+                    "name": "Dariusz Gafka",
+                    "email": "support@simplycodedsoftware.com"
+                }
+            ],
+            "description": "Doctrine DBAL integration for Ecotone — database-backed message channel, outbox pattern, dead letter queue, durable saga state storage, and document store.",
+            "homepage": "https://docs.ecotone.tech/",
+            "keywords": [
+                "dbal",
+                "dead-letter-queue",
+                "doctrine",
+                "document-store",
+                "durable-workflows",
+                "ecotone",
+                "messaging",
+                "outbox",
+                "saga"
+            ],
+            "support": {
+                "source": "https://github.com/ecotoneframework/dbal/tree/2.0.0-beta.7"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/dgafka",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-10-28T18:55:53+00:00"
+        },
+        {
+            "name": "ecotone/ecotone",
+            "version": "2.0.0-beta.7",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ecotoneframework/ecotone.git",
+                "reference": "73fa1ef11cbfc848aba2cd057219ef3b50d07950"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ecotoneframework/ecotone/zipball/73fa1ef11cbfc848aba2cd057219ef3b50d07950",
+                "reference": "73fa1ef11cbfc848aba2cd057219ef3b50d07950",
+                "shasum": ""
+            },
+            "require": {
+                "laminas/laminas-code": "^4",
+                "php": "^8.2",
+                "psr/clock": "^1.0",
+                "psr/container": "^1.1.1|^2.0.1",
+                "psr/log": "^2.0|^3.0",
+                "symfony/dependency-injection": "^6.4|^7.0|^8.0",
+                "symfony/uid": "^6.4|^7.0|^8.0"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^2.1",
+                "phpunit/phpunit": "^10.5|^11.0|^12.0",
+                "ramsey/uuid": "^4.0",
+                "symfony/console": "^6.4|^7.0|^8.0",
+                "symfony/expression-language": "^6.4|^7.0|^8.0"
+            },
+            "suggest": {
+                "symfony/console": "Allows using SymfonyConsoleWriter for styled console command output"
+            },
+            "type": "library",
+            "extra": {
+                "ecotone": {
+                    "repository": "ecotone"
+                },
+                "branch-alias": {
+                    "dev-main": "2.0.x-dev"
+                },
+                "license-info": {
+                    "Apache-2.0": {
+                        "url": "https://github.com/ecotoneframework/ecotone-dev/blob/main/LICENSE",
+                        "name": "Apache License 2.0",
+                        "description": "Allows to use non Enterprise features of Ecotone. For more information please write to support@simplycodedsoftware.com"
+                    },
+                    "proprietary": {
+                        "name": "Enterprise License",
+                        "description": "Allows to use Enterprise features of Ecotone. For more information please write to support@simplycodedsoftware.com"
+                    }
+                },
+                "release-time": "2026-10-28 18:55:11"
+            },
+            "autoload": {
+                "psr-4": {
+                    "Ecotone\\": "src",
+                    "Ecotone\\Api\\": "Api/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0",
+                "proprietary"
+            ],
+            "authors": [
+                {
+                    "name": "Dariusz Gafka",
+                    "email": "support@simplycodedsoftware.com"
+                }
+            ],
+            "description": "Enterprise architecture layer for Laravel and Symfony — CQRS, Event Sourcing, Durable Workflows (Sagas, Orchestrators), Projections, and Outbox messaging via PHP attributes.",
+            "homepage": "https://docs.ecotone.tech",
+            "keywords": [
+                "cqrs",
+                "ddd",
+                "durable-execution",
+                "durable-workflows",
+                "ecotone",
+                "event-driven",
+                "event-sourcing",
+                "message-driven",
+                "outbox",
+                "projections",
+                "sagas",
+                "service-bus",
+                "workflow"
+            ],
+            "support": {
+                "source": "https://github.com/ecotoneframework/ecotone/tree/2.0.0-beta.7"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/dgafka",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-10-28T18:55:52+00:00"
+        },
+        {
+            "name": "ecotone/enqueue",
+            "version": "2.0.0-beta.7",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ecotoneframework/enqueue.git",
+                "reference": "a2b312bd810a60abf17b280c5c342b586501f03d"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ecotoneframework/enqueue/zipball/a2b312bd810a60abf17b280c5c342b586501f03d",
+                "reference": "a2b312bd810a60abf17b280c5c342b586501f03d",
+                "shasum": ""
+            },
+            "require": {
+                "ecotone/ecotone": "~2.0.0-beta.7",
+                "enqueue/dsn": "^0.10.4",
+                "queue-interop/queue-interop": "^0.8"
+            },
+            "require-dev": {
+                "enqueue/null": "^0.10.18",
+                "phpstan/phpstan": "^2.1",
+                "phpunit/phpunit": "^10.5|^11.0|^12.0"
+            },
+            "type": "library",
+            "extra": {
+                "ecotone": {
+                    "repository": "enqueue"
+                },
+                "branch-alias": {
+                    "dev-main": "2.0.x-dev"
+                },
+                "license-info": {
+                    "Apache-2.0": {
+                        "url": "https://github.com/ecotoneframework/ecotone-dev/blob/main/LICENSE",
+                        "name": "Apache License 2.0",
+                        "description": "Allows to use non Enterprise features of Ecotone. For more information please write to support@simplycodedsoftware.com"
+                    },
+                    "proprietary": {
+                        "name": "Enterprise License",
+                        "description": "Allows to use Enterprise features of Ecotone. For more information please write to support@simplycodedsoftware.com"
+                    }
+                },
+                "release-time": "2026-10-28 18:55:11"
+            },
+            "autoload": {
+                "psr-4": {
+                    "Ecotone\\Enqueue\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0",
+                "proprietary"
+            ],
+            "authors": [
+                {
+                    "name": "Dariusz Gafka",
+                    "email": "support@simplycodedsoftware.com"
+                }
+            ],
+            "description": "Enqueue adapter layer for Ecotone — shared base for AMQP, Redis, and SQS transports.",
+            "homepage": "https://docs.ecotone.tech/",
+            "keywords": [
+                "AMQP",
+                "async-messaging",
+                "ecotone",
+                "enqueue",
+                "message-broker",
+                "redis",
+                "sqs"
+            ],
+            "support": {
+                "source": "https://github.com/ecotoneframework/enqueue/tree/2.0.0-beta.7"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/dgafka",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-10-28T18:55:51+00:00"
+        },
+        {
             "name": "egulias/email-validator",
             "version": "4.0.4",
             "source": {
@@ -728,6 +1001,59 @@
                 }
             ],
             "time": "2025-03-06T22:45:56+00:00"
+        },
+        {
+            "name": "enqueue/dsn",
+            "version": "0.10.27",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/php-enqueue/dsn.git",
+                "reference": "43e223c984bec7095d6a0d4ff70bb3d9e084fb30"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/php-enqueue/dsn/zipball/43e223c984bec7095d6a0d4ff70bb3d9e084fb30",
+                "reference": "43e223c984bec7095d6a0d4ff70bb3d9e084fb30",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9.5"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "0.10.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Enqueue\\Dsn\\": ""
+                },
+                "exclude-from-classmap": [
+                    "/Tests/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Parse DSN",
+            "homepage": "https://enqueue.forma-pro.com/",
+            "keywords": [
+                "dsn",
+                "parse"
+            ],
+            "support": {
+                "docs": "https://github.com/php-enqueue/enqueue-dev/blob/master/docs/index.md",
+                "email": "opensource@forma-pro.com",
+                "forum": "https://gitter.im/php-enqueue/Lobby",
+                "issues": "https://github.com/php-enqueue/enqueue-dev/issues",
+                "source": "https://github.com/php-enqueue/enqueue-dev"
+            },
+            "time": "2025-12-21T18:13:12+00:00"
         },
         {
             "name": "filp/whoops",
@@ -1270,6 +1596,70 @@
                 }
             ],
             "time": "2026-08-24T09:13:11+00:00"
+        },
+        {
+            "name": "laminas/laminas-code",
+            "version": "4.18.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/laminas/laminas-code.git",
+                "reference": "d1ec5de6a87971446cfcc2acbc340c65ca56cee3"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/laminas/laminas-code/zipball/d1ec5de6a87971446cfcc2acbc340c65ca56cee3",
+                "reference": "d1ec5de6a87971446cfcc2acbc340c65ca56cee3",
+                "shasum": ""
+            },
+            "require": {
+                "php": "~8.2.0 || ~8.3.0 || ~8.4.0 || ~8.5.0"
+            },
+            "require-dev": {
+                "boundwize/structarmed": "^0.18.0",
+                "doctrine/annotations": "^2.0.1",
+                "ext-phar": "*",
+                "laminas/laminas-coding-standard": "^3.0.0",
+                "laminas/laminas-stdlib": "^3.18.0",
+                "phpunit/phpunit": "^10.5.58",
+                "psalm/plugin-phpunit": "^0.19.0",
+                "vimeo/psalm": "^6.17"
+            },
+            "suggest": {
+                "doctrine/annotations": "Doctrine\\Common\\Annotations >=1.0 for annotation features",
+                "laminas/laminas-stdlib": "Laminas\\Stdlib component"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Laminas\\Code\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "BSD-3-Clause"
+            ],
+            "description": "Extensions to the PHP Reflection API, static code scanning, and code generation",
+            "homepage": "https://laminas.dev",
+            "keywords": [
+                "code",
+                "laminas",
+                "laminasframework"
+            ],
+            "support": {
+                "chat": "https://laminas.dev/chat",
+                "docs": "https://docs.laminas.dev/laminas-code/",
+                "forum": "https://discourse.laminas.dev",
+                "issues": "https://github.com/laminas/laminas-code/issues",
+                "rss": "https://github.com/laminas/laminas-code/releases.atom",
+                "source": "https://github.com/laminas/laminas-code"
+            },
+            "funding": [
+                {
+                    "url": "https://crowdfunding.linuxfoundation.org/initiatives/laminas-project",
+                    "type": "custom"
+                }
+            ],
+            "time": "2026-10-26T23:36:20+00:00"
         },
         {
             "name": "laminas/laminas-diactoros",
@@ -3264,6 +3654,57 @@
             "time": "2024-09-11T13:17:53+00:00"
         },
         {
+            "name": "queue-interop/queue-interop",
+            "version": "0.8.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/queue-interop/queue-interop.git",
+                "reference": "752db86fee6d9fd11d2e34191afe212c64b96fa7"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/queue-interop/queue-interop/zipball/752db86fee6d9fd11d2e34191afe212c64b96fa7",
+                "reference": "752db86fee6d9fd11d2e34191afe212c64b96fa7",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.1.3 || ^8.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^5.5 || ^6.0 || ^7.0 || ^8.0 || ^9.0",
+                "queue-interop/queue-spec": "^0.6@dev"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "0.7-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Interop\\Queue\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Promoting the interoperability of MQs objects. Based on Java JMS",
+            "homepage": "https://github.com/queue-interop/queue-interop",
+            "keywords": [
+                "MQ",
+                "jms",
+                "message queue",
+                "messaging",
+                "queue"
+            ],
+            "support": {
+                "issues": "https://github.com/queue-interop/queue-interop/issues",
+                "source": "https://github.com/queue-interop/queue-interop/tree/0.8.2"
+            },
+            "time": "2025-02-21T08:24:49+00:00"
+        },
+        {
             "name": "ralouphie/getallheaders",
             "version": "3.0.3",
             "source": {
@@ -3723,6 +4164,90 @@
                 }
             ],
             "time": "2026-10-27T13:53:15+00:00"
+        },
+        {
+            "name": "symfony/dependency-injection",
+            "version": "8.2.x-dev",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/dependency-injection.git",
+                "reference": "26adc6205d68a978dabfb38b21145686ff2294e3"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/dependency-injection/zipball/26adc6205d68a978dabfb38b21145686ff2294e3",
+                "reference": "26adc6205d68a978dabfb38b21145686ff2294e3",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.4.1",
+                "psr/container": "^1.1|^2.0",
+                "symfony/deprecation-contracts": "^2.5|^3",
+                "symfony/service-contracts": "^3.8",
+                "symfony/var-exporter": "^8.1"
+            },
+            "conflict": {
+                "ext-psr": "<1.1|>=2",
+                "symfony/config": "<8.2",
+                "symfony/http-kernel": "<8.2"
+            },
+            "provide": {
+                "psr/container-implementation": "1.1|2.0",
+                "symfony/service-implementation": "1.1|2.0|3.0"
+            },
+            "require-dev": {
+                "symfony/config": "^7.4|^8.0",
+                "symfony/expression-language": "^7.4|^8.0",
+                "symfony/yaml": "^7.4|^8.0"
+            },
+            "default-branch": true,
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Symfony\\Component\\DependencyInjection\\": ""
+                },
+                "exclude-from-classmap": [
+                    "/Tests/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Fabien Potencier",
+                    "email": "fabien@symfony.com"
+                },
+                {
+                    "name": "Symfony Community",
+                    "homepage": "https://symfony.com/contributors"
+                }
+            ],
+            "description": "Allows you to standardize and centralize the way objects are constructed in your application",
+            "homepage": "https://symfony.com",
+            "support": {
+                "source": "https://github.com/symfony/dependency-injection/tree/8.2"
+            },
+            "funding": [
+                {
+                    "url": "https://symfony.com/sponsor",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/fabpot",
+                    "type": "github"
+                },
+                {
+                    "url": "https://github.com/nicolas-grekas",
+                    "type": "github"
+                },
+                {
+                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
+                    "type": "tidelift"
+                }
+            ],
+            "time": "2026-10-29T20:55:21+00:00"
         },
         {
             "name": "symfony/deprecation-contracts",
@@ -5284,16 +5809,16 @@
         },
         {
             "name": "symfony/service-contracts",
-            "version": "v3.7.3",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/service-contracts.git",
-                "reference": "15e6a07ec2a2c75ceb1b21dd98105ee8456d2257"
+                "reference": "052852a96fd5e5ebdb617dba22031e41a3300fb5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/service-contracts/zipball/15e6a07ec2a2c75ceb1b21dd98105ee8456d2257",
-                "reference": "15e6a07ec2a2c75ceb1b21dd98105ee8456d2257",
+                "url": "https://api.github.com/repos/symfony/service-contracts/zipball/052852a96fd5e5ebdb617dba22031e41a3300fb5",
+                "reference": "052852a96fd5e5ebdb617dba22031e41a3300fb5",
                 "shasum": ""
             },
             "require": {
@@ -5304,6 +5829,7 @@
             "conflict": {
                 "ext-psr": "<1.1|>=2"
             },
+            "default-branch": true,
             "type": "library",
             "extra": {
                 "thanks": {
@@ -5311,7 +5837,7 @@
                     "name": "symfony/contracts"
                 },
                 "branch-alias": {
-                    "dev-main": "3.7-dev"
+                    "dev-main": "3.8-dev"
                 }
             },
             "autoload": {
@@ -5347,7 +5873,7 @@
                 "standards"
             ],
             "support": {
-                "source": "https://github.com/symfony/service-contracts/tree/v3.7.3"
+                "source": "https://github.com/symfony/service-contracts/tree/main"
             },
             "funding": [
                 {
@@ -5367,7 +5893,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-07-27T15:39:01+00:00"
+            "time": "2026-10-20T17:38:25+00:00"
         },
         {
             "name": "symfony/string",
@@ -5626,16 +6152,16 @@
         },
         {
             "name": "symfony/var-exporter",
-            "version": "v8.1.9",
+            "version": "v8.1.10",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/var-exporter.git",
-                "reference": "3717217839a76f6fa284931a224c4cada514da2a"
+                "reference": "e94442cdefc1df995528d26acb40d25c2d50504d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/var-exporter/zipball/3717217839a76f6fa284931a224c4cada514da2a",
-                "reference": "3717217839a76f6fa284931a224c4cada514da2a",
+                "url": "https://api.github.com/repos/symfony/var-exporter/zipball/e94442cdefc1df995528d26acb40d25c2d50504d",
+                "reference": "e94442cdefc1df995528d26acb40d25c2d50504d",
                 "shasum": ""
             },
             "require": {
@@ -5685,7 +6211,7 @@
                 "serialize"
             ],
             "support": {
-                "source": "https://github.com/symfony/var-exporter/tree/v8.1.9"
+                "source": "https://github.com/symfony/var-exporter/tree/v8.1.10"
             },
             "funding": [
                 {
@@ -5705,7 +6231,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-07T07:28:40+00:00"
+            "time": "2026-10-22T14:30:01+00:00"
         },
         {
             "name": "symfony/yaml",
