@@ -31,6 +31,7 @@
 
     <php>
         <env name="ENVIRONMENT" value="testing"/>
+        <env name="STASHD_OPERATIONS_ACCEPTANCE_DRIVER" value="Tests\Support\Operations\LocalOperationsDriver"/>
         <env name="BASE_URI" value=""/>
         <env name="CACHE" value="null"/>
     </php>
