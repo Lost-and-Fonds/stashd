@@ -7,7 +7,12 @@
         "ottosmops/ocfl": "dev-fix/atomic-inventory-sidecars as 1.0.1",
         "symfony/lock": "^8.1",
         "league/uri": "^7.8",
-        "symfony/uid": "^8.1"
+        "symfony/uid": "^8.1",
+        "doctrine/dbal": "^4.3",
+        "symfony/messenger": "8.2.x-dev",
+        "symfony/doctrine-messenger": "8.2.x-dev",
+        "symfony/event-dispatcher": "8.2.x-dev",
+        "symfony/console": "8.2.x-dev"
     },
     "require-dev": {
         "pestphp/pest": "^v5.3.2",
