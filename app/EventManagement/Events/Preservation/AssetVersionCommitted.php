@@ -10,17 +10,19 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * This records an authoritative Asset version commit; it does not imply an Item revision references that version.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * The Vault is authoritative; database projections and independently versioned Asset and Item histories remain separate.
  */
 #[DurableHistory]
 #[PremisSignificant]
 final readonly class AssetVersionCommitted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * This records an authoritative Asset version commit; it does not imply an Item revision references that version.
      *
-     * @param list<string> $evidenceReferences Stable identifiers or references included in this event.
+     * @param string $transactionId Preservation transaction responsible for the archival operation.
+     * @param string $assetId Asset whose bytes or history are identified.
+     * @param string $assetVersion Exact historical OCFL Asset version, never a latest selector.
+     * @param list<string> $evidenceReferences Identified evidence references for this occurrence.
      */
     public function __construct(
         public string $transactionId,

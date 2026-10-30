@@ -9,13 +9,12 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Plugin capability changed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Plugin lifecycle and process observations do not establish Job completion or successful preservation.
  */
 final readonly class PluginCapabilityChanged
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Plugin capability changed.
      */
     public function __construct(
         public string $pluginId,

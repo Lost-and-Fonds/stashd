@@ -8,13 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Completion means this Job's required outcome was met; it does not alone prove preservation.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Job, Attempt and Worker identities have separate authority; lifecycle observations do not prove preservation.
  */
 final readonly class JobCompleted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Completion means this Job's required outcome was met; it does not alone prove preservation.
+     *
+     * @param string $jobId Logical durable Job.
      */
     public function __construct(
         public string $jobId,

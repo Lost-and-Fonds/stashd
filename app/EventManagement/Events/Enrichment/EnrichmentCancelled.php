@@ -8,13 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Enrichment was cancelled.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Derived processing must retain source histories and exact input versions even when it fails.
  */
 final readonly class EnrichmentCancelled
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Enrichment was cancelled.
+     *
+     * @param string $itemId Canonical Item affected by this fact.
      */
     public function __construct(
         public string $enrichmentId,

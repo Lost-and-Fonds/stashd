@@ -7,14 +7,15 @@ namespace App\EventManagement\Events\Scheduling;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Source Cooldown Ended a source cooldown ended.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records that the identified Input cooldown ended.
+ * Dispatch and admission decisions do not establish that an Attempt started or completed.
  */
 final readonly class SourceCooldownEnded
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the identified Input cooldown ended.
+     *
+     * @param string $inputId Input through which the source relationship is known.
      */
     public function __construct(
         public string $inputId,

@@ -9,13 +9,12 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the logical discovery run completed with the declared exhaustive, partial or indeterminate coverage.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Coverage belongs to the logical discovery run; a checkpoint or interruption does not prove exhaustive refresh completion.
  */
 final readonly class DiscoveryRunCompleted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the logical discovery run completed with the declared exhaustive, partial or indeterminate coverage.
      */
     public function __construct(
         public string $discoveryRunId,

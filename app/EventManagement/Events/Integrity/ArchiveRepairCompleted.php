@@ -10,17 +10,17 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records repair only after the restored exact historical Asset versions passed required verification.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Verification evidence applies to the identified scope; inability to verify does not establish damage to unrelated Items.
  */
 #[DurableHistory]
 #[PremisSignificant]
 final readonly class ArchiveRepairCompleted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records repair only after the restored exact historical Asset versions passed required verification.
      *
-     * @param list<string> $restoredAssetVersions Exact historical Asset version references verified after repair.
+     * @param string $itemId Canonical Item affected by this fact.
+     * @param list<string> $restoredAssetVersions Identified restored asset versions for this occurrence.
      */
     public function __construct(
         public string $itemId,

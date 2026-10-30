@@ -8,13 +8,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Staging records received bytes only; it does not establish durable custody or Vault commitment.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * A custody receipt accepts responsibility for bytes; a later OCFL commit has its own identity and event.
  */
 final readonly class ArtifactStaged
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Staging records received bytes only; it does not establish durable custody or Vault commitment.
+     *
+     * @param string $acquisitionId Logical acquisition being observed.
+     * @param string $componentId Stable component identity known before authoritative OCFL version allocation.
      */
     public function __construct(
         public string $artifactId,

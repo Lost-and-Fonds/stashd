@@ -8,15 +8,16 @@ use App\EventManagement\Attributes\DurableHistory;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Circuit Breaker a probe failed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records that the identified circuit breaker probe failed for the supplied reason.
+ * An Incident evolves independently of immutable evidence and of protective circuit breaker authority.
  */
 #[DurableHistory]
 final readonly class CircuitBreakerProbeFailed
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the identified circuit breaker probe failed for the supplied reason.
+     *
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $breakerId,

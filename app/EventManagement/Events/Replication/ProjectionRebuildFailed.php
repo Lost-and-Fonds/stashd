@@ -7,14 +7,15 @@ namespace App\EventManagement\Events\Replication;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Projection Rebuild Failed rebuilding failed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records that the identified projection rebuild failed for the supplied reason.
+ * Replicas copy the authoritative Vault and never become competing preservation authorities.
  */
 final readonly class ProjectionRebuildFailed
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the identified projection rebuild failed for the supplied reason.
+     *
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $rebuildId,

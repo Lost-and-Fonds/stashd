@@ -9,14 +9,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records a real denied operation and its safe actor, resource and reason references.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Only safe identifying references belong here; credential values and authentication headers must never be included.
  */
 #[DurableHistory]
 final readonly class AccessDenied
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records a real denied operation and its safe actor, resource and reason references.
+     *
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $actorId,

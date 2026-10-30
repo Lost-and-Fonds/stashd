@@ -80,7 +80,7 @@ test('typed event contracts preserve coverage, partial outcomes, versions and id
     $metadata = new EventMetadata(eventId: 'stable-event');
     $discovery = new DiscoveryRunCompleted('run-1', DiscoveryCoverage::PARTIAL, $metadata);
     $acquisition = new AcquisitionPartiallyCompleted('acq-1', ['component-2'], $metadata);
-    $custody = new AssetCustodyAcknowledged('asset-1', 'v3', 'receipt-1', $metadata);
+    $custody = new AssetCustodyAcknowledged('asset-1', 'component-1', 'receipt-1', $metadata);
     $commit = new AssetVersionCommitted('txn-1', 'asset-1', 'v3', ['evidence-1'], $metadata);
     $publication = new ItemPublicationAcknowledged('pub-1', 'broadcast-1', 'item-1', PublicationOutcome::FAILED, 'fingerprint-1', 'invoke-1', 'destination-rejected', $metadata);
     $checkFailure = new FixityCheckFailed('item-1', 'asset-1', 'v3', 'check-1', 'storage-unavailable', $metadata);
@@ -114,7 +114,7 @@ test('every event namespace exposes constructible event classes with standard me
         new InputCreated('input-1'),
         new DiscoveryRunCompleted('run-1', DiscoveryCoverage::EXHAUSTIVE),
         new AcquisitionPartiallyCompleted('acq-1', ['part-2']),
-        new AssetCustodyAcknowledged('asset-1', 'v1', 'receipt-1'),
+        new AssetCustodyAcknowledged('asset-1', 'component-1', 'receipt-1'),
         new AssetVersionCommitted('txn-1', 'asset-1', 'v1', ['evidence-1']),
         new FixityCheckFailed('item-1', 'asset-1', 'v1', 'check-1', 'unavailable'),
         new ReplicaRegistered('replica-1'),
@@ -317,4 +317,58 @@ test('catalogue audit identifies missing and unexpected classes', function (): v
         ->toBe(['App\\EventManagement\\Events\\Catalogue\\ItemDiscovered'])
         ->and($unexpected->unexpectedClasses)
         ->toBe(['App\\EventManagement\\Events\\Catalogue\\UnexpectedEvent']);
+});
+
+test('reviewed boundaries need no assigned work or future committed version', function (): void {
+    $worker = new \App\EventManagement\Events\Execution\WorkerStarted('idle-worker');
+    $resume = new \App\EventManagement\Events\Acquisition\AcquisitionResumed('acquisition-1', 'checkpoint-4');
+    $custody = new AssetCustodyAcknowledged('asset-1', 'component-1', 'receipt-1');
+    $pin = new \App\EventManagement\DTO\AssetVersionReference('asset-1', 'v12');
+    $commit = new \App\EventManagement\Events\Preservation\ItemVersionCommitted('txn-1', 'item-1', 'v3', [$pin]);
+
+    expect($worker->workerId)
+        ->toBe('idle-worker')
+        ->and($resume->acquisitionId)
+        ->toBe('acquisition-1')
+        ->and($resume->checkpointId)
+        ->toBe('checkpoint-4')
+        ->and($custody->componentId)
+        ->toBe('component-1')
+        ->and($commit->assetVersionReferences[0]->assetId)
+        ->toBe('asset-1')
+        ->and($commit->assetVersionReferences[0]->version)
+        ->toBe('v12');
+    expect(fn () => new \App\EventManagement\DTO\AssetVersionReference('asset-1', 'latest'))->toThrow(InvalidArgumentException::class);
+    expect(fn () => new \App\EventManagement\Events\Preservation\ItemVersionCommitted('txn-1', 'item-1', 'v3', ['asset-1:v12']))->toThrow(InvalidArgumentException::class);
+});
+
+test('assertions about one event never certify coverage for another event', function (): void {
+    $root = sys_get_temp_dir() . '/stashd-coverage-isolation-' . bin2hex(random_bytes(5));
+    mkdir($root . '/docs', 0o777, true);
+    mkdir($root . '/tests', 0o777, true);
+    mkdir($root . '/app/EventManagement/Events/Catalogue', 0o777, true);
+    $catalogue = '';
+    foreach (['ItemDiscovered', 'StashCreated'] as $name) {
+        copy(dirname(__DIR__, 2) . '/app/EventManagement/Events/Catalogue/' . $name . '.php', $root . '/app/EventManagement/Events/Catalogue/' . $name . '.php');
+        $catalogue .= '`App\\EventManagement\\Events\\Catalogue\\' . $name . "`\n";
+    }
+
+    file_put_contents($root . '/docs/event-management-catalogue.md', $catalogue);
+    file_put_contents($root . '/tests/Example.php', '<?php $bus->assertDispatched(ItemDiscovered::class); $bus->assertNotDispatched(ItemDiscovered::class);');
+    $report = new EventCatalogueAudit()->audit($root);
+    foreach ($report->coverage as $stages) {
+        expect($stages['verified'])
+            ->toBeFalse()
+            ->and($stages['emitted'])
+            ->toBeFalse()
+            ->and($stages['consumed'])
+            ->toBeFalse();
+    }
+
+    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+    foreach ($iterator as $path => $_) {
+        is_dir($path) ? rmdir($path) : unlink($path);
+    }
+
+    rmdir($root);
 });

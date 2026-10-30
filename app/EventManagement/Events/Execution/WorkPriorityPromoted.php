@@ -8,13 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records increased priority on an existing queued Job without creating a second execution.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Job, Attempt and Worker identities have separate authority; lifecycle observations do not prove preservation.
  */
 final readonly class WorkPriorityPromoted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records increased priority on an existing queued Job without creating a second execution.
+     *
+     * @param string $jobId Logical durable Job.
      */
     public function __construct(
         public string $jobId,

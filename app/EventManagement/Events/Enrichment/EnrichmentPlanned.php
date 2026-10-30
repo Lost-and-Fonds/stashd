@@ -7,14 +7,15 @@ namespace App\EventManagement\Events\Enrichment;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Enrichment Planned fact occurred.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records the enrichment planned observation for the identified operation.
+ * Derived processing must retain source histories and exact input versions even when it fails.
  */
 final readonly class EnrichmentPlanned
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records the enrichment planned observation for the identified operation.
+     *
+     * @param string $itemId Canonical Item affected by this fact.
      */
     public function __construct(
         public string $enrichmentId,

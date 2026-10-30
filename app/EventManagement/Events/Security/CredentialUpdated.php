@@ -9,14 +9,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records an update to a credential reference or scope. It never contains the credential value.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Only safe identifying references belong here; credential values and authentication headers must never be included.
  */
 #[DurableHistory]
 final readonly class CredentialUpdated
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records an update to a credential reference or scope. It never contains the credential value.
+     *
+     * @param string $credentialId Safe credential identifier; never the credential value.
      */
     public function __construct(
         public string $credentialId,

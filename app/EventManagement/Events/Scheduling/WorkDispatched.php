@@ -7,14 +7,15 @@ namespace App\EventManagement\Events\Scheduling;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Work Dispatched was dispatched.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records that scheduling dispatched the identified Job for execution admission.
+ * Dispatch and admission decisions do not establish that an Attempt started or completed.
  */
 final readonly class WorkDispatched
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that scheduling dispatched the identified Job for execution admission.
+     *
+     * @param string $jobId Logical durable Job.
      */
     public function __construct(
         public string $jobId,

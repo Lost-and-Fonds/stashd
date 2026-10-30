@@ -9,14 +9,13 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Incident evidence was linked.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * An Incident evolves independently of immutable evidence and of protective circuit breaker authority.
  */
 #[DurableHistory]
 final readonly class IncidentEvidenceLinked
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Incident evidence was linked.
      */
     public function __construct(
         public string $incidentId,

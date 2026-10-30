@@ -7,18 +7,18 @@ namespace App\EventManagement\Events\Execution;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Worker Crashed fact occurred.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records an unexpected end of the identified Worker process.
+ * Job, Attempt and Worker identities have separate authority; lifecycle observations do not prove preservation.
  */
 final readonly class WorkerCrashed
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records an unexpected end of the identified Worker process.
+     *
+     * @param string $workerId Execution capacity identity, independent of any assigned Job.
      */
     public function __construct(
         public string $workerId,
-        public string $workKey,
         public EventMetadata $metadata = new EventMetadata(),
     ) {}
 }

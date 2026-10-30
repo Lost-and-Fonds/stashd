@@ -8,13 +8,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records a failed plugin invocation using a safe reason code. It does not claim that preservation failed if independent archival evidence exists.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Plugin lifecycle and process observations do not establish Job completion or successful preservation.
  */
 final readonly class PluginInvocationFailed
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records a failed plugin invocation using a safe reason code. It does not claim that preservation failed if independent archival evidence exists.
+     *
+     * @param string $invocationId Plugin invocation responsible for this observation.
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $pluginId,

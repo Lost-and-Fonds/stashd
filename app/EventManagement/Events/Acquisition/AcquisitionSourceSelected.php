@@ -8,13 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Acquisition was selected as an acquisition source.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Gathering source material does not establish an authoritative Vault commit.
  */
 final readonly class AcquisitionSourceSelected
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Acquisition was selected as an acquisition source.
+     *
+     * @param string $acquisitionId Logical acquisition being observed.
      */
     public function __construct(
         public string $acquisitionId,

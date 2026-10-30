@@ -8,15 +8,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records acquisition completion with the identified known gaps; it does not erase successfully preserved partial material.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Gathering source material does not establish an authoritative Vault commit.
  */
 final readonly class AcquisitionPartiallyCompleted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records acquisition completion with the identified known gaps; it does not erase successfully preserved partial material.
      *
-     * @param list<string> $missingComponentIds Stable identifiers or references included in this event.
+     * @param string $acquisitionId Logical acquisition being observed.
+     * @param list<string> $missingComponentIds Identified missing component ids for this occurrence.
      */
     public function __construct(
         public string $acquisitionId,

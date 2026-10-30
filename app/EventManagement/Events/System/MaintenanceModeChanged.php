@@ -7,14 +7,13 @@ namespace App\EventManagement\Events\System;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Maintenance Mode Changed changed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records that maintenance mode actually changed to the supplied enabled state.
+ * Plugin lifecycle and process observations do not establish Job completion or successful preservation.
  */
 final readonly class MaintenanceModeChanged
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that maintenance mode actually changed to the supplied enabled state.
      */
     public function __construct(
         public bool $enabled,

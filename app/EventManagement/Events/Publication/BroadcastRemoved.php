@@ -8,13 +8,12 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Broadcast Removed was removed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Published results remain in history when another Item or a later republish fails; selection changes do not prune outputs.
  */
 final readonly class BroadcastRemoved
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Broadcast Removed was removed.
      */
     public function __construct(
         public string $broadcastId,

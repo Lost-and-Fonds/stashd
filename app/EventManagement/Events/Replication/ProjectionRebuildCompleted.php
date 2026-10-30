@@ -7,14 +7,13 @@ namespace App\EventManagement\Events\Replication;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Projection Rebuild Completed rebuilding completed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records that the projection rebuild met its required evidence and completeness checks.
+ * Replicas copy the authoritative Vault and never become competing preservation authorities.
  */
 final readonly class ProjectionRebuildCompleted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the projection rebuild met its required evidence and completeness checks.
      */
     public function __construct(
         public string $rebuildId,

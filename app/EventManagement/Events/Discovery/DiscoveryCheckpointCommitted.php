@@ -9,14 +9,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Discovery was committed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Coverage belongs to the logical discovery run; a checkpoint or interruption does not prove exhaustive refresh completion.
  */
 #[TransientObservation]
 final readonly class DiscoveryCheckpointCommitted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Discovery was committed.
+     *
+     * @param string $checkpointId Durably saved continuation position for this operation.
      */
     public function __construct(
         public string $discoveryRunId,

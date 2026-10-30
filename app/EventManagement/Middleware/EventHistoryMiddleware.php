@@ -32,6 +32,7 @@ final readonly class EventHistoryMiddleware implements EventBusMiddleware
      */
     public function __invoke(string|object $event, EventBusMiddlewareCallable $next): void
     {
+        // A throwing handler skips recording; future durable delivery needs a commit/outbox boundary.
         $next($event);
 
         if (! is_object($event) || ! new ReflectionClass($event)->getAttributes(DurableHistory::class)) {

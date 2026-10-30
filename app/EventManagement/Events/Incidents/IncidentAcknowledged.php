@@ -9,14 +9,13 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Acknowledgement records operator receipt, not recovery or resolution.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * An Incident evolves independently of immutable evidence and of protective circuit breaker authority.
  */
 #[DurableHistory]
 final readonly class IncidentAcknowledged
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Acknowledgement records operator receipt, not recovery or resolution.
      */
     public function __construct(
         public string $incidentId,

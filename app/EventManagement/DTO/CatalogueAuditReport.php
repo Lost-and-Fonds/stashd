@@ -12,7 +12,7 @@ final readonly class CatalogueAuditReport
 {
     /**
      * Holds catalogue differences, contract violations and coverage observations.
-     * Each coverage entry has independent Defined, Emitted, Verified and Consumed flags.
+     * Defined is checked by reflection. False for other stages means unverified, not proven absent.
      *
      * @param list<string> $missingClasses
      * @param list<string> $unexpectedClasses

@@ -9,14 +9,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Archive Repair started.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Verification evidence applies to the identified scope; inability to verify does not establish damage to unrelated Items.
  */
 #[DurableHistory]
 final readonly class ArchiveRepairStarted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Archive Repair started.
+     *
+     * @param string $itemId Canonical Item affected by this fact.
      */
     public function __construct(
         public string $itemId,

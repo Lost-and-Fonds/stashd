@@ -8,13 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Replication failed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Replicas copy the authoritative Vault and never become competing preservation authorities.
  */
 final readonly class ReplicationFailed
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Replication failed.
+     *
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $replicaId,

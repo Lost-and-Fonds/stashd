@@ -8,13 +8,16 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * The caller must provide positive evidence for this Item/source relationship; absence from a result is insufficient.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * An Input is a generic source mechanism; these references do not assume a URL or HTTP provider.
  */
 final readonly class SourceUnavailabilityConfirmed
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * The caller must provide positive evidence for this Item/source relationship; absence from a result is insufficient.
+     *
+     * @param string $inputId Input through which the source relationship is known.
+     * @param string $itemId Canonical Item affected by this fact.
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $inputId,

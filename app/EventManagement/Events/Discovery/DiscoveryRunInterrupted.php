@@ -8,13 +8,12 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that a discovery execution stopped without claiming exhaustive refresh coverage.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Coverage belongs to the logical discovery run; a checkpoint or interruption does not prove exhaustive refresh completion.
  */
 final readonly class DiscoveryRunInterrupted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that a discovery execution stopped without claiming exhaustive refresh coverage.
      */
     public function __construct(
         public string $discoveryRunId,

@@ -7,14 +7,13 @@ namespace App\EventManagement\Events\System;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Configuration Changed changed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records an applied configuration change using a safe change reference rather than configuration values.
+ * Plugin lifecycle and process observations do not establish Job completion or successful preservation.
  */
 final readonly class ConfigurationChanged
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records an applied configuration change using a safe change reference rather than configuration values.
      */
     public function __construct(
         public string $configurationKey,

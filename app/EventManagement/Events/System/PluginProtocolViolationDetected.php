@@ -7,14 +7,16 @@ namespace App\EventManagement\Events\System;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Plugin a protocol violation was detected.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records a protocol violation by the identified plugin invocation using a safe reason code.
+ * Plugin lifecycle and process observations do not establish Job completion or successful preservation.
  */
 final readonly class PluginProtocolViolationDetected
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records a protocol violation by the identified plugin invocation using a safe reason code.
+     *
+     * @param string $invocationId Plugin invocation responsible for this observation.
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $pluginId,

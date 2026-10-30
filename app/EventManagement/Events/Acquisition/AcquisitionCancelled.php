@@ -8,13 +8,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Acquisition was cancelled.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Gathering source material does not establish an authoritative Vault commit.
  */
 final readonly class AcquisitionCancelled
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Acquisition was cancelled.
+     *
+     * @param string $acquisitionId Logical acquisition being observed.
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $acquisitionId,

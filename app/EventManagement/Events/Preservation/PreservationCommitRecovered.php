@@ -9,14 +9,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records recovery of the identified preservation transaction from established archival evidence.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * The Vault is authoritative; database projections and independently versioned Asset and Item histories remain separate.
  */
 #[DurableHistory]
 final readonly class PreservationCommitRecovered
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records recovery of the identified preservation transaction from established archival evidence.
+     *
+     * @param string $transactionId Preservation transaction responsible for the archival operation.
      */
     public function __construct(
         public string $transactionId,

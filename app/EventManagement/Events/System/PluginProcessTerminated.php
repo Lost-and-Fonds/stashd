@@ -7,14 +7,16 @@ namespace App\EventManagement\Events\System;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Plugin was terminated.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records termination of the plugin process associated with the invocation.
+ * Plugin lifecycle and process observations do not establish Job completion or successful preservation.
  */
 final readonly class PluginProcessTerminated
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records termination of the plugin process associated with the invocation.
+     *
+     * @param string $invocationId Plugin invocation responsible for this observation.
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $pluginId,

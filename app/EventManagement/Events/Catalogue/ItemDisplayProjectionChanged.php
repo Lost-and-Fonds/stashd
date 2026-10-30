@@ -8,13 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records a changed display projection without changing the historical source metadata revisions.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Stash membership and display changes do not delete or rewrite canonical preserved bytes.
  */
 final readonly class ItemDisplayProjectionChanged
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records a changed display projection without changing the historical source metadata revisions.
+     *
+     * @param string $itemId Canonical Item affected by this fact.
      */
     public function __construct(
         public string $itemId,

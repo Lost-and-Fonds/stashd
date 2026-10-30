@@ -8,13 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Enrichment a metadata revision was recorded.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Derived processing must retain source histories and exact input versions even when it fails.
  */
 final readonly class EnrichmentMetadataRevisionRecorded
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Enrichment a metadata revision was recorded.
+     *
+     * @param string $itemId Canonical Item affected by this fact.
      */
     public function __construct(
         public string $enrichmentId,

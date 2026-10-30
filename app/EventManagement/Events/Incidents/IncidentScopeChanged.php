@@ -8,17 +8,16 @@ use App\EventManagement\Attributes\DurableHistory;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Incident the scope changed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records a change to the set of references affected by the Incident.
+ * An Incident evolves independently of immutable evidence and of protective circuit breaker authority.
  */
 #[DurableHistory]
 final readonly class IncidentScopeChanged
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records a change to the set of references affected by the Incident.
      *
-     * @param list<string> $scopeReferences Stable identifiers or references included in this event.
+     * @param list<string> $scopeReferences Identified scope references for this occurrence.
      */
     public function __construct(
         public string $incidentId,

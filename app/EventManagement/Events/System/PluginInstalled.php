@@ -7,14 +7,13 @@ namespace App\EventManagement\Events\System;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Plugin Installed fact occurred.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records that the plugin installation completed and its identity is registered.
+ * Plugin lifecycle and process observations do not establish Job completion or successful preservation.
  */
 final readonly class PluginInstalled
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the plugin installation completed and its identity is registered.
      */
     public function __construct(
         public string $pluginId,

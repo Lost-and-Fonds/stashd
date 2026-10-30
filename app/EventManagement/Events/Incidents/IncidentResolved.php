@@ -9,14 +9,13 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Resolution follows verified recovery and does not rewrite the evidence that opened the Incident.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * An Incident evolves independently of immutable evidence and of protective circuit breaker authority.
  */
 #[DurableHistory]
 final readonly class IncidentResolved
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Resolution follows verified recovery and does not rewrite the evidence that opened the Incident.
      */
     public function __construct(
         public string $incidentId,

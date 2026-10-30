@@ -7,14 +7,13 @@ namespace App\EventManagement\Events\Replication;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Projection Rebuild Started rebuilding started.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records the start of the identified database projection rebuild.
+ * Replicas copy the authoritative Vault and never become competing preservation authorities.
  */
 final readonly class ProjectionRebuildStarted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records the start of the identified database projection rebuild.
      */
     public function __construct(
         public string $rebuildId,

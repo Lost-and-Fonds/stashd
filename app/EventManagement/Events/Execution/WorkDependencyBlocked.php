@@ -8,13 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that a Job cannot proceed until the identified dependency Job is satisfied.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Job, Attempt and Worker identities have separate authority; lifecycle observations do not prove preservation.
  */
 final readonly class WorkDependencyBlocked
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that a Job cannot proceed until the identified dependency Job is satisfied.
+     *
+     * @param string $jobId Logical durable Job.
      */
     public function __construct(
         public string $jobId,

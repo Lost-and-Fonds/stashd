@@ -8,13 +8,12 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records independent verification of a copied Vault object version, separate from copying it.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Replicas copy the authoritative Vault and never become competing preservation authorities.
  */
 final readonly class ReplicaVersionVerified
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records independent verification of a copied Vault object version, separate from copying it.
      */
     public function __construct(
         public string $replicaId,

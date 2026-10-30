@@ -8,13 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Item Ignore was revoked.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Stash membership and display changes do not delete or rewrite canonical preserved bytes.
  */
 final readonly class ItemIgnoreRevoked
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Item Ignore was revoked.
+     *
+     * @param string $itemId Canonical Item affected by this fact.
      */
     public function __construct(
         public string $itemId,

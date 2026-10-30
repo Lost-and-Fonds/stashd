@@ -8,13 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Input was updated.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * An Input is a generic source mechanism; these references do not assume a URL or HTTP provider.
  */
 final readonly class InputUpdated
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Input was updated.
+     *
+     * @param string $inputId Input through which the source relationship is known.
      */
     public function __construct(
         public string $inputId,

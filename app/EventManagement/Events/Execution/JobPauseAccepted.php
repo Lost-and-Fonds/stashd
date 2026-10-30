@@ -8,13 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Acceptance records a promise to pause safely; it does not mean the Job is already paused.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Job, Attempt and Worker identities have separate authority; lifecycle observations do not prove preservation.
  */
 final readonly class JobPauseAccepted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Acceptance records a promise to pause safely; it does not mean the Job is already paused.
+     *
+     * @param string $jobId Logical durable Job.
      */
     public function __construct(
         public string $jobId,

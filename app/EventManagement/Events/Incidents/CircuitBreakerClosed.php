@@ -9,14 +9,13 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Circuit Breaker was closed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * An Incident evolves independently of immutable evidence and of protective circuit breaker authority.
  */
 #[DurableHistory]
 final readonly class CircuitBreakerClosed
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Circuit Breaker was closed.
      */
     public function __construct(
         public string $breakerId,

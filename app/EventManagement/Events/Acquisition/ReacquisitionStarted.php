@@ -8,13 +8,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Reacquisition started.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Gathering source material does not establish an authoritative Vault commit.
  */
 final readonly class ReacquisitionStarted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Reacquisition started.
+     *
+     * @param string $acquisitionId Logical acquisition being observed.
+     * @param string $parentAcquisitionId Earlier acquisition whose material motivated this new acquisition.
      */
     public function __construct(
         public string $acquisitionId,

@@ -8,13 +8,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records a component added to the expected acquisition set. An estimated size is not an exact byte count.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Gathering source material does not establish an authoritative Vault commit.
  */
 final readonly class ExpectedComponentDeclared
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records a component added to the expected acquisition set. An estimated size is not an exact byte count.
+     *
+     * @param string $acquisitionId Logical acquisition being observed.
+     * @param string $componentId Stable component identity known before authoritative OCFL version allocation.
      */
     public function __construct(
         public string $acquisitionId,

@@ -7,18 +7,20 @@ namespace App\EventManagement\Events\Acquisition;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Acquisition resumed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records continuation of the same logical acquisition from its saved checkpoint.
+ * Gathering source material does not establish an authoritative Vault commit.
  */
 final readonly class AcquisitionResumed
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records continuation of the same logical acquisition from its saved checkpoint.
+     *
+     * @param string $acquisitionId Logical acquisition being observed.
+     * @param string $checkpointId Durably saved continuation position for this operation.
      */
     public function __construct(
         public string $acquisitionId,
-        public string $parentAcquisitionId,
+        public string $checkpointId,
         public EventMetadata $metadata = new EventMetadata(),
     ) {}
 }

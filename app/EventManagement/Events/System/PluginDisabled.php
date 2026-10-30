@@ -7,14 +7,13 @@ namespace App\EventManagement\Events\System;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Plugin Disabled fact occurred.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records that the installed plugin became disabled for use.
+ * Plugin lifecycle and process observations do not establish Job completion or successful preservation.
  */
 final readonly class PluginDisabled
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the installed plugin became disabled for use.
      */
     public function __construct(
         public string $pluginId,

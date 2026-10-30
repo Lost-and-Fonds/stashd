@@ -8,15 +8,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Enrichment completed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Derived processing must retain source histories and exact input versions even when it fails.
  */
 final readonly class EnrichmentCompleted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Enrichment completed.
      *
-     * @param list<string> $outputAssetVersions Derived Asset versions that are present and verified.
+     * @param string $itemId Canonical Item affected by this fact.
+     * @param list<string> $outputAssetVersions Identified output asset versions for this occurrence.
      */
     public function __construct(
         public string $enrichmentId,

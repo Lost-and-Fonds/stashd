@@ -9,14 +9,16 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Preservation Commit Conflict was detected.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * The Vault is authoritative; database projections and independently versioned Asset and Item histories remain separate.
  */
 #[DurableHistory]
 final readonly class PreservationCommitConflictDetected
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Preservation Commit Conflict was detected.
+     *
+     * @param string $transactionId Preservation transaction responsible for the archival operation.
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $transactionId,

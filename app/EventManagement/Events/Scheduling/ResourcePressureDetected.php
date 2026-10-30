@@ -7,14 +7,13 @@ namespace App\EventManagement\Events\Scheduling;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Resource Pressure Detected resource pressure was detected.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records observed pressure on the named execution resource.
+ * Dispatch and admission decisions do not establish that an Attempt started or completed.
  */
 final readonly class ResourcePressureDetected
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records observed pressure on the named execution resource.
      */
     public function __construct(
         public string $resourceType,

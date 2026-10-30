@@ -8,13 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records completion against the sealed declared acquisition scope, not everything that may ever exist upstream.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Gathering source material does not establish an authoritative Vault commit.
  */
 final readonly class AcquisitionCompleted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records completion against the sealed declared acquisition scope, not everything that may ever exist upstream.
+     *
+     * @param string $acquisitionId Logical acquisition being observed.
      */
     public function __construct(
         public string $acquisitionId,

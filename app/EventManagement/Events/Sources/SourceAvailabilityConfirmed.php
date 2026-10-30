@@ -8,13 +8,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the identified Item was confirmed available through the identified Input, based on positive evidence.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * An Input is a generic source mechanism; these references do not assume a URL or HTTP provider.
  */
 final readonly class SourceAvailabilityConfirmed
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the identified Item was confirmed available through the identified Input, based on positive evidence.
+     *
+     * @param string $inputId Input through which the source relationship is known.
+     * @param string $itemId Canonical Item affected by this fact.
      */
     public function __construct(
         public string $inputId,

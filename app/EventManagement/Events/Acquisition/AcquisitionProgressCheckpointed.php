@@ -9,16 +9,17 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Acquisition made a progress checkpoint.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Gathering source material does not establish an authoritative Vault commit.
  */
 #[TransientObservation]
 final readonly class AcquisitionProgressCheckpointed
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Acquisition made a progress checkpoint.
      *
-     * @param list<string> $completedComponentIds Stable identifiers or references included in this event.
+     * @param string $acquisitionId Logical acquisition being observed.
+     * @param string $checkpointId Durably saved continuation position for this operation.
+     * @param list<string> $completedComponentIds Identified completed component ids for this occurrence.
      */
     public function __construct(
         public string $acquisitionId,

@@ -8,15 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records which Items entered or left the Broadcast selection. Deselecting an Item does not delete an earlier published output.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Published results remain in history when another Item or a later republish fails; selection changes do not prune outputs.
  */
 final readonly class BroadcastSelectionChanged
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records which Items entered or left the Broadcast selection. Deselecting an Item does not delete an earlier published output.
      *
-     * @param list<string> $itemIds Items whose membership in the selection changed.
+     * @param list<string> $itemIds Identified item ids for this occurrence.
      */
     public function __construct(
         public string $broadcastId,

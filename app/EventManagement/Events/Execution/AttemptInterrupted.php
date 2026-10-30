@@ -8,13 +8,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Attempt was interrupted.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Job, Attempt and Worker identities have separate authority; lifecycle observations do not prove preservation.
  */
 final readonly class AttemptInterrupted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Attempt was interrupted.
+     *
+     * @param string $jobId Logical durable Job.
+     * @param string $attemptId Fenced physical execution episode.
      */
     public function __construct(
         public string $jobId,

@@ -12,14 +12,14 @@ use ReflectionClass;
 use RuntimeException;
 
 /**
- * Compares the documented inventory with event classes and observes real code references.
- * It checks structure with reflection and reports unreferenced definitions without failing them.
+ * Compares the documented inventory with reflected event contracts.
+ * Emission, acceptance coverage and consumption remain unverified until backed by explicit integration evidence.
  */
 final readonly class EventCatalogueAudit
 {
     /**
      * Audits the catalogue document, application source and tests under one Core checkout.
-     * The repository root must contain docs/event-management-catalogue.md, app/ and tests/.
+     * The repository root must contain docs/event-management-catalogue.md and app/.
      */
     public function audit(string $repositoryRoot): CatalogueAuditReport
     {
@@ -52,10 +52,6 @@ final readonly class EventCatalogueAudit
             $violations[] = 'The EventManagement/Events tree contains duplicate class paths.';
         }
 
-        $applicationFiles = $this->phpFiles($repositoryRoot . '/app');
-        $testFiles = $this->phpFiles($repositoryRoot . '/tests');
-        $source = $this->readFiles($applicationFiles, excludePrefix: $eventsRoot);
-        $tests = $this->readFiles($testFiles);
         foreach ($actual as $class) {
             if (! class_exists($class)) {
                 $violations[] = "{$class} cannot be autoloaded.";
@@ -63,7 +59,7 @@ final readonly class EventCatalogueAudit
             }
 
             $parts = explode('\\', $class);
-            $shortName = array_pop($parts);
+            array_pop($parts);
             $reflection = new ReflectionClass($class);
             $expectedNamespace = implode('\\', $parts);
             if ($reflection->getNamespaceName() !== $expectedNamespace) {
@@ -94,18 +90,10 @@ final readonly class EventCatalogueAudit
                 $violations[] = "{$class} must end its typed constructor with default EventMetadata.";
             }
 
-            $dispatchPattern = '/(?:\\bTempest\\\\event|\\bevent|->dispatch)\s*\(\s*new\s+(?:\\\\[A-Za-z_][A-Za-z0-9_\\\\]*\\\\)?' . preg_quote($shortName, '/') . '\\b/';
-            $emitted = preg_match($dispatchPattern, $source) === 1;
-            $verified =
-                preg_match(
-                    '/assertDispatched\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_\\\\]*::class|new\s+(?:\\\\[A-Za-z_][A-Za-z0-9_\\\\]*\\\\)?' . preg_quote($shortName, '/') . '\\b)/',
-                    $tests,
-                ) === 1
-                && preg_match(
-                    '/assertNotDispatched\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_\\\\]*::class|new\s+(?:\\\\[A-Za-z_][A-Za-z0-9_\\\\]*\\\\)?' . preg_quote($shortName, '/') . '\\b)/',
-                    $tests,
-                ) === 1;
-            $consumed = preg_match('/#\[EventHandler[^]]*\][\s\S]{0,700}\\b' . preg_quote($shortName, '/') . '\\s+\$event/', $source) === 1;
+            // Source references alone cannot prove emission timing, acceptance coverage or consumption.
+            $emitted = false;
+            $verified = false;
+            $consumed = false;
 
             $coverage[$class] = [
                 'defined' => true,
@@ -146,25 +134,5 @@ final readonly class EventCatalogueAudit
         }
 
         return $files;
-    }
-
-    /**
-     * Reads a bounded set of source files into one searchable string.
-     * Event class declarations can be excluded so they do not appear self-referenced.
-     *
-     * @param list<string> $files
-     */
-    private function readFiles(array $files, ?string $excludePrefix = null): string
-    {
-        $contents = '';
-        foreach ($files as $file) {
-            if ($excludePrefix !== null && str_starts_with($file, $excludePrefix . '/')) {
-                continue;
-            }
-
-            $contents .= "\n" . (file_get_contents($file) ?: '');
-        }
-
-        return $contents;
     }
 }

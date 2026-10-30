@@ -8,13 +8,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that an Item was removed from an organisational Stash. This does not delete the Item or its preserved content.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Stash membership and display changes do not delete or rewrite canonical preserved bytes.
  */
 final readonly class ItemRemovedFromStash
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that an Item was removed from an organisational Stash. This does not delete the Item or its preserved content.
+     *
+     * @param string $itemId Canonical Item affected by this fact.
+     * @param string $stashId Organisational Stash affected by the change.
      */
     public function __construct(
         public string $itemId,

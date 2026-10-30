@@ -8,15 +8,14 @@ use App\EventManagement\Attributes\DurableHistory;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Incident the diagnosis was updated.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records a revised diagnosis code without changing the original Incident evidence.
+ * An Incident evolves independently of immutable evidence and of protective circuit breaker authority.
  */
 #[DurableHistory]
 final readonly class IncidentDiagnosisUpdated
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records a revised diagnosis code without changing the original Incident evidence.
      */
     public function __construct(
         public string $incidentId,

@@ -9,16 +9,16 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Enrichment output was checkpointed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Derived processing must retain source histories and exact input versions even when it fails.
  */
 #[TransientObservation]
 final readonly class EnrichmentOutputCheckpointed
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Enrichment output was checkpointed.
      *
-     * @param list<string> $outputReferences Stable identifiers or references included in this event.
+     * @param string $checkpointId Durably saved continuation position for this operation.
+     * @param list<string> $outputReferences Identified output references for this occurrence.
      */
     public function __construct(
         public string $enrichmentId,

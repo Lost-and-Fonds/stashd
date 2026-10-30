@@ -7,14 +7,13 @@ namespace App\EventManagement\Events\Replication;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Replica Registered fact occurred.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records the replica registered observation for the identified operation.
+ * Replicas copy the authoritative Vault and never become competing preservation authorities.
  */
 final readonly class ReplicaRegistered
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records the replica registered observation for the identified operation.
      */
     public function __construct(
         public string $replicaId,

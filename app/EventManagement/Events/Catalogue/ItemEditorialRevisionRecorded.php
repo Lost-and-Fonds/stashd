@@ -8,13 +8,14 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records an editorial revision for an Item, separate from source-provided metadata.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Stash membership and display changes do not delete or rewrite canonical preserved bytes.
  */
 final readonly class ItemEditorialRevisionRecorded
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records an editorial revision for an Item, separate from source-provided metadata.
+     *
+     * @param string $itemId Canonical Item affected by this fact.
      */
     public function __construct(
         public string $itemId,

@@ -8,13 +8,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Work was deferred for dispatch.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Dispatch and admission decisions do not establish that an Attempt started or completed.
  */
 final readonly class WorkDispatchDeferred
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Work was deferred for dispatch.
+     *
+     * @param string $jobId Logical durable Job.
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $jobId,

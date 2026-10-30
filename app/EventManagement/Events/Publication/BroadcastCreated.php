@@ -8,13 +8,12 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records creation of a Broadcast that publishes selected content; it does not synchronize or prune destination files.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Published results remain in history when another Item or a later republish fails; selection changes do not prune outputs.
  */
 final readonly class BroadcastCreated
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records creation of a Broadcast that publishes selected content; it does not synchronize or prune destination files.
      */
     public function __construct(
         public string $broadcastId,

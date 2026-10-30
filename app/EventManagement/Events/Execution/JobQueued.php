@@ -7,14 +7,15 @@ namespace App\EventManagement\Events\Execution;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Job Queued fact occurred.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records the job queued observation for the identified operation.
+ * Job, Attempt and Worker identities have separate authority; lifecycle observations do not prove preservation.
  */
 final readonly class JobQueued
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records the job queued observation for the identified operation.
+     *
+     * @param string $jobId Logical durable Job.
      */
     public function __construct(
         public string $jobId,

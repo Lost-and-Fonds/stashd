@@ -8,13 +8,12 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Scheduled Work became due.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Dispatch and admission decisions do not establish that an Attempt started or completed.
  */
 final readonly class ScheduledWorkDue
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Scheduled Work became due.
      */
     public function __construct(
         public string $scheduleId,

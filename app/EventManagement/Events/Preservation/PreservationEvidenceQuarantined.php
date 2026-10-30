@@ -9,14 +9,16 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that conflicting evidence was isolated for review rather than guessed away or destroyed.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * The Vault is authoritative; database projections and independently versioned Asset and Item histories remain separate.
  */
 #[DurableHistory]
 final readonly class PreservationEvidenceQuarantined
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that conflicting evidence was isolated for review rather than guessed away or destroyed.
+     *
+     * @param string $transactionId Preservation transaction responsible for the archival operation.
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $transactionId,

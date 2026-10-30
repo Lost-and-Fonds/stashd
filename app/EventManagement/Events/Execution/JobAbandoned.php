@@ -7,14 +7,16 @@ namespace App\EventManagement\Events\Execution;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Job Abandoned fact occurred.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records the job abandoned observation for the identified operation.
+ * Job, Attempt and Worker identities have separate authority; lifecycle observations do not prove preservation.
  */
 final readonly class JobAbandoned
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records the job abandoned observation for the identified operation.
+     *
+     * @param string $jobId Logical durable Job.
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $jobId,

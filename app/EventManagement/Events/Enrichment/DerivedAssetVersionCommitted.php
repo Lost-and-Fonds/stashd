@@ -8,13 +8,16 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Derived was committed.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Derived processing must retain source histories and exact input versions even when it fails.
  */
 final readonly class DerivedAssetVersionCommitted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Derived was committed.
+     *
+     * @param string $itemId Canonical Item affected by this fact.
+     * @param string $assetId Asset whose bytes or history are identified.
+     * @param string $assetVersion Exact historical OCFL Asset version, never a latest selector.
      */
     public function __construct(
         public string $enrichmentId,

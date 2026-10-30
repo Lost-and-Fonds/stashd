@@ -7,14 +7,15 @@ namespace App\EventManagement\Events\Scheduling;
 use App\EventManagement\DTO\EventMetadata;
 
 /**
- * Records that the Resource Admission Deferred resource admission was deferred.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Records that resource capacity prevented admission, with the reason for deferral.
+ * Dispatch and admission decisions do not establish that an Attempt started or completed.
  */
 final readonly class ResourceAdmissionDeferred
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that resource capacity prevented admission, with the reason for deferral.
+     *
+     * @param string $reasonCode Safe machine-readable explanation, without process output or secrets.
      */
     public function __construct(
         public string $resourceType,

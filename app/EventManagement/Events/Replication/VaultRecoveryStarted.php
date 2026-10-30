@@ -8,13 +8,12 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the Vault recovery started.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Replicas copy the authoritative Vault and never become competing preservation authorities.
  */
 final readonly class VaultRecoveryStarted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the Vault recovery started.
      */
     public function __construct(
         public string $recoveryId,

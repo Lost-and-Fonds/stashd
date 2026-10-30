@@ -9,14 +9,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records invalidation of a credential reference without exposing its secret value.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * Only safe identifying references belong here; credential values and authentication headers must never be included.
  */
 #[DurableHistory]
 final readonly class CredentialInvalidated
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records invalidation of a credential reference without exposing its secret value.
+     *
+     * @param string $credentialId Safe credential identifier; never the credential value.
      */
     public function __construct(
         public string $credentialId,

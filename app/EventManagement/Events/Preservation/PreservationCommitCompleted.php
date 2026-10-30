@@ -9,14 +9,15 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * Records that the preservation transaction reached its own completion condition. It does not claim that a search projection is current.
- * Its typed IDs identify the subject and the operation that established this fact.
+ * The Vault is authoritative; database projections and independently versioned Asset and Item histories remain separate.
  */
 #[DurableHistory]
 final readonly class PreservationCommitCompleted
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * Records that the preservation transaction reached its own completion condition. It does not claim that a search projection is current.
+     *
+     * @param string $transactionId Preservation transaction responsible for the archival operation.
      */
     public function __construct(
         public string $transactionId,

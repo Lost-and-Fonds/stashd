@@ -10,15 +10,18 @@ use App\EventManagement\DTO\EventMetadata;
 
 /**
  * A mismatch records different observed and expected digests, without claiming the full cause is known.
- * The typed identifiers distinguish this occurrence from other operations on the same subject.
+ * Verification evidence applies to the identified scope; inability to verify does not establish damage to unrelated Items.
  */
 #[DurableHistory]
 #[PremisSignificant]
 final readonly class FixityMismatchDetected
 {
     /**
-     * Captures the established fact and its operation-specific references.
-     * Callers must dispatch only after the stated occurrence condition is true.
+     * A mismatch records different observed and expected digests, without claiming the full cause is known.
+     *
+     * @param string $itemId Canonical Item affected by this fact.
+     * @param string $assetId Asset whose bytes or history are identified.
+     * @param string $assetVersion Exact historical OCFL Asset version, never a latest selector.
      */
     public function __construct(
         public string $itemId,
