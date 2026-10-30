@@ -6,7 +6,6 @@ use App\Integration\OperationsConfig;
 use App\Operations\DTO\ExecutionContext;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DriverManager;
 use Ecotone\Api\Attribute\Asynchronous;
 use Ecotone\Api\Attribute\CommandHandler;
 use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
@@ -16,7 +15,6 @@ use Ecotone\Api\ExtensionObject\ExecutionPollingMetadata;
 use Ecotone\Api\Lite\EcotoneLite;
 use Ecotone\Api\Messaging\ConfiguredMessagingSystem;
 use Ecotone\Api\Messaging\MessageHeaders;
-use Ecotone\Dbal\Database\EnqueueTableManager;
 use Ecotone\Dbal\DbalConnection;
 use InvalidArgumentException;
 use RuntimeException;
@@ -26,8 +24,7 @@ use Throwable;
 /**
  * Evaluate durable Jobs on a native Ecotone PostgreSQL channel.
  *
- * Job and channel writes share this DBAL connection, not the separate Tempest
- * connection. Claims fence state changes but cannot fence external effects.
+ * Normal Tempest bootstrap supplies the shared application connection. Claims fence state changes but cannot fence external effects.
  */
 final class JobRuntime
 {
@@ -36,46 +33,45 @@ final class JobRuntime
 
     /**
      * Build real transports on one connection; domain Work requires an executor.
+     *
+     * @param list<object> $interceptors Optional native interceptors for the isolated evaluation.
      */
     public function __construct(
         OperationsConfig $config,
         private ?WorkExecutor $executor = null,
         ?Connection $connection = null,
+        array $interceptors = [],
     ) {
-        if (! str_starts_with($config->dsn, 'pgsql:') || $config->username === '') {
-            throw new InvalidArgumentException('Explicit PostgreSQL operations credentials are required.');
-        }
-
-        $parts = [];
-        foreach (explode(';', substr($config->dsn, 6)) as $part) {
-            if ($part === '') {
-                continue;
-            }
-
-            $pair = explode('=', $part, 2);
-            if (count($pair) !== 2 || ! in_array($pair[0], ['host', 'port', 'dbname', 'sslmode', 'sslrootcert', 'sslcert', 'sslkey'], true)) {
-                throw new InvalidArgumentException('Unsupported PostgreSQL operations DSN.');
-            }
-
-            $parts[$pair[0]] = $pair[1];
-        }
-
-        $this->database = $connection ?? DriverManager::getConnection([...$parts, 'driver' => 'pdo_pgsql', 'user' => $config->username, 'password' => $config->password]);
-        $this->database->executeStatement('SET search_path TO "' . $config->schema . '"');
-        // Spike only: production must provision Ecotone tables before starting consumers.
-        new EnqueueTableManager('enqueue', true)->createTable($this->database);
+        $this->database = $connection ?? new SharedOperationsConnection($config)->database();
         $this->messaging = EcotoneLite::bootstrap(
-            classesToResolve: [self::class],
-            containerOrAvailableServices: [self::class => $this, DbalConnectionReference::DEFAULT => DbalConnection::create($this->database)],
+            classesToResolve: [self::class, ...array_map(static fn (object $service): string => $service::class, $interceptors)],
+            containerOrAvailableServices: [self::class => $this, DbalConnectionReference::DEFAULT => DbalConnection::create($this->database, [
+                'redelivery_delay' => 60_000,
+            ]), ...$interceptors],
             extensionObjects: [
-                DbalBackedMessageChannelBuilder::create('jobs')->withReceiveTimeout(1),
+                DbalBackedMessageChannelBuilder::create('jobs')->withReceiveTimeout(1)->withAutoDeclare(false),
+                \Ecotone\Api\ExtensionObject\ServiceConfiguration::createWithDefaults()->withDefaultErrorChannel('operations.errors'),
+                \Ecotone\Api\ExtensionObject\ErrorHandlerConfiguration::createWithDeadLetterChannel(
+                    'operations.errors',
+                    \Ecotone\Api\ExtensionObject\RetryTemplateBuilder::fixedBackOff(1000)->maxRetries(3),
+                    'dbal_dead_letter',
+                ),
+                \Ecotone\Api\ExtensionObject\InstantRetryConfiguration::createWithDefaults()->withAsynchronousEndpointsRetry(false),
                 DbalConfiguration::createWithDefaults()
                     ->withTransactionOnAsynchronousEndpoints(false)
                     ->withTransactionOnCommandBus(false)
                     ->withDeduplication(false)
-                    ->withDeadLetter(false),
+                    ->withDeadLetter(true),
             ],
         );
+    }
+
+    /**
+     * Expose native recovery gateways to operator commands without a second bus.
+     */
+    public function messaging(): ConfiguredMessagingSystem
+    {
+        return $this->messaging;
     }
 
     /**
@@ -193,7 +189,11 @@ final class JobRuntime
         if ($job === false) {
             $status = $this->database->fetchOne('SELECT status FROM jobs WHERE id = ? AND generation = ?', [$message->id, $message->generation]);
             if ($status === 'running') {
-                throw new RuntimeException('Job is already claimed.');
+                // A valid claim is not a handler failure; retain a delayed native invitation.
+                $priority = (string) $this->database->fetchOne('SELECT desired_priority FROM jobs WHERE id = ?', [$message->id]);
+                $this->dispatchWork($message->id, $message->generation, $priority, 60_000);
+
+                return;
             }
 
             if ($status === false && $this->database->fetchOne('SELECT id FROM jobs WHERE id = ?', [$message->id]) === false) {
@@ -263,7 +263,7 @@ final class JobRuntime
     /**
      * Run the native database consumer without a relay process.
      *
-     * This spike leaves transport failure recovery unconfigured; do not deploy it.
+     * Native delayed retries retain infrastructure failures before dead-letter storage.
      */
     public function work(string $receiver, bool $once = false, ?int $limit = null): void
     {
@@ -272,7 +272,7 @@ final class JobRuntime
         }
 
         $metadata = ExecutionPollingMetadata::createWithDefaults()
-            ->withStopOnError(true);
+            ->withStopOnError(false);
         if ($once && $limit === null) {
             $metadata = $metadata->withFinishWhenNoMessages(true);
         }

@@ -18,7 +18,9 @@ try {
     $runtime = new JobRuntime(new OperationsConfig($descriptor['dsn'], $descriptor['username'], $descriptor['password'], $descriptor['schema']), new ProbeExecutor($database));
     $result = [];
     if ($request['action'] === 'initialize') {
-        // Provision the native channel before concurrent admission starts.
+        new \App\Operations\DeliverySchema(new \App\Operations\SharedOperationsConnection(
+            new OperationsConfig($descriptor['dsn'], $descriptor['username'], $descriptor['password'], $descriptor['schema']),
+        ))->provision();
     } elseif ($request['action'] === 'request') {
         $work = $request['work'];
         $result = ['job_id' => new Jobs($runtime)->request(new Work('acceptance.probe', $work['scope_id'], $work['mode'], $work['observation']), $work['priority'])];
