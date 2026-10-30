@@ -36,6 +36,7 @@
         "fmt": "vendor/bin/mago fmt",
         "lint": "vendor/bin/mago lint --reporting-format=rich && vendor/bin/mago lint --fix --format-after-fix",
         "analyse": "vendor/bin/mago analyse",
+        "audit:events": "@php tools/audit-event-catalogue.php",
         "test": "@php ./vendor/bin/pest",
         "qa": [
             "composer fmt",
