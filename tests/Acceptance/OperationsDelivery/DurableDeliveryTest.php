@@ -123,8 +123,7 @@ test('relay crash after forwarding but before acknowledgment is safe to replay',
     expect($this->delivery->run('probe.effects', ['scope_id' => $scope, 'mode' => 'refresh'])['job_ids'])
         ->toBe([$jobId]);
     $job = $this->delivery->run('jobs.read', ['job_id' => $jobId])['job'];
-    expect($job['state'])->toBe('completed')
-        ->and($job['attempt_count'])->toBe(1);
+    expect($job['state'])->toBe('completed')->and($job['attempt_count'])->toBe(1);
 });
 
 test('completed Job redelivery after lost worker acknowledgment does not repeat its effect', function (): void {
@@ -158,10 +157,16 @@ test('a changed forwarding order does not determine the authoritative Job outcom
     $firstScope = $this->delivery->run('probe.prepare', ['name' => 'first-outbox-job'])['scope_id'];
     $secondScope = $this->delivery->run('probe.prepare', ['name' => 'second-outbox-job'])['scope_id'];
     $first = $this->delivery->run('work.request', [
-        'scope_id' => $firstScope, 'mode' => 'refresh', 'observation' => 'revision-1', 'priority' => 'routine',
+        'scope_id' => $firstScope,
+        'mode' => 'refresh',
+        'observation' => 'revision-1',
+        'priority' => 'routine',
     ])['job_id'];
     $second = $this->delivery->run('work.request', [
-        'scope_id' => $secondScope, 'mode' => 'refresh', 'observation' => 'revision-1', 'priority' => 'routine',
+        'scope_id' => $secondScope,
+        'mode' => 'refresh',
+        'observation' => 'revision-1',
+        'priority' => 'routine',
     ])['job_id'];
 
     // Control the actual transport relay order, not the order of this response.
