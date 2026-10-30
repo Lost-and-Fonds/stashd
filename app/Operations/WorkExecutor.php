@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Operations;
 
+use App\Operations\DTO\ExecutionContext;
+
 /**
  * Execute registered domain Work after Operations has persisted its claim.
  *
@@ -14,6 +16,8 @@ interface WorkExecutor
 {
     /**
      * Perform the requested operation, throwing when its outcome is unsuccessful.
+     *
+     * Context describes this Attempt; it does not authorize external effects.
      */
-    public function execute(Work $work, string $jobId): void;
+    public function execute(Work $work, ExecutionContext $context): void;
 }

@@ -1,7 +1,7 @@
 <?php
 
-use Tests\Support\RecordsAndArchives\ArchiveTestCase;
 use Tests\Support\Operations\OperationsTestCase;
+use Tests\Support\RecordsAndArchives\ArchiveTestCase;
 use Tests\TestCase;
 
 // Acceptance tests receive a disposable workspace. Feature tests do not.

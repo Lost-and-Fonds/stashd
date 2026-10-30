@@ -17,14 +17,19 @@ test('concurrent equivalent requests admit one durable Job', function (): void {
     $jobId = (string) reset($ids);
 
     $jobs = $this->operations->run('jobs.for_work', ['scope_id' => $scope, 'mode' => 'refresh'])['jobs'];
-    expect($jobs)->toHaveCount(1)
-        ->and($jobs[0]['id'])->toBe($jobId)
-        ->and($jobs[0]['terminal'])->toBeFalse();
+    expect($jobs)
+        ->toHaveCount(1)
+        ->and($jobs[0]['id'])
+        ->toBe($jobId)
+        ->and($jobs[0]['terminal'])
+        ->toBeFalse();
 
     $this->operations->run('work.execute_all');
     $effects = $this->operations->run('probe.effects', ['scope_id' => $scope, 'mode' => 'refresh']);
-    expect($effects['job_ids'])->toBe([$jobId])
-        ->and($this->operations->run('jobs.read', ['job_id' => $jobId])['job']['state'])->toBe('completed');
+    expect($effects['job_ids'])
+        ->toBe([$jobId])
+        ->and($this->operations->run('jobs.read', ['job_id' => $jobId])['job']['state'])
+        ->toBe('completed');
 });
 
 test('refresh and complete modes of one work scope remain distinct Work', function (): void {
@@ -37,13 +42,19 @@ test('refresh and complete modes of one work scope remain distinct Work', functi
     ]);
 
     $ids = array_column($result['receipts'], 'job_id');
-    expect($ids)->toHaveCount(4)
-        ->and($ids[0])->toBe($ids[2])
-        ->and($ids[1])->toBe($ids[3])
-        ->and($ids[0])->not->toBe($ids[1]);
+    expect($ids)
+        ->toHaveCount(4)
+        ->and($ids[0])
+        ->toBe($ids[2])
+        ->and($ids[1])
+        ->toBe($ids[3])
+        ->and($ids[0])
+        ->not->toBe($ids[1]);
 
-    expect($this->operations->run('jobs.for_work', ['scope_id' => $scope, 'mode' => 'refresh'])['jobs'])->toHaveCount(1)
-        ->and($this->operations->run('jobs.for_work', ['scope_id' => $scope, 'mode' => 'complete'])['jobs'])->toHaveCount(1);
+    expect($this->operations->run('jobs.for_work', ['scope_id' => $scope, 'mode' => 'refresh'])['jobs'])
+        ->toHaveCount(1)
+        ->and($this->operations->run('jobs.for_work', ['scope_id' => $scope, 'mode' => 'complete'])['jobs'])
+        ->toHaveCount(1);
 });
 
 test('a higher-priority equivalent request promotes one queued Job without duplicate execution', function (): void {
@@ -58,10 +69,15 @@ test('a higher-priority equivalent request promotes one queued Job without dupli
     $repeated = $this->operations->run('work.request', [...$target, 'priority' => 'interactive'])['job_id'];
     $lowerPriorityRepeat = $this->operations->run('work.request', $target)['job_id'];
 
-    expect($targetJob)->not->toBe($olderJob)
-        ->and($promoted)->toBe($targetJob)
-        ->and($repeated)->toBe($targetJob)
-        ->and($lowerPriorityRepeat)->toBe($targetJob);
+    expect($targetJob)
+        ->not
+        ->toBe($olderJob)
+        ->and($promoted)
+        ->toBe($targetJob)
+        ->and($repeated)
+        ->toBe($targetJob)
+        ->and($lowerPriorityRepeat)
+        ->toBe($targetJob);
 
     $job = $this->operations->run('jobs.read', ['job_id' => $targetJob])['job'];
     expect($job['desired_priority'])->toBe('interactive');

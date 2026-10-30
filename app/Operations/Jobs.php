@@ -24,6 +24,10 @@ final readonly class Jobs
 
     /**
      * Return the durable Job admitted for or already performing this Work.
+     *
+     * Joining retains the original observation and promises no follow-up. The
+     * department must durably retain unmet demand and reconcile satisfied
+     * coverage after Job termination and process restart before requesting again.
      */
     public function request(Work $work, string $priority = 'routine'): string
     {

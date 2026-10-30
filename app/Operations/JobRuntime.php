@@ -3,6 +3,8 @@
 namespace App\Operations;
 
 use App\Integration\OperationsConfig;
+use App\Operations\DTO\ExecutionContext;
+use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use InvalidArgumentException;
@@ -192,7 +194,7 @@ final class JobRuntime
         $token = Uuid::v7()->toString();
         $job = $this->database->transactional(function (Connection $database) use ($token, $message): array|false {
             $job = $database->fetchAssociative(
-                "UPDATE jobs SET status = 'running', claim_token = ?, lease_until = clock_timestamp() + interval '60 seconds', attempts = attempts + 1 WHERE id = ? AND generation = ? AND (status = 'queued' OR (status = 'running' AND lease_until <= clock_timestamp())) RETURNING payload, failures, work_type, work_scope, work_mode, desired_priority",
+                "UPDATE jobs SET status = 'running', claim_token = ?, lease_until = clock_timestamp() + interval '60 seconds', attempts = attempts + 1 WHERE id = ? AND generation = ? AND (status = 'queued' OR (status = 'running' AND lease_until <= clock_timestamp())) RETURNING payload, failures, work_type, work_scope, work_mode, desired_priority, lease_until",
                 [$token, $message->id, $message->generation],
             );
             if ($job !== false) {
@@ -221,7 +223,10 @@ final class JobRuntime
                     throw new RuntimeException('No domain Work executor is registered.');
                 }
 
-                $this->executor->execute(new Work($job['work_type'], $job['work_scope'], $job['work_mode'], $job['payload']), $message->id);
+                $this->executor->execute(
+                    new Work($job['work_type'], $job['work_scope'], $job['work_mode'], $job['payload']),
+                    new ExecutionContext($message->id, $token, $message->generation, new DateTimeImmutable($job['lease_until'])),
+                );
             }
 
             if ($job['work_type'] === null && $job['payload'] === 'fail') {

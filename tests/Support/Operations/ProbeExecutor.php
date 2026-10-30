@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support\Operations;
 
+use App\Operations\DTO\ExecutionContext;
 use App\Operations\Work;
 use App\Operations\WorkExecutor;
 use PDO;
@@ -26,7 +27,7 @@ final readonly class ProbeExecutor implements WorkExecutor
     /**
      * Observe the operation before recording an effect on a separate connection.
      */
-    public function execute(Work $work, string $jobId): void
+    public function execute(Work $work, ExecutionContext $context): void
     {
         $scope = $this->database->prepare('SELECT id FROM probe_scopes WHERE id = ?');
         $scope->execute([$work->scope]);
@@ -35,6 +36,6 @@ final readonly class ProbeExecutor implements WorkExecutor
         }
 
         $effect = $this->database->prepare('INSERT INTO probe_effects (scope_id, mode, job_id, observation) VALUES (?, ?, ?, ?)');
-        $effect->execute([$work->scope, $work->mode, $jobId, $work->observation]);
+        $effect->execute([$work->scope, $work->mode, $context->jobId, $work->observation]);
     }
 }
