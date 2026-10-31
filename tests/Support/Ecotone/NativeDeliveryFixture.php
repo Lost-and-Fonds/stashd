@@ -7,11 +7,13 @@ namespace Tests\Support\Ecotone;
 use PDO;
 use PHPUnit\Framework\Assert;
 use RuntimeException;
+use Symfony\Component\Uid\Uuid;
 use Tempest\DateTime\Duration;
 use Tempest\Process\GenericProcessExecutor;
 use Tempest\Process\InvokedProcess;
 use Tests\Support\Operations\LocalOperationsDriver;
 use Tests\Support\RecordsAndArchives\ArchiveFixture;
+use Tests\Support\RecordsAndArchives\TransactionProbe;
 
 /**
  * Own one disposable installation and bounded native consumer processes.
@@ -30,15 +32,28 @@ final class NativeDeliveryFixture
 
     /**
      * Allocate through the existing restricted-role fixture and explicit provisioning.
+     * Set initialize to false to leave a genuinely empty database for installation tests.
      */
-    public function __construct()
+    public function __construct(bool $initialize = true)
     {
         $this->workspace = new ArchiveFixture();
         $this->root = $this->workspace->path('operations');
         mkdir($this->root, 0o700);
         $this->allocator = new LocalOperationsDriver();
         try {
-            $this->scope = $this->allocator->run('probe.prepare', ['workspace' => $this->root, 'name' => 'native-durability'])['scope_id'];
+            if ($initialize) {
+                $this->scope = $this->allocator->run('probe.prepare', ['workspace' => $this->root, 'name' => 'native-durability'])['scope_id'];
+            } else {
+                $name = 'stashd_tx_test_' . bin2hex(random_bytes(8));
+                $fixture = ['database' => $name, 'username' => $name, 'schema' => $name];
+                $path = $this->root . '/installation.json';
+                file_put_contents($path, json_encode(['fixture' => $fixture], JSON_THROW_ON_ERROR));
+                chmod($path, 0o600);
+                $descriptor = TransactionProbe::run($this->root, ['operation' => 'projection.describe', 'fixture' => $fixture]);
+                file_put_contents($path, json_encode(compact('fixture', 'descriptor'), JSON_THROW_ON_ERROR));
+                $this->scope = Uuid::v7()->toString();
+            }
+
             $this->descriptor = json_decode(file_get_contents($this->root . '/installation.json'), true, flags: JSON_THROW_ON_ERROR)['descriptor'];
             $this->database = LocalOperationsDriver::connect($this->descriptor);
         } catch (\Throwable $error) {
@@ -56,7 +71,7 @@ final class NativeDeliveryFixture
     {
         $pause = $this->root . '/pause-' . count($this->children);
         $child = new GenericProcessExecutor()->start(new \Tempest\Process\PendingProcess(
-            command: [PHP_BINARY, __DIR__ . '/delivery-process.php'],
+            command: [PHP_BINARY, __DIR__ . (in_array($action, ['install', 'nested', 'official-nested'], true) ? '/installation-process.php' : '/delivery-process.php')],
             input: json_encode([
                 'descriptor' => $this->descriptor,
                 'workspace' => $this->root,

@@ -1,0 +1,16 @@
+{
+  "baseline": "passed",
+  "controls": [
+    {
+      "id": "premature-inner-commit",
+      "result": "detected",
+      "assertion": "tests/Acceptance/EcotoneInstallation/InstallationTest.php:40"
+    },
+    {
+      "id": "separate-physical-connection",
+      "result": "detected",
+      "assertion": "tests/Acceptance/EcotoneInstallation/InstallationTest.php:40"
+    }
+  ],
+  "restored": "passed"
+}

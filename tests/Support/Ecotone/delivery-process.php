@@ -21,6 +21,19 @@ require dirname(__DIR__, 3) . '/vendor/autoload.php';
 
 try {
     $request = json_decode(stream_get_contents(STDIN), true, flags: JSON_THROW_ON_ERROR);
+    if ($request['without_messenger'] ?? false) {
+        // Prove the fresh lifecycle cannot construct or autoload a Messenger service.
+        spl_autoload_register(
+            static function (string $class): void {
+                if (str_starts_with($class, 'Symfony\\Component\\Messenger\\')) {
+                    throw new LogicException('Messenger dependency requested in the clean-install contract: ' . $class);
+                }
+            },
+            true,
+            true,
+        );
+    }
+
     $d = $request['descriptor'];
     $observer = LocalOperationsDriver::connect($d);
     if (isset($request['schema'])) {
