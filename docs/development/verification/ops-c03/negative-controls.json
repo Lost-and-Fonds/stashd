@@ -1,0 +1,74 @@
+[
+  {
+    "control": "claim-exclusion",
+    "baseline": "PASS",
+    "violation": "DETECTED",
+    "exit": 1,
+    "restored": "PASS",
+    "invariant": "tests/Acceptance/OperationsFencing/AttemptFencingTest.php:23",
+    "fault_patch": "claim-exclusion.patch"
+  },
+  {
+    "control": "stale-renewal",
+    "baseline": "PASS",
+    "violation": "DETECTED",
+    "exit": 1,
+    "restored": "PASS",
+    "invariant": "tests/Acceptance/OperationsFencing/AttemptFencingTest.php:71",
+    "fault_patch": "stale-renewal.patch"
+  },
+  {
+    "control": "detached-write",
+    "baseline": "PASS",
+    "violation": "DETECTED",
+    "exit": 1,
+    "restored": "PASS",
+    "invariant": "tests/Feature/AttemptAuthorityTest.php:12",
+    "fault_patch": "detached-write.patch"
+  },
+  {
+    "control": "expired-completion",
+    "baseline": "PASS",
+    "violation": "DETECTED",
+    "exit": 1,
+    "restored": "PASS",
+    "invariant": "tests/Acceptance/OperationsFencing/AttemptFencingTest.php:142",
+    "fault_patch": "expired-completion.patch"
+  },
+  {
+    "control": "stale-failure",
+    "baseline": "PASS",
+    "violation": "DETECTED",
+    "exit": 1,
+    "restored": "PASS",
+    "invariant": "tests/Acceptance/OperationsFencing/AttemptFencingTest.php:368",
+    "fault_patch": "stale-failure.patch"
+  },
+  {
+    "control": "renewal-takeover",
+    "baseline": "PASS",
+    "violation": "DETECTED",
+    "exit": 1,
+    "restored": "PASS",
+    "invariant": "tests/Acceptance/OperationsFencing/AttemptFencingTest.php:278",
+    "fault_patch": "renewal-takeover.patch"
+  },
+  {
+    "control": "custody-reconciliation",
+    "baseline": "PASS",
+    "violation": "DETECTED",
+    "exit": 1,
+    "restored": "PASS",
+    "invariant": "tests/Acceptance/OperationsFencing/AttemptFencingTest.php:221",
+    "fault_patch": "custody-reconciliation.patch"
+  },
+  {
+    "control": "transaction-clock",
+    "baseline": "PASS",
+    "violation": "DETECTED",
+    "exit": 1,
+    "restored": "PASS",
+    "invariant": "tests/Feature/AttemptAuthorityTest.php:12",
+    "fault_patch": "transaction-clock.patch"
+  }
+]

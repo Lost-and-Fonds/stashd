@@ -1,0 +1,24 @@
+--- app/Operations/JobRuntime.php
++++ app/Operations/JobRuntime.php
+@@ -205,10 +205,10 @@
+             }
+         } catch (Throwable $error) {
+             $failed = ((int) $job['failures'] + 1) >= 3;
+-            $accepted = $this->authority->finish($context, function (Connection $database) use ($failed, $error, $message, $token, $job): void {
++            $accepted = $this->database->transactional(function (Connection $database) use ($failed, $error, $message, $token, $job): void {
+                 $database->fetchOne('SELECT id FROM jobs WHERE id = ? FOR UPDATE', [$message->id]);
+                 $updated = $database->executeStatement(
+-                    'UPDATE jobs SET status = ?, failures = failures + 1, generation = generation + 1, claim_token = NULL, lease_until = NULL, error = ? WHERE id = ? AND claim_token = ? AND lease_until > clock_timestamp()',
++                    'UPDATE jobs SET status = ?, failures = failures + 1, generation = generation + 1, claim_token = NULL, lease_until = NULL, error = ? WHERE id = ? AND ?::text IS NOT NULL',
+                     [
+                         $failed ? 'failed' : 'queued',
+                         $error->getMessage(),
+@@ -235,7 +235,7 @@
+             return;
+         }
+ 
+-        $accepted = $this->authority->finish($context, function (Connection $database) use ($message, $token): void {
++        $accepted = $this->database->transactional(function (Connection $database) use ($message, $token): void {
+             $database->fetchOne('SELECT id FROM jobs WHERE id = ? FOR UPDATE', [$message->id]);
+             if (
+                 $database->executeStatement("UPDATE jobs SET status = 'completed', claim_token = NULL, lease_until = NULL, error = NULL WHERE id = ? AND claim_token = ? AND lease_until > clock_timestamp()", [

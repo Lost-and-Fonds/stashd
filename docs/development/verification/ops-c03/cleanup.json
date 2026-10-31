@@ -1,0 +1,15 @@
+{
+  "owned_fixture_workers": 0,
+  "owned_fixture_databases": 0,
+  "owned_fixture_roles": 0,
+  "private_admin_copy_removed": true,
+  "older_resources_preserved": {
+    "database": "stashd_tx_test_827d41e078c94da1",
+    "role": "stashd_tx_test_827d41e078c94da1",
+    "tables_last_modified": "2026-10-28 07:45:44+00",
+    "operations_tables": false,
+    "empty_workspaces": 2
+  },
+  "empty_initial_setup_workspaces_removed": 9,
+  "other_worktree_git_status_entries_unchanged": true
+}

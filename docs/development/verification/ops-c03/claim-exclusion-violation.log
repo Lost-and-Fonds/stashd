@@ -1,0 +1,23 @@
+⨯
+  ────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Acceptance\OperationsFencing\AttemptFencingTest > concurren…
+  Failed asserting that actual size 2 matches expected size 1.
+
+  at tests/Acceptance/OperationsFencing/AttemptFencingTest.php:23
+     19▕         'workers' => ['alpha', 'bravo'],
+     20▕     ]);
+     21▕
+     22▕     expect($race['observed_competing_processes'])->toBe(2);
+  ➜  23▕     expect($race['entered_executor_attempt_ids'])->toHaveCount(1);
+     24▕
+     25▕     $state = $this->fencing->run('attempts.read', ['job_id' => $jobId]);
+     26▕     expect($state['attempts'])->toHaveCount(1);
+     27▕     expect($state['current_attempt_id'])->toBe($race['entered_executor_attempt_ids'][0]);
+
+  1   tests/Acceptance/OperationsFencing/AttemptFencingTest.php:23
+
+
+  Tests:    1 failed (12 assertions)
+  Duration: 2.47s
+
+Script @php ./vendor/bin/pest handling the test event returned with error code 1

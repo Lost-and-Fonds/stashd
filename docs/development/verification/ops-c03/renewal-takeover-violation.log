@@ -1,0 +1,23 @@
+⨯
+  ────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Acceptance\OperationsFencing\AttemptFencingTest > concurren…
+  Failed asserting that true is identical to false.
+
+  at tests/Acceptance/OperationsFencing/AttemptFencingTest.php:278
+    274▕         expect($race['observed_competing_processes'])->toBe(2);
+    275▕         expect($race['overlapping_database_operations_observed'])->toBeTrue();
+    276▕         expect($race['received_native_message'])->toBeTrue();
+    277▕         expect($race['original_worker_alive'])->toBeTrue();
+  ➜ 278▕         expect($race['renewal_accepted'])->toBe($firstMutation === 'renewal');
+    279▕         expect($race['takeover_accepted'])->toBe($firstMutation === 'takeover');
+    280▕         expect($race['authority_snapshots'])->toHaveKeys(['before', 'after_first', 'after_both']);
+    281▕         foreach ($race['authority_snapshots'] as $snapshot) {
+    282▕             expect(count($snapshot['authoritative_attempt_ids']))->toBeLessThanOrEqual(1);
+
+  1   tests/Acceptance/OperationsFencing/AttemptFencingTest.php:278
+
+
+  Tests:    1 failed (53 assertions)
+  Duration: 12.06s
+
+Script @php ./vendor/bin/pest handling the test event returned with error code 1

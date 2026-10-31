@@ -21,9 +21,16 @@ use Throwable;
  *
  * Normal Tempest bootstrap supplies the shared application connection. Claims fence state changes but cannot fence external effects.
  */
+#[\Tempest\Container\Singleton]
 final class JobRuntime
 {
+    /**
+     * Observe the last claim decision's database time without granting authority.
+     */
+    public private(set) ?DateTimeImmutable $claimDecidedAt = null;
+
     private Connection $database;
+    private AttemptAuthority $authority;
 
     /**
      * Use the application-owned transaction boundary and the framework command bus.
@@ -33,12 +40,14 @@ final class JobRuntime
         TempestConnection $connection,
         private CommandBus $commands,
         private ?WorkExecutor $executor = null,
+        private LeaseConfig $lease = new LeaseConfig(),
     ) {
         if (! $connection instanceof DbalBackedConnection) {
             throw new \LogicException('Operations requires the shared Ecotone/Tempest connection.');
         }
 
         $this->database = $connection->database();
+        $this->authority = new AttemptAuthority($connection, $this->lease);
     }
 
     /**
@@ -142,14 +151,22 @@ final class JobRuntime
     {
         $token = Uuid::v7()->toString();
         $job = $this->database->transactional(function (Connection $database) use ($token, $message): array|false {
+            $database->fetchOne('SELECT id FROM jobs WHERE id = ? FOR UPDATE', [$message->id]);
             $job = $database->fetchAssociative(
-                "UPDATE jobs SET status = 'running', claim_token = ?, lease_until = clock_timestamp() + interval '60 seconds', attempts = attempts + 1 WHERE id = ? AND generation = ? AND (status = 'queued' OR (status = 'running' AND lease_until <= clock_timestamp())) RETURNING payload, failures, work_type, work_scope, work_mode, desired_priority, lease_until",
-                [$token, $message->id, $message->generation],
+                "WITH decision AS MATERIALIZED (SELECT clock_timestamp() AS at), claimed AS (UPDATE jobs SET status = 'running', claim_token = ?, lease_until = decision.at + (? * interval '1 millisecond'), attempts = attempts + 1 FROM decision WHERE id = ? AND generation = ? AND (status = 'queued' OR (status = 'running' AND lease_until <= decision.at)) RETURNING payload, failures, work_type, work_scope, work_mode, desired_priority, lease_until) SELECT decision.at AS decision_at, claimed.* FROM decision LEFT JOIN claimed ON true",
+                [$token, $this->lease->milliseconds, $message->id, $message->generation],
             );
-            if ($job !== false) {
-                $database->executeStatement("UPDATE job_attempts SET ended_at = clock_timestamp(), outcome = 'interrupted' WHERE job_id = ? AND ended_at IS NULL", [$message->id]);
-                $database->executeStatement('INSERT INTO job_attempts (id, job_id) VALUES (?, ?)', [$token, $message->id]);
+            if ($job === false) {
+                throw new \LogicException('The database did not return a claim decision.');
             }
+
+            $this->claimDecidedAt = new DateTimeImmutable($job['decision_at']);
+            if ($job['lease_until'] === null) {
+                return false;
+            }
+
+            $database->executeStatement("UPDATE job_attempts SET ended_at = clock_timestamp(), outcome = 'interrupted' WHERE job_id = ? AND ended_at IS NULL", [$message->id]);
+            $database->executeStatement('INSERT INTO job_attempts (id, job_id) VALUES (?, ?)', [$token, $message->id]);
 
             return $job;
         });
@@ -170,6 +187,7 @@ final class JobRuntime
             return;
         }
 
+        $context = new ExecutionContext($message->id, $token, $message->generation, new DateTimeImmutable($job['lease_until']));
         try {
             if ($job['work_type'] !== null) {
                 if ($this->executor === null) {
@@ -178,7 +196,7 @@ final class JobRuntime
 
                 $this->executor->execute(
                     new Work($job['work_type'], $job['work_scope'], $job['work_mode'], $job['payload']),
-                    new ExecutionContext($message->id, $token, $message->generation, new DateTimeImmutable($job['lease_until'])),
+                    $context,
                 );
             }
 
@@ -187,7 +205,8 @@ final class JobRuntime
             }
         } catch (Throwable $error) {
             $failed = ((int) $job['failures'] + 1) >= 3;
-            $this->database->transactional(function (Connection $database) use ($failed, $error, $message, $token, $job): void {
+            $accepted = $this->authority->finish($context, function (Connection $database) use ($failed, $error, $message, $token, $job): void {
+                $database->fetchOne('SELECT id FROM jobs WHERE id = ? FOR UPDATE', [$message->id]);
                 $updated = $database->executeStatement(
                     'UPDATE jobs SET status = ?, failures = failures + 1, generation = generation + 1, claim_token = NULL, lease_until = NULL, error = ? WHERE id = ? AND claim_token = ? AND lease_until > clock_timestamp()',
                     [
@@ -198,7 +217,7 @@ final class JobRuntime
                     ],
                 );
                 if ($updated !== 1) {
-                    throw new RuntimeException('Job claim expired before recording failure.');
+                    throw new AuthorityLost('Failure transition lost its claim.');
                 }
 
                 $database->executeStatement("UPDATE job_attempts SET ended_at = clock_timestamp(), outcome = 'failed' WHERE id = ?", [$token]);
@@ -209,21 +228,43 @@ final class JobRuntime
                     $this->dispatchWork($message->id, $message->generation + 1, 'routine', 1000);
                 }
             });
+            if (! $accepted) {
+                $this->retainRecovery($message, $token);
+            }
 
             return;
         }
 
-        $this->database->transactional(function (Connection $database) use ($message, $token): void {
+        $accepted = $this->authority->finish($context, function (Connection $database) use ($message, $token): void {
+            $database->fetchOne('SELECT id FROM jobs WHERE id = ? FOR UPDATE', [$message->id]);
             if (
                 $database->executeStatement("UPDATE jobs SET status = 'completed', claim_token = NULL, lease_until = NULL, error = NULL WHERE id = ? AND claim_token = ? AND lease_until > clock_timestamp()", [
                     $message->id,
                     $token,
                 ]) !== 1
             ) {
-                throw new RuntimeException('Job claim expired before completion.');
+                throw new AuthorityLost('Completion transition lost its claim.');
             }
 
             $database->executeStatement("UPDATE job_attempts SET ended_at = clock_timestamp(), outcome = 'completed' WHERE id = ?", [$token]);
+        });
+        if (! $accepted) {
+            $this->retainRecovery($message, $token);
+        }
+    }
+
+    /**
+     * Retain native recovery intent only if an expired claimant still owns the row.
+     *
+     * A superseded worker must never publish retries on behalf of its successor.
+     */
+    private function retainRecovery(ExecuteJob $message, string $token): void
+    {
+        $this->database->transactional(function (Connection $database) use ($message, $token): void {
+            $job = $database->fetchAssociative('SELECT claim_token, desired_priority FROM jobs WHERE id = ? FOR UPDATE', [$message->id]);
+            if ($job !== false && hash_equals($token, (string) $job['claim_token'])) {
+                $this->dispatchWork($message->id, $message->generation, (string) $job['desired_priority']);
+            }
         });
     }
 }

@@ -1,0 +1,23 @@
+⨯
+  ────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Acceptance\OperationsFencing\AttemptFencingTest > a replace…
+  Failed asserting that true is false.
+
+  at tests/Acceptance/OperationsFencing/AttemptFencingTest.php:221
+    217▕         'job_id' => $jobId,
+    218▕         'attempt_id' => $b['attempt_id'],
+    219▕         'coverage' => 'verified-component-1',
+    220▕     ]);
+  ➜ 221▕     expect($premature['accepted'])->toBeFalse();
+    222▕     expect($this->fencing->run('host.records', ['job_id' => $jobId])['results'])->toBe([]);
+    223▕
+    224▕     $review = $this->fencing->run('host.reconcile_custody', [
+    225▕         'job_id' => $jobId,
+
+  1   tests/Acceptance/OperationsFencing/AttemptFencingTest.php:221
+
+
+  Tests:    1 failed (14 assertions)
+  Duration: 6.87s
+
+Script @php ./vendor/bin/pest handling the test event returned with error code 1
