@@ -1,6 +1,7 @@
 <?php
 
 use Tests\Support\Operations\OperationsTestCase;
+use Tests\Support\OperationsFencing\FencingTestCase;
 use Tests\Support\RecordsAndArchives\ArchiveTestCase;
 use Tests\TestCase;
 
@@ -8,6 +9,7 @@ use Tests\TestCase;
 pest()->extend(TestCase::class)->in('Feature');
 pest()->extend(ArchiveTestCase::class)->in('Acceptance/RecordsAndArchives');
 pest()->extend(OperationsTestCase::class)->in('Acceptance/Operations');
+pest()->extend(FencingTestCase::class)->in('Acceptance/OperationsFencing');
 
 // Use the production boundary by default; an explicit adapter remains available to independent reviewers.
 if (! getenv('STASHD_TRANSACTION_TEST_ADAPTER')) {
