@@ -155,6 +155,66 @@ new file mode 100644
 +        return $pdo;
 +    }
 +}
+diff --git a/Api/TempestConnectionReference.php b/Api/TempestConnectionReference.php
+--- a/Api/TempestConnectionReference.php
++++ b/Api/TempestConnectionReference.php
+@@ -17,9 +17,15 @@
+  */
+ final class TempestConnectionReference extends ConnectionReference implements DefinedObject
+ {
++    /**
++     * Retain the Tempest tag and native connection settings for compiled definitions.
++     *
++     * @param array<string, mixed> $connectionConfiguration
++     */
+     private function __construct(
+         string $referenceName,
+         public readonly ?string $configTag = null,
++        public readonly array $connectionConfiguration = [],
+     ) {
+         parent::__construct($referenceName, $referenceName);
+     }
+@@ -36,6 +42,16 @@
+         return new self(DbalConnectionReference::DEFAULT, null);
+     }
+
++    /**
++     * Configure native consumer timing on the injected DBAL connection factory.
++     *
++     * @param array<string, mixed> $configuration
++     */
++    public function withConnectionConfiguration(array $configuration): self
++    {
++        return new self($this->getReferenceName(), $this->configTag, $configuration);
++    }
++
+     public function getDefinition(): Definition
+     {
+         return new Definition(
+@@ -43,6 +59,7 @@
+             [
+                 $this->getReferenceName(),
+                 $this->configTag,
++                $this->connectionConfiguration,
+             ],
+             [
+                 self::class,
+@@ -51,8 +68,13 @@
+         );
+     }
+
+-    public static function fromTagAndReferenceName(string $referenceName, ?string $configTag = null): self
++    /**
++     * Rebuild the connection reference when Ecotone loads compiled definitions.
++     *
++     * @param array<string, mixed> $connectionConfiguration
++     */
++    public static function fromTagAndReferenceName(string $referenceName, ?string $configTag = null, array $connectionConfiguration = []): self
+     {
+-        return new self($referenceName, $configTag);
++        return new self($referenceName, $configTag, $connectionConfiguration);
+     }
+ }
 diff --git a/src/Config/ManagedDbalConnection.php b/src/Config/ManagedDbalConnection.php
 new file mode 100644
 --- /dev/null
@@ -271,13 +331,19 @@ diff --git a/src/Config/TempestConnectionResolver.php b/src/Config/TempestConnec
  use Ecotone\Api\Tempest\TempestConnectionReference;
  use Ecotone\Dbal\DbalConnection;
  use Ecotone\Tempest\Config\PDO\MySqlDriver;
-@@ -28,6 +29,10 @@
+@@ -25,9 +26,16 @@
+  */
+ final class TempestConnectionResolver
+ {
++    /**
++     * Reuse an injected transaction owner, retaining the existing adapter path otherwise.
++     */
      public static function resolve(TempestConnectionReference $reference): ConnectionFactory
      {
          $configTag = $reference->configTag;
 +        $injected = GenericContainer::instance()->get(TempestConnection::class, tag: $configTag);
 +        if ($injected instanceof DbalBackedConnection) {
-+            return DbalConnection::create($injected->database());
++            return DbalConnection::create($injected->database(), $reference->connectionConfiguration);
 +        }
 
          if ($configTag === null) {

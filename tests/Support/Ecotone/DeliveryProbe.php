@@ -5,17 +5,14 @@ declare(strict_types=1);
 namespace Tests\Support\Ecotone;
 
 use App\Operations\DTO\ExecutionContext;
-use App\Operations\JobRuntime;
 use App\Operations\Work;
 use App\Operations\WorkExecutor;
-use Ecotone\Api\Attribute\Around;
-use Ecotone\Api\Interceptor\MethodInvocation;
 use PDO;
 use RuntimeException;
 use Tests\Support\Operations\ProbeExecutor;
 
 /**
- * Pause actual execution before an effect or after durable completion, before ack.
+ * Pause actual execution after its durable claim and before the independent effect.
  * No acknowledgement, claim or effect ledger is implemented by this test probe.
  */
 final readonly class DeliveryProbe implements WorkExecutor
@@ -43,20 +40,6 @@ final readonly class DeliveryProbe implements WorkExecutor
         }
 
         new ProbeExecutor($this->observer)->execute($work, $context);
-    }
-
-    /**
-     * Stop after the real handler has saved completion, still inside native delivery.
-     */
-    #[Around(pointcut: JobRuntime::class . '::handle')]
-    public function after(MethodInvocation $invocation): mixed
-    {
-        $result = $invocation->proceed();
-        if ($this->boundary === 'completed') {
-            $this->pause();
-        }
-
-        return $result;
     }
 
     /**

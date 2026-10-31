@@ -11,14 +11,14 @@ use Tempest\Database\Tables\NamingStrategy;
 use Tempest\Database\Tables\PluralizedSnakeCaseStrategy;
 
 /**
- * Give Tempest the operator's connection string without changing PostgreSQL options.
+ * Give Tempest the operator's settings and establish the private schema on every connection.
  *
  * Register this only when database commands need it; Vault-only commands do not connect.
  */
 final class OperationsConnectionConfig implements DatabaseConfig
 {
     public string $dsn {
-        get => $this->operations->dsn;
+        get => $this->operations->dsn === '' ? '' : $this->operations->dsn . ';options=--search_path=' . $this->operations->schema;
     }
     public ?string $username {
         get => $this->operations->username;
@@ -46,9 +46,13 @@ final class OperationsConnectionConfig implements DatabaseConfig
     }
 
     /**
-     * Keep the supplied connection settings without opening the database.
+     * Keep settings lazy and reject conflicting startup options that could change schema.
      */
     public function __construct(
         private readonly OperationsConfig $operations,
-    ) {}
+    ) {
+        if (preg_match('/(?:^|;)\s*options\s*=/i', $operations->dsn)) {
+            throw new \InvalidArgumentException('Use STASHD_OPERATIONS_SCHEMA for PostgreSQL startup search_path; DSN options are reserved.');
+        }
+    }
 }

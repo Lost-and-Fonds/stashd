@@ -2,56 +2,45 @@
 
 declare(strict_types=1);
 
-use App\Integration\OperationsConfig;
-use App\Operations\JobRuntime;
-use App\Operations\Jobs;
-use App\Operations\Work;
-use Symfony\Component\Messenger\Exception\TransportException;
-use Tests\Support\RecordsAndArchives\ArchiveFixture;
+use Tests\Support\Ecotone\NativeDeliveryFixture;
 
-require_once dirname(__DIR__, 2) . '/Support/Integration/configuration-cli.php';
-
-test('Work admission and promotion roll back when their outbox write fails', function (): void {
-    with_configuration_database(function (ArchiveFixture $archive, array $descriptor, PDO $database): void {
-        configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
-        $runtime = new JobRuntime(new OperationsConfig($descriptor['dsn'], $descriptor['username'], $descriptor['password'], 'configuration_proof'));
-        $jobs = new Jobs($runtime);
-        $work = new Work('discovery', 'scope-1', 'refresh', 'revision-1');
-        $database->exec("ALTER TABLE configuration_proof.messenger_messages ADD CONSTRAINT reject_work_outbox CHECK (queue_name <> 'outbox')");
-        expect(fn () => $jobs->request($work))->toThrow(TransportException::class);
-        expect((int) $database->query('SELECT count(*) FROM configuration_proof.jobs')->fetchColumn())->toBe(0);
-        $database->exec('ALTER TABLE configuration_proof.messenger_messages DROP CONSTRAINT reject_work_outbox');
-        $id = $jobs->request($work);
-        $database->exec("ALTER TABLE configuration_proof.messenger_messages ADD CONSTRAINT reject_promoted_outbox CHECK (queue_name <> 'outbox') NOT VALID");
-        expect(fn () => $jobs->request($work, 'interactive'))->toThrow(TransportException::class);
-        $row = $database->query('SELECT id, desired_priority, generation FROM configuration_proof.jobs')->fetch(PDO::FETCH_ASSOC);
-        expect($row['id'])
-            ->toBe($id)
-            ->and($row['desired_priority'])
-            ->toBe('routine')
-            ->and((int) $row['generation'])
-            ->toBe(0);
-        expect((int) $database->query('SELECT count(*) FROM configuration_proof.messenger_messages')->fetchColumn())->toBe(1);
-    });
+test('Work admission and promotion roll back when their native invitation write fails', function (): void {
+    $f = new NativeDeliveryFixture();
+    try {
+        $f->database->exec('ALTER TABLE enqueue ADD CONSTRAINT reject_invitation CHECK (false)');
+        $failure = $f->start('request')->wait();
+        expect($failure->exitCode)->toBe(1);
+        expect($failure->errorOutput)->toContain('23514');
+        expect($f->count('jobs'))->toBe(0);
+        $f->database->exec('ALTER TABLE enqueue DROP CONSTRAINT reject_invitation');
+        $id = $f->run('request')['id'];
+        $f->database->exec('ALTER TABLE enqueue ADD CONSTRAINT reject_promotion CHECK (false) NOT VALID');
+        $failure = $f->start('request', ['priority' => 'interactive'])->wait();
+        expect($failure->exitCode)->toBe(1);
+        expect($failure->errorOutput)->toContain('23514');
+        expect($f->rows('SELECT id, desired_priority, generation FROM jobs'))->toBe([['id' => $id, 'desired_priority' => 'routine', 'generation' => 0]]);
+        expect($f->count('enqueue'))->toBe(1);
+    } finally {
+        $f->dispose();
+    }
 });
 
 test('running Work coalesces a new observation and priority without restarting its Attempt', function (): void {
-    with_configuration_database(function (ArchiveFixture $archive, array $descriptor, PDO $database): void {
-        configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
-        $runtime = new JobRuntime(new OperationsConfig($descriptor['dsn'], $descriptor['username'], $descriptor['password'], 'configuration_proof'));
-        $jobs = new Jobs($runtime);
-        $id = $jobs->request(new Work('discovery', 'scope-1', 'refresh', 'revision-1'));
-        $database->exec("UPDATE configuration_proof.jobs SET status = 'running', claim_token = 'existing-worker', lease_until = clock_timestamp() + interval '60 seconds'");
-        expect($jobs->request(new Work('discovery', 'scope-1', 'refresh', 'revision-2'), 'interactive'))->toBe($id);
-        $row = $database->query('SELECT payload, desired_priority, generation, claim_token FROM configuration_proof.jobs')->fetch(PDO::FETCH_ASSOC);
-        expect($row['payload'])
-            ->toBe('revision-1')
-            ->and($row['desired_priority'])
-            ->toBe('interactive')
-            ->and((int) $row['generation'])
-            ->toBe(0)
-            ->and($row['claim_token'])
-            ->toBe('existing-worker');
-        expect((int) $database->query('SELECT count(*) FROM configuration_proof.messenger_messages')->fetchColumn())->toBe(1);
-    });
+    $f = new NativeDeliveryFixture();
+    try {
+        $claim = 'existing-worker';
+        $id = $f->run('request', ['observation' => 'revision-1'])['id'];
+        $f->database->exec("UPDATE jobs SET status = 'running', claim_token = 'existing-worker', lease_until = clock_timestamp() + interval '60 seconds'");
+        expect($f->run('request', ['observation' => 'revision-2', 'priority' => 'interactive'])['id'])->toBe($id);
+        expect($f->rows('SELECT payload, desired_priority, generation, claim_token FROM jobs'))->toBe([[
+            'payload' => 'revision-1',
+            'desired_priority' => 'interactive',
+            'generation' => 0,
+            'claim_token' => $claim,
+        ]]);
+        expect($f->count('enqueue'))->toBe(1);
+        expect($f->count('job_attempts'))->toBe(0);
+    } finally {
+        $f->dispose();
+    }
 });

@@ -9,7 +9,7 @@ foreach (['commit', 'rollback', 'inner-failure'] as $mode) {
         $f = new NativeDeliveryFixture();
         try {
             $result = $f->run('injected-nested', ['mode' => $mode]);
-            expect($result['official_diagnostic']['effect'])->toBe('native');
+            expect($result['official_diagnostic']['connection_class'])->toBe(\Ecotone\Api\Tempest\DbalBackedConnection::class);
             expect($result['official_diagnostic']['messenger_installed'])->toBeFalse();
             expect($result['before'])->toBe(['mutations' => 0, 'jobs' => 0, 'invitations' => 0]);
             expect($result['same_transaction'])->toBeTrue();

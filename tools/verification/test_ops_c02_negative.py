@@ -1,4 +1,4 @@
-"""Regression checks for the focused OPS-C02 failure classifier and restoration."""
+"""Regression checks for native OPS-C02 failure classification and restoration."""
 
 import tempfile
 import unittest
@@ -10,60 +10,61 @@ import ops_c02_negative as verifier
 
 
 class NegativeControlTests(unittest.TestCase):
-    """Reject unrelated failures even when a contract and its expected diff appear."""
+    """Accept named invariant failures; reject infrastructure and cleanup errors."""
 
     def report(self, text, failure_type='PHPUnit\\Framework\\ExpectationFailedException'):
-        root = ET.Element('testsuites')
-        case = ET.SubElement(root, 'testcase', name=verifier.CONTROLS[0]['test'], file=verifier.TEST + '::test')
+        root = ET.Element('testsuite')
+        case = ET.SubElement(root, 'testcase', name='case')
         ET.SubElement(case, 'failure', type=failure_type).text = text
         return ET.tostring(root, encoding='unicode')
 
-    def test_fixture_setup_counterexample_is_verification_error(self):
-        xml = self.report('RuntimeException: An explicit private local projection test-admin configuration is required.\n'
-                          'Failed asserting that 1 is identical to 0.\n\n'
-                          'tests/Support/RecordsAndArchives/TransactionProbe.php:187\n')
-        self.assertEqual('verification error', verifier.classify(verifier.CONTROLS[0], xml, 1, (verifier.TEST, 21))['result'])
+    def check(self, xml, code=1, events=''):
+        return verifier.classify(xml, code, 'case', 'x.php:21', events)
 
-    def test_specific_surviving_job_is_detected(self):
-        job = '00000000-0000-0000-0000-000000000001'
-        text = ("Failed asserting that two arrays are identical.\n-Array &0 []\n+Array &0 [\n"
-                f"+    0 => Array &1 [\n+        'id' => '{job}',\n+        'terminal' => false,\n+    ],\n+]\n\n{verifier.TEST}:21\n")
-        junit = self.report('Failed asserting that two arrays are identical.\n\n' + verifier.TEST + ':21\n')
-        result = verifier.classify(verifier.CONTROLS[0], junit, 1, (verifier.TEST, 21), text)
-        self.assertEqual('detected', result['result'])
-        self.assertEqual([job], result['evidence']['persisted_job_ids'])
-        # An expected violation accompanied by a cleanup exception is not proof.
-        combined = 'Failed asserting that two arrays are identical.\n\n' + verifier.TEST + ':21\ntests/Support/OperationsDelivery/DurableDeliveryTestCase.php:31\n'
-        self.assertEqual('verification error', verifier.classify(verifier.CONTROLS[0], self.report(combined), 1, (verifier.TEST, 21), text)['result'])
-        extra = 'Failed asserting that two arrays are identical.\n\n' + verifier.TEST + ':21\nRuntimeException: unrelated failure\n'
-        self.assertEqual('verification error', verifier.classify(verifier.CONTROLS[0], self.report(extra), 1, (verifier.TEST, 21), text)['result'])
+    def test_specific_invariant_failure_is_detected(self):
+        self.assertTrue(self.check(self.report('Failed asserting that 1 is identical to 0.\nx.php:21\n')))
+
+    def test_fixture_setup_counterexample_is_rejected(self):
+        self.assertFalse(self.check(self.report('RuntimeException: Missing fixture administrator.\nFailed asserting that 1 is identical to 0.\nfixture.php:187\n')))
+
+    def test_extra_diagnostics_and_wrong_first_frame_are_rejected(self):
+        for text in ['Failed asserting\nfixture.php:187\nx.php:21\n',
+                     'Failed asserting\nx.php:21\nRuntimeException: cleanup failed\n',
+                     'SQLSTATE: unavailable\nFailed asserting\nx.php:21\n']:
+            self.assertFalse(self.check(self.report(text)))
 
     def test_hook_error_rejects_an_otherwise_valid_violation(self):
-        control = verifier.CONTROLS[6]
-        xml = self.report('Failed asserting that 0 is not identical to 0.\n\n' + verifier.DRIVER + ':83\n')
-        result = verifier.classify(control, xml, 1, (verifier.DRIVER, 83), hook_errors=['After Test Method Errored'])
-        self.assertEqual('verification error', result['result'])
+        xml = self.report('Failed asserting\nx.php:21\n')
+        self.assertFalse(self.check(xml, events='After Test Method Errored (cleanup)'))
+        self.assertFalse(self.check(xml, events='Test Preparation Failed (setup)'))
 
-    def test_wrong_assertion_and_infrastructure_exit_are_errors(self):
-        xml = self.report('Failed asserting that two arrays are identical.\n\n' + verifier.TEST + ':22\n')
-        for code in (1, 124, 137):
-            self.assertEqual('verification error', verifier.classify(verifier.CONTROLS[0], xml, code, (verifier.TEST, 21))['result'])
-        self.assertEqual('verification error', verifier.classify(verifier.CONTROLS[0], '<broken', 1, (verifier.TEST, 21))['result'])
+    def test_wrong_assertion_and_infrastructure_exit_are_rejected(self):
+        self.assertFalse(self.check(self.report('Failed asserting\nx.php:22\n')))
+        for code in [0, 2, 124, 137]:
+            self.assertFalse(self.check(self.report('Failed asserting\nx.php:21\n'), code))
+        self.assertFalse(self.check('<broken'))
 
-    def test_passing_mutant_is_not_detected(self):
-        root = ET.Element('testsuites')
-        ET.SubElement(root, 'testcase', name=verifier.CONTROLS[0]['test'], file=verifier.TEST + '::test')
-        result = verifier.classify(verifier.CONTROLS[0], ET.tostring(root, encoding='unicode'), 0, (verifier.TEST, 21))
-        self.assertEqual('not detected', result['result'])
+    def test_wrong_exception_and_passing_mutant_are_rejected(self):
+        self.assertFalse(self.check(self.report('Failed asserting\nx.php:21\n', 'RuntimeException')))
+        self.assertFalse(self.check('<testsuite><testcase name="case"/></testsuite>', 0))
+
+    def test_multiple_problems_or_tests_are_rejected(self):
+        xml = self.report('Failed asserting\nx.php:21\n')
+        root = ET.fromstring(xml)
+        ET.SubElement(root.find('testcase'), 'error').text = 'cleanup'
+        self.assertFalse(self.check(ET.tostring(root, encoding='unicode')))
+        root = ET.fromstring(xml)
+        ET.SubElement(root, 'testcase', name='unrelated')
+        self.assertFalse(self.check(ET.tostring(root, encoding='unicode')))
 
     def test_signal_waits_for_action_then_restores_source(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             target = root / 'source.php'
             target.write_bytes(b'original bytes')
-            with patch.object(verifier, 'ROOT', root), patch.object(verifier, 'INTERRUPTED', False), patch('builtins.print'):
-                verifier.mutated('source.php', lambda s: s + ' mutation', lambda: verifier.interrupted(15, None), root)
-                self.assertTrue(verifier.INTERRUPTED)
+            with patch.object(verifier, 'ROOT', root), patch.object(verifier, 'abort', False):
+                verifier.mutated('source.php', lambda s: s + ' mutation', lambda: verifier.stop(15, None), root)
+                self.assertTrue(verifier.abort)
             self.assertEqual(b'original bytes', target.read_bytes())
 
     def test_exception_restores_preexisting_uncommitted_bytes(self):
@@ -78,6 +79,17 @@ class NegativeControlTests(unittest.TestCase):
                     verifier.mutated('source.php', lambda s: s + 'mutation\n', fail, root)
             self.assertEqual(b'preexisting uncommitted work\n', target.read_bytes())
             self.assertEqual([target], list(root.iterdir()))
+
+    def test_mutation_rejects_ambiguous_anchors_and_shared_targets(self):
+        with self.assertRaises(ValueError):
+            verifier.replace_once('anchor anchor', 'anchor', 'replacement')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / 'source.php'
+            target.write_text('original')
+            (root / 'link.php').symlink_to(target)
+            with patch.object(verifier, 'ROOT', root), self.assertRaises(ValueError):
+                verifier.mutated('link.php', lambda s: s + 'mutation', lambda: None, root)
 
 
 if __name__ == '__main__':

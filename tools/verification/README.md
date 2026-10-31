@@ -1,98 +1,45 @@
-# OPS-C02 negative controls
+# Native Operations negative verification
 
-This is a focused Python 3 standard-library verifier for the eight delivery
-controls in `docs/development/durable-delivery.md`. It adds no production API
-and never edits the approved PR #77 specifications. Run it from an idle Core
-checkout with no other tests, editors, formatters or agents changing that
-checkout. Other worktrees may contain uncommitted work; they are read only.
-
-## Prerequisites and invocation
-
-Use Linux/POSIX, Python 3.9+ (`fcntl` is required), the locked Composer
-installation, and the normal Lerd PHP/PostgreSQL environment. Configure the
-private ignored `tmp/transaction-projection-admin.json` using the existing
-local test administrator as documented in
-`docs/preservation/recoverable-transactions-phase2.md`. Never use application
-or production credentials. CI can use the disposable service and hostname
-mapping in `.github/workflows/ci.yml`; the runner invokes `bin/test.sh`, so
-its existing environment routing remains authoritative.
-
-From any directory:
+Use the repository's canonical test wrapper, real PostgreSQL fixtures and an idle
+evaluation checkout. No test, formatter or editor may change mutation targets while
+these commands run. The scripts accept the existing uncommitted candidate as their
+restoration source; they never reset Git or touch another worktree.
 
 ```sh
-python3 -B /path/to/core/tools/verification/ops_c02_negative.py
-```
-
-From the checkout, run its small classifier/restoration regression checks:
-
-```sh
-python3 -B -m unittest discover -s tools/verification -p test_ops_c02_negative.py -v
+python3 -B -m unittest discover -s tools/verification -p 'test_*.py'
 python3 -B tools/verification/ops_c02_negative.py
+python3 -B tools/evaluations/installation-negative.py
 ```
 
-The script resolves Core from its own file, requires a passing seven-contract
-baseline, then temporarily points only the projection fixture's test-admin
-lookup at a guaranteed absent file. That real setup failure must be classified
-as **verification error**, not detected sabotage. The real credential file is
-never renamed, read or copied by this verifier.
+The former relay verifier now checks native delivery. Its ten-case baseline must
+pass, then nine mutations separately break atomic admission, retained intent,
+completed-Job guards, independent effects, generation guards, busy recovery,
+physical transaction sharing, native priority propagation and actual queue order.
+A passing restored native suite is required. Original relay-only mutation targets
+were removed together with their transport; their reliability correspondence is
+in docs/development/durable-delivery.md.
 
-Each of the original eight mutations runs separately through the canonical
-wrapper. PHPUnit JUnit reports establish the selected test, exception class
-and exact first failure location. The native PHPUnit event stream separately
-rejects setup/teardown hook errors, even when another assertion already failed. Captured console diffs supply the observed
-Job/effect IDs and physical ordering that this installed JUnit reporter omits.
-The lost-outbox control requires a separate persisted-state diagnostic: one
-queued Job, zero native envelopes, zero effects after the settlement deadline.
-The removed-barrier control requires a successful, un-killed child exit before
-the barrier. Neither control accepts a generic timeout or arbitrary exception.
+The nesting verifier checks premature physical commit, a separate connection and
+bypassed DBAL transaction ownership against the real application. Both tools share
+the classifier, bounded process runner, mutation lock and exact-byte restoration
+helper. Linked mutation targets are refused. Concurrent edits are preserved and
+reported, not overwritten. SIGINT/SIGTERM defer interruption until the current
+bounded test completes cleanup and source is restored. SIGKILL or machine failure
+can leave a private original backup under tmp/ for manual inspection.
 
-**detected** means that precise violation was observed. **not detected** means
-the mutated contract passed. **verification error** means setup, cleanup,
-infrastructure, source drift, unexpected output, or an unrelated failure
-prevented a valid result. All controls must be detected; any unexpected
-verification error fails the run. The intentionally broken fixture regression
-is the sole expected verification error. A restored seven-contract run must
-also pass before the overall result can pass.
+JUnit must report one selected expectation failure at the intended first frame.
+The event log must contain no setup/teardown errors. Other exceptions, wrong
+assertions, malformed reports, multiple failures, passing mutants and timeouts
+are verification errors. Python regressions cover these counterexamples,
+restoration of dirty source, interrupted runs and the POSIX test wrapper's routes.
 
-## Isolation, interruption and restoration
+The native test runner has a 120-second deadline and individual application
+children have shorter deadlines. PostgreSQL and filesystem cleanup are independently
+asserted by the fixtures. Private JUnit/events/output stay under ignored
+`tmp/ecotone-native-negative/` or `tmp/ecotone-installation-negative/`; credentials
+and raw error output must not be attached to a PR. Checked-in allowlisted results
+are in docs/evaluations/ecotone-native-negative.json and
+ecotone-installation-negative.json.
 
-The existing fixtures create private PostgreSQL databases, schemas and
-unprivileged roles and bounded real runtime processes. Their teardown owns
-resource cleanup. The verifier never restarts shared services or modifies
-another worktree. Mutations require normal, unshared files: symlinks and
-hardlinks are refused. A checkout-local lock prevents concurrent verifier runs.
-
-Every mutation saves the original bytes privately, restores them in `finally`,
-and verifies their hash. Existing uncommitted bytes are the restoration source;
-`git checkout`, `reset`, `clean` and index writes are never used. All worktrees'
-status, diffs and dirty/untracked file hashes must match their initial snapshots.
-If an outside process edits a mutation target, its unexpected bytes are preserved
-and the run fails rather than overwriting that edit; the original backup remains. Backup names are the SHA-256 of the relative target
-path followed by `.original`; the five mutation targets are listed in the script.
-
-SIGINT and SIGTERM defer stopping until the current bounded test has completed
-its teardown and the source has been restored, then fail the overall run.
-The wrapper has a 90-second deadline. Uncatchable SIGKILL, machine failure or
-filesystem failure cannot be repaired by Python `finally`: private
-`tmp/ops-c02-verification/*.original` backups remain for manual inspection and
-recovery. A later run refuses leftover backups. Do not run this against an
-installation or checkout used for live traffic.
-
-## Attachable evidence
-
-`tmp/ops-c02-verification/manifest.json` describes every mutation, expected
-invariant, actual result, exact assertion location, observed IDs/counts/order,
-source hashes and working-tree status hashes. It is an allowlisted JSON artifact:
-no raw exception output, credentials, environment dumps, absolute paths, tokens
-or private database passwords are copied into it. Raw console output is held
-in an anonymous temporary file and discarded; temporary JUnit reports and hook-event logs are also removed. The existing driver's ignored native evidence stream remains local.
-
-A sanitized successful run is retained at
-`docs/development/verification/ops-c02/negative-controls.json`. After reviewing
-a fresh manifest, copy it there or attach it to the implementation PR. Never
-attach the entire `tmp/` directory or fixture credential files. Remove any
-private administrator file created for verification after all QA is complete.
-
-These checks cover the bounded local PostgreSQL/Doctrine crash windows only.
-They do not establish OPS-C03 fencing/renewal, remote-broker behavior or
-exactly-once arbitrary external effects.
+These controls establish bounded local PostgreSQL behaviour, not remote broker
+recovery, arbitrary exactly-once effects, OPS-C03 fencing or lease renewal.

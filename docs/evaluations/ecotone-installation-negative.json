@@ -4,12 +4,20 @@
     {
       "id": "premature-inner-commit",
       "result": "detected",
-      "assertion": "tests/Acceptance/EcotoneInstallation/InstallationTest.php:40"
+      "assertion": "tests/Acceptance/EcotoneInstallation/OfficialIntegrationTest.php:14",
+      "source_restored": true
     },
     {
       "id": "separate-physical-connection",
       "result": "detected",
-      "assertion": "tests/Acceptance/EcotoneInstallation/InstallationTest.php:40"
+      "assertion": "tests/Acceptance/EcotoneInstallation/OfficialIntegrationTest.php:14",
+      "source_restored": true
+    },
+    {
+      "id": "bypass-dbal-nesting",
+      "result": "detected",
+      "assertion": "tests/Acceptance/EcotoneInstallation/OfficialIntegrationTest.php:17",
+      "source_restored": true
     }
   ],
   "restored": "passed"

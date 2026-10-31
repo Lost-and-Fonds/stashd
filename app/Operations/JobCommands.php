@@ -6,17 +6,16 @@ use Tempest\Console\Console;
 use Tempest\Console\ConsoleCommand;
 
 /**
- * Expose the evaluation job admission and native consumer commands.
+ * Expose keyed Job admission; native worker and recovery commands belong to Ecotone.
  */
 final readonly class JobCommands
 {
     /**
-     * Resolve domain admission and the isolated evaluation runtime.
+     * Resolve domain admission and console output.
      */
     public function __construct(
         private Console $console,
         private Jobs $jobs,
-        private JobRuntime $runtime,
     ) {}
 
     /**
@@ -26,14 +25,5 @@ final readonly class JobCommands
     public function admit(string $key, string $payload): void
     {
         $this->console->writeRaw(json_encode(['id' => $this->jobs->admit($key, $payload)], JSON_THROW_ON_ERROR) . PHP_EOL);
-    }
-
-    /**
-     * Consume the native jobs channel in this process.
-     */
-    #[ConsoleCommand(name: 'job:work', description: 'Run the native Ecotone job consumer.')]
-    public function work(string $receiver, bool $once = false): void
-    {
-        $this->runtime->work($receiver, $once);
     }
 }

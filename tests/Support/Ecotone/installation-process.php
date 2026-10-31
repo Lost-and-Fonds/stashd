@@ -4,49 +4,31 @@ declare(strict_types=1);
 
 use App\Integration\IntegrationConfigurations;
 use App\Integration\OperationsDatabase;
-use App\Operations\DeliverySchema;
 use App\Operations\Jobs;
-use App\Operations\SharedOperationsConnection;
 use App\Operations\Work;
+use App\Operations\WorkExecutor;
+use Ecotone\Api\ExtensionObject\ExecutionPollingMetadata;
+use Ecotone\Api\Messaging\ConfiguredMessagingSystem;
 use Tempest\Core\Tempest;
 use Tempest\Database\Connection\Connection;
 use Tempest\Database\Query;
 use Tests\Support\Operations\LocalOperationsDriver;
+use Tests\Support\Operations\ProbeExecutor;
 
-$request = json_decode(stream_get_contents(STDIN), true, flags: JSON_THROW_ON_ERROR);
-$injected = str_starts_with($request['action'], 'injected-');
-$official = $request['action'] === 'official-nested' || $injected;
-$root = dirname(__DIR__, 3);
-if ($official) {
-    $loader = require $root . '/tmp/official-tempest-vendor/autoload.php';
-    $loader->addPsr4('Tests\\', $root . '/tests/');
-    $root .= '/tools/evaluations/official-tempest';
-    chdir($root);
-} else {
-    require $root . '/vendor/autoload.php';
-}
+require dirname(__DIR__, 3) . '/vendor/autoload.php';
 
 try {
-    if ($request['without_messenger'] ?? false) {
-        // Prove the fresh lifecycle cannot construct or autoload a Messenger service.
-        spl_autoload_register(
-            static function (string $class): void {
-                if (str_starts_with($class, 'Symfony\\Component\\Messenger\\')) {
-                    throw new LogicException('Messenger dependency requested in the clean-install contract: ' . $class);
-                }
-            },
-            true,
-            true,
-        );
-    }
-
+    $request = json_decode(stream_get_contents(STDIN), true, flags: JSON_THROW_ON_ERROR);
     $d = $request['descriptor'];
     $observer = LocalOperationsDriver::connect($d);
-    if ($injected && ($request['private_schema'] ?? false)) {
-        $d['schema'] .= '_injected';
-        $observer->exec('CREATE SCHEMA IF NOT EXISTS "' . $d['schema'] . '"');
-        $observer->exec('SET search_path TO "' . $d['schema'] . '"');
-        $d['dsn'] .= ';options=--search_path=' . $d['schema'];
+    if ($request['private_schema'] ?? false) {
+        $private = $d['schema'] . '_injected';
+        if ($observer->query("SELECT to_regnamespace('" . $d['schema'] . "')")->fetchColumn() !== null) {
+            $observer->exec('ALTER SCHEMA "' . $d['schema'] . '" RENAME TO "' . $private . '"');
+        }
+
+        $d['schema'] = $private;
+        $observer->exec('SET search_path TO "' . $private . '"');
     }
 
     foreach ([
@@ -60,114 +42,87 @@ try {
         $_ENV[$key] = $value;
     }
 
-    putenv('ECOTONE_INJECTED_CONNECTION=' . ($injected ? '1' : '0'));
-    $container = Tempest::boot(root: $root);
-    if ($request['action'] === 'injected-lifecycle' && $request['order'] === 'messaging-first') {
-        $container->get(\Ecotone\Api\Messaging\ConfiguredMessagingSystem::class);
+    $container = Tempest::boot(root: dirname(__DIR__, 3));
+    $container->singleton(WorkExecutor::class, new ProbeExecutor($observer));
+    if (($request['order'] ?? '') === 'messaging-first' || $request['action'] === 'official-nested') {
+        $container->get(ConfiguredMessagingSystem::class);
     }
 
     $database = $container->get(OperationsDatabase::class)->connect();
+    $connection = $container->get(Connection::class);
+    $dbal = $connection->database();
+    $jobs = $container->get(Jobs::class);
+    $system = $container->get(ConfiguredMessagingSystem::class);
     if ($request['action'] === 'install') {
         if (! ($request['provision_only'] ?? false)) {
             $container->get(IntegrationConfigurations::class)->initialize();
         }
 
-        $container->get(DeliverySchema::class)->provision();
+        $system->getServiceFromContainer(\Ecotone\Api\Dbal\ExtensionObject\DatabaseSetupManager::class)->initializeAll();
         if (! ($request['provision_only'] ?? false)) {
             $observer->exec('CREATE TABLE probe_scopes (id UUID PRIMARY KEY, name TEXT NOT NULL)');
             $observer->exec(
                 'CREATE TABLE probe_effects (sequence BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, scope_id UUID REFERENCES probe_scopes(id), mode TEXT, job_id UUID, observation TEXT)',
             );
-            $seed = $observer->prepare('INSERT INTO probe_scopes VALUES (?, ?)');
-            $seed->execute([$request['scope'], 'fresh-installation']);
+            $observer->prepare('INSERT INTO probe_scopes VALUES (?, ?)')->execute([$request['scope'], 'fresh-installation']);
         }
 
         echo '{}';
         exit(0);
     }
 
-    $diagnostic = null;
-    if ($official) {
-        $system = $container->get(\Ecotone\Api\Messaging\ConfiguredMessagingSystem::class);
-        $system->getServiceFromContainer(\Ecotone\Api\Dbal\ExtensionObject\DatabaseSetupManager::class)->initialize('message_queue');
-        $dbal = $system
-            ->getServiceFromContainer(\Ecotone\Api\Dbal\ExtensionObject\DbalConnectionReference::DEFAULT)
-            ->createContext()
-            ->getDbalConnection();
-        if ($request['action'] === 'injected-consume') {
-            $system->run('official_probe', \Ecotone\Api\ExtensionObject\ExecutionPollingMetadata::createWithFinishWhenNoMessages());
-            echo json_encode(['effects' => $observer->query('SELECT value FROM official_effects')->fetchAll(PDO::FETCH_COLUMN)], JSON_THROW_ON_ERROR);
-            exit(0);
-        }
+    if ($request['action'] === 'injected-consume') {
+        $system->run('jobs', ExecutionPollingMetadata::createWithFinishWhenNoMessages());
+        echo json_encode(['effects' => $observer->query('SELECT observation FROM probe_effects')->fetchAll(PDO::FETCH_COLUMN)], JSON_THROW_ON_ERROR);
+        exit(0);
+    }
 
-        if ($request['action'] === 'injected-lifecycle') {
-            $connection = $container->get(Connection::class);
-            $config = $container->get(\Tempest\Database\Config\DatabaseConfig::class);
-            $identity = $database->fetchFirst(new Query('SELECT pg_backend_pid() AS backend, current_schema() AS schema'));
-            $sameOwner = $database->connection === $connection && $connection->database() === $dbal;
-            $connection->reconnect();
-            $after = $database->fetchFirst(new Query('SELECT pg_backend_pid() AS backend, current_schema() AS schema'));
-            $database->execute(new Query('CREATE TABLE official_effects (value TEXT)'));
-            $connection->beginTransaction();
-            $transaction = $database->fetchFirst(new Query('SELECT pg_backend_pid() AS backend, txid_current() AS tx'));
-            $rejected = [];
-            foreach (['tempest-reconnect', 'dbal-close'] as $operation) {
-                try {
-                    if ($operation === 'tempest-reconnect') {
-                        $connection->reconnect();
-                    } else {
-                        $dbal->close();
-                    }
-
-                    $rejected[$operation] = false;
-                } catch (LogicException) {
-                    $rejected[$operation] = true;
+    if ($request['action'] === 'injected-lifecycle') {
+        $identity = $database->fetchFirst(new Query('SELECT pg_backend_pid() AS backend, current_schema() AS schema'));
+        $sameOwner = $database->connection === $connection;
+        $connection->reconnect();
+        $after = $database->fetchFirst(new Query('SELECT pg_backend_pid() AS backend, current_schema() AS schema'));
+        $connection->beginTransaction();
+        $transaction = $database->fetchFirst(new Query('SELECT pg_backend_pid() AS backend, txid_current() AS tx'));
+        $rejected = [];
+        foreach (['tempest-reconnect', 'dbal-close'] as $operation) {
+            try {
+                if ($operation === 'tempest-reconnect') {
+                    $connection->reconnect();
+                } else {
+                    $dbal->close();
                 }
+
+                $rejected[$operation] = false;
+            } catch (LogicException) {
+                $rejected[$operation] = true;
             }
-
-            $system->getCommandBus()->send(new \Evaluation\Official\BridgePing('rolled-back'));
-            $before = (int) $observer->query('SELECT count(*) FROM enqueue')->fetchColumn();
-            $physicalSame =
-                (int) $transaction['backend'] === (int) $dbal->fetchOne('SELECT pg_backend_pid()')
-                && (string) $transaction['tx'] === (string) $dbal->fetchOne('SELECT txid_current()');
-            $connection->rollback();
-            $rolledBack = (int) $observer->query('SELECT count(*) FROM enqueue')->fetchColumn();
-            $connection->beginTransaction();
-            $system->getCommandBus()->send(new \Evaluation\Official\BridgePing('committed'));
-            $connection->commit();
-            echo json_encode([
-                'same_owner' => $sameOwner,
-                'same_transaction' => $physicalSame,
-                'reconnected' => $identity['backend'] !== $after['backend'],
-                'schema_before' => $identity['schema'],
-                'schema_after' => $after['schema'],
-                'persistent' => $config->usePersistentConnection,
-                'rejected' => $rejected,
-                'invisible' => $before,
-                'rolled_back' => $rolledBack,
-                'committed' => (int) $observer->query('SELECT count(*) FROM enqueue')->fetchColumn(),
-                'dbal_level' => $dbal->getTransactionNestingLevel(),
-                'effect_count' => (int) $observer->query('SELECT count(*) FROM official_effects')->fetchColumn(),
-            ], JSON_THROW_ON_ERROR);
-            exit(0);
         }
 
-        $jobs = new Jobs(new \App\Operations\JobRuntime($container->get(\App\Integration\OperationsConfig::class), connection: $dbal));
-        // Validate native messaging independently of the Operations nesting diagnostic.
-        $database->execute(new Query('CREATE TABLE official_effects (value TEXT)'));
-        $system->getCommandBus()->send(new \Evaluation\Official\BridgePing('native'));
-        $system->run('official_probe', \Ecotone\Api\ExtensionObject\ExecutionPollingMetadata::createWithFinishWhenNoMessages());
-        $diagnostic = [
-            'effect' => $observer->query('SELECT value FROM official_effects')->fetchColumn(),
-            'messenger_installed' => \Composer\InstalledVersions::isInstalled('symfony/messenger'),
-            'connection_class' => $container->get(Connection::class)::class,
-        ];
-        if ($diagnostic['effect'] !== 'native') {
-            throw new RuntimeException('The official consumer did not persist its diagnostic effect.');
-        }
-    } else {
-        $jobs = $container->get(Jobs::class);
-        $dbal = $container->get(SharedOperationsConnection::class)->database();
+        $jobs->request(new Work('acceptance.probe', $request['scope'], 'refresh', 'rolled-back'));
+        $before = (int) $observer->query('SELECT count(*) FROM enqueue')->fetchColumn();
+        $physicalSame =
+            (int) $transaction['backend'] === (int) $dbal->fetchOne('SELECT pg_backend_pid()') && (string) $transaction['tx'] === (string) $dbal->fetchOne('SELECT txid_current()');
+        $connection->rollback();
+        $rolledBack = (int) $observer->query('SELECT count(*) FROM enqueue')->fetchColumn();
+        $connection->beginTransaction();
+        $jobs->request(new Work('acceptance.probe', $request['scope'], 'refresh', 'committed'));
+        $connection->commit();
+        echo json_encode([
+            'same_owner' => $sameOwner,
+            'same_transaction' => $physicalSame,
+            'reconnected' => $identity['backend'] !== $after['backend'],
+            'schema_before' => $identity['schema'],
+            'schema_after' => $after['schema'],
+            'persistent' => $container->get(\Tempest\Database\Config\DatabaseConfig::class)->usePersistentConnection,
+            'rejected' => $rejected,
+            'invisible' => $before,
+            'rolled_back' => $rolledBack,
+            'committed' => (int) $observer->query('SELECT count(*) FROM enqueue')->fetchColumn(),
+            'dbal_level' => $dbal->getTransactionNestingLevel(),
+            'effect_count' => (int) $observer->query('SELECT count(*) FROM probe_effects')->fetchColumn(),
+        ], JSON_THROW_ON_ERROR);
+        exit(0);
     }
 
     $observer->exec('CREATE TABLE nested_state (id TEXT PRIMARY KEY, backend INT, tx BIGINT)');
@@ -231,7 +186,7 @@ try {
         'after' => $observe(),
         'inner_error_message' => $errorMessage,
         'writes_in_outer' => count($writes),
-        'official_diagnostic' => $diagnostic,
+        'official_diagnostic' => ['messenger_installed' => \Composer\InstalledVersions::isInstalled('symfony/messenger'), 'connection_class' => $connection::class],
     ], JSON_THROW_ON_ERROR);
 } catch (Throwable $error) {
     while ($error->getPrevious() !== null) {

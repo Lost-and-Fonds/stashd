@@ -8,7 +8,6 @@ use Tempest\Container\Container;
 use Tempest\Container\Singleton;
 use Tempest\Database\Connection\Connection;
 use Tempest\Database\Database;
-use Tempest\Database\Query;
 use Tempest\Database\Transactions\GenericTransactionManager;
 use Throwable;
 
@@ -50,11 +49,7 @@ final class OperationsDatabase
             throw new InvalidArgumentException('Set STASHD_OPERATIONS_USERNAME to an explicit application owner.');
         }
 
-        $this->container->config(new OperationsConnectionConfig($this->config));
-        $database = $this->container->get(Database::class);
-        $database->execute(new Query('SET search_path TO "' . $this->config->schema . '"'));
-
-        return $this->connection = $database;
+        return $this->connection = $this->container->get(Database::class);
     }
 
     /**
@@ -62,7 +57,7 @@ final class OperationsDatabase
      *
      * Tempest's Database::withinTransaction returns only a boolean and hides the
      * error needed to explain a retry. This uses its transaction manager instead,
-     * keeping the result and error. Callers must not nest these transactions.
+     * keeping the result and error. The shared DBAL owner provides nested savepoints.
      *
      * @template T
      * @param Closure(): T $work

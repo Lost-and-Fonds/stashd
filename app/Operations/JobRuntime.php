@@ -2,76 +2,43 @@
 
 namespace App\Operations;
 
-use App\Integration\OperationsConfig;
 use App\Operations\DTO\ExecutionContext;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Ecotone\Api\Attribute\Asynchronous;
 use Ecotone\Api\Attribute\CommandHandler;
-use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConnectionReference;
-use Ecotone\Api\ExtensionObject\ExecutionPollingMetadata;
-use Ecotone\Api\Lite\EcotoneLite;
-use Ecotone\Api\Messaging\ConfiguredMessagingSystem;
+use Ecotone\Api\Gateway\CommandBus;
 use Ecotone\Api\Messaging\MessageHeaders;
-use Ecotone\Dbal\DbalConnection;
+use Ecotone\Api\Tempest\DbalBackedConnection;
 use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
+use Tempest\Database\Connection\Connection as TempestConnection;
 use Throwable;
 
 /**
- * Evaluate durable Jobs on a native Ecotone PostgreSQL channel.
+ * Admit, claim and complete durable domain Jobs on the native PostgreSQL channel.
  *
  * Normal Tempest bootstrap supplies the shared application connection. Claims fence state changes but cannot fence external effects.
  */
 final class JobRuntime
 {
     private Connection $database;
-    private ConfiguredMessagingSystem $messaging;
 
     /**
-     * Build real transports on one connection; domain Work requires an executor.
-     *
-     * @param list<object> $interceptors Optional native interceptors for the isolated evaluation.
+     * Use the application-owned transaction boundary and the framework command bus.
+     * Claims are short transactions; domain execution and external effects run outside them.
      */
     public function __construct(
-        OperationsConfig $config,
+        TempestConnection $connection,
+        private CommandBus $commands,
         private ?WorkExecutor $executor = null,
-        ?Connection $connection = null,
-        array $interceptors = [],
     ) {
-        $this->database = $connection ?? new SharedOperationsConnection($config)->database();
-        $this->messaging = EcotoneLite::bootstrap(
-            classesToResolve: [self::class, ...array_map(static fn (object $service): string => $service::class, $interceptors)],
-            containerOrAvailableServices: [self::class => $this, DbalConnectionReference::DEFAULT => DbalConnection::create($this->database, [
-                'redelivery_delay' => 60_000,
-            ]), ...$interceptors],
-            extensionObjects: [
-                DbalBackedMessageChannelBuilder::create('jobs')->withReceiveTimeout(1)->withAutoDeclare(false),
-                \Ecotone\Api\ExtensionObject\ServiceConfiguration::createWithDefaults()->withDefaultErrorChannel('operations.errors'),
-                \Ecotone\Api\ExtensionObject\ErrorHandlerConfiguration::createWithDeadLetterChannel(
-                    'operations.errors',
-                    \Ecotone\Api\ExtensionObject\RetryTemplateBuilder::fixedBackOff(1000)->maxRetries(3),
-                    'dbal_dead_letter',
-                ),
-                \Ecotone\Api\ExtensionObject\InstantRetryConfiguration::createWithDefaults()->withAsynchronousEndpointsRetry(false),
-                DbalConfiguration::createWithDefaults()
-                    ->withTransactionOnAsynchronousEndpoints(false)
-                    ->withTransactionOnCommandBus(false)
-                    ->withDeduplication(false)
-                    ->withDeadLetter(true),
-            ],
-        );
-    }
+        if (! $connection instanceof DbalBackedConnection) {
+            throw new \LogicException('Operations requires the shared Ecotone/Tempest connection.');
+        }
 
-    /**
-     * Expose native recovery gateways to operator commands without a second bus.
-     */
-    public function messaging(): ConfiguredMessagingSystem
-    {
-        return $this->messaging;
+        $this->database = $connection->database();
     }
 
     /**
@@ -153,11 +120,11 @@ final class JobRuntime
     }
 
     /**
-     * Save priority routing in the same outbox transaction as its Job revision.
+     * Save the native invitation in the same transaction as its Job revision.
      */
     private function dispatchWork(string $id, int $generation, string $priority, int $delay = 0): void
     {
-        $this->messaging->getCommandBus()->send(new ExecuteJob($id, $generation), metadata: [
+        $this->commands->send(new ExecuteJob($id, $generation), metadata: [
             MessageHeaders::PRIORITY => $priority === 'interactive' ? 10 : 0,
             MessageHeaders::DELIVERY_DELAY => $delay,
         ]);
@@ -258,29 +225,5 @@ final class JobRuntime
 
             $database->executeStatement("UPDATE job_attempts SET ended_at = clock_timestamp(), outcome = 'completed' WHERE id = ?", [$token]);
         });
-    }
-
-    /**
-     * Run the native database consumer without a relay process.
-     *
-     * Native delayed retries retain infrastructure failures before dead-letter storage.
-     */
-    public function work(string $receiver, bool $once = false, ?int $limit = null): void
-    {
-        if ($receiver !== 'jobs') {
-            throw new InvalidArgumentException('Ecotone uses jobs directly; there is no relay.');
-        }
-
-        $metadata = ExecutionPollingMetadata::createWithDefaults()
-            ->withStopOnError(false);
-        if ($once && $limit === null) {
-            $metadata = $metadata->withFinishWhenNoMessages(true);
-        }
-
-        if ($limit !== null) {
-            $metadata = $metadata->withHandledMessageLimit($limit)->withExecutionTimeLimitInMilliseconds(2000);
-        }
-
-        $this->messaging->run('jobs', $metadata);
     }
 }

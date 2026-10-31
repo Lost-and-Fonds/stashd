@@ -29,6 +29,8 @@ final class NativeDeliveryFixture
     private array $descriptor;
     private array $children = [];
     private array $reaped = [];
+    private ?InvokedProcess $acknowledging = null;
+    private ?int $ackBackend = null;
 
     /**
      * Allocate through the existing restricted-role fixture and explicit provisioning.
@@ -70,6 +72,12 @@ final class NativeDeliveryFixture
     public function start(string $action, array $arguments = []): InvokedProcess
     {
         $pause = $this->root . '/pause-' . count($this->children);
+        if (($arguments['boundary'] ?? '') === 'completed') {
+            $this->database->exec('SELECT pg_advisory_lock(82, 2)');
+            $this->database->exec("CREATE FUNCTION pause_ack() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN PERFORM pg_advisory_xact_lock(82, 2); RETURN OLD; END'");
+            $this->database->exec('CREATE TRIGGER pause_ack BEFORE DELETE ON enqueue FOR EACH ROW EXECUTE FUNCTION pause_ack()');
+        }
+
         $child = new GenericProcessExecutor()->start(new \Tempest\Process\PendingProcess(
             command: [
                 PHP_BINARY,
@@ -90,9 +98,12 @@ final class NativeDeliveryFixture
             ], JSON_THROW_ON_ERROR),
             path: dirname(__DIR__, 3),
             timeout: Duration::seconds(18),
-            environment: ['ENVIRONMENT' => 'testing', 'PGAPPNAME' => 'native-' . basename($this->root) . '-' . count($this->children)],
+            environment: ['ENVIRONMENT' => $arguments['environment'] ?? 'testing', 'PGAPPNAME' => 'native-' . basename($this->root) . '-' . count($this->children)],
         ));
         $this->children[] = [$child, $pause];
+        if (($arguments['boundary'] ?? '') === 'completed') {
+            $this->acknowledging = $child;
+        }
 
         return $child;
     }
@@ -119,10 +130,33 @@ final class NativeDeliveryFixture
     }
 
     /**
-     * Require a live test interceptor/executor boundary with matching process ID.
+     * Require a live executor boundary, or independently observe the native queue DELETE barrier.
      */
     public function paused(InvokedProcess $child): void
     {
+        if ($this->acknowledging === $child) {
+            $deadline = microtime(true) + 8;
+            do {
+                $this->database->exec('SELECT pg_stat_clear_snapshot()');
+                $backend = $this->database
+                    ->query(
+                        "SELECT pid FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event = 'advisory' AND query ILIKE '%DELETE%enqueue%'",
+                    )
+                    ->fetchColumn();
+                if ($backend !== false) {
+                    $this->ackBackend = (int) $backend;
+                    Assert::assertTrue($child->running);
+
+                    return;
+                }
+
+                Assert::assertTrue($child->running, 'Consumer exited before the native acknowledgement barrier: ' . $child->errorOutput);
+                usleep(10_000);
+            } while (microtime(true) < $deadline);
+
+            Assert::fail('Consumer did not reach the native queue DELETE barrier.');
+        }
+
         $path = null;
         foreach ($this->children as [$candidate, $pause]) {
             if ($candidate !== $child) {
@@ -159,6 +193,12 @@ final class NativeDeliveryFixture
 
         $this->reaped[spl_object_id($child)] = true;
         Assert::assertFalse($child->running);
+        if ($this->acknowledging === $child) {
+            // Client death cannot cancel a server-side DELETE already waiting for its lock.
+            $this->database->query('SELECT pg_terminate_backend(' . $this->ackBackend . ')');
+            $this->database->exec('SELECT pg_advisory_unlock(82, 2)');
+            $this->database->exec('DROP TRIGGER pause_ack ON enqueue');
+        }
     }
 
     /**

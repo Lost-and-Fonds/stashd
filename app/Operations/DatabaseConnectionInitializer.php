@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Evaluation\Official;
+namespace App\Operations;
 
 use Ecotone\Api\Tempest\DbalBackedConnection;
 use Tempest\Container\Container;
@@ -12,13 +12,13 @@ use Tempest\Database\Config\DatabaseConfig;
 use Tempest\Database\Connection\Connection;
 
 /**
- * Opt into the proposed upstream connection through Tempest PR 2326 injection.
- * The unmodified official profile excludes this initializer through discovery.
+ * Bind Tempest's public connection interface before any Database is resolved.
+ * Requires the isolated upstream Connection injection fix in PR 2326.
  */
-final readonly class InjectedConnectionInitializer implements Initializer
+final readonly class DatabaseConnectionInitializer implements Initializer
 {
     /**
-     * Let both frameworks resolve the library's one transaction owner from normal DI.
+     * Select the official adapter's shared transaction owner from Tempest configuration.
      */
     #[Singleton]
     public function initialize(Container $container): Connection

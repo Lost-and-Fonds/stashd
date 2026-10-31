@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Support\Ecotone;
+namespace Tests\Support\Ecotone\Catalogue;
 
 use App\EventManagement\Events\Integrity\FixityCheckPassed;
 use Doctrine\DBAL\Connection;

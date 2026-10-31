@@ -7,10 +7,8 @@ use App\Integration\OperationsDatabase;
 use App\Operations\ExecuteJob;
 use App\Operations\JobRuntime;
 use App\Operations\Jobs;
-use App\Operations\SharedOperationsConnection;
 use App\Operations\Work;
 use App\Operations\WorkExecutor;
-use Ecotone\Api\Dbal\Gateway\DeadLetterGateway;
 use Tempest\Core\Tempest;
 use Tempest\Database\Connection\Connection;
 use Tempest\Database\Query;
@@ -54,34 +52,65 @@ try {
         $_ENV[$key] = $value;
     }
 
+    putenv('STASHD_CATALOGUE_PROOF=' . (str_starts_with($request['action'], 'event-') ? '1' : '0'));
     $container = Tempest::boot(root: dirname(__DIR__, 3));
-    $probe = new DeliveryProbe($observer, $request['boundary'] ?? '', $request['pause']);
-    $container->singleton(WorkExecutor::class, $probe);
-    if (($request['boundary'] ?? '') !== '') {
-        // Only the controlled before-ack case needs a test interceptor in the real system.
+    if (str_starts_with($request['action'], 'event-')) {
         $container->singleton(
-            JobRuntime::class,
-            new JobRuntime($container->get(OperationsConfig::class), $probe, $container->get(SharedOperationsConnection::class)->database(), [$probe]),
+            \Tests\Support\Ecotone\Catalogue\CatalogueSubscribers::class,
+            new \Tests\Support\Ecotone\Catalogue\CatalogueSubscribers($container->get(Connection::class)->database(), $request['fail'] ?? false),
         );
     }
 
+    $probe = new DeliveryProbe($observer, $request['boundary'] ?? '', $request['pause']);
+    $container->singleton(WorkExecutor::class, ($request['executor'] ?? '') === 'context' ? new \Tests\Support\Operations\ContextExecutor($observer) : $probe);
+
     $result = [];
     $action = $request['action'];
-    if ($action === 'request') {
+    if ($action === 'console') {
+        $process = new \Tempest\Process\GenericProcessExecutor()->run(new \Tempest\Process\PendingProcess(
+            command: [PHP_BINARY, 'tempest', ...$request['arguments'], '--no-interaction'],
+            path: dirname(__DIR__, 3),
+            timeout: \Tempest\DateTime\Duration::seconds(12),
+        ));
+        $result = ['code' => $process->exitCode, 'output' => $process->output, 'error' => $process->errorOutput];
+    } elseif ($action === 'event-publish') {
+        $event = new \App\EventManagement\Events\Integrity\FixityCheckPassed('item-1', 'asset-1', 'v1', 'check-1', 'digest-1');
+        $connection = $container->get(Connection::class);
+        $events = $container->get(\Ecotone\Api\Messaging\ConfiguredMessagingSystem::class)->getEventBus();
+        $connection->beginTransaction();
+        $events->publish($event);
+        $result['hidden'] = (int) $observer->query('SELECT count(*) FROM enqueue')->fetchColumn() === 0;
+        $connection->rollback();
+        $result['rolled_back'] = (int) $observer->query('SELECT count(*) FROM enqueue')->fetchColumn() === 0;
+        $connection->beginTransaction();
+        $events->publish($event);
+        $connection->commit();
+        $result['id'] = $event->metadata->eventId;
+    } elseif ($action === 'event-consume') {
+        $container->get(\Ecotone\Api\Messaging\ConfiguredMessagingSystem::class)->run(
+            $request['channel'],
+            \Ecotone\Api\ExtensionObject\ExecutionPollingMetadata::createWithFinishWhenNoMessages()->withStopOnError(false),
+        );
+    } elseif ($action === 'admit') {
+        $result['id'] = $container->get(Jobs::class)->admit($request['key'], $request['payload']);
+    } elseif ($action === 'handle') {
+        $container->get(JobRuntime::class)->handle(new ExecuteJob($request['id'], $request['generation'] ?? 0));
+    } elseif ($action === 'request') {
         $result['id'] = $container->get(Jobs::class)->request(
             new Work('acceptance.probe', $request['scope'], 'refresh', $request['observation'] ?? 'v1'),
             $request['priority'] ?? 'routine',
         );
     } elseif ($action === 'consume') {
-        $container->get(JobRuntime::class)->work('jobs', true, $request['limit'] ?? null);
+        $metadata = \Ecotone\Api\ExtensionObject\ExecutionPollingMetadata::createWithDefaults()->withStopOnError(false);
+        $metadata = isset($request['limit'])
+            ? $metadata->withHandledMessageLimit($request['limit'])->withExecutionTimeLimitInMilliseconds(2000)
+            : $metadata->withFinishWhenNoMessages(true);
+        $container->get(\Ecotone\Api\Messaging\ConfiguredMessagingSystem::class)->run('jobs', $metadata);
     } elseif ($action === 'publish') {
         $container
-            ->get(JobRuntime::class)
-            ->messaging()
+            ->get(\Ecotone\Api\Messaging\ConfiguredMessagingSystem::class)
             ->getCommandBus()
             ->send(new ExecuteJob($request['id'], $request['generation']), metadata: [\Ecotone\Api\Messaging\MessageHeaders::PRIORITY => $request['priority'] ?? 0]);
-    } elseif ($action === 'replay') {
-        $container->get(JobRuntime::class)->messaging()->getGatewayByName(DeadLetterGateway::class)->replayAll();
     } elseif ($action === 'bootstrap') {
         if ($request['order'] === 'jobs-first') {
             $container->get(Jobs::class);
@@ -89,7 +118,7 @@ try {
 
         $database = $container->get(OperationsDatabase::class)->connect();
         $container->get(Jobs::class);
-        $dbal = $container->get(SharedOperationsConnection::class)->database();
+        $dbal = $container->get(Connection::class)->database();
         $connection = $container->get(Connection::class);
         $database->execute(new Query('CREATE TABLE IF NOT EXISTS bootstrap_probe (id INT PRIMARY KEY, pid INT, tx BIGINT)'));
         $connection->reconnect();

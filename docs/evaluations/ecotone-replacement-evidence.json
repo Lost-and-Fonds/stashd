@@ -1,0 +1,378 @@
+{
+  "recorded_at_utc": "2026-10-31T04:44:41.082721+00:00",
+  "branch": "spike/ecotone-evaluation",
+  "base_head": "56026a28228c7f7d4700ba7b8adfab30618336ca",
+  "delivery": "Prepared for review in PR #80; verification collected from the working tree based on base_head. No merge.",
+  "qa": {
+    "command": "lerd composer qa",
+    "exit_code": 0,
+    "passed": 478,
+    "incomplete": 33,
+    "failed": 0,
+    "assertions": 24388,
+    "seconds": 116.83,
+    "parallel_processes": 4,
+    "format": "passed",
+    "lint": "passed",
+    "analysis": "passed with three existing RecordsAndArchives help diagnostics",
+    "incomplete_scope": "Existing preservation contracts; unchanged assertions and driver. No intentional red Operations tests.",
+    "local_log": "tmp/ecotone-replacement-qa-delivery.log"
+  },
+  "focused": {
+    "passed": 38,
+    "failed": 0,
+    "incomplete": 0,
+    "assertions": 1065,
+    "seconds": 90.48,
+    "processes": 1,
+    "junit": "tmp/ecotone-replacement-focused.xml",
+    "suites": [
+      {
+        "name": "Tests\\Acceptance\\Operations\\WorkAdmissionTest",
+        "file": "tests/Acceptance/Operations/WorkAdmissionTest.php",
+        "tests": "4",
+        "assertions": "68",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "10.398859"
+      },
+      {
+        "name": "Tests\\Acceptance\\OperationsDelivery\\DurableDeliveryTest",
+        "file": "tests/Acceptance/OperationsDelivery/DurableDeliveryTest.php",
+        "tests": "1",
+        "assertions": "19",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "2.067782"
+      },
+      {
+        "name": "Tests\\Acceptance\\EcotoneDelivery\\NativeDurabilityTest",
+        "file": "tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php",
+        "tests": "10",
+        "assertions": "399",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "28.233610"
+      },
+      {
+        "name": "Tests\\Acceptance\\EcotoneDelivery\\TransportFailureTest",
+        "file": "tests/Acceptance/EcotoneDelivery/TransportFailureTest.php",
+        "tests": "1",
+        "assertions": "66",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "4.417431"
+      },
+      {
+        "name": "Tests\\Acceptance\\EcotoneInstallation\\InjectedIntegrationTest",
+        "file": "tests/Acceptance/EcotoneInstallation/InjectedIntegrationTest.php",
+        "tests": "5",
+        "assertions": "121",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "7.897994"
+      },
+      {
+        "name": "Tests\\Acceptance\\EcotoneInstallation\\InstallationTest",
+        "file": "tests/Acceptance/EcotoneInstallation/InstallationTest.php",
+        "tests": "6",
+        "assertions": "148",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "12.987173"
+      },
+      {
+        "name": "Tests\\Acceptance\\EcotoneInstallation\\OfficialIntegrationTest",
+        "file": "tests/Acceptance/EcotoneInstallation/OfficialIntegrationTest.php",
+        "tests": "3",
+        "assertions": "63",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "4.677879"
+      },
+      {
+        "name": "Tests\\Acceptance\\Integration\\JobsTest",
+        "file": "tests/Acceptance/Integration/JobsTest.php",
+        "tests": "4",
+        "assertions": "94",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "11.090984"
+      },
+      {
+        "name": "Tests\\Acceptance\\Integration\\WorkAdmissionAtomicityTest",
+        "file": "tests/Acceptance/Integration/WorkAdmissionAtomicityTest.php",
+        "tests": "2",
+        "assertions": "38",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "3.650119"
+      },
+      {
+        "name": "Tests\\Acceptance\\Integration\\WorkExecutionContextTest",
+        "file": "tests/Acceptance/Integration/WorkExecutionContextTest.php",
+        "tests": "1",
+        "assertions": "23",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "2.132649"
+      },
+      {
+        "name": "Tests\\Feature\\EcotoneTransactionTest",
+        "file": "tests/Feature/EcotoneTransactionTest.php",
+        "tests": "1",
+        "assertions": "26",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "2.807951"
+      }
+    ]
+  },
+  "negative_controls": {
+    "native_detected": 9,
+    "nesting_detected": 3,
+    "artifacts": [
+      "docs/evaluations/ecotone-native-negative.json",
+      "docs/evaluations/ecotone-installation-negative.json"
+    ],
+    "baseline_and_restored": "passed",
+    "rejected_experiments": [
+      "Broad bypass of DBAL nesting initially broke fixture migration; rejected as verification error. Restricted to the real nested_state test before counting detection.",
+      "Recovery insertion fault initially also rejected queue receipt UPDATE; replaced with BEFORE INSERT trigger so receipt succeeds before publication fails."
+    ],
+    "timeouts_or_fixture_errors_counted_as_detection": false
+  },
+  "python_regressions": {
+    "command": "python3 -B -m unittest discover -s tools/verification -p 'test_*.py'",
+    "passed": 13,
+    "failed": 0
+  },
+  "composer_audit": {
+    "advisories": [],
+    "abandoned": [],
+    "filter": []
+  },
+  "composer_validate": "Passed with deliberate exact-pin and commit-ref warnings.",
+  "dependency_diff": {
+    "direct_removed": [
+      "symfony/console",
+      "symfony/doctrine-messenger",
+      "symfony/event-dispatcher",
+      "symfony/messenger"
+    ],
+    "direct_added": [
+      "cweagans/composer-patches",
+      "ecotone/tempest"
+    ],
+    "packages_removed": {
+      "doctrine/event-manager": "2.1.1",
+      "doctrine/persistence": "4.2.1",
+      "symfony/clock": "v8.1.9",
+      "symfony/doctrine-messenger": "8.2.x-dev",
+      "symfony/messenger": "8.2.x-dev"
+    },
+    "packages_added": {
+      "cweagans/composer-configurable-plugin": "2.0.0",
+      "cweagans/composer-patches": "2.0.0",
+      "ecotone/tempest": "2.0.0-beta.7"
+    },
+    "packages_updated": {
+      "brianium/paratest": {
+        "from": "v7.27.1",
+        "to": "v7.27.5"
+      },
+      "nette/php-generator": {
+        "from": "v4.2.1",
+        "to": "v4.2.3"
+      },
+      "pestphp/pest": {
+        "from": "v5.3.2",
+        "to": "v5.3.4"
+      },
+      "phpunit/phpunit": {
+        "from": "13.4.2",
+        "to": "13.4.5"
+      },
+      "sebastian/git-state": {
+        "from": "1.0.0",
+        "to": "1.1.0"
+      },
+      "symfony/console": {
+        "from": "8.2.x-dev",
+        "to": "v8.1.10"
+      },
+      "symfony/event-dispatcher": {
+        "from": "8.2.x-dev",
+        "to": "v8.1.5"
+      },
+      "symfony/mime": {
+        "from": "v8.1.7",
+        "to": "v8.1.10"
+      },
+      "tempest/framework": {
+        "from": "v3.19.2",
+        "to": "dev-fix/2325-injected-connections"
+      }
+    },
+    "remaining_transitive": {
+      "symfony/console": "v8.1.10",
+      "symfony/event-dispatcher": "v8.1.5",
+      "ecotone/enqueue": "2.0.0-beta.7"
+    },
+    "messenger_installed": false,
+    "doctrine_orm_installed": false
+  },
+  "exact_foundation": {
+    "tempest/framework": {
+      "version": "dev-fix/2325-injected-connections",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/hipsterjazzbo/tempest-framework",
+        "reference": "5e56e440298e4c30e8059030ef078e7a71e4fbf6"
+      }
+    },
+    "ecotone/tempest": {
+      "version": "2.0.0-beta.7",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/ecotoneframework/tempest.git",
+        "reference": "9a1469ea24c58e20924ceecbceea77055fb19419"
+      }
+    },
+    "ecotone/ecotone": {
+      "version": "2.0.0-beta.7",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/ecotoneframework/ecotone.git",
+        "reference": "73fa1ef11cbfc848aba2cd057219ef3b50d07950"
+      }
+    },
+    "ecotone/dbal": {
+      "version": "2.0.0-beta.7",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/ecotoneframework/dbal.git",
+        "reference": "630374177e3e4edf01aafbc0a891ed10530ab45b"
+      }
+    },
+    "ecotone/enqueue": {
+      "version": "2.0.0-beta.7",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/ecotoneframework/enqueue.git",
+        "reference": "a2b312bd810a60abf17b280c5c342b586501f03d"
+      }
+    },
+    "doctrine/dbal": {
+      "version": "4.5.0",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/doctrine/dbal.git",
+        "reference": "c435cd7ea33e17d2a89288caf994cf3d4549b879"
+      }
+    },
+    "cweagans/composer-patches": {
+      "version": "2.0.0",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/cweagans/composer-patches.git",
+        "reference": "bfa6018a5f864653d9ed899b902ea72f858a2cf7"
+      }
+    }
+  },
+  "patches": {
+    "ecotone/tempest": [
+      {
+        "description": "Share the injected Tempest DBAL owner without PDO reflection",
+        "url": "tools/evaluations/ecotone-tempest-injection.patch",
+        "sha256": "fa18d412bea0b3672aa588599885d4551ef1a9ce8b08ef05499ad0cc120d8f8f",
+        "depth": 1
+      },
+      {
+        "description": "Keep ordinary Tempest services and non-messaging commands lazy",
+        "url": "tools/evaluations/ecotone-tempest-lazy-boot.patch",
+        "sha256": "e76c4d8ac6658c6df0c5fb8ff7ba47b8fefded80a7d32b9c842b814950700bd5",
+        "depth": 1
+      }
+    ],
+    "ecotone/dbal": [
+      {
+        "description": "Preserve native DBAL channel message priority",
+        "url": "tools/evaluations/ecotone-dbal-priority.patch",
+        "sha256": "2c6e6062e2166be4a637f73586d987858d6124a24d9b958242c92da1ffb1557d",
+        "depth": 1
+      }
+    ]
+  },
+  "patched_library_lint": "Mago lint passed on ten changed/new ecotone/tempest files using repository rules with vendor treated as source. Full upstream package unit suites were not run.",
+  "checks": {
+    "patches_reverse_check": true,
+    "protected_source_and_OPS_C01_assertions_unchanged": true,
+    "other_worktrees_status_diff_and_dirty_file_hashes_match_snapshot": true,
+    "other_worktrees_count": 6,
+    "index_empty": true,
+    "fixture_cleanup": "Each native fixture asserts child reaping, exact generated database and role removal, and private directory removal. No unrelated database targeted."
+  },
+  "proof_limits": [
+    "No arbitrary exactly-once external effects; completion-write failure test observes repeated independent effect.",
+    "No OPS-C03 live stale-worker fencing or lease renewal.",
+    "No remote broker, power-loss, storage-failure or total-partition certification.",
+    "Three local Ecotone patches and Tempest PR2326 fork remain required; no released upstream guarantee.",
+    "No standalone deployment-image or performance benchmark was run."
+  ],
+  "verified_source_sha256": {
+    "app/Integration/Migrations/AdmitWorkTable.php": "0c7949660d68759bffa8d6dceaeb2fc6295dc9c22b7e9461b0449249de967b45",
+    "app/Integration/Migrations/CreateJobsTable.php": "33231f8994484885d0f38a2b83bc29bac7273b845d25cf12c277410977afa0ff",
+    "app/Integration/OperationsConnectionConfig.php": "f0cd371cd45e62e6d6a943107324418b776e194f22d426293833658a090cc055",
+    "app/Integration/OperationsDatabase.php": "87a7a92a626b0324b8675bb4db916af4fc9db8c2005fc1e4157fcba42d2ac075",
+    "app/Operations/DatabaseConnectionInitializer.php": "d0a571bfbe4a5ceb4126e38289079592272c55780254aa8d6f5e106735fb7cca",
+    "app/Operations/JobCommands.php": "4e1376a3f20c8efe37f6ebfff71a5f06154eb525814514b7ed08d53fe0eb5bd5",
+    "app/Operations/JobRuntime.php": "149bd0eb2cb473073f3e0ddd124a644996d2f80f1fc46634c0957c64fdbbe84d",
+    "app/Operations/OperationsMessaging.php": "805b1484c891d98afceaa94f6160a7d638a0b47d05837ae993493f716a2c876b",
+    "app/Operations/discovery.config.php": "2ccbe0d6b4ee06b79cb1f8b6ae75486d238cc734f8a6c96e1f27d11be449cd24",
+    "app/Operations/ecotone.config.php": "d8e6b137d3bdc2807994dcca2ea3c12f63c4da2077acffd828d9266016bf9393",
+    "bin/test.sh": "48cebf0de60fbacca85f7ac4aed998770c202e9cd9c26a00675947d4e629d682",
+    "composer.json": "90249a9e6928688efba0b0b86f927865144dd5d4b6dd7695f56b9aade6e33245",
+    "composer.lock": "64d893239d3071b39301df890b597da23d299658d9f9f664eea1b70c83b21060",
+    "patches.json": "6b4481d58012bb66502defc262aa26c1af5a4e245466612100cdf2bf059c64e3",
+    "patches.lock.json": "2b353796a389f593b10328f666112b490f405be6affd025309fb2730a63ee849",
+    "tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php": "0bc5ce9cdbcde0867c05c9afb98172500aef5a3516bc5bc361f14b8e68bc1b2d",
+    "tests/Acceptance/EcotoneDelivery/TransportFailureTest.php": "a84e2d8262c761a6c9623662882b2a40b341d61312c6e6555dcc2649fb5d5d1f",
+    "tests/Acceptance/EcotoneInstallation/InjectedIntegrationTest.php": "6f01ec36cb6ff5b94173291640f53c77dfecd2c9d94166b52cbf87f112ed79a2",
+    "tests/Acceptance/EcotoneInstallation/InstallationTest.php": "78363b589a39a6817761f5f1f52800eabbc3b87d5a4fe8d1835faedc8a20557e",
+    "tests/Acceptance/EcotoneInstallation/OfficialIntegrationTest.php": "749428df6c3dee4c608cadeec439e041e3201737af5cf49ae5447b399d129958",
+    "tests/Acceptance/Integration/JobsTest.php": "343b30b2b4ac6d61d0dc9af916b10eb2b4863d540f2f0d3f96bfb0d7cfa2567b",
+    "tests/Acceptance/Integration/WorkAdmissionAtomicityTest.php": "da05c340493d833c79f0ee50ddca7801372a65b0764cc320ba251f9162a9440c",
+    "tests/Acceptance/Integration/WorkExecutionContextTest.php": "e841b1112f4596ccfaa2a58a845a596c417b13a400e98ce0a9d360d67b715ce0",
+    "tests/Acceptance/OperationsDelivery/DurableDeliveryTest.php": "a4ccf06de4a7e1523d83871a9c94f3fccadc0be19e0164147304283f89a9bac0",
+    "tests/Feature/EcotoneTransactionTest.php": "edff5312092029138fd9e92b5e9330ae59e59b6fb2224c02943dc6571826ea91",
+    "tests/Pest.php": "4b415d6698ba2bb7db405757b58b9b28d2660668b2b4e954e902d1c7690d7599",
+    "tests/Support/Ecotone/Catalogue/CatalogueConfiguration.php": "59a95793c5375f11f7fff4a69502c84103937d87c2b262c76211a98d5b12c119",
+    "tests/Support/Ecotone/Catalogue/CatalogueSubscribers.php": "4b505d403a300a3a962a8c44b65b9779002e8696ed314815c557e734e0c4995c",
+    "tests/Support/Ecotone/DeliveryProbe.php": "2e11656b43eec7be99318f542105e4802b937854440c0cdcbccec6617e00a217",
+    "tests/Support/Ecotone/NativeDeliveryFixture.php": "544c8839cc332caae6647933f1af159f2648f3e63d4aa4638bbe853a4a881e7e",
+    "tests/Support/Ecotone/delivery-process.php": "e3510ffa1415a57e3414903d9b01bdbc9c989fd6e2d5117d13b861e142361dca",
+    "tests/Support/Ecotone/installation-process.php": "a167b71336602530d7d06fba5f9edabeff5ef15223c59b455fbc03dfbbb66331",
+    "tests/Support/Operations/ContextExecutor.php": "d13215f15c6df2ea7b0dcc00a14f3db2f9b1e38898cf0abce06ff66e76da5f07",
+    "tests/Support/Operations/LocalOperationsDriver.php": "c6ada49afa264ce5fefe35e7041be421078f5e5b62d4ae1be83602250bba5154",
+    "tests/Support/Operations/runtime-process.php": "4497ade9ced6d952dc5e915c3de6af6ef658ae6d462061bbe73a6e4ba1ddba93",
+    "tests/Unit/OperationsConnectionConfigTest.php": "c5eba3bb44891dde2958a13e8d95073e59bd737fe5b2e67223deb5011a954f0c",
+    "tools/evaluations/ecotone-tempest-injection.patch": "fa18d412bea0b3672aa588599885d4551ef1a9ce8b08ef05499ad0cc120d8f8f",
+    "tools/evaluations/ecotone-tempest-lazy-boot.patch": "e76c4d8ac6658c6df0c5fb8ff7ba47b8fefded80a7d32b9c842b814950700bd5",
+    "tools/evaluations/installation-negative.py": "32bc60957c2a6456389f5cc89731e54a4d026ead4b1fdda43cda538b50993f46",
+    "tools/verification/ops_c02_negative.py": "2b12650c94f7aca42de29aecc7163e82c22ee5c7e0a4c0790f3b1c8ad2182cef",
+    "tools/verification/test_ops_c02_negative.py": "aaffb63231d77abef88bd923fa734fa97e98d10ad04f087262a9862d642dea89",
+    "tools/verification/test_test_wrapper.py": "3a597685c75e5b4a3d266dc94351d8fb1bb6b458c1d66886a47550425e5f6807"
+  }
+}

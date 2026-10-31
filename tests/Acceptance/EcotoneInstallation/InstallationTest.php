@@ -53,3 +53,48 @@ foreach (['commit', 'rollback', 'inner-failure'] as $mode) {
         }
     });
 }
+
+test('native startup commands provision idempotently and consume in a fresh CLI', function (): void {
+    $f = new NativeDeliveryFixture();
+    try {
+        $admitted = $f->run('console', ['arguments' => ['job:admit', 'cli-proof', 'hello']]);
+        expect($admitted['code'])->toBe(0, $admitted['error']);
+        $id = json_decode(trim($admitted['output']), true, flags: JSON_THROW_ON_ERROR)['id'];
+        $pending = $f->rows('SELECT id, body FROM enqueue');
+        expect($pending)->toHaveCount(1);
+        $setup = $f->run('console', ['arguments' => ['ecotone:migration:database:setup', '--initialize']]);
+        expect($setup['code'])->toBe(0, $setup['error']);
+        expect($f->rows('SELECT id, body FROM enqueue'))->toBe($pending);
+        $worker = $f->run('console', ['arguments' => ['ecotone:run', 'jobs', '--finishWhenNoMessages', '--memoryLimit=256', '--executionTimeLimit=300000']]);
+        expect($worker['code'])->toBe(0, $worker['error']);
+        expect($f->rows('SELECT id, status FROM jobs'))->toBe([['id' => $id, 'status' => 'completed']]);
+        expect($f->rows('SELECT job_id, outcome FROM job_attempts'))->toBe([['job_id' => $id, 'outcome' => 'completed']]);
+        expect($f->count('enqueue'))->toBe(0);
+    } finally {
+        $f->dispose();
+    }
+});
+
+test('production messaging caches retain definitions without sharing fixture connections', function (): void {
+    $first = new NativeDeliveryFixture();
+    $second = null;
+    try {
+        $second = new NativeDeliveryFixture();
+        $one = $first->run('request', ['environment' => 'production'])['id'];
+        expect($second->count('jobs'))->toBe(0);
+        $two = $second->run('request', ['environment' => 'production'])['id'];
+        expect($first->rows('SELECT id FROM jobs'))->toBe([['id' => $one]]);
+        expect($second->rows('SELECT id FROM jobs'))->toBe([['id' => $two]]);
+        $first->run('consume', ['environment' => 'production']);
+        $second->run('consume', ['environment' => 'production']);
+        expect($first->rows('SELECT job_id FROM probe_effects'))->toBe([['job_id' => $one]]);
+        expect($second->rows('SELECT job_id FROM probe_effects'))->toBe([['job_id' => $two]]);
+        expect($first->count('job_attempts'))->toBe(1);
+        expect($second->count('job_attempts'))->toBe(1);
+        expect($first->count('enqueue'))->toBe(0);
+        expect($second->count('enqueue'))->toBe(0);
+    } finally {
+        $second?->dispose();
+        $first->dispose();
+    }
+});

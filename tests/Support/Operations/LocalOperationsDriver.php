@@ -14,7 +14,7 @@ use Tempest\Process\PendingProcess;
 use Tests\Support\RecordsAndArchives\TransactionProbe;
 
 /**
- * Adapt the independent contracts to real admission, Messenger and PostgreSQL.
+ * Adapt the independent contracts to real admission, native Ecotone and PostgreSQL.
  *
  * Each fixture owns an entire disposable database and role. No worker survives
  * an action; SQL observations and probe effects never stand in for delivery.

@@ -1,685 +1,264 @@
-# Ecotone architectural replacement evaluation
+# Ecotone Operations foundation
 
+**Decision: Adopt for the pre-release application using the pinned development
+fork and reproducible Ecotone patches below.** Upstream releases are not a
+prerequisite for this branch. This is a replacement foundation, not a migration
+of existing installations. There is no old-message conversion or dual transport.
+The implementation is submitted for review in PR #80 on spike/ecotone-evaluation.
+Verification provenance is recorded against the pre-change base and source hashes.
 
-## Injected official connection — works with our Tempest PR and an Ecotone patch
+This report supersedes the earlier evaluation recommendations. Earlier evidence
+JSON remains historical, pinned to its own source commit; the prior implementation
+and reports can be inspected at `56026a2`. The current source and current verification
+results, not those historical reports, define the replacement's claims.
 
-**Recommendation: Adopt after specific upstream work.** The nested transaction
-blocker now has a working, isolated solution using the exact Tempest PR #2326 fork
-commit and a proposed patch to ecotone/tempest. The Tempest PR alone remains
-insufficient: the published adapter's default PDO bridge still fails the original
-three nesting gates. Those tests and the legacy clean-schema failure are retained.
-No production connection binding, root Composer dependency, Messenger migration,
-Vault behavior or application source was changed.
+## Actual application architecture
 
-### What changed
+Normal Tempest boot resolves DatabaseConnectionInitializer, selecting the proposed
+library-owned Ecotone Api Tempest DbalBackedConnection from Tempest DatabaseConfig.
+The official TempestConnectionReference reuses that object's DBAL owner. Ordinary
+persistence remains Tempest Database; no general-purpose Doctrine application
+repository layer or ORM is added.
 
-The isolated Composer fixture now installs **hipsterjazzbo/tempest-framework at
-5e56e440298e4c30e8059030ef078e7a71e4fbf6**, branch
-`fix/2325-injected-connections`, directly. Its `3.19.2` alias satisfies Ecotone's
-constraint; it is not a released Tempest guarantee. Composer also updates the
-fork's required nette/php-generator from 4.2.1 to **4.2.3**. All Ecotone packages
-remain **2.0.0-beta.7** and DBAL remains **4.5.0**. Only the isolated lockfile changes;
-Core's working vendor and root lockfile retain the earlier candidate dependencies.
-The existing Tempest patch file remains historical/reproducible evidence; it must
-not be applied a second time to this fork installation.
+Jobs::request retains canonical Work admission and generation-based queued
+promotion. JobRuntime receives the shared Connection, native CommandBus and optional
+departmental WorkExecutor through normal DI. It builds no container, bus, transport,
+sender or worker. OperationsMessaging is a native ServiceContext configuration.
+ConfiguredMessagingSystem runs the real asynchronous handler.
 
-`tools/evaluations/ecotone-tempest-injection.patch` is an explicit **proposed
-Ecotone change**, not a published API or an upstream PR. It introduces:
-
-- `Ecotone\Api\Tempest\DbalBackedConnection`, implementing Tempest's public
-  Connection interface and delegating transactions to one DBAL owner.
-- `ConfiguredPdoDriver`, opening PDO from the original Tempest DatabaseConfig DSN
-  and options each time a physical connection is needed. It does not parse or
-  translate application credentials into a separate Operations configuration.
-- `ManagedDbalConnection`, refusing closure/replacement during an active transaction.
-- A resolver branch that recognizes the injected connection and reuses its DBAL
-  object for the normal `TempestConnectionReference::defaultConnection()`.
-
-There is no reflection on this injected path. The existing adapter's default
-reflection-based path remains intact for baseline comparison. Tempest PR #2326
-lets DatabaseInitializer honour the injected connection, including when Database
-resolves first. Both frameworks consequently update the same DBAL nesting counter;
-an inner admission uses a savepoint and never commits the outer transaction.
-This relocates shared-connection infrastructure into an explicit library proposal;
-it does not make that infrastructure disappear or certify an upstream release.
-
-The test profile selects the proposed library connection using a normal Tempest
-initializer, enabled through supported discovery configuration:
-
-```php
-#[Singleton]
-public function initialize(Container $container): Connection
-{
-    return DbalBackedConnection::fromConfiguration($container->get(DatabaseConfig::class));
-}
+```mermaid
+sequenceDiagram
+    participant Caller
+    participant Tempest
+    participant Owner as Shared DBAL owner
+    participant Queue as PostgreSQL enqueue
+    participant Consumer as Native Ecotone consumer
+    participant Executor as WorkExecutor
+    Caller->>Tempest: ordinary mutation / Jobs::request(Work)
+    Tempest->>Owner: outer transaction / nested savepoint
+    Owner->>Queue: Job + invitation commit together
+    Consumer->>Queue: receive durable invitation
+    Consumer->>Owner: claim + Attempt, commit
+    Consumer->>Executor: Work + persisted ExecutionContext
+    Executor-->>Consumer: outcome / independent effect
+    Consumer->>Owner: guarded completion + Attempt outcome, commit
+    Consumer->>Queue: acknowledge
 ```
 
-The profile does not instantiate SharedOperationsConnection, SharedPostgresConnection,
-TempestDbalConnection or OperationsConnectionInitializer. A small binding like this
-would remain in Stashd until the official adapter offered its own opt-in initializer.
-JobRuntimeInitializer and JobRuntime's EcotoneLite assembly remain further migration
-work; this proof does not remove or silently replace either one in the application.
+The consumer does not wrap external effects in one long transaction. Short claim,
+failure/retry and completion transactions are application domain policy. A valid
+busy claim creates a delayed invitation and returns without consuming domain
+failure budget. Obsolete generations and terminal Jobs are discarded safely.
 
-### Independently observed evidence
+Infrastructure failures use native delayed retries and dead letters. A transport
+failure does not manufacture an Attempt failure or Job failure. Native replay
+preserves Job identity and retains its dead letter when enqueue fails. Domain
+handler failures have a distinct persisted three-failure budget and Attempt history.
 
-`InjectedIntegrationTest.php` adds the same commit/rollback/inner-failure behavioral
-assertions as the existing official contracts. The real Tempest container resolves
-an ordinary mutation and Jobs::request on the injected owner. Observers see nothing
-before commit; PostgreSQL insertion triggers verify backend PID and txid for all
-three writes. Rollback removes all three. An actual enqueue constraint rejection
-rolls back Job and invitation to the inner savepoint while unrelated outer work
-still commits. All three cases pass.
+## What disappeared and what remains
 
-Two further contracts exercise Database-first and messaging-first resolution,
-nonpersistent connections, a non-default private PostgreSQL schema, explicit
-physical reconnection, and rejected Tempest reconnect/DBAL close during an active
-transaction. Both check actual connection identity and transaction identity.
-A native official command invitation is invisible before commit and absent after
-rollback. A committed invitation survives process exit and a **fresh official
-consumer process** persists the sole independent `committed` effect and settles
-the queue. The schema remains correct after reconnect because these profiles
-supply it as a PostgreSQL startup option in the Tempest DSN, rather than relying
-on a one-time session SET. Reconnection does not promise to preserve arbitrary
-session changes; required session state must be configured for each connection.
-
-The Job admission diagnostic continues to reuse the real Jobs/JobRuntime admission
-logic on the official DBAL connection. Native messaging is separately exercised
-through the official ConfiguredMessagingSystem. This is not yet a complete
-JobRuntime migration onto the official bus. The existing OPS-C01/native durability
-regressions in the combined run still exercise the retained working candidate,
-not all fault windows through the new connection profile.
-
-| Check | Result |
+| Existing architecture / evaluation component | Final replacement |
 | --- | --- |
-| Injected official nested commit / rollback / inner failure | 3 passed |
-| Both resolution orders, reconnect guards and fresh official consumers | 2 passed |
-| Focused candidate regressions plus all installation profiles | **23 passed, 4 expected-failing**, 833 assertions, 54.63 seconds, exit 1 |
-| Retained expected failures | Legacy messenger_messages schema plus 3 default-adapter nesting cases |
-| Injected premature commit / separate physical connection / bypassed DBAL nesting controls | All 3 detected at named assertions; baseline and restored tests pass |
-| Original candidate nesting negative controls after verifier extension | Both detected; baseline and restoration pass |
-| Format / lint / analysis | Passed; analysis only has the same 3 existing Records & Archives help messages |
-| Patched library additions | Explicit Mago format/lint passed; PostgreSQL integration tests pass |
-| Isolated Composer validation | Passed with deliberate commit-ref and version-pin warnings |
-| Patch reversibility | Reverse-check, removal, forward-check and reapplication all passed |
+| Messenger MessageBus, sender/handler locators, anonymous JobServices, transport construction | Official framework-managed ConfiguredMessagingSystem and CommandBus |
+| OutboxSender, relay, envelopes and stamps, intermediate jobs/jobs_interactive forwarding queues | One native jobs channel with native priority; no forwarding hop |
+| Messenger worker listener/dispatcher assembly, retry/failure listeners | Native polling, delayed retries and DBAL dead letters |
+| FailedMessageRepository and job:retry-message redispatch | Native deadletter list/show/replay commands |
+| messenger_messages migration schema | Removed; clean databases provision enqueue and ecotone_error_messages |
+| SharedOperationsConnection, SharedPostgresConnection, TempestDbalConnection | Removed from Stashd; library-owned injected connection/driver/close guard |
+| OperationsConnectionInitializer and JobRuntimeInitializer | One small DatabaseConnectionInitializer; ordinary DI handles the domain runtime |
+| JobRuntime's EcotoneLite bootstrap and work()/messaging() assembly | Removed; native configuration and ecotone:run |
+| DeliverySchema / job:setup wrapper | Removed; native database setup command/API |
+| Separate official-test Composer application and custom bridge profiles | Removed; all integration contracts boot the actual application |
+| Messenger-only acceptance drivers, relay supervisor and fault commands | Removed; native PostgreSQL/process fixture with independent SQL/effects |
+| Work identities, Jobs, Attempts, desired priority, generations, claim leases | Remain application-owned and persisted |
+| PostgreSQL advisory identity locks, partial active-Work index, conditional finalization | Remain domain concurrency operations |
+| Department reconciliation, resource/execution policy and fencing obligations | Remain department/Operations responsibilities; no new scheduler or OPS-C03 implementation |
+| Vault/OCFL authority, catalogue metadata/PREMIS classifications | Remain separate from delivery and unchanged |
 
-The negative verifier accepts only the selected assertion failure, rejects setup
-errors/timeouts, and restores exact source bytes. Private JUnit/events are retained
-under ignored tmp/. The checked-in results are `ecotone-injection-evidence.json`
-and `ecotone-injected-negative.json`. The preceding round's evidence files remain
-historical records of their own source versions.
+Core directly removes symfony/messenger, symfony/doctrine-messenger,
+symfony/event-dispatcher and symfony/console. Console/event-dispatcher remain
+transitively where libraries require them; their presence is not a Messenger
+runtime. It adds ecotone/tempest and cweagans/composer-patches. DBAL remains an
+accepted direct dependency and Ecotone dependency. There is no installed Messenger
+package or Doctrine ORM. The lockfile records the complete transitive graph.
 
-### Reproduce the fork and proposed adapter path
+This reduces responsibilities, not just local lines: there is one delivery hop,
+one supervised Operations process role, one connection owner and no Stashd runtime
+assembly. The shared-connection responsibilities still exist in the proposed
+library patch. Three local Ecotone patches and an unreleased Tempest fork are an
+explicit maintenance cost; moving code upstream is not counted as its disappearance.
+No throughput/CPU benchmark or general resource-cost superiority is claimed.
+
+## Development dependencies and bootstrap requirements
+
+The authoritative pins and patch checksums are composer.lock, patches.json and
+patches.lock.json. Composer Patches applies local checksum-locked files on install;
+there are no unexplained manual vendor changes. Git is required during dependency
+build. The Tempest dependency is the actual hipsterjazzbo/tempest-framework fork,
+branch fix/2325-injected-connections at
+`5e56e440298e4c30e8059030ef078e7a71e4fbf6`, aliased as 3.19.2 solely to satisfy
+Ecotone's constraint. The alias is not a released guarantee.
+
+- ecotone/ecotone, dbal, enqueue and tempest: 2.0.0-beta.7.
+- doctrine/dbal: 4.5.0; cweagans/composer-patches: 2.0.0.
+- The fork requires nette/php-generator 4.2.3.
+- Existing advisory fixes also update symfony/mime to 8.1.10, Pest to 5.3.4,
+  PHPUnit to 13.4.5, ParaTest to 7.27.5 and its required git-state helper to 1.1.0.
+- `ecotone-tempest-injection.patch`: library-owned Tempest Connection, original
+  DatabaseConfig/PDO driver, transaction-close guard, and resolver reuse of the
+  one DBAL owner. It also exposes native connection settings so visibility is
+  deliberately configured at 60 seconds rather than the factory's default.
+- `ecotone-dbal-priority.patch`: copies outbound priority into the native message.
+  Its failing negative control is retained. Interactive preference is not FIFO or
+  starvation-freedom, and does not preempt an already running Attempt.
+- `ecotone-tempest-lazy-boot.patch`: avoids compiling messaging for ordinary
+  concrete/unrelated interfaces, supports console-prefix discovery, skips CLI
+  discovery during HTTP boot, and namespaces/clears caches by application root.
+
+The Tempest fork alone does not fix the official adapter's transaction ownership.
+Sharing PDO with a separate DBAL nesting counter fails inner admission. The injected
+path instead updates one counter and uses real savepoints. Stashd requires that
+binding; it has no fallback to the original reflection-based PDO bridge. The
+official package still contains its old path for other users, but Stashd does not
+execute it. No private PDO property is reflected into by the replacement.
+
+Supported Tempest discovery filters keep Ecotone's internal Config/driver and Api
+classes out of Tempest's general service discovery; Ecotone loads those itself.
+Without those filters and lazy adapter resolution, installing the integration broke
+the existing 32 MiB archive CLI contracts. They now pass unchanged, including the
+large binary streaming and HTTP tests. This is a documented configuration choice,
+not a higher memory cap or preservation implementation change. Revisit when the
+upstream package exposes only its integration hooks to Tempest discovery.
+
+The active channel, retry, dead-letter and integration code paths carry Apache-2.0
+or MIT notices and run without an Enterprise key. Ecotone packages also contain
+proprietary features; their package licence declaration is not blanket permission
+to use every module. No Enterprise workflow, saga orchestration, dynamic routing
+or instant command retry capability is adopted or evaluated here.
+
+## Installation, consumers and recovery
 
 ```sh
-lerd composer --working-dir=tools/evaluations/official-tempest install --no-interaction --no-scripts
-test -e tools/evaluations/official-tempest/vendor || ln -s ../../../tmp/official-tempest-vendor tools/evaluations/official-tempest/vendor
-# Apply only to an unpatched isolated Ecotone installation:
-git apply --check --directory=tmp/official-tempest-vendor/ecotone/tempest tools/evaluations/ecotone-tempest-injection.patch
-git apply --directory=tmp/official-tempest-vendor/ecotone/tempest tools/evaluations/ecotone-tempest-injection.patch
-STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/EcotoneInstallation/InjectedIntegrationTest.php
-python3 -B tools/evaluations/installation-negative.py --injected
-# Retained regression set, including four deliberate red acceptance gates:
-STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/EcotoneInstallation tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php tests/Acceptance/Operations/WorkAdmissionTest.php tests/Feature/EcotoneTransactionTest.php --log-junit tmp/ecotone-injected-final.xml
-```
-
-Existing candidate vendor patches/setup documented below are still prerequisites
-for the candidate regression set. The isolated fork needs no additional Tempest
-patch. Both fixture VCS repositories use Git transport for metadata to avoid a
-local Composer GitHub-API authentication failure; the committed lock pins package
-sources. No credentials are written to the repository.
-
-The remaining integration work is to propose/review/release this Ecotone change,
-release the Tempest injection fix, bind the actual Operations runtime to the
-native system, and run its complete fault contracts through that profile. The
-native priority defect and legacy clean-schema gate remain separate obligations.
-Tagged databases, tenant switching, MySQL and SQLite are not covered by this
-PostgreSQL proof. No Messenger removal, preservation-safety or production-readiness
-claim follows from these results.
-
-## Previous final acceptance round — unmodified official integration
-
-The architectural preference is now the official **ecotone/tempest** integration.
-The custom bridge described in the round-two sections below is retained only as a
-working evaluation candidate until the official adapter passes the shared-boundary
-gates. No Messenger package, migration, relay or application service was removed
-in this round. Core's composer.json/lock and application source are unchanged.
-
-Two new contracts live in `tests/Acceptance/EcotoneInstallation/`: a genuinely
-fresh installation without Messenger schema, and nested Tempest/Operations admission.
-Original OPS-C01, OPS-C02 and OPS-C02-E assertions are unchanged.
-
-### Clean installation gate: expected failure
-
-The fixture allocates a new database and restricted role with no application
-schema tables. The real Tempest bootstrap runs all applicable migrations and
-explicit native queue provisioning. Each lifecycle process rejects Messenger
-class autoloads, so a hidden transport/service dependency fails even while Core
-still has the package installed. Jobs::request admits Work, a fresh native
-consumer completes it, and independent PostgreSQL observations verify Job,
-Attempt, effect and settled queue. A second admission retains its exact native
-invitation ID/body across repeated provisioning, then completes with its own
-history/effect. All those assertions pass.
-
-The final assertion intentionally fails because `CreateJobsTable` still creates
-**messenger_messages**. The test requires absence, not an empty legacy table.
-It is neither skipped nor rewritten to expect legacy schema. The migration remains
-untouched for the future removal pass. Runtime success in the presence of that
-legacy table is not certification that a complete Messenger-free Core installation
-already exists.
-
-### Nested transactions: candidate passes, official adapter fails
-
-The additional candidate contracts cover outer commit, outer rollback and an inner
-admission failure. The outer transaction is started through Tempest's normal
-Connection from the real application container. Ordinary Tempest mutation plus
-Job/native invitation are independently invisible until outer commit. On rollback,
-all three disappear. A real enqueue constraint violation rolls back the inner Job
-and queue invitation to its savepoint; the outer transaction can still insert and
-commit unrelated ordinary work. PostgreSQL insertion triggers record backend PID
-and txid for both Job and queue writes and compare them with the Tempest mutation.
-These are physical transaction observations, not DSN comparisons.
-
-Both negative controls are detected at the independent precommit visibility
-assertion: deliberately committing the inner physical PDO, and providing a second
-physical Job connection. Baseline and restored nested tests pass. The classifier
-rejects timeouts, setup/teardown errors and unrelated exception paths; raw private
-JUnit/events remain under ignored tmp/ecotone-installation-negative/.
-
-### Official integration installation and exact blocker
-
-`tools/evaluations/official-tempest/` is a separate locked Composer installation
-using the **real Core App source** through test-only PSR-4 paths. It installs
-`ecotone/tempest`, `ecotone/ecotone`, `ecotone/dbal`, and `ecotone/enqueue`
-**2.0.0-beta.7**, Tempest **3.19.2**, and DBAL **4.5.0**. It does not install
-symfony/messenger or symfony/doctrine-messenger. Core's working vendor tree and
-lockfile are not changed. The same explicit Tempest PR #2326 patch is applied to
-the isolated framework; no Ecotone adapter source is patched.
-
-The official profile uses normal Tempest boot/discovery, EcotoneConfig namespace
-selection, documented TempestConnectionReference and native ConfiguredMessagingSystem.
-Supported DiscoveryConfig excludes the candidate's connection/runtime initializers
-and provisioning binding in this profile; the selected Connection is Tempest's
-PDOConnection. There is no private singleton replacement or bridge workaround.
-A native async diagnostic is enqueued, consumed and persisted through injected
-Tempest Database, independently of the Operations nesting probe; its effect is
-observed and Composer confirms Messenger is absent.
-
-The subsequent real Jobs::request nesting probe fails with **PDOException:
-There is already an active transaction**. Independent PID/txid checks show Tempest
-and the official DBAL bridge do share the same physical PostgreSQL connection.
-The problem is ownership of transaction state: Tempest's transaction manager calls
-PDO directly, while the official DBAL wrapper still has nesting level zero. Inner
-JobRuntime::admitWork uses DBAL::transactional, so DBAL tries PDO::beginTransaction
-instead of creating a savepoint. The error occurs before Job or queue insertion.
-The outer mutation can still commit or roll back, but successful nested admission
-and the required inner-savepoint failure recovery are not established. All three
-official contract variants retain this failure.
-
-The diagnostic deliberately reuses the real Jobs admission logic on the official
-connection; it does not claim a completed migration of JobRuntime's messaging
-bootstrap to the native container. Native messaging is verified separately first.
-Ecotone's async/command automatic transaction wrappers are disabled through its
-supported configuration to preserve Operations' existing short-claim boundaries;
-this does not fix the inner DBAL begin. No handler retry or transaction shim is
-added to conceal the failure.
-
-Minimal reproducer on the official connection:
-
-```php
-$tempestConnection->beginTransaction();
-// Ordinary Tempest mutation runs on this PDO.
-$officialDbal->transactional(fn () => $jobs->request($work));
-// PDOException: There is already an active transaction
-```
-
-Even `$officialDbal->beginTransaction()` reproduces the conflict before the domain
-callback. Upstream must coordinate Tempest transaction ownership with DBAL nesting
-and savepoints (and keep rollback/reconnect state consistent). PR #2326's injected
-Connection fix alone does not do that for the official PDO bridge. Reflection-based
-PDO access is documented here as an actual official implementation assumption,
-not used as a reason to reject the user's preferred long-term integration.
-
-### Recorded final-gate results
-
-| Check | Result |
-| --- | --- |
-| Candidate outer commit / rollback / inner-savepoint failure | 3 passed |
-| Fresh install lifecycle / intent-preserving reprovisioning | Passed before the explicit schema-absence gate |
-| Fresh install schema-absence gate | Expected failure: legacy migration creates messenger_messages |
-| Official commit / rollback / inner-savepoint gates | 3 expected failures: already active PDO transaction; no admitted Job/invitation |
-| Native official async diagnostic and no Messenger package | Passed before each official nesting gate |
-| Combined new gates + existing native durability, OPS-C01 and transaction/event proof | **18 passed, 4 expected-failing, 0 unexpected failures**, 860 assertions, 91.62 seconds, exit 1 |
-| Premature physical commit / separate physical connection controls | Both detected at the named visibility assertion; baseline and restoration pass |
-| Format / lint / analysis | Format/lint passed; only 3 existing Records & Archives help messages |
-| Isolated Composer validation | Passed; warnings are deliberate exact-version pins |
-
-The red cases are real failing acceptance tests, not tests marked skipped, incomplete
-or expected-failure by the runner. Their exact assertion locations and failure
-classification are retained in `ecotone-final-acceptance.json`; negative-control
-results are in `ecotone-installation-negative.json`. No full-suite green claim is
-made; the older retained Messenger-specific failures from round two remain as
-previously documented. Only the focused regression set was rerun this round.
-
-### Custom components eligible for removal
-
-Remove these only after the official adapter satisfies the nested gates **and**
-existing shared-boundary/reconnect/durability contracts:
-
-| Candidate component | Official replacement / remaining condition |
-| --- | --- |
-| SharedOperationsConnection | Official TempestConnectionReference/DBAL factory with coordinated nesting |
-| OperationsConnectionInitializer | Tempest's own Connection initializer and official bridge |
-| TempestDbalConnection | Native Tempest connection with correct shared transaction ownership |
-| SharedPostgresConnection | Native lifecycle preserving schema on reconnect and rejecting active-transaction loss |
-| JobRuntimeInitializer | Native service discovery/binding after the real domain executor/runtime can resolve without creating a second bus |
-| JobRuntime's EcotoneLite assembly | Official ConfiguredMessagingSystem and supported channel/error configuration |
-
-Ordinary PostgreSQL application configuration, Jobs/Work/Attempts, domain claim and
-generation policy, and explicit queue provisioning obligations remain. DeliverySchema
-can delegate to native DatabaseSetupManager/setup commands; the idempotent
-provisioning requirement itself must not disappear. No custom component is deleted
-in this validation round.
-
-### Reproduce the previous round at bf376a9
-
-```sh
-# Core working candidate dependencies/patches remain as documented below.
-lerd composer --working-dir=tools/evaluations/official-tempest install --no-interaction --no-scripts
-# Tempest resolves vendor/composer relative to the isolated application root:
-test -e tools/evaluations/official-tempest/vendor || ln -s ../../../tmp/official-tempest-vendor tools/evaluations/official-tempest/vendor
-# Only if the isolated copy is not already patched:
-git apply --directory=tmp/official-tempest-vendor/tempest/framework tools/evaluations/tempest-2326.patch
-STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/EcotoneInstallation
-python3 -B tools/evaluations/installation-negative.py
-# The recorded 22-case regression set (four documented assertion failures):
-STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/EcotoneInstallation tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php tests/Acceptance/Operations/WorkAdmissionTest.php tests/Feature/EcotoneTransactionTest.php --log-junit tmp/ecotone-final-acceptance.xml
-```
-
-The vendor symlink, package installation, framework patch and Tempest caches are
-local/ignored. The fixture lockfile records exact dependency versions. The new
-acceptance directory is expected to remain red at the documented clean-schema
-assertion and official nesting assertions until those blockers are fixed. Report
-those separately from the passing working-candidate contracts.
-
-**Decision at that round:** prefer the official adapter, retain the working candidate,
-and keep Messenger removal out of this round. The clean-install gate must pass
-before a subsequent removal is accepted; the official adapter must pass the shared
-transaction gates before it replaces the candidate. Improving upstream can be separate work; it is not silently
-implemented in Stashd here. The earlier round-two adoption recommendation below is
-historical evidence for that candidate, not approval of the official adapter as-is.
-
-## Recommendation: Adopt after specific upstream work
-
-The candidate now satisfies the bounded native Operations durability contracts
-without rebuilding Messenger's local relay. Ordinary application persistence can
-use Tempest Database on the same physical connection as Ecotone delivery through
-normal Tempest bootstrap. Neither conclusion depends on an in-memory queue or a
-manually constructed Tempest container.
-
-Adoption remains conditional on releasing Tempest PR #2326 and fixing/releasing
-Ecotone's native DBAL priority propagation. This branch is an evaluation, not an
-authorized production migration. Existing queued-envelope migration, deployment
-compatibility and operational rollout still need design. Do not merge this draft
-as a production replacement.
-
-[Round-one findings](https://github.com/Lost-and-Fonds/stashd/blob/c710a7f5481fa9f8ef012a006fcb19760865b5b1/docs/evaluations/ecotone.md) and its original evidence JSON are
-retained. Its seven failures from the Messenger driver establish **neither**
-success nor failure of the new architecture. The additional native contracts below
-now test the necessary product outcomes directly. The round-one rejection is
-superseded by this conditional recommendation.
-
-## Provenance and scope
-
-- Core repository `Lost-and-Fonds/stashd`, branch `spike/ecotone-evaluation`, draft
-  PR #80. Base fetched dev: `65eb0388378d827e8874162c2255722e7c3a4e99`.
-- Round-one commit: `c710a7f5481fa9f8ef012a006fcb19760865b5b1`.
-- Existing local dev remains at `8c6dc0b6ecf74ab4782c7c3196457103a03b1a39`;
-  other branches/worktrees and the workspace submodule pointer are untouched.
-- PHP 8.5; Tempest 3.19.2; Doctrine DBAL 4.5.0; Ecotone DBAL/core/enqueue
-  2.0.0-beta.7. No dependency or lockfile changes were made in round two.
-- Isolated Tempest patch is pinned to PR #2326 head
-  `5e56e440298e4c30e8059030ef078e7a71e4fbf6`; the separate native-priority patch
-  is stored under `tools/evaluations/`. Neither is silently installed by Composer.
-- Tempest adapter source inspection uses ecotone-dev
-  `bba9fa69dc999a75f709d5f3e913f178af40098d`.
-- No workflows, sagas, ORM or preservation implementation was added. Vault/OCFL
-  remains entirely outside messaging transactions.
-
-Inputs: unchanged OPS-C01/OPS-C02 specifications and drivers, their negative-control
-verifier, Operations design notes, Core AGENTS.md, installed Tempest database/DI/
-process facilities and installed Ecotone channel/retry/acknowledgement source.
-Ecotone's official async, resiliency, testing, handler and interceptor skills and
-documentation MCP were also consulted. Some documentation/skill examples use old
-namespaces; installed 2.0 APIs determine the actual implementation.
-
-## Contracts first: OPS-C02-E
-
-The new [native specification](../../tests/Acceptance/EcotoneDelivery/README.md)
-and `NativeDurabilityTest.php` are additional contracts. Original OPS-C01 and
-OPS-C02 assertions, names and READMEs remain byte-identical to the fetched base.
-The new test assertions query independent PostgreSQL state and effects; the driver
-has no alternate Job store, fake queue, acknowledgement mechanism or completion
-ledger.
-
-| Original OPS-C02 | Native contract / independent outcome |
-| --- | --- |
-| Outbox rejection | Real enqueue constraint rejection rolls back Job; later Tempest mutation failure rolls back enqueue |
-| Admission death | Deferred COMMIT trigger blocks after writes; terminate child/backend, observe no partial intent, readmit |
-| Restart before relay | Observe committed Job and native row before launching a fresh consumer; one effect/Attempt |
-| Forward destination failure | Real claim-write rejection, native delayed retries, exhausted dead letter, native replay of same Job |
-| Relay forward-before-ack death | Local relay disappears; receipt/claim death tests the new durable execution boundary |
-| Worker completion-before-ack death | Observe completed Job, independent effect and unacknowledged native row; kill/replay without another Attempt/effect |
-| Reverse physical forwarding | No forwarding hop; old/new generation invitations and queued priority preference are observed directly |
-
-Multiple consumers additionally overlap on a valid paused Attempt, duplicate
-invitation and unrelated Work. The second consumer completes unrelated Work,
-retains delayed recovery intent, adds no domain failure, and does not hot-loop.
-Both real queue visibility and Job lease deadlines are advanced after terminating
-the first consumer; recovery closes the old Attempt as interrupted and completes
-under a new Attempt. Completed and obsolete deliveries are safe no-ops.
-
-### Crash boundaries and explicit limits
-
-Native `delivery_id`, Job/Attempt rows and separate effects are observed while the
-child is alive. Executor pause occurs before its independent effect, after a
-committed claim. A test-only native around-interceptor pauses after the real handler
-has committed completion but before acknowledgement. An `After` interceptor on the
-void handler did not establish that boundary and was discarded as evidence.
-SIGKILL is sent to the exact PID and a signaled exit/137 is required; every child
-has a deadline and is reaped before database teardown.
-
-The precommit test blocks PostgreSQL with a deferred trigger, independently observes
-a live waiting transaction, and terminates **both** the child and blocked server
-backend before releasing the barrier. Client death alone cannot promise rollback
-of COMMIT already received by PostgreSQL. Lost commit responses are ambiguous;
-readmission/coalescing must handle either committed or aborted state. The proof is
-server transaction abort before commit, not a claim about power loss/WAL/storage.
-
-The effect-to-completion window remains: if an arbitrary external effect succeeds
-and the worker dies before saving completion, recovery can repeat that effect.
-The tests do not conceal effects with uniqueness constraints. No exactly-once
-external effects, live stale-worker fencing, claim renewal, fairness or preservation
-crash safety is claimed. Those were also deferred by the baseline Operations design.
-
-## Busy claims and native error recovery
-
-The round-one generic RuntimeException plus stop-on-error regression is removed.
-A busy, valid claim is normal domain contention. It publishes a delayed invitation
-on the **same native channel**, then returns normally. It adds no domain failure,
-no Attempt and no new Job identity. Delay is 60 seconds, matching the bounded Job
-lease. A crash before publication leaves the original native receipt recoverable;
-a crash after publication but before ack can duplicate invitations, which the Job
-guards tolerate. No separate busy queue or Messenger exception/listener is added.
-
-The documentation MCP recommends delayed delivery and normal return for this case;
-the behavior is also tested against actual DBAL messages. The second consumer's
-subsequent bounded poll before the due time produces no extra Attempt/effect and
-leaves the delayed row intact. The proof checks the native delayed deadline, not
-a claimed timer or a sleep in application code.
-
-Infrastructure errors use Ecotone's actual `ErrorHandlerConfiguration`: one initial
-failed delivery plus three delayed retries at one second, then DBAL dead-letter
-storage. Instant retries are disabled so this budget is explicit. A real database
-trigger rejects Job claim updates; native retry headers/rows are persisted, Job
-stays queued with zero Attempts and zero domain failures, and the exhausted
-payload retains its Job ID. After the fault is removed, the native DeadLetterGateway
-replays it and that same Job completes. The suite separately proves executor
-failures produce three failed Attempts and a terminal failed Job, with no transport
-dead letter. These are distinct outcomes.
-
-Native receipt visibility is explicitly 60,000 ms instead of the lower-level
-20-minute default. Job leases are 60 seconds. Tests may advance actual native
-`redeliver_after`, `delayed_until` and Job lease deadlines to make recovery bounded;
-this is eligibility manipulation, not manufactured acknowledgement. Ordinary
-expired-delay eligibility also occurs during the domain-retry tests. Sustained
-outages of the entire database, failure of dead-letter storage itself and remote
-brokers are not covered by the isolated claim-write fault.
-
-## Normal Tempest persistence and DI
-
-The target is one connection owner, not a Doctrine-only Operations island:
-
-1. `OperationsConnectionConfig.config.php` declares the existing PostgreSQL settings
-   as Tempest's DatabaseConfig. No connection opens during configuration loading.
-2. `SharedOperationsConnection` lazily constructs one DBAL connection per container/
-   process. `OperationsConnectionInitializer` binds Tempest's public Connection
-   interface to `TempestDbalConnection` over that owner.
-3. `JobRuntimeInitializer` resolves the same owner and any department WorkExecutor.
-   Ordinary Integration persistence continues using Tempest Database/Query,
-   validation and migrations; the domain-specific advisory/claim SQL is retained.
-4. With PR #2326, Tempest DatabaseInitializer honors that injected Connection and
-   gets dialect/tag from configuration rather than assuming PDOConnection internals.
-
-Fresh child processes call **Tempest::boot**, the same framework entry used by the
-console application. The test binds only a disposable departmental executor. Both
-Jobs-first and Database-first resolution orders are exercised. Tempest mutation
-and Jobs enqueue share PostgreSQL PID and txid; independent SQL sees neither until
-commit. Rollback and a subsequent real unique violation remove both. The manual
-container proof from round one remains useful regression coverage but is not the
-round-two integration evidence.
-
-### Reconnect and connection lifetime
-
-Session search-path initialization must survive reconnects. The supported
-DBAL `wrapperClass` extension now uses `SharedPostgresConnection` to initialize the
-private schema whenever a new physical session opens, and to refuse closing an
-active transaction. Tempest's adapter has no cached PDO; it resolves through the
-same owner. Both adapter reconnect and direct DBAL close/reopen are tested, as are
-both active-transaction refusal paths. An additional schema-renaming case avoids
-PostgreSQL’s default `$user` search path masking a missing initialization hook. The current proof covers explicit reconnect
-between transactions and sharing across fresh consumer processes, not autonomous
-healing in the middle of a server/network failure.
-
-This costs a small DBAL connection subclass in addition to the Tempest adapter.
-Ecotone's installed reconnect helper itself invokes DBAL methods through
-ReflectionMethod; Stashd does not reflect PDO or container internals. A future
-Ecotone release could use public native-connection resolution instead. Do not claim
-that every optional Ecotone reconnect path or tenant switch has been certified.
-
-### Native ecotone/tempest alternative
-
-The official Tempest module recommends `TempestConnectionReference` to reuse the
-configured connection. Its inspected dynamic driver still reflects a private
-`pdo` property, and its PSR adapter reflects Tempest container internals. PR #2326
-does not remove those assumptions. In particular, the public injected Connection
-implementation above intentionally has no `pdo` property. The existing native
-bridge therefore cannot wrap it as written.
-
-A minimal reproducer, with `ecotone/tempest` available, is:
-
-```php
-$container = \Tempest\Core\Tempest::boot(root: getcwd());
-$container->get(\Tempest\Database\Database::class);
-$factory = \Ecotone\Tempest\Config\TempestConnectionResolver::resolve(
-    \Ecotone\Api\Tempest\TempestConnectionReference::defaultConnection(),
-);
-$factory->createContext()->getDbalConnection()->executeQuery('SELECT 1');
-// Current bridge tries ReflectionProperty($injectedConnection, 'pdo').
-```
-
-The cleaner candidate uses supported EcotoneLite production bootstrap and explicit
-connection registration, plus normal Tempest initializers. It does not install the
-native Tempest adapter. To make that adapter interchangeable, upstream needs a
-public connection/factory extension that accepts the already-owned DBAL connection
-(or a public Tempest native-handle capability with transaction-owner coordination),
-and must stop assuming every Connection implementation owns a private PDO field.
-Publishing PR #2326 alone is insufficient. This alternative is source-reviewed;
-it is not counted as a passing adapter package integration test.
-
-## Schema, deployment and recovery procedure
-
-`JobRuntime` construction performs no queue DDL. Tempest `integration:init` continues
-to migrate domain tables. Explicit **`php tempest job:setup`** provisions the queue
-and `ecotone_error_messages` using vendor schema managers, before consumers start.
-Using the vendor-provided schema rather than copying it into a handwritten Tempest
-migration avoids a second schema definition. This is an explicit provisioning
-command, not an automatic per-request schema check. It preserves retained messages.
-
-For this candidate:
-
-```sh
+lerd composer install --no-interaction
+# Application environment (use the repository/Lerd console entry point locally):
 php tempest integration:init
-php tempest job:setup
-php tempest job:work jobs
+php tempest ecotone:migration:database:setup --initialize
+php tempest ecotone:run jobs --memoryLimit=256 --executionTimeLimit=300000
+php tempest ecotone:deadletter:list
+php tempest ecotone:deadletter:show MESSAGE_ID
+php tempest ecotone:deadletter:replay MESSAGE_ID
 ```
 
-Supervise the single Job consumer with restart-on-exit and deployment restarts.
-There is no `job:work outbox`. Stop old consumers before changing payload contracts;
-apply schema/provisioning before starting new ones. Do not mix old Messenger
-serialized envelopes with Ecotone payloads. Existing Jobs/Attempts and historical
-Messenger tables are retained; migrating accepted old delivery intent is still a
-rollout obligation, not silently solved by this spike.
+The PostgreSQL database and restricted owner must exist. Application migrations
+create the private schema/domain tables; native setup provisions only used queue
+and dead-letter features, without deleting intent. No historical upgrade is
+needed. Schema is a PostgreSQL startup option in Tempest DatabaseConfig so it
+survives reconnect; a conflicting independent DSN options field is rejected.
+Nonpersistent connections are process-local. Connection replacement during an
+active shared transaction is rejected, including direct DBAL close.
 
-Operator recovery uses the native DeadLetterGateway list/show/replay APIs exposed
-by the runtime's messaging system. The test invokes replay from a fresh application
-process. A user-facing, authorized operator console/UI is not implemented by this
-evaluation. Monitor queued/running Jobs, delayed invitations, failed Attempts and
-dead letters separately; an exhausted transport delivery is not a terminal domain
-Job failure. Test credentials/fixture names never become deployment defaults.
+Supervise one or more native jobs consumers, restarting on exit. No relay or
+priority-specific worker is required. Tempest retains scheduling. Stop consumers
+before code/payload or cache changes, install locked dependencies/patches, migrate,
+provision/warm once, and restart. Caches contain definitions, not a reusable physical
+connection. Production-cache tests exercise fresh processes against two independent
+installations without sharing their Jobs or effects. Other dialects and tenant
+switching are not certified by this PostgreSQL proof.
 
-## Complexity comparison
+See ../development/jobs.md for startup/recovery details and
+../development/work-admission.md for Work and departmental reconciliation policy.
 
-| Dimension | Messenger baseline | Round-two candidate |
-| --- | --- | --- |
-| Local Job topology | Outbox relay + destination worker | One native database-channel worker |
-| Plumbing removed | Envelopes/stamps, senders/locators, JobServices, transport assembly, lifecycle retry/failure listeners, failed-envelope redispatch | Native attributes, channel/error configuration and recovery gateway |
-| Domain policy | Work identity/coalescing, promotion generations, claims, Jobs/Attempts, reconciliation | Same; still Stashd's responsibility |
-| Ordinary persistence | Tempest connection separate from Operations DBAL | Tempest and Ecotone share one owner via normal DI |
-| New connection integration | No supported shared boundary | SharedOperationsConnection, two initializers, TempestDbalConnection, SharedPostgresConnection and configuration |
-| Schema ownership | Tempest domain + Messenger message table | Tempest domain + explicit vendor queue/dead-letter provisioning |
-| Recovery | Messenger retries/failure transport and relay replay | Native delayed retries/dead letters; no local forwarding boundary |
-| Priority | Interactive destination polled first | Native numeric priority; upstream defect fix required |
-| Maintenance | Messenger 8.2 dev API; custom worker assembly | Ecotone 2 beta API, compilation/cache lifecycle, two upstream dependencies and small connection integration |
+## Executable contracts and evidence
 
-No dependencies changed this round. Relative to baseline, direct addition remains
-`ecotone/dbal:2.0.0-beta.7`; transitive additions remain Ecotone core/enqueue,
-queue-interop 0.8.2, enqueue/dsn 0.10.27, laminas-code 4.18.0 and Symfony DI
-8.2.x-dev. Service-contracts became dev-main and var-exporter 8.1.10 in round one.
-DBAL 4.5.0 remains a direct and transitive dependency. No ORM is introduced.
-Baseline Messenger dependencies remain for its preserved drivers/tests; no actual
-removal is claimed until that verification/deployment transition is designed.
+The complete retired-test-to-native-proof mapping is in
+[durable-delivery.md](../development/durable-delivery.md). OPS-C01 assertions remain
+unchanged. The original Messenger-only OPS-C02 observations are replaced by native
+failure observations; no case is skipped, made incomplete or declared green merely
+because relay machinery disappeared.
 
-Native per-subscriber event isolation from round one remains demonstrated but is
-not expanded into a new preservation implementation here. Production event
-projection policy/PREMIS binding remains separate work. No throughput/RSS benchmark
-was run. One process and one queue hop removed are measured topology differences,
-not a throughput claim. Connection adapter maintenance increases while transaction
-ownership becomes coherent. A line-count reduction alone is not the recommendation.
+The actual integration proves ordinary mutation + Job + invitation commit/rollback,
+nested savepoint failure with usable outer work, physical PostgreSQL PID/transaction
+identity, both initialization orders, reconnect guards, non-default schema,
+production cache isolation, idempotent provisioning and clean installation.
+The four previously retained red gates now run against the real application binding.
 
-## Licensing
-
-This proof runs without an Enterprise key. Native DBAL channels, explicit delayed
-error configuration, basic handlers/interceptors and dead-letter gateway code are
-Apache-2.0 (inherited queue code includes MIT). Framework message dedup remains off;
-Jobs guard domain execution. Aggregate Sagas are source-present open-source
-facilities but were not evaluated. Orchestrator, high-throughput publishing and
-some per-handler retry attributes are Enterprise-gated; none is used here. Package
-installation is not permission to use all shipped features. This is implementation
-licence inspection, not a legal opinion or a general licence audit.
-
-## Evidence, remaining work and reproducibility
-
-See the retained native negative-control JSON and round-two evidence JSON. Raw
-process logs/JUnit/hook events stay in ignored `tmp/ecotone-native-negative/`.
-Tests use disposable databases and restricted roles through the existing allocator.
-The parent terminates/reaps every child, drops only its generated database/role,
-and independently audits removal plus filesystem teardown. No production data is
-used. Poll/barrier assertion counts can vary with timing.
+Fault tests cover concurrent coalescence, Refresh/Complete identity, queued promotion,
+new Work after terminal completion, precommit death, restart after commit, receipt
+and claim death, completion-before-ack death at the actual native DELETE,
+duplicates/obsolete generations, busy recovery, truthful domain failures, infrastructure
+retry exhaustion/dead letters, native operator replay, rejected busy/retry publication
+and delivery reordering.
+The separate catalogue proof delivers one existing event through the same native
+system to independent history/PREMIS/client consumers, preserving its ID and safe
+projection. It is not a canonical Vault PREMIS implementation or migration of all
+catalogue events.
 
 ```sh
-lerd composer install --no-interaction --no-scripts
-# Apply only when not already present in this worktree's vendor tree:
-git apply --directory=vendor/tempest/framework tools/evaluations/tempest-2326.patch
-git apply --directory=vendor/ecotone/dbal tools/evaluations/ecotone-dbal-priority.patch
-# Supply the existing private local test-admin descriptor (never production).
-STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php tests/Acceptance/Operations/WorkAdmissionTest.php tests/Feature/EcotoneTransactionTest.php
-python3 -B tools/evaluations/native-negative.py
-lerd composer github:fmt
-lerd composer github:lint
-lerd composer github:analyse
+lerd composer qa
+STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/Operations tests/Acceptance/OperationsDelivery tests/Acceptance/EcotoneDelivery tests/Acceptance/EcotoneInstallation tests/Acceptance/Integration/JobsTest.php tests/Acceptance/Integration/WorkAdmissionAtomicityTest.php tests/Acceptance/Integration/WorkExecutionContextTest.php tests/Feature/EcotoneTransactionTest.php --log-junit tmp/ecotone-replacement-focused.xml
+python3 -B -m unittest discover -s tools/verification -p 'test_*.py'
+python3 -B tools/verification/ops_c02_negative.py
+python3 -B tools/evaluations/installation-negative.py
+lerd composer audit
 ```
 
-Patches are isolated and applied to this evaluation vendor tree; Composer reinstall
-can remove them. The priority negative control deliberately removes its behavior
-and requires failure at the **original** OPS-C01 next-effect assertion, then restores
-exact bytes. Other controls split admission transactions, drop native intent,
-permit completed reclaim, repeat the independent effect, ignore generations, drop
-busy recovery intent and substitute a separate physical Database connection.
-Only a specific assertion failure counts; timeouts, setup failures and unrelated
-errors do not. Source restoration and a passing baseline/restored run are mandatory.
+Final results are recorded in
+[ecotone-replacement-evidence.json](ecotone-replacement-evidence.json), including
+exact dependency additions/removals, patch hashes and verified source hashes.
 
-The native tests establish bounded Operations delivery equivalence, not all Stashd
-product acceptance. Pre-existing Messenger-specific drivers are retained and can
-still fail against the replacement; those are documented compatibility tasks,
-not durability verdicts. Any full-suite result below must be interpreted by its
-specific failing contracts rather than summarized as a green migration.
-
-### Recorded round-two results
-
-| Check | Result |
+| Verification | Observed result |
 | --- | --- |
-| Native OPS-C02-E | 10 passed, including explicit setup/teardown resource audits |
-| Additional non-default schema reconnect case | 1 passed, 36 assertions after strengthening the bootstrap test |
-| Native + unchanged OPS-C01 + original transaction/event proof | **15 passed, 626 assertions, 52.81 seconds** in the combined focused run |
-| Deliberate negative controls | **8 detected**, baseline and restored native suites both 10 passed |
-| Classifier self-checks | Correct assertion accepted; infrastructure exit, wrong location, error and hook failure rejected |
-| Format / lint | Passed |
-| Static analysis | No errors; 3 existing Records & Archives help messages |
-| Full suite, 8 processes | Exit 2: **453 passed, 17 failed, 33 incomplete**, 24,224 assertions, 116.74 seconds |
+| Complete canonical `lerd composer qa` | Exit 0; 478 passed, 33 existing incomplete preservation contracts, zero failures; 24,388 assertions, 116.83 seconds, four processes |
+| Focused Operations, delivery, installation and catalogue contracts | 38 passed, zero incomplete/failures; 1,065 assertions, 90.48 seconds, serial |
+| Native delivery adversarial verification | Passing ten-case baseline, nine intended invariant failures, exact source restoration, passing restored suite |
+| Nested transaction adversarial verification | Passing baseline, three intended invariant failures, exact source restoration, passing restored test |
+| Python verifier/wrapper regressions | 13 passed |
+| Mago format, lint and analysis | Passed; analysis retains three pre-existing Records & Archives help diagnostics |
+| Composer audit / validate | No advisories or abandoned packages; valid with deliberate development-pin warnings |
+| Isolation and cleanup | Six other worktrees match saved status/diff/dirty-file hashes; fixture database, role, directory and child cleanup asserted |
 
-The 17 retained failures are 7 Integration Jobs tests, 2 WorkAdmissionAtomicity,
-1 WorkExecutionContext, and 7 original OPS-C02 cases. Their fixtures still provision
-only Messenger tables; assertions/commands also explicitly require Messenger
-transport types, envelope rows, visibility columns or the removed relay. They were
-not weakened or skipped. The native suite covers corresponding durability outcomes;
-legacy driver/provisioning compatibility remains visible work. No unrelated domain
-or preservation assertion failed. The 33 incomplete preservation contracts remain
-pre-existing product gaps. Focused polling assertion counts vary with timing.
+A broad initial nesting sabotage failed during fixture migrations and was rejected
+as a verification error. The retained control targets the actual nested test only.
+Similarly, the transport publication fault uses a BEFORE INSERT trigger so receipt
+can succeed before retry publication is rejected. Neither fixture errors nor those
+initial runs are counted as successful negative controls. All retained controls
+have passing restored baselines. The four previously red acceptance gates pass;
+there are no expected-failing replacement gates.
 
-The canonical wrapper was used for all tests. QA components were run separately
-rather than using the mutating composer qa chain, preserving protected assertions
-and respecting the repository's canonical runtime wrapper.
 
-### Remaining blockers classified
+The full-suite exception is the existing independently incomplete preservation
+contracts and known test-environment deprecations. No intentional red acceptance
+case is accepted as a green build. Negative verification requires passing baseline,
+precise assertion failure, independent persisted observations, exact source
+restoration and a passing restored suite. Setup errors and timeouts never count.
+The original verifier's classifier/restoration regressions were carried forward
+and extended for native failures and the canonical POSIX test wrapper.
 
-- **Upstream defects/release dependencies:** Tempest must honor injected connections
-  in a release; Ecotone DBAL must propagate native priority. Native Tempest adapter
-  requires a public extension if selected instead of explicit bootstrap.
-- **Unfinished evaluation/rollout:** existing envelope migration, old-version message
-  compatibility, supervision configuration, operational UI/authorization, automatic
-  network-loss recovery, cache warmup/invalidation and production resource benchmarks.
-- **Domain obligations regardless of transport:** department-owned unmet demand and
-  reconciliation, resource policy, external-effect idempotency/fencing, long-running
-  lease renewal/cancellation, fairness and preservation crash safety.
+## What we would never have needed
 
-No inherent need for Messenger's local relay emerged. Ecotone meets these bounded
-native guarantees with less delivery infrastructure and a coherent persistence
-boundary, at the cost of framework connection integration and release dependencies.
-We should discard unnecessary relay machinery once those dependencies and rollout
-requirements are resolved, rather than preserve its transport assumptions.
+Selecting Ecotone first would have avoided the Messenger sender/locator/listener
+assembly, local outbox relay, separate forwarding/interactive destination queues
+and failed-envelope redispatch command. Framework-managed messaging, retries and
+native PostgreSQL delivery provide those responsibilities directly.
 
-## If Ecotone had been selected first
+Shared transaction integration would still have required work: Ecotone alone does
+not fix Tempest injection or coordinate two transaction counters. The fork and
+adapter changes are the demonstrated solution. With that integration there is no
+permanent separate Operations persistence runtime to maintain.
 
-We would not have built the local outbox relay, extra local destination hop,
-Messenger envelope/stamp routing, JobServices locator, lifecycle listener assembly
-or failed-envelope redispatch method. A native event bus could also supply durable
-subscriber delivery without inventing commit-aware Tempest middleware.
+We would still need canonical Work identities, coalescence, queued promotion policy,
+Jobs, actual Attempt history, claim generations and leases, guarded state transitions,
+department executors, resource policy, reconciliation and independently tested crash
+behaviour. Database provisioning, worker supervision, cache/deployment discipline
+and upstream integration maintenance also remain. Vault authority, custody, fixity
+and recovery remain preservation responsibilities regardless of messaging choice.
 
-We would still need Work identities, concurrent coalescing, Refresh/Complete modes,
-queued promotion policy, Jobs/Attempts, generation checks, leases, resource policy,
-departmental reconciliation, client-safe event policy and external-effect guards.
-We would also need the shared framework connection integration. Vault/OCFL custody,
-fixity, authoritative commit and recovery remain independent preservation work.
+## Proof limits
 
-## Sources
-
-- [Tempest PR #2326](https://github.com/tempestphp/tempest-framework/pull/2326) and
-  [issue #2325](https://github.com/tempestphp/tempest-framework/issues/2325).
-- [Ecotone source](https://github.com/ecotoneframework/ecotone-dev) and installed
-  DBAL/core/enqueue 2.0.0-beta.7 source for ack, visibility, retry and licence claims.
-- [Official Tempest connection guidance](https://docs.ecotone.tech/modules/tempest/database-connection-dbal-module)
-  and [Tempest workers](https://docs.ecotone.tech/modules/tempest/asynchronous-tempest).
-- [Error channels/dead letters](https://docs.ecotone.tech/modelling/recovering-tracing-and-monitoring/resiliency/error-channel-and-dead-letter)
-  and [final failure strategies](https://docs.ecotone.tech/modelling/recovering-tracing-and-monitoring/resiliency/final-failure-strategy).
-- [Ecotone AI integration](https://docs.ecotone.tech/other/ai-integration) for skills
-  and documentation MCP; guidance was checked against installed APIs and real tests.
+An independent effect can happen before completion persistence fails. The acceptance
+suite deliberately observes its repetition after recovery; arbitrary external
+exactly-once effects are not guaranteed. Job completion fencing does not fence a
+live stale worker's external effects. OPS-C03 fencing/lease renewal, cancellation,
+remote brokers, power/storage failure, total network partitions, tenant switching,
+other database engines and comprehensive workflow orchestration remain unproved.
+No preservation code or protected preservation assertion is changed.
