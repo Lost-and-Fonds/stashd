@@ -1,0 +1,23 @@
+⨯
+  ────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Acceptance\OperationsFencing\AttemptFencingTest > a real st…
+  Failed asserting that true is false.
+
+  at tests/Acceptance/OperationsFencing/AttemptFencingTest.php:368
+    364▕     ]);
+    365▕     expect($failure['original_worker_alive_at_failure'])->toBeTrue();
+    366▕     expect($failure['handler_error_observed'])->toBeTrue();
+    367▕     expect($failure['failure_transition_reached'])->toBeTrue();
+  ➜ 368▕     expect($failure['job_failure_accepted'])->toBeFalse();
+    369▕     expect($failure['native_delivery_settled'])->toBeTrue();
+    370▕
+    371▕     $after = $this->fencing->run('job.read', ['job_id' => $jobId])['job'];
+    372▕     expect($after)->toBe($before);
+
+  1   tests/Acceptance/OperationsFencing/AttemptFencingTest.php:368
+
+
+  Tests:    1 failed (23 assertions)
+  Duration: 6.92s
+
+Script @php ./vendor/bin/pest handling the test event returned with error code 1

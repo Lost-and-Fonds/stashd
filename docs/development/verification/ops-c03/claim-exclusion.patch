@@ -1,0 +1,11 @@
+--- app/Operations/JobRuntime.php
++++ app/Operations/JobRuntime.php
+@@ -153,7 +153,7 @@
+         $job = $this->database->transactional(function (Connection $database) use ($token, $message): array|false {
+             $database->fetchOne('SELECT id FROM jobs WHERE id = ? FOR UPDATE', [$message->id]);
+             $job = $database->fetchAssociative(
+-                "WITH decision AS MATERIALIZED (SELECT clock_timestamp() AS at), claimed AS (UPDATE jobs SET status = 'running', claim_token = ?, lease_until = decision.at + (? * interval '1 millisecond'), attempts = attempts + 1 FROM decision WHERE id = ? AND generation = ? AND (status = 'queued' OR (status = 'running' AND lease_until <= decision.at)) RETURNING payload, failures, work_type, work_scope, work_mode, desired_priority, lease_until) SELECT decision.at AS decision_at, claimed.* FROM decision LEFT JOIN claimed ON true",
++                "WITH decision AS MATERIALIZED (SELECT clock_timestamp() AS at), claimed AS (UPDATE jobs SET status = 'running', claim_token = ?, lease_until = decision.at + (? * interval '1 millisecond'), attempts = attempts + 1 FROM decision WHERE id = ? AND generation = ? AND status IN ('queued', 'running') RETURNING payload, failures, work_type, work_scope, work_mode, desired_priority, lease_until) SELECT decision.at AS decision_at, claimed.* FROM decision LEFT JOIN claimed ON true",
+                 [$token, $this->lease->milliseconds, $message->id, $message->generation],
+             );
+             if ($job === false) {

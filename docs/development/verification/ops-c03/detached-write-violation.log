@@ -1,0 +1,23 @@
+⨯
+  ────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\AttemptAuthorityTest > a database mutation delayed…
+  Failed asserting that true is false.
+
+  at tests/Feature/AttemptAuthorityTest.php:12
+      8▕     $fixture = new FencingFixture();
+      9▕     try {
+     10▕         $job = $fixture->run('job.prepare', ['name' => 'delayed-database-mutation'])['job_id'];
+     11▕         $attempt = $fixture->run('worker.start_paused', ['job_id' => $job]);
+  ➜  12▕         expect($fixture->run('host.slow_write', ['attempt_id' => $attempt['attempt_id']])['accepted'])->toBeFalse();
+     13▕         expect($fixture->run('host.records', ['job_id' => $job])['checkpoints'])->toBe([]);
+     14▕     } finally {
+     15▕         $fixture->dispose();
+     16▕     }
+
+  1   tests/Feature/AttemptAuthorityTest.php:12
+
+
+  Tests:    1 failed (11 assertions)
+  Duration: 7.24s
+
+Script @php ./vendor/bin/pest handling the test event returned with error code 1

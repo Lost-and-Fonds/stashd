@@ -1,0 +1,23 @@
+⨯
+  ────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Acceptance\OperationsFencing\AttemptFencingTest > an expire…
+  Failed asserting that true is false.
+
+  at tests/Acceptance/OperationsFencing/AttemptFencingTest.php:142
+    138▕     }
+    139▕
+    140▕     expect($this->fencing->run('lease.renew', ['attempt_id' => $a['attempt_id']])['accepted'])->toBeFalse();
+    141▕     $finish = $this->fencing->run('worker.try_complete', ['attempt_id' => $a['attempt_id']]);
+  ➜ 142▕     expect($finish['accepted'])->toBeFalse();
+    143▕     expect($this->fencing->run('job.read', ['job_id' => $jobId])['job']['state'])->not->toBe('completed');
+    144▕     $records = $this->fencing->run('host.records', ['job_id' => $jobId]);
+    145▕     expect($records['checkpoints'])->toBe([]);
+    146▕     expect($records['custody'])->toBe([]);
+
+  1   tests/Acceptance/OperationsFencing/AttemptFencingTest.php:142
+
+
+  Tests:    1 failed (17 assertions)
+  Duration: 7.97s
+
+Script @php ./vendor/bin/pest handling the test event returned with error code 1

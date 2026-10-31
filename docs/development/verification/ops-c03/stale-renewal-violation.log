@@ -1,0 +1,23 @@
+⨯
+  ────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Acceptance\OperationsFencing\AttemptFencingTest > an expire…
+  Failed asserting that true is false.
+
+  at tests/Acceptance/OperationsFencing/AttemptFencingTest.php:71
+     67▕     expect(array_column($state['attempts'], 'id'))->toContain($a['attempt_id'], $b['attempt_id']);
+     68▕     expect(array_column($state['attempts'], 'outcome'))->not->toContain('completed', 'failed');
+     69▕
+     70▕     $renewal = $this->fencing->run('lease.renew', ['attempt_id' => $a['attempt_id']]);
+  ➜  71▕     expect($renewal['accepted'])->toBeFalse();
+     72▕
+     73▕     $this->fencing->run('worker.release_all', ['job_id' => $jobId]);
+     74▕ });
+     75▕
+
+  1   tests/Acceptance/OperationsFencing/AttemptFencingTest.php:71
+
+
+  Tests:    1 failed (21 assertions)
+  Duration: 8.48s
+
+Script @php ./vendor/bin/pest handling the test event returned with error code 1

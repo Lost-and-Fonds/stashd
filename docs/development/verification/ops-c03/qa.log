@@ -1,0 +1,641 @@
+INFO All files are already formatted.
+ INFO No issues found.
+ INFO No fixes were applied.
+help[redundant-null-coalesce]: Redundant null coalesce: left-hand side can never be `null` or undefined.
+   ┌─ app/RecordsAndArchives/ItemArchive.php:64:18
+   │
+64 │             if (($asset['item_uri'] ?? null) !== $uri || ($asset['item_object_id'] ?? null) !== $id->toString()) {
+   │                  ^^^^^^^^^^^^^^^^^^    ---- This right-hand side will never be evaluated
+   │                  │
+   │                  This expression (type `string`) is never `null` or undefined
+   │
+   = The null coalesce operator `??` only evaluates the right-hand side if the left-hand side is `null` or not set.
+   = Help: Consider removing the `??` operator and the right-hand side expression.
+
+help[redundant-null-coalesce]: Redundant null coalesce: left-hand side can never be `null` or undefined.
+   ┌─ app/RecordsAndArchives/ItemArchive.php:64:59
+   │
+64 │             if (($asset['item_uri'] ?? null) !== $uri || ($asset['item_object_id'] ?? null) !== $id->toString()) {
+   │                                                           ^^^^^^^^^^^^^^^^^^^^^^^^    ---- This right-hand side will never be evaluated
+   │                                                           │
+   │                                                           This expression (type `string`) is never `null` or undefined
+   │
+   = The null coalesce operator `??` only evaluates the right-hand side if the left-hand side is `null` or not set.
+   = Help: Consider removing the `??` operator and the right-hand side expression.
+
+help[redundant-type-comparison]: Redundant condition: variable `$pins` (type `list<mixed>`) is already known to be `list<mixed>`.
+    ┌─ app/RecordsAndArchives/PreservationTransaction.php:810:13
+    │
+810 │ ╭             $this->require(
+811 │ │                 is_array($pin)
+812 │ │                 && count($pin) === 2
+813 │ │                 && is_string($pin['object_id'] ?? null)
+    · │
+817 │ │                 'Malformed exact-pin precondition.',
+818 │ │             );
+    │ ╰─────────────^ This condition always evaluates to true
+    │
+    = The type of variable `$pins` (type `list<mixed>`) already satisfies the condition that it is `list<mixed>`. This check is redundant.
+    = Help: This condition is always true and the associated code block will always execute if reached. Consider simplifying.
+
+help: found 3 issues: 3 help message(s)
+ = 2 issues contain auto-fix suggestions
+
+
+  ............................................................................
+  ............................................................................
+  ........................................................................!!!!
+  !!..!!!!!!........!!!!!..!!!!!..............................................
+  ......!!!!!!!!.!..!.........................................................
+  ..................................................................!.........
+  ......................................................................
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\CommitConsistencyTest > a…
+  Archives operation 'fault.interrupt' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\CommitConsistencyTest > a…
+  Archives operation 'fault.interrupt' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\CommitConsistencyTest > a…
+  Archives operation 'fault.interrupt' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\CommitConsistencyTest > t…
+  Archives operation 'concurrency.preserve' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\CommitConsistencyTest > s…
+  Archives operation 'fault.interrupt' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\CommitConsistencyTest > a…
+  Archives operation 'fault.interrupt' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest > a r…
+  Replica synchronization and recovery, including Item pins, are not implemented.
+
+  at tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+      4▕
+      5▕ use Tests\Support\RecordsAndArchives\OcflInspector;
+      6▕
+      7▕ beforeEach(function (): void {
+  ➜   8▕     $this->markTestIncomplete('Replica synchronization and recovery, including Item pins, are not implemented.');
+      9▕ });
+     10▕
+     11▕ test('a replica of a complete Vault has the same identity and a verified coherent recovery point', function (): void {
+     12▕     $initial = $this->archive->run('vault.initialize');
+
+  1   tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest > cle…
+  Replica synchronization and recovery, including Item pins, are not implemented.
+
+  at tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+      4▕
+      5▕ use Tests\Support\RecordsAndArchives\OcflInspector;
+      6▕
+      7▕ beforeEach(function (): void {
+  ➜   8▕     $this->markTestIncomplete('Replica synchronization and recovery, including Item pins, are not implemented.');
+      9▕ });
+     10▕
+     11▕ test('a replica of a complete Vault has the same identity and a verified coherent recovery point', function (): void {
+     12▕     $initial = $this->archive->run('vault.initialize');
+
+  1   tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest > a r…
+  Replica synchronization and recovery, including Item pins, are not implemented.
+
+  at tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+      4▕
+      5▕ use Tests\Support\RecordsAndArchives\OcflInspector;
+      6▕
+      7▕ beforeEach(function (): void {
+  ➜   8▕     $this->markTestIncomplete('Replica synchronization and recovery, including Item pins, are not implemented.');
+      9▕ });
+     10▕
+     11▕ test('a replica of a complete Vault has the same identity and a verified coherent recovery point', function (): void {
+     12▕     $initial = $this->archive->run('vault.initialize');
+
+  1   tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest > reb…
+  Replica synchronization and recovery, including Item pins, are not implemented.
+
+  at tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+      4▕
+      5▕ use Tests\Support\RecordsAndArchives\OcflInspector;
+      6▕
+      7▕ beforeEach(function (): void {
+  ➜   8▕     $this->markTestIncomplete('Replica synchronization and recovery, including Item pins, are not implemented.');
+      9▕ });
+     10▕
+     11▕ test('a replica of a complete Vault has the same identity and a verified coherent recovery point', function (): void {
+     12▕     $initial = $this->archive->run('vault.initialize');
+
+  1   tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest > a l…
+  Replica synchronization and recovery, including Item pins, are not implemented.
+
+  at tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+      4▕
+      5▕ use Tests\Support\RecordsAndArchives\OcflInspector;
+      6▕
+      7▕ beforeEach(function (): void {
+  ➜   8▕     $this->markTestIncomplete('Replica synchronization and recovery, including Item pins, are not implemented.');
+      9▕ });
+     10▕
+     11▕ test('a replica of a complete Vault has the same identity and a verified coherent recovery point', function (): void {
+     12▕     $initial = $this->archive->run('vault.initialize');
+
+  1   tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest > a c…
+  Replica synchronization and recovery, including Item pins, are not implemented.
+
+  at tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+      4▕
+      5▕ use Tests\Support\RecordsAndArchives\OcflInspector;
+      6▕
+      7▕ beforeEach(function (): void {
+  ➜   8▕     $this->markTestIncomplete('Replica synchronization and recovery, including Item pins, are not implemented.');
+      9▕ });
+     10▕
+     11▕ test('a replica of a complete Vault has the same identity and a verified coherent recovery point', function (): void {
+     12▕     $initial = $this->archive->run('vault.initialize');
+
+  1   tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest > a r…
+  Replica synchronization and recovery, including Item pins, are not implemented.
+
+  at tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+      4▕
+      5▕ use Tests\Support\RecordsAndArchives\OcflInspector;
+      6▕
+      7▕ beforeEach(function (): void {
+  ➜   8▕     $this->markTestIncomplete('Replica synchronization and recovery, including Item pins, are not implemented.');
+      9▕ });
+     10▕
+     11▕ test('a replica of a complete Vault has the same identity and a verified coherent recovery point', function (): void {
+     12▕     $initial = $this->archive->run('vault.initialize');
+
+  1   tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\ReplicaRecoveryTest > a c…
+  Replica synchronization and recovery, including Item pins, are not implemented.
+
+  at tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+      4▕
+      5▕ use Tests\Support\RecordsAndArchives\OcflInspector;
+      6▕
+      7▕ beforeEach(function (): void {
+  ➜   8▕     $this->markTestIncomplete('Replica synchronization and recovery, including Item pins, are not implemented.');
+      9▕ });
+     10▕
+     11▕ test('a replica of a complete Vault has the same identity and a verified coherent recovery point', function (): void {
+     12▕     $initial = $this->archive->run('vault.initialize');
+
+  1   tests/Acceptance/RecordsAndArchives/ReplicaRecoveryTest.php:8
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\StoragePortabilityTest >…
+  Archives operation 'storage.probe' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\StoragePortabilityTest >…
+  Archives operation 'catalogue.drop_projection' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\FixityAndRepairTest > fix…
+  Archives operation 'fixity.verify' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\FixityAndRepairTest > ext…
+  Archives operation 'fixity.verify' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\FixityAndRepairTest > cor…
+  Archives operation 'fixity.verify' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\FixityAndRepairTest > ver…
+  Archives operation 'replica.sync' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\FixityAndRepairTest > a c…
+  Archives operation 'replica.sync' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\FixityAndRepairTest > a r…
+  Archives operation 'replica.sync' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\MetadataHistoryTest > sou…
+  Archives operation 'metadata.record' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\MetadataHistoryTest > upd…
+  Archives operation 'metadata.record' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\MetadataHistoryTest > dif…
+  Archives operation 'metadata.record' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\MetadataHistoryTest > edi…
+  Archives operation 'metadata.record' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\MetadataHistoryTest > inv…
+  Archives operation 'metadata.record' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\PreservationEvidenceTest…
+  Archives operation 'asset.describe' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\PreservationEvidenceTest…
+  Archives operation 'asset.describe' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\PreservationEvidenceTest…
+  Archives operation 'asset.describe' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\PreservationEvidenceTest…
+  Archives operation 'asset.describe' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\PreservationEvidenceTest…
+  Acquisition provenance events are not implemented by the local file preservation slice.
+
+  at tests/Acceptance/RecordsAndArchives/PreservationEvidenceTest.php:102
+     98▕     expect($earlier['complete'])->toBeFalse()->and($later['complete'])->toBeTrue();
+     99▕ });
+    100▕
+    101▕ test('reacquiring identical source bytes still preserves new provenance evidence', function (): void {
+  ➜ 102▕     $this->markTestIncomplete('Acquisition provenance events are not implemented by the local file preservation slice.');
+    103▕     $this->archive->run('vault.initialize');
+    104▕     $input = $this->archive->input('same-content.bin', 'same versioned content');
+    105▕
+    106▕     $first = $this->archive->run('asset.preserve', [
+
+  1   tests/Acceptance/RecordsAndArchives/PreservationEvidenceTest.php:102
+
+  ────────────────────────────────────────────────────────────────────────────
+   INCOMPLETE  Tests\Acceptance\RecordsAndArchives\VaultIdentityTest > an em…
+  Archives operation 'catalogue.list' is not implemented by the local driver.
+
+  at tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+     60▕                 'item.read',
+     61▕             ],
+     62▕             true,
+     63▕         )) {
+  ➜  64▕             throw new IncompleteTestError("Archives operation '{$operation}' is not implemented by the local driver.");
+     65▕         }
+     66▕
+     67▕         $primary = self::validatePrimary($arguments);
+     68▕
+
+  1   tests/Support/RecordsAndArchives/LocalArchivesDriver.php:64
+  2   tests/Support/RecordsAndArchives/ArchiveFixture.php:89
+
+
+  Tests:    33 incomplete, 493 passed (24874 assertions)
+  Duration: 172.13s
+
+  Parallel: 4 processes

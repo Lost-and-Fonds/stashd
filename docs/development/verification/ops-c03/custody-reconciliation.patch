@@ -1,0 +1,11 @@
+--- app/Operations/ExecutionArtifacts.php
++++ app/Operations/ExecutionArtifacts.php
+@@ -99,7 +99,7 @@
+     public function result(ExecutionContext $context, string $coverage): void
+     {
+         $this->authority->protect($context, function (Connection $db) use ($context, $coverage): void {
+-            if ($db->fetchOne(
++            if (false && $db->fetchOne(
+                 "SELECT EXISTS (SELECT 1 FROM execution_artifacts a WHERE a.job_id = ? AND a.kind = 'custody' AND NOT EXISTS (SELECT 1 FROM execution_reconciliations r WHERE r.artifact_id = a.id AND r.attempt_id = ?))",
+                 [$context->jobId, $context->attemptId],
+             )) {

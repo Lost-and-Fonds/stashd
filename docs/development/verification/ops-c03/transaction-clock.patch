@@ -1,0 +1,29 @@
+--- app/Operations/AttemptAuthority.php
++++ app/Operations/AttemptAuthority.php
+@@ -75,7 +75,7 @@
+                 $deadline = $database->fetchOne('SELECT lease_until FROM jobs WHERE id = ? FOR UPDATE', [$context->jobId]);
+                 $this->requireCurrent($context);
+                 $transition($database);
+-                if (! $database->fetchOne('SELECT clock_timestamp() < ?::timestamptz', [$deadline])) {
++                if (! $database->fetchOne('SELECT transaction_timestamp() < ?::timestamptz', [$deadline])) {
+                     throw new AuthorityLost('The Attempt expired during its terminal transition.');
+                 }
+             });
+@@ -108,7 +108,7 @@
+         return $this->database->transactional(function (Connection $database) use ($context): \App\Operations\DTO\LeaseRenewal {
+             $database->fetchOne('SELECT id FROM jobs WHERE id = ? FOR UPDATE', [$context->jobId]);
+             $row = $database->fetchAssociative(
+-                "WITH decision AS MATERIALIZED (SELECT clock_timestamp() AS at), renewed AS (UPDATE jobs j SET lease_until = decision.at + (? * interval '1 millisecond') FROM decision WHERE j.id = ? AND j.claim_token = ? AND j.status = 'running' AND j.lease_until > decision.at AND EXISTS (SELECT 1 FROM job_attempts a WHERE a.id::text = j.claim_token AND a.job_id = j.id AND a.ended_at IS NULL) RETURNING j.lease_until) SELECT decision.at, renewed.lease_until FROM decision LEFT JOIN renewed ON true",
++                "WITH decision AS MATERIALIZED (SELECT transaction_timestamp() AS at), renewed AS (UPDATE jobs j SET lease_until = decision.at + (? * interval '1 millisecond') FROM decision WHERE j.id = ? AND j.claim_token = ? AND j.status = 'running' AND j.lease_until > decision.at AND EXISTS (SELECT 1 FROM job_attempts a WHERE a.id::text = j.claim_token AND a.job_id = j.id AND a.ended_at IS NULL) RETURNING j.lease_until) SELECT decision.at, renewed.lease_until FROM decision LEFT JOIN renewed ON true",
+                 [$this->lease->milliseconds, $context->jobId, $context->attemptId],
+             );
+             if ($row === false) {
+@@ -129,7 +129,7 @@
+     private function requireCurrent(ExecutionContext $context): void
+     {
+         if (! $this->database->fetchOne(
+-            "SELECT EXISTS (SELECT 1 FROM jobs j JOIN job_attempts a ON a.id::text = j.claim_token AND a.job_id = j.id WHERE j.id = ? AND a.id = ? AND j.status = 'running' AND a.ended_at IS NULL AND j.lease_until > clock_timestamp())",
++            "SELECT EXISTS (SELECT 1 FROM jobs j JOIN job_attempts a ON a.id::text = j.claim_token AND a.job_id = j.id WHERE j.id = ? AND a.id = ? AND j.status = 'running' AND a.ended_at IS NULL AND j.lease_until > transaction_timestamp())",
+             [$context->jobId, $context->attemptId],
+         )) {
+             throw new AuthorityLost('The Attempt no longer has execution authority.');
