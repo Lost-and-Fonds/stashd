@@ -1,0 +1,154 @@
+diff --git a/src/EcotoneConfig.php b/src/EcotoneConfig.php
+--- a/src/EcotoneConfig.php
++++ b/src/EcotoneConfig.php
+@@ -11,12 +11,18 @@
+  */
+ final class EcotoneConfig
+ {
++    /**
++     * Select messaging discovery and optionally limit eager console compilation.
++     *
++     * @param list<string>|null $consoleCommandPrefixes Null preserves discovery for all commands.
++     */
+     public function __construct(
+         public array $namespaces = [],
+         public bool $loadAppNamespaces = true,
+         public ?array $enabledModulePackageNames = null,
+         public bool $test = false,
+         public string $licenceKey = '',
++        public ?array $consoleCommandPrefixes = null,
+         mixed ...$unrecognisedKeys,
+     ) {
+         FrameworkConfigurationKeys::refuseUnrecognisedKeys(
+diff --git a/src/EcotoneServiceInitializer.php b/src/EcotoneServiceInitializer.php
+--- a/src/EcotoneServiceInitializer.php
++++ b/src/EcotoneServiceInitializer.php
+@@ -5,6 +5,8 @@
+ namespace Ecotone\Tempest;
+
+ use Ecotone\Api\Messaging\ConfiguredMessagingSystem;
++use Ecotone\Api\Attribute\MessageGateway;
++use Ecotone\Api\Attribute\Repository;
+ use Tempest\Container\Container;
+ use Tempest\Container\DynamicInitializer;
+ use Tempest\Container\GenericContainer;
+@@ -31,13 +33,24 @@
+         self::$compiledServiceIds = array_flip($serviceIds);
+     }
+
++    /**
++     * Resolve actual messaging gateways without compiling ordinary Tempest dependencies.
++     */
+     public function canInitialize(ClassReflector $class, null|string|UnitEnum $tag): bool
+     {
++        if ($class->isInstantiable()) {
++            return false;
++        }
++
+         if (self::$compiledServiceIds !== null) {
+             return isset(self::$compiledServiceIds[$class->getName()]);
+         }
+
+         if (self::$compiling) {
++            return false;
++        }
++
++        if (! $this->isGateway($class)) {
+             return false;
+         }
+
+@@ -54,6 +67,22 @@
+         return isset(self::$compiledServiceIds[$class->getName()]);
+     }
+
++    /**
++     * Recognize native and attributed gateways without compiling unrelated application interfaces.
++     */
++    private function isGateway(ClassReflector $class): bool
++    {
++        if (str_starts_with($class->getName(), 'Ecotone\\Api\\') || $class->hasAttribute(Repository::class)) {
++            return true;
++        }
++        foreach ($class->getPublicMethods() as $method) {
++            if ($method->hasAttribute(MessageGateway::class) || $method->hasAttribute(Repository::class) || $method->hasAttribute('Ecotone\\Api\\Attribute\\OrchestratorGateway')) {
++                return true;
++            }
++        }
++        return false;
++    }
++
+     public function initialize(ClassReflector $class, null|string|UnitEnum $tag, Container $container): object
+     {
+         $configuredMessagingSystem = $container->get(ConfiguredMessagingSystem::class);
+diff --git a/src/EcotoneConsoleCommandDiscovery.php b/src/EcotoneConsoleCommandDiscovery.php
+--- a/src/EcotoneConsoleCommandDiscovery.php
++++ b/src/EcotoneConsoleCommandDiscovery.php
+@@ -8,6 +8,7 @@
+
+ use Tempest\Console\ConsoleCommand;
+ use Tempest\Console\ConsoleConfig;
++use Tempest\Console\Input\ConsoleArgumentBag;
+ use Tempest\Container\Container;
+ use Tempest\Discovery\Discovery;
+ use Tempest\Discovery\DiscoveryLocation;
+@@ -31,8 +32,23 @@
+     {
+     }
+
++    /**
++     * Register native CLI commands without compiling messaging during HTTP boot.
++     */
+     public function apply(): void
+     {
++        if (PHP_SAPI !== 'cli') {
++            return;
++        }
++
++        if ($this->container->has(EcotoneConfig::class)) {
++            $prefixes = $this->container->get(EcotoneConfig::class)->consoleCommandPrefixes;
++            $command = $this->container->get(ConsoleArgumentBag::class)->getCommandName();
++            if ($prefixes !== null && $command !== '' && ! array_any($prefixes, static fn (string $prefix): bool => str_starts_with($command, $prefix))) {
++                return;
++            }
++        }
++
+         if (MessagingSystemInitializer::getRegisteredCommands() === null) {
+             if (! $this->container->has(EcotoneConfig::class)) {
+                 return;
+diff --git a/src/MessagingSystemInitializer.php b/src/MessagingSystemInitializer.php
+--- a/src/MessagingSystemInitializer.php
++++ b/src/MessagingSystemInitializer.php
+@@ -56,11 +56,14 @@
+         self::$proxyDirectory = null;
+     }
+
++    /**
++     * Load or compile this application's definitions with fresh runtime services.
++     */
+     public function initialize(Container $container): ConfiguredMessagingSystem
+     {
+         $config = $this->resolveEcotoneConfig($container);
+         $rootPath = getcwd();
+-        $cacheDirectory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'ecotone_tempest';
++        $cacheDirectory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'ecotone_tempest' . DIRECTORY_SEPARATOR . hash('sha256', $rootPath);
+         $environment = getenv('APP_ENV') ?: (getenv('ENVIRONMENT') ?: 'production');
+         $useProductionCache = in_array($environment, ['prod', 'production'], true) || DiscoveryCacheStrategy::resolveFromEnvironment() === DiscoveryCacheStrategy::FULL;
+
+diff --git a/src/EcotoneCacheClearCommand.php b/src/EcotoneCacheClearCommand.php
+--- a/src/EcotoneCacheClearCommand.php
++++ b/src/EcotoneCacheClearCommand.php
+@@ -18,10 +18,13 @@
+     {
+     }
+
++    /**
++     * Clear only the current application's messaging definitions and generated proxies.
++     */
+     #[ConsoleCommand(name: 'ecotone:cache:clear')]
+     public function __invoke(): void
+     {
+-        $cacheDirectory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'ecotone_tempest';
++        $cacheDirectory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'ecotone_tempest' . DIRECTORY_SEPARATOR . hash('sha256', getcwd());
+
+         $this->removeCacheDirectory($cacheDirectory);
+

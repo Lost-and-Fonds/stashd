@@ -1,0 +1,69 @@
+{
+  "controls": [
+    {
+      "id": "split-admission",
+      "result": "detected",
+      "assertion": "tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php:147",
+      "observation": "Failed asserting that 1 is identical to 0.",
+      "source_restored": true
+    },
+    {
+      "id": "drop-intent",
+      "result": "detected",
+      "assertion": "tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php:18",
+      "observation": "Failed asserting that 0 is identical to 1.",
+      "source_restored": true
+    },
+    {
+      "id": "reclaim-completed",
+      "result": "detected",
+      "assertion": "tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php:57",
+      "observation": "Failed asserting that 2 is identical to 1.",
+      "source_restored": true
+    },
+    {
+      "id": "repeat-effect",
+      "result": "detected",
+      "assertion": "tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php:22",
+      "observation": "Failed asserting that two arrays are identical.",
+      "source_restored": true
+    },
+    {
+      "id": "ignore-generation",
+      "result": "detected",
+      "assertion": "tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php:69",
+      "observation": "Failed asserting that 1 is identical to 0.",
+      "source_restored": true
+    },
+    {
+      "id": "drop-busy-intent",
+      "result": "detected",
+      "assertion": "tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php:92",
+      "observation": "Failed asserting that 0 is identical to 1.",
+      "source_restored": true
+    },
+    {
+      "id": "split-database-connection",
+      "result": "detected",
+      "assertion": "tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php:109",
+      "observation": "Failed asserting that two arrays are identical.",
+      "source_restored": true
+    },
+    {
+      "id": "native-priority",
+      "result": "detected",
+      "assertion": "tests/Acceptance/Operations/WorkAdmissionTest.php:87",
+      "observation": "Failed asserting that two strings are identical.",
+      "source_restored": true
+    },
+    {
+      "id": "reverse-queue-order",
+      "result": "detected",
+      "assertion": "tests/Acceptance/OperationsDelivery/DurableDeliveryTest.php:15",
+      "observation": "Failed asserting that two arrays are identical.",
+      "source_restored": true
+    }
+  ],
+  "baseline": "10 passed",
+  "restored": "10 passed"
+}

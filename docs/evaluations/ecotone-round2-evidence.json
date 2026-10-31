@@ -1,0 +1,91 @@
+{
+  "baseline": "65eb0388378d827e8874162c2255722e7c3a4e99",
+  "round_one": "c710a7f5481fa9f8ef012a006fcb19760865b5b1",
+  "recommendation": "Adopt after specific upstream work",
+  "versions": {
+    "php": "8.5",
+    "tempest/framework": "3.19.2",
+    "doctrine/dbal": "4.5.0",
+    "ecotone/dbal": "2.0.0-beta.7",
+    "ecotone/ecotone": "2.0.0-beta.7",
+    "ecotone/enqueue": "2.0.0-beta.7"
+  },
+  "focused": {
+    "passed": 15,
+    "assertions": 626,
+    "seconds": 52.72,
+    "exit": 0,
+    "wall_seconds": 52.81
+  },
+  "negative_controls": {
+    "detected": 8,
+    "baseline": "10 passed",
+    "restored": "10 passed",
+    "artifact": "ecotone-native-negative.json"
+  },
+  "full_suite": {
+    "passed": 453,
+    "failed": 17,
+    "incomplete": 33,
+    "assertions": 24224,
+    "seconds": 116.74,
+    "exit": 2,
+    "failure_classification": {
+      "Integration/JobsTest.php": 7,
+      "Integration/WorkAdmissionAtomicityTest.php": 2,
+      "Integration/WorkExecutionContextTest.php": 1,
+      "OperationsDelivery/DurableDeliveryTest.php": 7
+    },
+    "reason": "Retained Messenger transport assumptions and old fixture provisioning prerequisites; no green full-suite claim."
+  },
+  "qa": {
+    "format": "pass",
+    "lint": "pass",
+    "analysis": "3 existing Records & Archives help messages, no errors"
+  },
+  "protected_assertions_unchanged": true,
+  "dependency_changes_this_round": false,
+  "upstream_tempest_pr": {
+    "state": "OPEN",
+    "merged_at": null,
+    "head": "5e56e440298e4c30e8059030ef078e7a71e4fbf6"
+  },
+  "limits": [
+    "Explicit visibility/lease deadline advancement in crash tests.",
+    "Precommit abort kills the blocked PostgreSQL backend as well as the client.",
+    "Effect-before-completion can repeat arbitrary external effects.",
+    "Native ecotone/tempest adapter is source-reviewed, not installed/tested.",
+    "Explicit reconnect tested; total database outage/automatic mid-flight recovery unproven."
+  ],
+  "sha256": {
+    "app/Operations/JobRuntime.php": "73994274fc18008485f08453c401c7af7a75368074a0e016bdb6b4c49f46f43e",
+    "app/Operations/SharedOperationsConnection.php": "485971ae4109c798415bcf512ead4f8115e1784f9015a0ed912572b8aee51271",
+    "app/Operations/SharedPostgresConnection.php": "3eb7109d77b0c6a9d173ee9eddee6cd22213889b2be1a5ff2bdf3d4be754546d",
+    "app/Operations/OperationsConnectionInitializer.php": "419fb0bc3b2af8c7c5e984add850778113f2ddce7f95747d45d8b09057c19e93",
+    "app/Operations/JobRuntimeInitializer.php": "cd9599e1a14bab3770d7303ddc4d38c6afec386fdf8c9a1f0a23d7bf08d4f4cb",
+    "app/Operations/DeliverySchema.php": "0a806f021d7496cae0f3a2cb25e217987dca30c5fd75d533c1b5fb5765976fd3",
+    "app/Operations/TempestDbalConnection.php": "0a3a9137f33bf8fb0b4a1e866cbc8ca79ea1aca1b5fe56f4b806e972b7245218",
+    "tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php": "356ff83fd903f01ddfcfae7797c959af946824e7876090ee1542cc71e8d85a2a",
+    "tests/Acceptance/EcotoneDelivery/README.md": "3f3c835b705e5cf91f909d01c62c2dcd2980e0e51db4b3a8e27570b069968330",
+    "tests/Support/Ecotone/NativeDeliveryFixture.php": "70786bce08f2692068a69bf93945310bd46ec1164bebac9567881dc9150d760d",
+    "tests/Support/Ecotone/delivery-process.php": "d077f0622558fd61ece82d2af6c330fd6aee487990cb0b4ed4c221b87f5cf92f",
+    "tests/Support/Ecotone/DeliveryProbe.php": "eb5c2a58368d16768b2208c8d40ddc1442c628327d8450db9c53899a5b140b50",
+    "tools/evaluations/native-negative.py": "51da64da12804a90358d7b6541e65906fdcce59067763a49793c69f86290a651",
+    "tools/evaluations/tempest-2326.patch": "320eebaf55b2da39a6cb18f1606477bd02ec3b96878c70fb4a0a4ea4f71df60e",
+    "tools/evaluations/ecotone-dbal-priority.patch": "2c6e6062e2166be4a637f73586d987858d6124a24d9b958242c92da1ffb1557d",
+    "composer.lock": "0441ed6a1469d160124e3169f4f358250120fbdb355281cdeb4bb2f89bc490fa",
+    "tests/Acceptance/Operations/WorkAdmissionTest.php": "28906ad7d92177b153c11d6216d2186df8fb3f66af402d8843d66b88eb1f5aed",
+    "tests/Acceptance/OperationsDelivery/DurableDeliveryTest.php": "ee2d0fb3facaec2a6008bfdb47741ce24d54bf08c0ac8a58dcf14a2885e365fc"
+  },
+  "additional_schema_regression": {
+    "passed": 1,
+    "assertions": 36,
+    "seconds": 4.71,
+    "exit": 0
+  },
+  "final_native_restored": {
+    "passed": 10,
+    "assertions": 503,
+    "test_case_seconds": 42.04
+  }
+}

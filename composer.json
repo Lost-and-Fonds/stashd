@@ -2,17 +2,16 @@
     "name": "tempest/app",
     "type": "project",
     "require": {
-        "tempest/framework": "^3.0",
+        "tempest/framework": "dev-fix/2325-injected-connections#5e56e440298e4c30e8059030ef078e7a71e4fbf6 as 3.19.2",
         "ext-intl": "*",
         "ottosmops/ocfl": "dev-fix/atomic-inventory-sidecars as 1.0.1",
         "symfony/lock": "^8.1",
         "league/uri": "^7.8",
         "symfony/uid": "^8.1",
         "doctrine/dbal": "^4.3",
-        "symfony/messenger": "8.2.x-dev",
-        "symfony/doctrine-messenger": "8.2.x-dev",
-        "symfony/event-dispatcher": "8.2.x-dev",
-        "symfony/console": "8.2.x-dev"
+        "ecotone/dbal": "2.0.0-beta.7",
+        "ecotone/tempest": "2.0.0-beta.7",
+        "cweagans/composer-patches": "^2.0"
     },
     "require-dev": {
         "pestphp/pest": "^v5.3.2",
@@ -47,7 +46,7 @@
             "composer fmt",
             "composer lint",
             "composer analyse",
-            "composer test -- --parallel --processes=8"
+            "./bin/test.sh"
         ],
         "github:lint": "vendor/bin/mago lint --potentially-unsafe --minimum-fail-level=note --reporting-format=github",
         "github:fmt": "vendor/bin/mago fmt --check",
@@ -67,7 +66,8 @@
         "allow-plugins": {
             "php-http/discovery": true,
             "carthage-software/mago": true,
-            "pestphp/pest-plugin": true
+            "pestphp/pest-plugin": true,
+            "cweagans/composer-patches": true
         }
     },
     "scripts-descriptions": {
@@ -82,7 +82,16 @@
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://github.com/hipsterjazzbo/ocfl"
+            "url": "https://github.com/hipsterjazzbo/tempest-framework",
+            "no-api": true
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/hipsterjazzbo/ocfl",
+            "no-api": true
         }
-    ]
+    ],
+    "extra": {
+        "patches-file": "patches.json"
+    }
 }

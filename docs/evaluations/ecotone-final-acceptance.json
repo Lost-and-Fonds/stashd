@@ -1,0 +1,71 @@
+{
+  "base": "4f7b45308268d6acfd3a1c8f18aac046516258b2",
+  "scope": "Tests and isolated official integration validation; no Messenger removal.",
+  "results": {
+    "passed": 18,
+    "expected_failing": 4,
+    "unexpected_failures": 0,
+    "incomplete": 0,
+    "assertions": 860,
+    "seconds": 91.62,
+    "exit": 1
+  },
+  "candidate_nested": "commit, rollback and inner-failure savepoint contracts passed",
+  "expected_failures": [
+    {
+      "test": "a fresh installation preserves intent across reprovisioning without Messenger schema",
+      "reason": "Legacy CreateJobsTable still creates messenger_messages; lifecycle and intent preservation passed before this assertion.",
+      "assertion": "tests/Acceptance/EcotoneInstallation/InstallationTest.php:29"
+    },
+    {
+      "test": "the official adapter preserves nested commit boundaries",
+      "reason": "Official PDO handle is physically shared, but DBAL nesting counter is zero at the outer Tempest transaction.",
+      "assertion": "tests/Acceptance/EcotoneInstallation/OfficialIntegrationTest.php:17"
+    },
+    {
+      "test": "the official adapter preserves nested rollback boundaries",
+      "reason": "Official PDO handle is physically shared, but DBAL nesting counter is zero at the outer Tempest transaction.",
+      "assertion": "tests/Acceptance/EcotoneInstallation/OfficialIntegrationTest.php:17"
+    },
+    {
+      "test": "the official adapter preserves nested inner-failure boundaries",
+      "reason": "Official PDO handle is physically shared, but DBAL nesting counter is zero at the outer Tempest transaction.",
+      "assertion": "tests/Acceptance/EcotoneInstallation/OfficialIntegrationTest.php:17"
+    }
+  ],
+  "official_installation": {
+    "root": "tools/evaluations/official-tempest",
+    "vendor": "tmp/official-tempest-vendor",
+    "versions": {
+      "doctrine/dbal": "4.5.0",
+      "ecotone/dbal": "2.0.0-beta.7",
+      "ecotone/ecotone": "2.0.0-beta.7",
+      "ecotone/enqueue": "2.0.0-beta.7",
+      "ecotone/tempest": "2.0.0-beta.7",
+      "tempest/framework": "v3.19.2"
+    },
+    "messenger_installed": false,
+    "doctrine_messenger_installed": false,
+    "tempest_patch": "tools/evaluations/tempest-2326.patch",
+    "ecotone_adapter_patched": false,
+    "native_async_diagnostic": "passed before each nesting assertion",
+    "custom_connection_selected": false
+  },
+  "negative_controls": "ecotone-installation-negative.json",
+  "qa": {
+    "format": "passed",
+    "lint": "passed",
+    "analysis": "3 existing Records & Archives help messages, no errors",
+    "isolated_composer_validate": "passed; expected exact-version warnings"
+  },
+  "sha256": {
+    "tests/Acceptance/EcotoneInstallation/InstallationTest.php": "69a4dcb75cd3206c5b6b432536d626c1db31d43007f9f75f2cbb035fe8a17508",
+    "tests/Acceptance/EcotoneInstallation/OfficialIntegrationTest.php": "0c7045f6fb46a1b4fc854e3bdaf95b8319c1181b77604b0c60bf7d6fb0814b2d",
+    "tests/Support/Ecotone/installation-process.php": "4352e9fd9b5479b2bc1cfdc1814ddc92a1daafcd6f08be6428c7035dab8951fa",
+    "tests/Support/Ecotone/NativeDeliveryFixture.php": "12516109c0a5315d3afa30fc3f8d2eb79ffe8ed37d89f45e558e6abe3e26671d",
+    "tests/Support/Ecotone/delivery-process.php": "d4fbffc0ee809ab100f8fac438711251877e9614c096bbbbce799fc97857de16",
+    "tools/evaluations/installation-negative.py": "9994128c4bb5a1d2532efcd9bc6e3e3297e4558924d32dac26d44181e12a9fb0",
+    "tools/evaluations/official-tempest/composer.json": "cdad1a5401764e919822f43e5df6e8613f76a3d4edc1e3fdb7405de0351e8e2f",
+    "tools/evaluations/official-tempest/composer.lock": "36f8cf8bec9bd8dbd1d53e17705094cf20704f7b5328e46172e81cc11b87fece"
+  }
+}

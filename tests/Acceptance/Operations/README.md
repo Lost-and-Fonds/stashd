@@ -83,7 +83,7 @@ a time and get specification-owner review before the implementer begins:
 
 | Contract | Adversarial acceptance evidence still required |
 | --- | --- |
-| OPS-C02 — durable delivery | Reject outbox insert; crash before/after Job commit; lose broker; kill relay after forward before ack; prove no lost intent or duplicate effect |
+| OPS-C02 — durable delivery | Reject native queue insert; crash before/after Job commit and receipt/completion; retry/dead-letter real infrastructure failures; prove retained intent and safe completed redelivery |
 | OPS-C03 — Attempts and fencing | Kill/partition Worker A, let lease expire, allow B to recover; A stays physically alive but cannot commit or publish effects |
 | OPS-C04 — lifecycle | Persist Attempt starts/ends and interrupted history across process restart; no invented completion after crash |
 | OPS-C05 — pause/cancel | Distinguish accepted pause from achieved pause, stop descendant helpers, retain acknowledged custody |

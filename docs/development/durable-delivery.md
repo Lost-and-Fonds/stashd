@@ -1,222 +1,83 @@
-# OPS-C02 durable delivery: implementation and proof limits
+# Durable Operations delivery
 
-The approved seven contracts from draft [PR #77](https://github.com/Lost-and-Fonds/stashd/pull/77)
-are imported unchanged from `22d23df`. That commit changes only formatting;
-its [complete CI run](https://github.com/Lost-and-Fonds/stashd/actions/runs/41000126637)
-passed. The implementation branch starts at current `dev`, `42327fb`, containing
-merged PR #74. No merge or OPS-C03 work is included.
+OPS-C02 specifies durable intent and honest Job execution, not an intermediate
+relay. Ecotone stores invitations directly in PostgreSQL's `enqueue` table in the
+same physical transaction as admission. There is no local forwarding hop.
 
-## Implementation decision
+`tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php` is the executable native
+fault contract. `tests/Acceptance/OperationsDelivery/DurableDeliveryTest.php`
+observes actual reordered effects. OPS-C01 remains in its original acceptance
+file with its assertions unchanged. The migration and retired drivers are
+reviewable at commit `56026a2`; no old transport implementation remains executable.
 
-The existing production runtime satisfies these seven bounded contracts. There
-is no production change, migration, dependency, alternate queue, or delivery
-ledger. Job admission still writes the Job and native Messenger outbox using
-the existing single DBAL transaction. Messenger's `OutboxSender`, Doctrine
-transports, retry listener, `Worker`, and the existing completed-Job guard do
-the delivery and execution work.
+## Correspondence with retired Messenger observations
 
-`LocalDurableDeliveryDriver` is test support. `phpunit.xml` installs it for the
-test suite. The specification README remains an unchanged description of the
-original tests-only proposal; its statement that no driver is installed refers
-to that proposal, not this implementation checkout.
-
-The driver reuses `LocalOperationsDriver` for disposable database provisioning,
-Tempest migrations, real Work admission, Job observations and the independent
-probe executor. Its only change is accepting the additional exact private
-`operations-delivery` workspace suffix. All six imported files, including
-the assertions and independent fixture, remain byte-identical to `22d23df`.
-
-Each fixture has its own randomly named PostgreSQL database, schema and
-unprivileged role. Provisioning requires the existing private, ignored local
-test-admin file; no administrator credentials reach relay/worker processes.
-Database identity checks reject application credentials. Probe effects use
-a separate connection and an append-only sequence with no Job uniqueness
-constraint. Outbox observers decode native envelopes and reject orphan Job
-references rather than making them disappear through an inner join.
-
-## Failure controls and framework choices
-
-Tempest's installed process documentation and `GenericProcessExecutor`,
-`PendingProcess`, `InvokedSystemProcess` and `ProcessResult` were inspected.
-All application children run through Tempest processes. A bounded, detached
-test supervisor owns the live handle across the specification's fresh driver
-objects; request, PID, kill command, exit and reaping evidence live in the
-private workspace. It signals SIGKILL and then waits, rather than calling
-`stop()` before `wait()`, which lost the exit code in the first experiment.
-The crash proof requires exit 137 and an actually running child at the signal.
-Supervisors enforce their own deadline and reap children on error.
-
-The installed Tempest database facilities remain responsible for application
-migrations. They do not expose PostgreSQL deferred constraint triggers,
-`pg_stat_activity`, native Messenger visibility timestamps, or deliberately
-rejected physical transport inserts. Small test-only PDO operations exercise
-those database-specific controls on the validated disposable connection. This
-extends the existing fixture pattern, not production persistence. Revisit only
-if the installed framework supplies these exact fault/observation facilities.
-
-The rejection trigger actually raises `P0001` on the selected queue's INSERT.
-A PostgreSQL sequence records that the real write reached it, even though the
-statement rolls back. Admission requires a failed child and the expected
-database error. Destination outage requires a rejected destination write,
-absence of a destination envelope, and a retained native retry envelope.
-
-For admission, an initially deferred constraint trigger pauses the actual
-COMMIT after both inserts. For relay and worker crashes, a BEFORE DELETE trigger
-pauses the native transport acknowledgment. The parent independently requires
-an active PostgreSQL transaction in `PgSleep`, with a COMMIT or DELETE query as
-appropriate. An acknowledgment barrier also requires the original native
-delivery to have `delivered_at` set. The approved tests inspect destination,
-Job and effect state while that child is still paused, then request SIGKILL.
-
-After SIGKILL, PostgreSQL may still be sleeping in the disconnected client's
-statement. The driver cancels only that recorded backend's statement and waits
-for the session to disappear before dropping the barrier. This is test barrier
-cleanup after proven process death, not a claim about automatic production
-backend detection time. Teardown removes the disposable database even if
-supervisor verification fails.
-
-Visibility expiry updates the retained native envelope's delivery timestamp;
-stalled-forward recovery advances its native retry availability. Neither
-operation invents a message or Job. Subsequent fresh production workers consume
-those actual envelopes. Reverse forwarding makes each requested native outbox
-row eligible in turn, runs the real relay, and reads destination records in
-physical insertion order. It does not sort an answer to match the request.
-
-## What each passing proof establishes
-
-| Contract | Actual evidence | Limit |
+| Previous executable test | Reliability obligation | Current executable evidence |
 | --- | --- | --- |
-| Outbox insert rejection | Real rejected INSERT; independent connection sees no Job or envelope; legitimate readmission works | This specific database error in the shared local transaction |
-| Admission death before commit | Active COMMIT barrier, SIGKILL/reaping, backend rollback, no retained Job/envelope, readmission succeeds | Controlled deferred-trigger window; backend cancellation removes the artificial sleep |
-| Restart before relay | Committed queued Job and native outbox survive fresh runtime processes; one independent effect appears | Local process/connection restart, not machine/power/storage failure |
-| Forwarding outage | Actual target INSERT rejection, retained native retry envelope, restored write path and same Job completes | PostgreSQL destination write outage; not a remote broker/network partition, nor exhausted failure-queue recovery |
-| Relay death before ack | Actual destination record plus unacknowledged outbox, SIGKILL, native visibility expiry and replay; one Attempt/effect | The first destination invitation is still queued while relay replay occurs; no live expired-worker fencing |
-| Worker death before ack | Persisted completed Job and independent effect, unacknowledged native message, SIGKILL and replay without another Attempt/effect | Death is after both completion and effect, not between external effect and Job completion |
-| Reverse forwarding | Native destination insertion order is reversed; both distinct Jobs complete with their own effect | Two independent Jobs; not causal ordering of dependent operations or sustained fairness |
+| OPS-C02: outbox insert rejection rolls back the accepted Job | Admission and invitation commit atomically | NativeDurability: queue insertion rejection; Installation nested rollback/savepoint cases; WorkAdmissionAtomicity: rejected initial enqueue and promotion |
+| OPS-C02: killing admission before commit | No partial durable intent; identity remains admissible | NativeDurability: death at the precommit PostgreSQL barrier, no Job/invitation, successful readmission |
+| OPS-C02: committed Job survives restart before relay | A committed Job must retain executable intent | NativeDurability: committed intent survives fresh application and native consumer |
+| OPS-C02: unavailable forwarding destination | Infrastructure failure must not fabricate domain success; intent is recoverable | NativeDurability: rejected actual claim update, finite native retries, retained dead letter, native CLI inspection and replay; failed replay preserves the original |
+| OPS-C02: relay forwarded before acknowledgement death | Receipt/acknowledgement loss cannot lose accepted Work or duplicate completion | Local forwarding disappears. NativeDurability's receipt/claim death proves recovery before completion; its completion-before-ack death proves safe recovery after completion |
+| OPS-C02: completed Job redelivery after lost worker acknowledgement | Persisted completion cannot start another Attempt/effect | NativeDurability: actual queue DELETE barrier, SIGKILL and server abort, independently retained row, redelivery, one Attempt/effect |
+| OPS-C02: changed forwarding order | Physical delivery order cannot define authoritative outcomes | OperationsDelivery: second admitted Job executes first by native priority, both complete with exact independent histories/effect order; NativeDurability also delivers obsolete generations ahead of current ones |
+| Integration JobsTest: admitted once and relayed to worker | Keyed admission, real execution, duplicates, mismatched payload rejection, rollback | JobsTest: keyed Jobs admitted once through concurrent fresh applications, native duplicate publication/consumption, completed history, rejected queue write |
+| Integration JobsTest: relay/worker interrupted acknowledgement | Retained executable intent and no repeated completed effect | NativeDurability: receipt/claim death and completion-before-ack death; there is no relay acknowledgement to reproduce |
+| Integration JobsTest: killed worker claim expiry | Recovery may close an interrupted Attempt and finish the same Job | NativeDurability: receipt/claim death with actual lease/visibility expiry |
+| Integration JobsTest: failed relay messages recover | Exhaustion is inspectable and replayable without inventing success | NativeDurability: actual native dead-letter and CLI replay/rejected-replay observations |
+| Integration JobsTest: completion database failure | Completion failure does not consume handler-failure budget | JobsTest: completion database failure, interrupted/completed history, two observable effects exposing the unprotected effect/completion window |
+| Integration JobsTest: duplicate old deliveries cannot consume retries | Obsolete invitations cannot start another failing Attempt | JobsTest: duplicate old deliveries, exact generation/failure/Attempt observations |
+| Integration JobsTest: expired claims and failed retry enqueue | Retry state and replacement invitation roll back together; Attempt failures have their own budget | JobsTest: real retry insertion rejection, unchanged running claim/failure/generation, retained original invitation, recovery to one interrupted plus three failed Attempts |
+| WorkAdmissionAtomicityTest's outbox checks | Queued promotion and admission are atomic; running coalescence does not restart | Same tests now reject native enqueue writes and inspect original Job revision/invitation; assertions retain priority, generation, payload and claim semantics |
+| WorkExecutionContextTest's relay calls | Executors receive actual persisted claim metadata on each Attempt | Same context assertions, now real application/fresh native consumers, exact persisted token/generation/deadline matches |
 
-The probe's single persisted effect is not exactly-once arbitrary external
-effects. Lease renewal, live expired-worker fencing, comprehensive recovery,
-remote-broker failure modes, cancellation and OPS-C03 remain unproven.
+The old retry-counter fixture seeded eight starts without eight historical Attempt
+records. The replacement does not fabricate history: it observes four actual
+starts, one interrupted and three failed, with exactly three domain failures.
+The original domain failure-budget obligation is stronger with those observations.
+
+## Fault observations and limits
+
+Each native fixture owns a generated PostgreSQL database, restricted role and
+private directory. Credentials arrive on child stdin. Application migrations,
+explicit queue provisioning, Jobs, native consumers and domain executors are real.
+Effects use a separate PDO and have no uniqueness constraint hiding duplicates.
+Process deadlines, actual signal status/reaping, database/role removal and private
+directory removal are checked. Faults never target an application database.
+
+Admission death blocks the real COMMIT on a deferred PostgreSQL trigger; the test
+ends the client and blocked backend before checking rollback. Completion-before-ack
+blocks the real queue DELETE, independently observes completed state and the
+unacknowledged invitation, then kills/reaps the worker and aborts that backend.
+A retained queue row is required before redelivery. Client death alone cannot
+promise rollback once PostgreSQL has received COMMIT.
+
+Crash tests explicitly move the real persisted visibility and lease deadlines into
+the past after killing the owner. The actual configured deadlines are also compared
+in PostgreSQL: native visibility and Job lease are both 60 seconds. These are
+bounded local restart proofs, not power-loss, remote broker or network-partition
+claims. Busy duplicate deliveries retain a delayed invitation without consuming
+handler-failure budget; unrelated Work completes and polling before the deadline
+adds no Attempt or effect.
+
+No test promises exactly-once arbitrary external effects. An effect can precede a
+failed completion write; a recovered Attempt can repeat it. OPS-C03 live stale-worker
+fencing and lease renewal are not implemented here. Department reconciliation
+remains responsible for unmet coverage after a Job terminates.
 
 ## Adversarial verification
 
-The repository-owned [focused verifier](../../tools/verification/ops_c02_negative.py)
-replaces the permissive local `/tmp` runner. Its
-[usage and safety notes](../../tools/verification/README.md) describe prerequisites,
-private fixture configuration, isolation, interruption and artifact handling.
-It resolves Core from its own file and always uses `bin/test.sh`.
-
 ```sh
-python3 -B -m unittest discover -s tools/verification -p test_ops_c02_negative.py -v
+python3 -B -m unittest discover -s tools/verification -p 'test_*.py'
 python3 -B tools/verification/ops_c02_negative.py
+python3 -B tools/evaluations/installation-negative.py
 ```
 
-A passing seven-contract baseline is mandatory. A live regression then changes
-only the test fixture's administrator lookup to a guaranteed absent file. The
-resulting real setup failure must be rejected as **verification error**. The
-actual private administrator file is never moved or read by the runner.
-
-Each control requires the exact selected assertion/exception location and its
-specific observed violation. JUnit establishes failure identity; PHPUnit hook events independently reject
-setup/teardown errors, including a second error after an expected assertion. Console
-diffs expose persisted Job/effect IDs and physical destination order. A missing
-barrier requires a successful un-killed child exit before its barrier. Lost
-outbox intent requires independently queried state at settlement timeout: one
-queued Job, zero retained native envelopes and zero effects. Arbitrary timeouts,
-setup/teardown errors, extra failures and infrastructure exceptions cannot count
-as detected sabotage. Results distinguish **detected**, **not detected** and
-**verification error**; every unexpected error fails the overall run.
-
-| Mutation | Selected contract and detected failure |
-| --- | --- |
-| Remove admission's transaction around Job/outbox writes | Rejection contract observes a surviving Job |
-| Remove the commit pause | Admission crash contract rejects a child that exited without reaching its barrier |
-| Skip actual destination send while acknowledging | Relay crash contract observes no forwarded invitation |
-| Delete durable outbox on restart | Restart contract cannot settle its queued Job |
-| Allow completed Job claims | Worker redelivery contract observes repeated effect/Attempt behaviour |
-| Execute the independent probe INSERT twice | Restart contract observes both effect rows |
-| Let the rejection trigger return successfully | Rejection contract rejects the successful child exit |
-| Reverse the requested forwarding iteration | Ordering contract observes the wrong physical destination order |
-
-The runner restores original bytes after each mutation, verifies source hashes,
-and compares every worktree's status, diff and existing dirty/untracked bytes.
-It refuses linked/shared mutation targets and concurrent verifier runs. SIGINT
-and SIGTERM finish the current bounded test cleanup before source restoration
-and exit. SIGKILL, machine failure and concurrent outside edits remain explicit
-limits: private original-byte backups are retained for manual recovery rather
-than overwriting unexpected edits. A restored seven-contract run must pass.
-
-The attachable allowlisted JSON manifest is generated at
-`tmp/ops-c02-verification/manifest.json`. A successful reviewed result is retained
-at [verification/ops-c02/negative-controls.json](verification/ops-c02/negative-controls.json).
-It includes all eight expected invariants, actual results, assertion locations,
-observed IDs/counts/order, source hashes and worktree status hashes. Raw console
-output, JUnit exception reports, absolute paths and credentials are excluded.
-Do not attach the whole ignored `tmp/` directory. Native driver observations
-remain local in ignored `tmp/operations-delivery-evidence.jsonl`.
-
-## Specification-owner review
-
-No assertion contradiction was found. These contracts are satisfied by the
-merged production foundation, so the implementation is a real test driver and
-verification rather than speculative production changes. The outage proof is
-specifically the local Doctrine variant allowed by the accepted README. Its
-retry action recovers the retained outbox retry, not an exhausted failure queue.
-The synthetic sleep cleanup, explicit visibility advancement and narrow crash
-windows above are material limits of the proof, not additional production
-recovery guarantees.
-
-This implementation is published separately from the tests-only PR #77 for
-final review. Existing worktrees and their uncommitted work were preserved;
-the workspace submodule pointer was not updated. No merge is included.
-
-## Final validation
-
-Reverification uses the repository's Mago commands and canonical test wrapper:
-
-```sh
-python3 -B -m unittest discover -s tools/verification -p test_ops_c02_negative.py -v
-python3 -B tools/verification/ops_c02_negative.py
-lerd composer github:fmt
-lerd composer github:lint
-lerd composer github:analyse
-STASHD_TEST_PROCESSES=8 ./bin/test.sh --compact --colors=never
-```
-
-The focused verifier runs the seven contracts both before sabotage and after
-restoration. The Python regression checks cover the missing-fixture false
-positive, a specific surviving Job, combined cleanup/unrelated failures,
-wrong assertions, infrastructure exit codes, a passing mutant, deferred signal
-handling and restoration of pre-existing uncommitted bytes.
-
-Final publication-tooling verification passed:
-
-| Check | Observed result |
-| --- | --- |
-| Python classifier/restoration regressions | 7 passed |
-| Unmodified baseline | 7 contracts passed, 177 assertions |
-| Live missing-fixture counterexample | Rejected as the expected verification error |
-| Eight negative controls | All 8 detected at their specific violations; no unexpected verification errors |
-| Restored contracts | 7 passed, 177 assertions |
-| Source integrity and all worktree snapshots | Preserved; before/after hashes in the retained manifest |
-| Mago format check and lint | Passed |
-| Mago analysis | Passed with the 3 existing Records & Archives help messages |
-| Full suite, 8 processes | Exit 0: 449 passed, 33 incomplete, 10 deprecated, 23,782 assertions, 66.28s |
-
-The complete suite's assertion count can vary with its existing polling and
-concurrency checks. Passing test counts and the seven focused contracts are
-unchanged. After final QA, PostgreSQL and process audits found zero new fixture
-databases/roles, zero delivery backend sessions, zero delivery runtime/supervisor
-processes and zero private fixture roots. The pre-existing disposable database
-and role were preserved. The temporary private administrator file and temporary
-report files were removed; no original-byte recovery backups remain.
-All six imported specification files remain byte-identical to `22d23df`;
-production code has no diff. Existing work in every other worktree was preserved.
-Publication is through a separate draft implementation PR for final review;
-PR #77 and OPS-C03 are outside this change.
-
-Mago's analyzer excludes tests and does not analyze Python; the driver is checked
-by Mago formatting/lint, real execution and the eight controls. The Python
-verifier uses only the standard library and is exercised by its regression checks
-and live PostgreSQL/Messenger run. OPS-C03 and remote-broker proof limits remain
-those described above.
+The native verifier replaces the obsolete relay verifier. It requires a passing
+ten-case baseline, nine targeted mutations and a passing restored native suite.
+The nesting verifier checks premature physical commit, a separate physical
+connection and bypassed DBAL nesting. A matching first assertion, exception class
+and independent observations are required. Setup errors, wrong assertions,
+timeouts, additional diagnostics and teardown errors cannot count as detection.
+Both tools preserve exact pre-existing uncommitted bytes; run them without another
+test, formatter or editor changing their mutation targets.

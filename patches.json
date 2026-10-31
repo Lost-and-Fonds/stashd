@@ -1,0 +1,26 @@
+{
+    "patches": {
+        "ecotone/tempest": [
+            {
+                "description": "Share the injected Tempest DBAL owner without PDO reflection",
+                "url": "tools/evaluations/ecotone-tempest-injection.patch",
+                "sha256": "fa18d412bea0b3672aa588599885d4551ef1a9ce8b08ef05499ad0cc120d8f8f",
+                "depth": 1
+            },
+            {
+                "description": "Keep ordinary Tempest services and non-messaging commands lazy",
+                "url": "tools/evaluations/ecotone-tempest-lazy-boot.patch",
+                "sha256": "e76c4d8ac6658c6df0c5fb8ff7ba47b8fefded80a7d32b9c842b814950700bd5",
+                "depth": 1
+            }
+        ],
+        "ecotone/dbal": [
+            {
+                "description": "Preserve native DBAL channel message priority",
+                "url": "tools/evaluations/ecotone-dbal-priority.patch",
+                "sha256": "2c6e6062e2166be4a637f73586d987858d6124a24d9b958242c92da1ffb1557d",
+                "depth": 1
+            }
+        ]
+    }
+}
