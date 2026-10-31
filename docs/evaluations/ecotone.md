@@ -1,6 +1,142 @@
-# Ecotone architectural replacement evaluation — round two
+# Ecotone architectural replacement evaluation
 
-## Final acceptance round — official integration is the preferred target
+
+## Injected official connection — works with our Tempest PR and an Ecotone patch
+
+**Recommendation: Adopt after specific upstream work.** The nested transaction
+blocker now has a working, isolated solution using the exact Tempest PR #2326 fork
+commit and a proposed patch to ecotone/tempest. The Tempest PR alone remains
+insufficient: the published adapter's default PDO bridge still fails the original
+three nesting gates. Those tests and the legacy clean-schema failure are retained.
+No production connection binding, root Composer dependency, Messenger migration,
+Vault behavior or application source was changed.
+
+### What changed
+
+The isolated Composer fixture now installs **hipsterjazzbo/tempest-framework at
+5e56e440298e4c30e8059030ef078e7a71e4fbf6**, branch
+`fix/2325-injected-connections`, directly. Its `3.19.2` alias satisfies Ecotone's
+constraint; it is not a released Tempest guarantee. Composer also updates the
+fork's required nette/php-generator from 4.2.1 to **4.2.3**. All Ecotone packages
+remain **2.0.0-beta.7** and DBAL remains **4.5.0**. Only the isolated lockfile changes;
+Core's working vendor and root lockfile retain the earlier candidate dependencies.
+The existing Tempest patch file remains historical/reproducible evidence; it must
+not be applied a second time to this fork installation.
+
+`tools/evaluations/ecotone-tempest-injection.patch` is an explicit **proposed
+Ecotone change**, not a published API or an upstream PR. It introduces:
+
+- `Ecotone\Api\Tempest\DbalBackedConnection`, implementing Tempest's public
+  Connection interface and delegating transactions to one DBAL owner.
+- `ConfiguredPdoDriver`, opening PDO from the original Tempest DatabaseConfig DSN
+  and options each time a physical connection is needed. It does not parse or
+  translate application credentials into a separate Operations configuration.
+- `ManagedDbalConnection`, refusing closure/replacement during an active transaction.
+- A resolver branch that recognizes the injected connection and reuses its DBAL
+  object for the normal `TempestConnectionReference::defaultConnection()`.
+
+There is no reflection on this injected path. The existing adapter's default
+reflection-based path remains intact for baseline comparison. Tempest PR #2326
+lets DatabaseInitializer honour the injected connection, including when Database
+resolves first. Both frameworks consequently update the same DBAL nesting counter;
+an inner admission uses a savepoint and never commits the outer transaction.
+This relocates shared-connection infrastructure into an explicit library proposal;
+it does not make that infrastructure disappear or certify an upstream release.
+
+The test profile selects the proposed library connection using a normal Tempest
+initializer, enabled through supported discovery configuration:
+
+```php
+#[Singleton]
+public function initialize(Container $container): Connection
+{
+    return DbalBackedConnection::fromConfiguration($container->get(DatabaseConfig::class));
+}
+```
+
+The profile does not instantiate SharedOperationsConnection, SharedPostgresConnection,
+TempestDbalConnection or OperationsConnectionInitializer. A small binding like this
+would remain in Stashd until the official adapter offered its own opt-in initializer.
+JobRuntimeInitializer and JobRuntime's EcotoneLite assembly remain further migration
+work; this proof does not remove or silently replace either one in the application.
+
+### Independently observed evidence
+
+`InjectedIntegrationTest.php` adds the same commit/rollback/inner-failure behavioral
+assertions as the existing official contracts. The real Tempest container resolves
+an ordinary mutation and Jobs::request on the injected owner. Observers see nothing
+before commit; PostgreSQL insertion triggers verify backend PID and txid for all
+three writes. Rollback removes all three. An actual enqueue constraint rejection
+rolls back Job and invitation to the inner savepoint while unrelated outer work
+still commits. All three cases pass.
+
+Two further contracts exercise Database-first and messaging-first resolution,
+nonpersistent connections, a non-default private PostgreSQL schema, explicit
+physical reconnection, and rejected Tempest reconnect/DBAL close during an active
+transaction. Both check actual connection identity and transaction identity.
+A native official command invitation is invisible before commit and absent after
+rollback. A committed invitation survives process exit and a **fresh official
+consumer process** persists the sole independent `committed` effect and settles
+the queue. The schema remains correct after reconnect because these profiles
+supply it as a PostgreSQL startup option in the Tempest DSN, rather than relying
+on a one-time session SET. Reconnection does not promise to preserve arbitrary
+session changes; required session state must be configured for each connection.
+
+The Job admission diagnostic continues to reuse the real Jobs/JobRuntime admission
+logic on the official DBAL connection. Native messaging is separately exercised
+through the official ConfiguredMessagingSystem. This is not yet a complete
+JobRuntime migration onto the official bus. The existing OPS-C01/native durability
+regressions in the combined run still exercise the retained working candidate,
+not all fault windows through the new connection profile.
+
+| Check | Result |
+| --- | --- |
+| Injected official nested commit / rollback / inner failure | 3 passed |
+| Both resolution orders, reconnect guards and fresh official consumers | 2 passed |
+| Focused candidate regressions plus all installation profiles | **23 passed, 4 expected-failing**, 833 assertions, 54.63 seconds, exit 1 |
+| Retained expected failures | Legacy messenger_messages schema plus 3 default-adapter nesting cases |
+| Injected premature commit / separate physical connection / bypassed DBAL nesting controls | All 3 detected at named assertions; baseline and restored tests pass |
+| Original candidate nesting negative controls after verifier extension | Both detected; baseline and restoration pass |
+| Format / lint / analysis | Passed; analysis only has the same 3 existing Records & Archives help messages |
+| Patched library additions | Explicit Mago format/lint passed; PostgreSQL integration tests pass |
+| Isolated Composer validation | Passed with deliberate commit-ref and version-pin warnings |
+| Patch reversibility | Reverse-check, removal, forward-check and reapplication all passed |
+
+The negative verifier accepts only the selected assertion failure, rejects setup
+errors/timeouts, and restores exact source bytes. Private JUnit/events are retained
+under ignored tmp/. The checked-in results are `ecotone-injection-evidence.json`
+and `ecotone-injected-negative.json`. The preceding round's evidence files remain
+historical records of their own source versions.
+
+### Reproduce the fork and proposed adapter path
+
+```sh
+lerd composer --working-dir=tools/evaluations/official-tempest install --no-interaction --no-scripts
+test -e tools/evaluations/official-tempest/vendor || ln -s ../../../tmp/official-tempest-vendor tools/evaluations/official-tempest/vendor
+# Apply only to an unpatched isolated Ecotone installation:
+git apply --check --directory=tmp/official-tempest-vendor/ecotone/tempest tools/evaluations/ecotone-tempest-injection.patch
+git apply --directory=tmp/official-tempest-vendor/ecotone/tempest tools/evaluations/ecotone-tempest-injection.patch
+STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/EcotoneInstallation/InjectedIntegrationTest.php
+python3 -B tools/evaluations/installation-negative.py --injected
+# Retained regression set, including four deliberate red acceptance gates:
+STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/EcotoneInstallation tests/Acceptance/EcotoneDelivery/NativeDurabilityTest.php tests/Acceptance/Operations/WorkAdmissionTest.php tests/Feature/EcotoneTransactionTest.php --log-junit tmp/ecotone-injected-final.xml
+```
+
+Existing candidate vendor patches/setup documented below are still prerequisites
+for the candidate regression set. The isolated fork needs no additional Tempest
+patch. Both fixture VCS repositories use Git transport for metadata to avoid a
+local Composer GitHub-API authentication failure; the committed lock pins package
+sources. No credentials are written to the repository.
+
+The remaining integration work is to propose/review/release this Ecotone change,
+release the Tempest injection fix, bind the actual Operations runtime to the
+native system, and run its complete fault contracts through that profile. The
+native priority defect and legacy clean-schema gate remain separate obligations.
+Tagged databases, tenant switching, MySQL and SQLite are not covered by this
+PostgreSQL proof. No Messenger removal, preservation-safety or production-readiness
+claim follows from these results.
+
+## Previous final acceptance round — unmodified official integration
 
 The architectural preference is now the official **ecotone/tempest** integration.
 The custom bridge described in the round-two sections below is retained only as a
@@ -144,7 +280,7 @@ can delegate to native DatabaseSetupManager/setup commands; the idempotent
 provisioning requirement itself must not disappear. No custom component is deleted
 in this validation round.
 
-### Reproduce this round
+### Reproduce the previous round at bf376a9
 
 ```sh
 # Core working candidate dependencies/patches remain as documented below.
@@ -165,7 +301,7 @@ acceptance directory is expected to remain red at the documented clean-schema
 assertion and official nesting assertions until those blockers are fixed. Report
 those separately from the passing working-candidate contracts.
 
-**Current decision:** prefer the official adapter, retain the working candidate,
+**Decision at that round:** prefer the official adapter, retain the working candidate,
 and keep Messenger removal out of this round. The clean-install gate must pass
 before a subsequent removal is accepted; the official adapter must pass the shared
 transaction gates before it replaces the candidate. Improving upstream can be separate work; it is not silently

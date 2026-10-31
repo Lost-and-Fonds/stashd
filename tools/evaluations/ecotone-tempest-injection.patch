@@ -1,0 +1,284 @@
+diff --git a/Api/DbalBackedConnection.php b/Api/DbalBackedConnection.php
+new file mode 100644
+--- /dev/null
++++ b/Api/DbalBackedConnection.php
+@@ -0,0 +1,152 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Ecotone\Api\Tempest;
++
++use Doctrine\DBAL\Connection as Dbal;
++use Ecotone\Tempest\Config\ManagedDbalConnection;
++use Ecotone\Tempest\Config\PDO\ConfiguredPdoDriver;
++use PDO;
++use PDOStatement;
++use Tempest\Database\Config\DatabaseConfig;
++use Tempest\Database\Connection\Connection;
++use Throwable;
++
++/**
++ * Share one DBAL transaction owner with an injected Tempest connection.
++ *
++ * licence Apache-2.0
++ *
++ * Requires Tempest PR 2326. DBAL owns transactions and reconnects; install this
++ * singleton before resolving Database. Never reconnect during a transaction.
++ */
++final readonly class DbalBackedConnection implements Connection
++{
++    /**
++     * Retain the same DBAL object supplied to Ecotone's connection factory.
++     */
++    private function __construct(
++        private Dbal $database,
++    ) {}
++
++    /**
++     * Open connections lazily using the supplied Tempest DSN and PDO options.
++     */
++    public static function fromConfiguration(DatabaseConfig $config): self
++    {
++        return new self(new ManagedDbalConnection([], new ConfiguredPdoDriver($config)));
++    }
++
++    /**
++     * Give Ecotone the existing owner rather than wrapping its PDO again.
++     */
++    public function database(): Dbal
++    {
++        return $this->database;
++    }
++
++    /**
++     * Start a transaction through its single owner, DBAL.
++     */
++    public function beginTransaction(): bool
++    {
++        $this->database->beginTransaction();
++
++        return true;
++    }
++
++    /**
++     * Report the physical connection's transaction state.
++     */
++    public function inTransaction(): bool
++    {
++        return $this->pdo()->inTransaction();
++    }
++
++    /**
++     * Commit through DBAL so its nesting counter stays consistent.
++     */
++    public function commit(): bool
++    {
++        $this->database->commit();
++
++        return true;
++    }
++
++    /**
++     * Roll back through DBAL, including nested savepoints.
++     */
++    public function rollback(): bool
++    {
++        $this->database->rollBack();
++
++        return true;
++    }
++
++    /**
++     * Return the last generated identifier for Tempest's insert helpers.
++     */
++    public function lastInsertId(): false|string
++    {
++        return $this->pdo()->lastInsertId();
++    }
++
++    /**
++     * Prepare on the currently owned PDO; no PDO handle is cached here.
++     */
++    public function prepare(string $sql): PDOStatement
++    {
++        return $this->pdo()->prepare($sql) ?: throw new \RuntimeException('Could not prepare a shared database statement.');
++    }
++
++    /**
++     * Refuse to silently lose an active transaction during connection closure.
++     */
++    public function close(): void
++    {
++        $this->database->close();
++    }
++
++    /**
++     * Resolve DBAL's lazy physical connection.
++     */
++    public function connect(): void
++    {
++        $this->pdo();
++    }
++
++    /**
++     * Replace the physical connection only outside a transaction.
++     */
++    public function reconnect(): void
++    {
++        $this->close();
++        $this->connect();
++    }
++
++    /**
++     * Probe connectivity without concealing errors from normal queries.
++     */
++    public function ping(): bool
++    {
++        try {
++            return $this->database->fetchOne('SELECT 1') !== false;
++        } catch (Throwable) {
++            return false;
++        }
++    }
++
++    /**
++     * Use DBAL's supported native-connection API and enforce the PDO driver.
++     */
++    private function pdo(): PDO
++    {
++        $pdo = $this->database->getNativeConnection();
++        if (! $pdo instanceof PDO) {
++            throw new \LogicException('The shared Tempest connection requires a PDO DBAL driver.');
++        }
++
++        return $pdo;
++    }
++}
+diff --git a/src/Config/ManagedDbalConnection.php b/src/Config/ManagedDbalConnection.php
+new file mode 100644
+--- /dev/null
++++ b/src/Config/ManagedDbalConnection.php
+@@ -0,0 +1,28 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Ecotone\Tempest\Config;
++
++use Doctrine\DBAL\Connection;
++use LogicException;
++
++/**
++ * Reject connection replacement while a shared transaction is still active.
++ *
++ * licence Apache-2.0
++ */
++final class ManagedDbalConnection extends Connection
++{
++    /**
++     * Allow physical reconnection only after both frameworks have settled their work.
++     */
++    public function close(): void
++    {
++        if ($this->isTransactionActive() || $this->isConnected() && $this->getNativeConnection()->inTransaction()) {
++            throw new LogicException('Cannot close an active shared transaction.');
++        }
++
++        parent::close();
++    }
++}
+diff --git a/src/Config/PDO/ConfiguredPdoDriver.php b/src/Config/PDO/ConfiguredPdoDriver.php
+new file mode 100644
+--- /dev/null
++++ b/src/Config/PDO/ConfiguredPdoDriver.php
+@@ -0,0 +1,67 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Ecotone\Tempest\Config\PDO;
++
++use Doctrine\DBAL\Driver;
++use Doctrine\DBAL\Driver\API\ExceptionConverter;
++use Doctrine\DBAL\Driver\Connection as DriverConnection;
++use Doctrine\DBAL\Driver\PDO\Exception;
++use Doctrine\DBAL\Platforms\AbstractPlatform;
++use Doctrine\DBAL\ServerVersionProvider;
++use PDO;
++use PDOException;
++use Tempest\Database\Config\DatabaseConfig;
++use Tempest\Database\Config\DatabaseDialect;
++
++/**
++ * Apply Tempest's original DSN and options on every physical connection.
++ *
++ * licence Apache-2.0
++ */
++final readonly class ConfiguredPdoDriver implements Driver
++{
++    private Driver $dialect;
++
++    /**
++     * Retain the native configuration without opening or caching a PDO handle.
++     */
++    public function __construct(
++        private DatabaseConfig $config,
++    ) {
++        $this->dialect = match ($config->dialect) {
++            DatabaseDialect::POSTGRESQL => new PostgresDriver(),
++            DatabaseDialect::MYSQL => new MySqlDriver(),
++            DatabaseDialect::SQLITE => new SQLiteDriver(),
++        };
++    }
++
++    /**
++     * Create a fresh PDO after DBAL closes its previous physical connection.
++     */
++    public function connect(array $params): DriverConnection
++    {
++        try {
++            return new Connection(new PDO($this->config->dsn, $this->config->username, $this->config->password, $this->config->options));
++        } catch (PDOException $error) {
++            throw Exception::new($error);
++        }
++    }
++
++    /**
++     * Use the adapter's existing dialect implementation for schema operations.
++     */
++    public function getDatabasePlatform(ServerVersionProvider $versionProvider): AbstractPlatform
++    {
++        return $this->dialect->getDatabasePlatform($versionProvider);
++    }
++
++    /**
++     * Preserve the adapter's existing conversion of native database errors.
++     */
++    public function getExceptionConverter(): ExceptionConverter
++    {
++        return $this->dialect->getExceptionConverter();
++    }
++}
+diff --git a/src/Config/TempestConnectionResolver.php b/src/Config/TempestConnectionResolver.php
+--- a/src/Config/TempestConnectionResolver.php
++++ b/src/Config/TempestConnectionResolver.php
+@@ -6,6 +6,7 @@
+
+ use Doctrine\DBAL\Connection;
+ use Doctrine\DBAL\Driver;
++use Ecotone\Api\Tempest\DbalBackedConnection;
+ use Ecotone\Api\Tempest\TempestConnectionReference;
+ use Ecotone\Dbal\DbalConnection;
+ use Ecotone\Tempest\Config\PDO\MySqlDriver;
+@@ -28,6 +29,10 @@
+     public static function resolve(TempestConnectionReference $reference): ConnectionFactory
+     {
+         $configTag = $reference->configTag;
++        $injected = GenericContainer::instance()->get(TempestConnection::class, tag: $configTag);
++        if ($injected instanceof DbalBackedConnection) {
++            return DbalConnection::create($injected->database());
++        }
+
+         if ($configTag === null) {
+             return self::resolveFromTempestConnection();

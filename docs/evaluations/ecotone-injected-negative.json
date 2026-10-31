@@ -1,0 +1,21 @@
+{
+  "baseline": "passed",
+  "controls": [
+    {
+      "id": "premature-inner-commit",
+      "result": "detected",
+      "assertion": "tests/Acceptance/EcotoneInstallation/InjectedIntegrationTest.php:14"
+    },
+    {
+      "id": "separate-physical-connection",
+      "result": "detected",
+      "assertion": "tests/Acceptance/EcotoneInstallation/InjectedIntegrationTest.php:14"
+    },
+    {
+      "id": "bypass-dbal-nesting",
+      "result": "detected",
+      "assertion": "tests/Acceptance/EcotoneInstallation/InjectedIntegrationTest.php:17"
+    }
+  ],
+  "restored": "passed"
+}

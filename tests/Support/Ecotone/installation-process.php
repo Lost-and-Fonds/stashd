@@ -14,7 +14,8 @@ use Tempest\Database\Query;
 use Tests\Support\Operations\LocalOperationsDriver;
 
 $request = json_decode(stream_get_contents(STDIN), true, flags: JSON_THROW_ON_ERROR);
-$official = $request['action'] === 'official-nested';
+$injected = str_starts_with($request['action'], 'injected-');
+$official = $request['action'] === 'official-nested' || $injected;
 $root = dirname(__DIR__, 3);
 if ($official) {
     $loader = require $root . '/tmp/official-tempest-vendor/autoload.php';
@@ -41,6 +42,13 @@ try {
 
     $d = $request['descriptor'];
     $observer = LocalOperationsDriver::connect($d);
+    if ($injected && ($request['private_schema'] ?? false)) {
+        $d['schema'] .= '_injected';
+        $observer->exec('CREATE SCHEMA IF NOT EXISTS "' . $d['schema'] . '"');
+        $observer->exec('SET search_path TO "' . $d['schema'] . '"');
+        $d['dsn'] .= ';options=--search_path=' . $d['schema'];
+    }
+
     foreach ([
         'STASHD_OPERATIONS_DSN' => $d['dsn'],
         'STASHD_OPERATIONS_USERNAME' => $d['username'],
@@ -52,7 +60,12 @@ try {
         $_ENV[$key] = $value;
     }
 
+    putenv('ECOTONE_INJECTED_CONNECTION=' . ($injected ? '1' : '0'));
     $container = Tempest::boot(root: $root);
+    if ($request['action'] === 'injected-lifecycle' && $request['order'] === 'messaging-first') {
+        $container->get(\Ecotone\Api\Messaging\ConfiguredMessagingSystem::class);
+    }
+
     $database = $container->get(OperationsDatabase::class)->connect();
     if ($request['action'] === 'install') {
         if (! ($request['provision_only'] ?? false)) {
@@ -81,6 +94,64 @@ try {
             ->getServiceFromContainer(\Ecotone\Api\Dbal\ExtensionObject\DbalConnectionReference::DEFAULT)
             ->createContext()
             ->getDbalConnection();
+        if ($request['action'] === 'injected-consume') {
+            $system->run('official_probe', \Ecotone\Api\ExtensionObject\ExecutionPollingMetadata::createWithFinishWhenNoMessages());
+            echo json_encode(['effects' => $observer->query('SELECT value FROM official_effects')->fetchAll(PDO::FETCH_COLUMN)], JSON_THROW_ON_ERROR);
+            exit(0);
+        }
+
+        if ($request['action'] === 'injected-lifecycle') {
+            $connection = $container->get(Connection::class);
+            $config = $container->get(\Tempest\Database\Config\DatabaseConfig::class);
+            $identity = $database->fetchFirst(new Query('SELECT pg_backend_pid() AS backend, current_schema() AS schema'));
+            $sameOwner = $database->connection === $connection && $connection->database() === $dbal;
+            $connection->reconnect();
+            $after = $database->fetchFirst(new Query('SELECT pg_backend_pid() AS backend, current_schema() AS schema'));
+            $database->execute(new Query('CREATE TABLE official_effects (value TEXT)'));
+            $connection->beginTransaction();
+            $transaction = $database->fetchFirst(new Query('SELECT pg_backend_pid() AS backend, txid_current() AS tx'));
+            $rejected = [];
+            foreach (['tempest-reconnect', 'dbal-close'] as $operation) {
+                try {
+                    if ($operation === 'tempest-reconnect') {
+                        $connection->reconnect();
+                    } else {
+                        $dbal->close();
+                    }
+
+                    $rejected[$operation] = false;
+                } catch (LogicException) {
+                    $rejected[$operation] = true;
+                }
+            }
+
+            $system->getCommandBus()->send(new \Evaluation\Official\BridgePing('rolled-back'));
+            $before = (int) $observer->query('SELECT count(*) FROM enqueue')->fetchColumn();
+            $physicalSame =
+                (int) $transaction['backend'] === (int) $dbal->fetchOne('SELECT pg_backend_pid()')
+                && (string) $transaction['tx'] === (string) $dbal->fetchOne('SELECT txid_current()');
+            $connection->rollback();
+            $rolledBack = (int) $observer->query('SELECT count(*) FROM enqueue')->fetchColumn();
+            $connection->beginTransaction();
+            $system->getCommandBus()->send(new \Evaluation\Official\BridgePing('committed'));
+            $connection->commit();
+            echo json_encode([
+                'same_owner' => $sameOwner,
+                'same_transaction' => $physicalSame,
+                'reconnected' => $identity['backend'] !== $after['backend'],
+                'schema_before' => $identity['schema'],
+                'schema_after' => $after['schema'],
+                'persistent' => $config->usePersistentConnection,
+                'rejected' => $rejected,
+                'invisible' => $before,
+                'rolled_back' => $rolledBack,
+                'committed' => (int) $observer->query('SELECT count(*) FROM enqueue')->fetchColumn(),
+                'dbal_level' => $dbal->getTransactionNestingLevel(),
+                'effect_count' => (int) $observer->query('SELECT count(*) FROM official_effects')->fetchColumn(),
+            ], JSON_THROW_ON_ERROR);
+            exit(0);
+        }
+
         $jobs = new Jobs(new \App\Operations\JobRuntime($container->get(\App\Integration\OperationsConfig::class), connection: $dbal));
         // Validate native messaging independently of the Operations nesting diagnostic.
         $database->execute(new Query('CREATE TABLE official_effects (value TEXT)'));

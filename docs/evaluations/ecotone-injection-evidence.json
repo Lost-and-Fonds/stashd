@@ -1,0 +1,105 @@
+{
+  "base": "bf376a9074f080fa1826b236c703b377f82d4441",
+  "scope": "Isolated proposed ecotone/tempest connection injection using the exact open Tempest PR fork. No production integration or Messenger removal.",
+  "results": {
+    "total": 27,
+    "passed": 23,
+    "expected_failing": 4,
+    "unexpected_failures": 0,
+    "assertions": 833,
+    "seconds": 54.63,
+    "exit": 1
+  },
+  "injected_profile": {
+    "passed": 5,
+    "assertions": 121,
+    "coverage": [
+      "outer commit",
+      "outer rollback",
+      "inner enqueue rejection/savepoint recovery",
+      "Database-first and messaging-first normal application resolution",
+      "nonpersistent connection",
+      "non-default schema after physical reconnect",
+      "active Tempest reconnect and DBAL close rejected",
+      "native rollback and process restart before fresh official consumption"
+    ]
+  },
+  "versions": {
+    "doctrine/dbal": {
+      "version": "4.5.0",
+      "reference": "c435cd7ea33e17d2a89288caf994cf3d4549b879"
+    },
+    "ecotone/dbal": {
+      "version": "2.0.0-beta.7",
+      "reference": "630374177e3e4edf01aafbc0a891ed10530ab45b"
+    },
+    "ecotone/ecotone": {
+      "version": "2.0.0-beta.7",
+      "reference": "73fa1ef11cbfc848aba2cd057219ef3b50d07950"
+    },
+    "ecotone/enqueue": {
+      "version": "2.0.0-beta.7",
+      "reference": "a2b312bd810a60abf17b280c5c342b586501f03d"
+    },
+    "ecotone/tempest": {
+      "version": "2.0.0-beta.7",
+      "reference": "9a1469ea24c58e20924ceecbceea77055fb19419"
+    },
+    "nette/php-generator": {
+      "version": "v4.2.3",
+      "reference": "abdfd4c22f9077af10daa7391d14e83fc36ba809"
+    },
+    "tempest/framework": {
+      "version": "dev-fix/2325-injected-connections",
+      "reference": "5e56e440298e4c30e8059030ef078e7a71e4fbf6"
+    }
+  },
+  "messenger_installed_in_isolated_vendor": false,
+  "ecotone_patch": "tools/evaluations/ecotone-tempest-injection.patch",
+  "ecotone_patch_published": false,
+  "additional_tempest_patch_applied_to_fork": false,
+  "retained_expected_failures": [
+    {
+      "test": "a fresh installation preserves intent across reprovisioning without Messenger schema",
+      "failure": "a fresh installation preserves intent across reprovisioning without Messenger schemaFailed asserting that 'messenger_messages' is null.\nat tests/Acceptance/EcotoneInstallation/InstallationTest.php:29"
+    },
+    {
+      "test": "the official adapter preserves nested commit boundaries",
+      "failure": "the official adapter preserves nested commit boundariesThere is already an active transaction\nFailed asserting that '0' is identical to null.\nat tests/Acceptance/EcotoneInstallation/OfficialIntegrationTest.php:17"
+    },
+    {
+      "test": "the official adapter preserves nested rollback boundaries",
+      "failure": "the official adapter preserves nested rollback boundariesThere is already an active transaction\nFailed asserting that '0' is identical to null.\nat tests/Acceptance/EcotoneInstallation/OfficialIntegrationTest.php:17"
+    },
+    {
+      "test": "the official adapter preserves nested inner-failure boundaries",
+      "failure": "the official adapter preserves nested inner-failure boundariesThere is already an active transaction\nFailed asserting that two strings are identical.\nat tests/Acceptance/EcotoneInstallation/OfficialIntegrationTest.php:17"
+    }
+  ],
+  "negative_controls": "ecotone-injected-negative.json",
+  "original_negative_verifier_regression": "both detected; baseline/restored passed",
+  "qa": {
+    "format": "passed",
+    "lint": "passed",
+    "analysis": "3 existing Records & Archives help messages; no errors",
+    "patched_library_lint": "passed explicitly with Mago",
+    "composer_validate": "passed; expected commit-ref and exact-version warnings",
+    "patch_reverse_reapply": "passed"
+  },
+  "limits": [
+    "JobRuntime admission uses the actual domain logic on the official factory connection, but its full messaging bootstrap has not migrated to the official bus.",
+    "Candidate native durability tests remain regressions for the existing candidate, not complete fault coverage for the injected profile.",
+    "Tagged databases, tenant switching, other dialects and the full suite were not tested in this round."
+  ],
+  "sha256": {
+    "tools/evaluations/ecotone-tempest-injection.patch": "73a6e2d6f5b6e824be7cd19cdb00c16d623c8ae5ee02c46618075a77998d0f43",
+    "tools/evaluations/official-tempest/composer.json": "9370f61734c6859a6432d511223682916f176a835cf74f6d157edfd2be1abf9e",
+    "tools/evaluations/official-tempest/composer.lock": "13e6b3b6716a649cf02a026833504985cc81f760000edacd41ce268786366872",
+    "tools/evaluations/official-tempest/config/discovery.config.php": "dfd071c999a3e3711b7ae26fd98151a1919a387332a84cf8a9111848a75bb107",
+    "tests/Acceptance/EcotoneInstallation/InjectedIntegrationTest.php": "460d9d6485b4b51702452124f8f862422866dca85ea41bd69da84b71c2c9971d",
+    "tests/Support/Ecotone/Official/InjectedConnectionInitializer.php": "e5acc130e017c0686487c535fe8c8d40cb9e8bb60cebee6286d9bbe148946c07",
+    "tests/Support/Ecotone/installation-process.php": "d545d3acfb3de8fbe23b16e11ceec63dd11fc0e864a9cb824eef3ab3152172ae",
+    "tests/Support/Ecotone/NativeDeliveryFixture.php": "4685ff0df5c2cb6b47d69467a555eace9629c1a659f6577e37c7f442b3bbd4f9",
+    "tools/evaluations/installation-negative.py": "de84c318c7ebd6502672d5aa89c1ebd5bb2deedfa8d093800548a836bc98c385"
+  }
+}

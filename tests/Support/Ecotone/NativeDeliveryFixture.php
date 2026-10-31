@@ -71,7 +71,15 @@ final class NativeDeliveryFixture
     {
         $pause = $this->root . '/pause-' . count($this->children);
         $child = new GenericProcessExecutor()->start(new \Tempest\Process\PendingProcess(
-            command: [PHP_BINARY, __DIR__ . (in_array($action, ['install', 'nested', 'official-nested'], true) ? '/installation-process.php' : '/delivery-process.php')],
+            command: [
+                PHP_BINARY,
+                __DIR__
+                    . (
+                        in_array($action, ['install', 'nested', 'official-nested', 'injected-nested', 'injected-lifecycle', 'injected-consume'], true)
+                            ? '/installation-process.php'
+                            : '/delivery-process.php'
+                    ),
+            ],
             input: json_encode([
                 'descriptor' => $this->descriptor,
                 'workspace' => $this->root,

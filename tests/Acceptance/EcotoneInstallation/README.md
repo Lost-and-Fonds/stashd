@@ -44,3 +44,23 @@ No private state is patched to make the official bridge pass. If transaction
 ownership or nesting fails, retain the working candidate and its failing official
 contract as evidence. The reflection-based official bridge is an explicit choice
 for evaluation, not justification for a Stashd workaround.
+
+## Injected official connection with Tempest PR 2326
+
+InjectedIntegrationTest adds the same nesting assertions for the proposed
+DbalBackedConnection API supplied by the isolated ecotone-tempest-injection.patch.
+The fixture now installs the exact Tempest fork commit in its separate lockfile.
+The unmodified default official adapter still runs through OfficialIntegrationTest
+and retains its three failures; no original assertion changes.
+
+Two lifecycle cases resolve Database first or messaging first, reconnect to a
+non-default private schema using Tempest configuration, reject active transaction
+replacement, and consume committed native intent in a fresh official process.
+The injected path must use the same DBAL owner, PostgreSQL PID and transaction ID.
+It must not invoke Stashd's custom shared-connection classes or reflection.
+
+Run installation-negative.py --injected to sabotage premature physical commit,
+physical connection sharing and DBAL nesting ownership. Each control must fail at
+its named behavioral assertion, with a passing baseline and restored test. Setup
+errors and timeouts are verification errors. See docs/evaluations/ecotone.md for
+the explicit patch/install commands and the remaining migration obligations.
