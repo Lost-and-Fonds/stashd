@@ -61,15 +61,14 @@ final class FencingFixture
      */
     public function dispose(): void
     {
-        try {
-            $class = getenv('STASHD_OPERATIONS_FENCING_DRIVER');
-            if ($class !== false && $class !== '' && is_a($class, FencingDriver::class, true)) {
-                /** @var FencingDriver $driver */
-                $driver = new $class();
-                $driver->run('fixture.dispose', ['workspace' => $this->workspace->path('operations-fencing')]);
-            }
-        } finally {
-            $this->workspace->dispose();
+        $class = getenv('STASHD_OPERATIONS_FENCING_DRIVER');
+        if ($class !== false && $class !== '' && is_a($class, FencingDriver::class, true)) {
+            /** @var FencingDriver $driver */
+            $driver = new $class();
+            $driver->run('fixture.dispose', ['workspace' => $this->workspace->path('operations-fencing')]);
         }
+
+        // Retain credentials and resource identifiers if driver cleanup fails.
+        $this->workspace->dispose();
     }
 }

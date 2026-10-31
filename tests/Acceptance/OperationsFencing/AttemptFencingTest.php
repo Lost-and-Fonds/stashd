@@ -6,7 +6,7 @@ declare(strict_types=1);
  * OPS-C03 / OPS-PSC04: independent execution ownership and fencing contracts.
  *
  * These actions describe observable outcomes, not production PHP APIs. A real
- * adapter must use native Jobs, Attempts, Messenger and guarded host operations.
+ * adapter must use native Jobs, Attempts, Ecotone and guarded host operations.
  * Without that driver, each scenario is intentionally INCOMPLETE.
  */
 
@@ -36,8 +36,10 @@ test('transport redelivery alone cannot replace a live unexpired Job lease', fun
     $this->fencing->run('transport.expire_delivery', ['job_id' => $jobId]);
     $delivery = $this->fencing->run('worker.try_redelivery', ['job_id' => $jobId, 'worker' => 'bravo']);
 
-    expect($delivery['received_native_envelope'])->toBeTrue();
+    expect($delivery['received_native_message'])->toBeTrue();
     expect($delivery['acquired_attempt'])->toBeFalse();
+    expect($delivery['original_worker_alive'])->toBeTrue();
+    expect($delivery['database_lease_valid'])->toBeTrue();
     expect($this->fencing->run('attempts.read', ['job_id' => $jobId])['current_attempt_id'])
         ->toBe($a['attempt_id']);
     expect($this->fencing->run('attempts.read', ['job_id' => $jobId])['attempts'])
@@ -62,7 +64,8 @@ test('an expired living worker is superseded by a new Attempt on the same delive
     $state = $this->fencing->run('attempts.read', ['job_id' => $jobId]);
     expect($state['current_attempt_id'])->toBe($b['attempt_id']);
     expect($state['attempts'])->toHaveCount(2);
-    expect($state['attempts'][0]['outcome'])->toBe('interrupted');
+    expect(array_column($state['attempts'], 'id'))->toContain($a['attempt_id'], $b['attempt_id']);
+    expect(array_column($state['attempts'], 'outcome'))->not->toContain('completed', 'failed');
 
     $renewal = $this->fencing->run('lease.renew', ['attempt_id' => $a['attempt_id']]);
     expect($renewal['accepted'])->toBeFalse();
@@ -70,58 +73,79 @@ test('an expired living worker is superseded by a new Attempt on the same delive
     $this->fencing->run('worker.release_all', ['job_id' => $jobId]);
 });
 
-test('a stale living Attempt cannot write checkpoints custody or authoritative results', function (): void {
-    $jobId = $this->fencing->run('job.prepare', ['name' => 'fence-host-boundaries'])['job_id'];
-    $a = $this->fencing->run('worker.start_paused', ['job_id' => $jobId, 'worker' => 'alpha']);
-    $this->fencing->run('lease.await_expiration', ['attempt_id' => $a['attempt_id']]);
-    $b = $this->fencing->run('worker.recover', ['job_id' => $jobId, 'worker' => 'bravo']);
-
+test('a stale living Attempt cannot win a check-write race at any authoritative host boundary', function (): void {
     foreach (['checkpoint', 'custody', 'result'] as $operation) {
-        $stale = $this->fencing->run('host.try_write', [
+        $jobId = $this->fencing->run('job.prepare', ['name' => 'fence-' . $operation])['job_id'];
+        $a = $this->fencing->run('worker.start_paused', ['job_id' => $jobId, 'worker' => 'alpha']);
+
+        // A starts while valid; expiry and B's claim occur before A's guarded mutation.
+        $race = $this->fencing->run('host.race_write', [
             'job_id' => $jobId,
             'attempt_id' => $a['attempt_id'],
             'kind' => $operation,
             'value' => 'stale-' . $operation,
+            'successor_worker' => 'bravo',
         ]);
-        expect($stale['accepted'])->toBeFalse();
-        expect($stale['reason'])->toBe('stale_attempt');
+        expect($race['write_boundary_reached_while_valid'])->toBeTrue();
+        expect($race['original_worker_alive'])->toBeTrue();
+        expect($race['successor_claimed_before_write'])->toBeTrue();
+        expect($race['accepted'])->toBeFalse();
+        expect($race['successor_attempt_id'])->not->toBe($a['attempt_id']);
+
+        $records = $this->fencing->run('host.records', ['job_id' => $jobId]);
+        expect($records['checkpoints'])->toBe([]);
+        expect($records['custody'])->toBe([]);
+        expect($records['results'])->toBe([]);
+
+        $current = $this->fencing->run('host.try_write', [
+            'job_id' => $jobId,
+            'attempt_id' => $race['successor_attempt_id'],
+            'kind' => $operation,
+            'value' => 'current-' . $operation,
+        ]);
+        expect($current['accepted'])->toBeTrue();
+        $records = $this->fencing->run('host.records', ['job_id' => $jobId]);
+        expect(
+            $records[match ($operation) {
+                'checkpoint' => 'checkpoints',
+                'custody' => 'custody',
+                'result' => 'results',
+            }],
+        )
+            ->toHaveCount(1);
+
+        expect($this->fencing->run('worker.try_complete', ['attempt_id' => $a['attempt_id']])['accepted'])->toBeFalse();
+
+        $this->fencing->run('worker.release_all', ['job_id' => $jobId]);
     }
-
-    $records = $this->fencing->run('host.records', ['job_id' => $jobId]);
-    expect($records['checkpoints'])->toBe([]);
-    expect($records['custody'])->toBe([]);
-    expect($records['results'])->toBe([]);
-
-    $current = $this->fencing->run('host.try_write', [
-        'job_id' => $jobId,
-        'attempt_id' => $b['attempt_id'],
-        'kind' => 'checkpoint',
-        'value' => 'current-checkpoint',
-    ]);
-    expect($current['accepted'])->toBeTrue();
-    expect($this->fencing->run('host.records', ['job_id' => $jobId])['checkpoints'])
-        ->toHaveCount(1);
-
-    $this->fencing->run('worker.release_all', ['job_id' => $jobId]);
 });
 
 test('an expired Attempt loses write and completion authority even before another worker claims', function (): void {
     $jobId = $this->fencing->run('job.prepare', ['name' => 'expiry-without-successor'])['job_id'];
     $a = $this->fencing->run('worker.start_paused', ['job_id' => $jobId, 'worker' => 'alpha']);
-    $this->fencing->run('lease.await_expiration', ['attempt_id' => $a['attempt_id']]);
+    $expired = $this->fencing->run('lease.await_expiration', ['attempt_id' => $a['attempt_id']]);
+    expect($expired['database_lease_expired'])->toBeTrue();
+    expect($expired['original_worker_alive'])->toBeTrue();
 
-    $write = $this->fencing->run('host.try_write', [
-        'job_id' => $jobId,
-        'attempt_id' => $a['attempt_id'],
-        'kind' => 'checkpoint',
-        'value' => 'expired-owner-checkpoint',
-    ]);
+    foreach (['checkpoint', 'custody', 'result'] as $operation) {
+        $write = $this->fencing->run('host.try_write', [
+            'job_id' => $jobId,
+            'attempt_id' => $a['attempt_id'],
+            'kind' => $operation,
+            'value' => 'expired-' . $operation,
+        ]);
+        expect($write['accepted'])->toBeFalse();
+    }
+
+    expect($this->fencing->run('lease.renew', ['attempt_id' => $a['attempt_id']])['accepted'])->toBeFalse();
     $finish = $this->fencing->run('worker.try_complete', ['attempt_id' => $a['attempt_id']]);
-
-    expect($write['accepted'])->toBeFalse();
     expect($finish['accepted'])->toBeFalse();
     expect($this->fencing->run('job.read', ['job_id' => $jobId])['job']['state'])->not->toBe('completed');
-    expect($this->fencing->run('host.records', ['job_id' => $jobId])['checkpoints'])->toBe([]);
+    $records = $this->fencing->run('host.records', ['job_id' => $jobId]);
+    expect($records['checkpoints'])->toBe([]);
+    expect($records['custody'])->toBe([]);
+    expect($records['results'])->toBe([]);
+    expect($this->fencing->run('attempts.read', ['job_id' => $jobId])['attempts'])->toHaveCount(1);
 
     $b = $this->fencing->run('worker.recover', ['job_id' => $jobId, 'worker' => 'bravo']);
     expect($this->fencing->run('attempts.read', ['job_id' => $jobId])['current_attempt_id'])
@@ -137,6 +161,7 @@ test('a renewed live lease prevents takeover past its original deadline', functi
     $renewed = $this->fencing->run('lease.renew', ['attempt_id' => $a['attempt_id']]);
     expect($renewed['accepted'])->toBeTrue();
     expect($renewed['new_deadline_later'])->toBeTrue();
+    expect($renewed['used_database_clock'])->toBeTrue();
 
     // Use the database clock and a deliberately short test lease; never rewrite
     // lease_until here or confuse broker visibility with Job ownership.
@@ -149,7 +174,20 @@ test('a renewed live lease prevents takeover past its original deadline', functi
 
     $this->fencing->run('transport.expire_delivery', ['job_id' => $jobId]);
     $attempt = $this->fencing->run('worker.try_redelivery', ['job_id' => $jobId, 'worker' => 'bravo']);
+    expect($attempt['received_native_message'])->toBeTrue();
     expect($attempt['acquired_attempt'])->toBeFalse();
+    expect($attempt['database_lease_valid'])->toBeTrue();
+    expect($attempt['original_worker_alive'])->toBeTrue();
+    expect($this->fencing->run('attempts.read', ['job_id' => $jobId])['attempts'])->toHaveCount(1);
+
+    $write = $this->fencing->run('host.try_write', [
+        'job_id' => $jobId,
+        'attempt_id' => $a['attempt_id'],
+        'kind' => 'checkpoint',
+        'value' => 'after-original-deadline',
+    ]);
+    expect($write['accepted'])->toBeTrue();
+    expect($this->fencing->run('host.records', ['job_id' => $jobId])['checkpoints'])->toHaveCount(1);
     expect($this->fencing->run('attempts.read', ['job_id' => $jobId])['current_attempt_id'])
         ->toBe($a['attempt_id']);
 
@@ -167,21 +205,21 @@ test('a replacement reconciles durable custody before publishing authoritative c
         'value' => 'verified-component-1',
     ]);
     expect($staged['accepted'])->toBeTrue();
-    expect($this->fencing->run('host.records', ['job_id' => $jobId])['custody'])
-        ->toHaveCount(1);
+    $retained = $this->fencing->run('host.records', ['job_id' => $jobId])['custody'];
+    expect($retained)->toHaveCount(1);
 
     $crash = $this->fencing->run('worker.crash', ['attempt_id' => $a['attempt_id']]);
     expect($crash['terminated_process'])->toBeTrue();
     $this->fencing->run('lease.await_expiration', ['attempt_id' => $a['attempt_id']]);
 
-    $b = $this->fencing->run('worker.recover', ['job_id' => $jobId, 'worker' => 'bravo']);
+    $b = $this->fencing->run('worker.recover', ['job_id' => $jobId, 'worker' => 'bravo', 'pause_before_reconciliation' => true]);
     $premature = $this->fencing->run('host.try_publish', [
         'job_id' => $jobId,
         'attempt_id' => $b['attempt_id'],
         'coverage' => 'verified-component-1',
     ]);
     expect($premature['accepted'])->toBeFalse();
-    expect($premature['reason'])->toBe('reconciliation_required');
+    expect($this->fencing->run('host.records', ['job_id' => $jobId])['results'])->toBe([]);
 
     $review = $this->fencing->run('host.reconcile_custody', [
         'job_id' => $jobId,
@@ -197,10 +235,20 @@ test('a replacement reconciles durable custody before publishing authoritative c
     expect($published['accepted'])->toBeTrue();
 
     $state = $this->fencing->run('host.records', ['job_id' => $jobId]);
-    expect($state['custody'])->toHaveCount(1);
+    expect($state['custody'])->toBe($retained);
+    expect($this->fencing->run('job.read', ['job_id' => $jobId])['job']['state'])->toBe('completed');
     expect($state['results'])->toHaveCount(1);
-    expect($this->fencing->run('attempts.read', ['job_id' => $jobId])['current_attempt_id'])
-        ->toBe($b['attempt_id']);
+
+    // Repeated adoption may reject or return the prior result, but cannot publish twice.
+    $this->fencing->run('host.try_publish', [
+        'job_id' => $jobId,
+        'attempt_id' => $b['attempt_id'],
+        'coverage' => 'verified-component-1',
+    ]);
+    expect($this->fencing->run('host.records', ['job_id' => $jobId]))->toBe($state);
+    $attempts = $this->fencing->run('attempts.read', ['job_id' => $jobId])['attempts'];
+    expect($attempts)->toHaveCount(2);
+    expect(array_column($attempts, 'id'))->toContain($a['attempt_id'], $b['attempt_id']);
 
     $this->fencing->run('worker.release_all', ['job_id' => $jobId]);
 });
