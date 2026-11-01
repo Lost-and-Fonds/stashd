@@ -1,0 +1,68 @@
+Exact baseline
+   PASS  Tests\Acceptance\OperationsDelivery\DurableDeliveryTest
+  ✓ outbox insert rejection rolls back the accepted Job and leaves no d… 1.35s  
+  ✓ killing admission before commit cannot leave a Job without its outb… 1.43s  
+  ✓ committed Job intent survives a process restart before the relay ru… 1.51s  
+  ✓ unavailable forwarding destination retains recoverable intent witho… 1.72s  
+  ✓ relay crash after forwarding but before acknowledgment is safe to r… 1.83s  
+  ✓ completed Job redelivery after lost worker acknowledgment does not…  1.95s  
+  ✓ a changed forwarding order does not determine the authoritative Job… 2.02s  
+   PASS  Tests\Acceptance\Operations\WorkAdmissionTest
+  ✓ concurrent equivalent requests admit one durable Job                 1.38s  
+  ✓ refresh and complete modes of one work scope remain distinct Work    1.20s  
+  ✓ a higher-priority equivalent request promotes one queued Job withou… 2.21s  
+  ✓ a later legitimate request creates a new Job without erasing the co… 1.71s  
+  Tests:    11 passed (245 assertions)
+  Duration: 18.40s
+
+Combined baseline + Durable before final assertion
+   DEPR  Tests\Feature\Durable\DurableSpikeTest
+  ! a persisted workflow completes through Messenger and duplicate acti… 0.45s  
+  ! enqueue rejection after journalling exposes the actual failure and…  0.51s  
+  ! fresh worker processes replay persisted history without repeating a… 1.04s  
+  ! session claims outlive a shortened TTL and killed workers can be re… 3.98s  
+  ! losing the lock session permits takeover and stale effects but bloc… 2.88s  
+  ! an expiring claim allows a stale living activity to append completi… 2.90s  
+   PASS  Tests\Acceptance\OperationsDelivery\DurableDeliveryTest
+  ✓ outbox insert rejection rolls back the accepted Job and leaves no d… 1.37s  
+  ✓ killing admission before commit cannot leave a Job without its outb… 1.45s  
+  ✓ committed Job intent survives a process restart before the relay ru… 1.51s  
+  ✓ unavailable forwarding destination retains recoverable intent witho… 1.71s  
+  ✓ relay crash after forwarding but before acknowledgment is safe to r… 1.97s  
+  ✓ completed Job redelivery after lost worker acknowledgment does not…  1.94s  
+  ✓ a changed forwarding order does not determine the authoritative Job… 1.93s  
+   PASS  Tests\Acceptance\Operations\WorkAdmissionTest
+  ✓ concurrent equivalent requests admit one durable Job                 1.39s  
+  ✓ refresh and complete modes of one work scope remain distinct Work    1.14s  
+  ✓ a higher-priority equivalent request promotes one queued Job withou… 2.22s  
+  ✓ a later legitimate request creates a new Job without erasing the co… 1.65s  
+    641▕             if (method_exists($prop, 'isInitialized') && !$prop->isInitialized($subject)) {
+    641▕             if (method_exists($prop, 'isInitialized') && !$prop->isInitialized($subject)) {
+    641▕             if (method_exists($prop, 'isInitialized') && !$prop->isInitialized($subject)) {
+    641▕             if (method_exists($prop, 'isInitialized') && !$prop->isInitialized($subject)) {
+    641▕             if (method_exists($prop, 'isInitialized') && !$prop->isInitialized($subject)) {
+    641▕             if (method_exists($prop, 'isInitialized') && !$prop->isInitialized($subject)) {
+  Tests:    6 deprecated, 11 passed (280 assertions)
+  Duration: 30.13s
+
+Negative control
+   FAILED  Tests\Feature\Durable\DurableSpikeTest > a persisted workflow com…   
+  Tests:    1 failed (2 assertions)
+  Duration: 0.45s
+
+Final Durable slice
+   DEPR  Tests\Feature\Durable\DurableSpikeTest
+  ! a persisted workflow completes through Messenger and duplicate acti… 0.45s  
+  ! enqueue rejection after journalling exposes the actual failure and…  0.42s  
+  ! fresh worker processes replay persisted history without repeating a… 1.01s  
+  ! session claims outlive a shortened TTL and killed workers can be re… 4.05s  
+  ! losing the lock session permits takeover and stale effects but bloc… 2.95s  
+  ! an expiring claim allows a stale living activity to append completi… 2.93s  
+    641▕             if (method_exists($prop, 'isInitialized') && !$prop->isInitialized($subject)) {
+    641▕             if (method_exists($prop, 'isInitialized') && !$prop->isInitialized($subject)) {
+    641▕             if (method_exists($prop, 'isInitialized') && !$prop->isInitialized($subject)) {
+    641▕             if (method_exists($prop, 'isInitialized') && !$prop->isInitialized($subject)) {
+    641▕             if (method_exists($prop, 'isInitialized') && !$prop->isInitialized($subject)) {
+    641▕             if (method_exists($prop, 'isInitialized') && !$prop->isInitialized($subject)) {
+  Tests:    6 deprecated (36 assertions)
+  Duration: 11.89s
