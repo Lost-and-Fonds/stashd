@@ -29,7 +29,7 @@ beforeEach(function (): void {
         new App\Operations\Durable\DurableConnections($this->application, $this->journal, $this->lockConnection),
     );
     $container->addInitializer(App\Operations\Durable\DurableRuntimeInitializer::class);
-    $this->runtime = $container->get(DurableRuntime::class);
+    $this->runtime = new DurableRuntime($this->journal, $this->application, new LockFactory(new PostgreSqlStore($this->lockConnection->getNativeConnection())));
     $this->runtime->workflows->registerClass(ProbeWorkflow::class);
     $this->application->executeStatement('CREATE TABLE effects (value TEXT NOT NULL)');
     $this->runtime->activities->register('spike.effect', function (array $payload): string {

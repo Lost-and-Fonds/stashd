@@ -7,7 +7,7 @@ namespace App\Operations\Durable;
 use Doctrine\DBAL\Connection;
 
 /**
- * Supply explicit isolated connections to the experimental Tempest initializer.
+ * Supply explicit isolated connections to Operations' Tempest initializer.
  *
  * The host owns credentials and connection lifetime; journal fencing must commit
  * independently of business transactions. Never share these handles with a fork.

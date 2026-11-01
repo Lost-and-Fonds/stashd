@@ -50,7 +50,7 @@ final class OperationsDatabase
             throw new InvalidArgumentException('Set STASHD_OPERATIONS_USERNAME to an explicit application owner.');
         }
 
-        $this->container->config(new OperationsConnectionConfig($this->config));
+        $this->container->config($this->config);
         $database = $this->container->get(Database::class);
         $database->execute(new Query('SET search_path TO "' . $this->config->schema . '"'));
 

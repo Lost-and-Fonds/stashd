@@ -1,5 +1,10 @@
 # Durable + Messenger spike
 
+This report records the original feasibility checkpoint. See the
+[implementation follow-up](operations-implementation.md) for current production-path
+work, new authority/recovery safeguards and verification. The original unsafe
+characterizations below are upstream controls, not the department's safety tests.
+
 ## Recommendation
 
 **No-go for replacing Operations as-is; promising execution substrate.** This is a
