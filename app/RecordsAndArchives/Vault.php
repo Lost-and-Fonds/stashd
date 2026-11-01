@@ -2,6 +2,8 @@
 
 namespace App\RecordsAndArchives;
 
+use App\Identity\Identifier;
+use App\Identity\IdentifierType;
 use App\RecordsAndArchives\Concurrency\ObjectWriteLock;
 use App\RecordsAndArchives\Storage\ArchiveStorage;
 use App\RecordsAndArchives\Storage\OcflFilesystemAdapter;
@@ -523,11 +525,6 @@ class Vault
      */
     public function urnFromUuid(IdentifierType $type, ?Uuid $uuid = null): Urn
     {
-        $uuid ??= Uuid::v4();
-
-        return Urn::fromRfc2141(
-            nid: 'stashd',
-            nss: $type->value . ':' . $uuid->toRfc4122(),
-        );
+        return Urn::new(new Identifier($type, $uuid ?? Uuid::v4()));
     }
 }

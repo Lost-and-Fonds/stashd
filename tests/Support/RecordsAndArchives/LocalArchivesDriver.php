@@ -225,7 +225,7 @@ final class LocalArchivesDriver implements ArchivesDriver
      */
     private static function createObject(Vault $vault, array $arguments): array
     {
-        $type = \App\RecordsAndArchives\IdentifierType::from($arguments['type']);
+        $type = \App\Identity\IdentifierType::from($arguments['type']);
         $uuid = Uuid::fromString($arguments['uuid']);
         $object = $vault->createObject($type, $uuid, $arguments['files']);
 

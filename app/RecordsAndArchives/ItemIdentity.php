@@ -2,6 +2,7 @@
 
 namespace App\RecordsAndArchives;
 
+use App\Identity\IdentifierType;
 use League\Uri\Exceptions\SyntaxError;
 use League\Uri\Uri;
 use League\Uri\Urn;

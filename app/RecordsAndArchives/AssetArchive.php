@@ -2,6 +2,7 @@
 
 namespace App\RecordsAndArchives;
 
+use App\Identity\IdentifierType;
 use League\Uri\Urn;
 use Ottosmops\Ocfl\OcflObject;
 use RuntimeException;
