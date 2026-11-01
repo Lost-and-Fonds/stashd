@@ -1,5 +1,7 @@
 # Operations implementation — 2026-11-01
 
+API/model update: [Operations API review](operations-api-review.md) supersedes the original modelling and naming below. Verification counts in this checkpoint describe its original commit.
+
 ## Architectural map
 
 - Injectable `Worker::do(Job, Priority)` returns an Assignment snapshot promptly.
