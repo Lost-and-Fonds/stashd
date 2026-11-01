@@ -12,7 +12,10 @@
         "symfony/messenger": "8.2.x-dev",
         "symfony/doctrine-messenger": "8.2.x-dev",
         "symfony/event-dispatcher": "8.2.x-dev",
-        "symfony/console": "8.2.x-dev"
+        "symfony/console": "8.2.x-dev",
+        "gplanchat/durable": "dev-main",
+        "gplanchat/durable-bundle": "dev-main",
+        "gplanchat/durable-bridge-dbal": "dev-main"
     },
     "require-dev": {
         "pestphp/pest": "^v5.3.2",
