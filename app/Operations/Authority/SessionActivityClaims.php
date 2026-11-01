@@ -92,11 +92,19 @@ final class SessionActivityClaims implements ActivityAttemptClaimInterface
     public function requireOwned(Connection $database): void
     {
         $owner = $this->current ?? throw new AuthorityLost('No current Activity ownership.');
-        if (! $database->fetchOne(
-            "SELECT EXISTS(SELECT 1 FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid WHERE l.locktype = 'advisory' AND l.mode = 'ExclusiveLock' AND l.granted AND l.pid = ? AND a.backend_start = ?::timestamptz AND l.classid = 0 AND l.objid = ?::oid AND l.objsubid = 1 AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database()))",
-            [$owner->pid, $owner->backendStart, $owner->lockKey],
-        )) {
+        if (! self::owns($database, $owner)) {
             throw new AuthorityLost('The Activity session no longer owns publication authority.');
         }
+    }
+
+    /**
+     * Observe the exact granted lock without acquiring it or changing worker state.
+     */
+    public static function owns(Connection $database, ActivityOwnership $owner): bool
+    {
+        return $database->fetchOne(
+            "SELECT EXISTS(SELECT 1 FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid WHERE l.locktype = 'advisory' AND l.mode = 'ExclusiveLock' AND l.granted AND l.pid = ? AND a.backend_start = ?::timestamptz AND l.classid = 0 AND l.objid = ?::oid AND l.objsubid = 1 AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database()))",
+            [$owner->pid, $owner->backendStart, $owner->lockKey],
+        ) === true;
     }
 }

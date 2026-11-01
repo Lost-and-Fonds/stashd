@@ -7,7 +7,6 @@ namespace App\Operations\Durable;
 use App\Operations\AssignmentExecution;
 use App\Operations\Authority\PublicationAuthority;
 use App\Operations\Authority\SessionActivityClaims;
-use App\Operations\Persistence\Assignments;
 use InvalidArgumentException;
 use PDO;
 use Psr\Log\LoggerInterface;
@@ -46,7 +45,6 @@ final class DurableRuntimeInitializer implements Initializer
             fn ($routine, $interactive) => new ActivityDelivery(
                 $routine,
                 $interactive,
-                $container->get(Assignments::class),
                 $container->get(LoggerInterface::class),
             ),
             $container->get(PublicationAuthority::class),

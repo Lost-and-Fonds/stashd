@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Support\Durable;
 
+use App\Operations\Authority\AuthorityLost;
+use App\Operations\Authority\PublicationAuthority;
+use App\Operations\CustodyHandoff;
 use App\Operations\DTO\AssignmentContext;
 use App\Operations\Durable\DurableConnections;
 use App\Operations\HandlesJob;
+use App\Operations\Models\Checkpoint;
+use App\Operations\Models\Result;
+use Doctrine\DBAL\Connection;
 
 /**
  * Record independent observable effects through a constructor-injected service.
@@ -19,9 +25,9 @@ final readonly class DepartmentHandler
      */
     public function __construct(
         private DurableConnections $connections,
-        private \App\Operations\Authority\PublicationAuthority $authority,
+        private PublicationAuthority $authority,
         private DepartmentControl $control,
-        private \App\Operations\ExecutionArtifacts $artifacts,
+        private CustodyHandoff $custody,
     ) {}
 
     /**
@@ -30,8 +36,8 @@ final readonly class DepartmentHandler
     public function __invoke(DepartmentJob $request, AssignmentContext $execution): void
     {
         if ($request->custodyPath !== null) {
-            $this->artifacts->checkpoint($execution, 'staged');
-            $this->artifacts->custody($execution, 'retained', $request->custodyPath);
+            Checkpoint::record($this->authority, $execution, 'staged');
+            $this->custody->acknowledge($execution, 'retained', $request->custodyPath);
         }
 
         if (! $this->control->insideMutation) {
@@ -44,7 +50,7 @@ final readonly class DepartmentHandler
 
         if ($request->custodyPath !== null) {
             try {
-                $this->artifacts->result($execution, 'verified');
+                Result::adopt($this->authority, $execution, 'verified');
                 throw new \LogicException('Adoption succeeded without reconciliation.');
             } catch (\RuntimeException $expected) {
                 if ($expected->getMessage() !== 'Retained custody requires reconciliation.') {
@@ -52,11 +58,11 @@ final readonly class DepartmentHandler
                 }
             }
 
-            $this->artifacts->reconcile($execution);
-            $this->artifacts->result($execution, 'verified');
-            $this->artifacts->result($execution, 'verified');
+            $this->custody->reconcile($execution);
+            Result::adopt($this->authority, $execution, 'verified');
+            Result::adopt($this->authority, $execution, 'verified');
             try {
-                $this->artifacts->result($execution, 'conflicting');
+                Result::adopt($this->authority, $execution, 'conflicting');
                 throw new \LogicException('A conflicting result was adopted.');
             } catch (\RuntimeException $expected) {
                 if ($expected->getMessage() !== 'A different result was already adopted.') {
@@ -65,7 +71,7 @@ final readonly class DepartmentHandler
             }
         }
 
-        $this->authority->protect($execution, function (\Doctrine\DBAL\Connection $database) use ($request, $execution): void {
+        $this->authority->protect($execution, function (Connection $database) use ($request, $execution): void {
             $database->insert('effects', ['assignment' => (string) $execution->assignmentId, 'value' => $request->scope . ':' . $request->mode . ':' . $request->observation]);
             if ($this->control->insideMutation) {
                 $this->barrier($execution);
@@ -91,6 +97,26 @@ final readonly class DepartmentHandler
         while (! is_file($this->control->barrier . '.release')) {
             if (microtime(true) > $deadline) {
                 throw new \RuntimeException('Handler barrier timed out.');
+            }
+
+            if (is_file($this->control->barrier . '.revoke') && ! is_file($this->control->barrier . '.revoked')) {
+                $this->connections->claims->executeQuery('SELECT pg_advisory_unlock_all()');
+                $checks = [];
+                foreach ([
+                    'checkpoint' => fn () => Checkpoint::record($this->authority, $execution, 'stale'),
+                    'custody' => fn () => $this->custody->acknowledge($execution, 'stale', $this->control->barrier),
+                    'reconciliation' => fn () => $this->custody->reconcile($execution),
+                    'result' => fn () => Result::adopt($this->authority, $execution, 'stale'),
+                ] as $name => $operation) {
+                    try {
+                        $operation();
+                        $checks[$name] = 'UNFENCED';
+                    } catch (AuthorityLost) {
+                        $checks[$name] = 'rejected';
+                    }
+                }
+
+                file_put_contents($this->control->barrier . '.revoked', json_encode($checks, JSON_THROW_ON_ERROR));
             }
 
             usleep(10_000);

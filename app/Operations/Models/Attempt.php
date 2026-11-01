@@ -29,6 +29,7 @@ final class Attempt
         public string $demand_id,
         public int $backend_pid,
         public string $backend_start,
+        public int $lock_key,
         public AttemptOutcome $outcome,
         public DateTimeImmutable $started_at,
         public ?DateTimeImmutable $ended_at = null,

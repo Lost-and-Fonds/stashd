@@ -11,7 +11,8 @@ use App\Operations\Durable\DurableRuntime;
 use App\Operations\Durable\JobRegistry;
 use App\Operations\Durable\StartAssignment;
 use App\Operations\Models\Attempt;
-use App\Operations\Persistence\Assignments;
+use App\Operations\Models\Demand;
+use App\Operations\Persistence\AdmissionLock;
 use DateTimeImmutable;
 use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
@@ -37,7 +38,7 @@ use function Tempest\Mapper\map;
 final readonly class AssignmentExecution
 {
     public function __construct(
-        private Assignments $assignments,
+        private AdmissionLock $admission,
         private DurableRuntime $runtime,
         private JobRegistry $registry,
         private Container $container,
@@ -52,7 +53,8 @@ final readonly class AssignmentExecution
      */
     public function recover(string $id): int
     {
-        $record = $this->assignments->find($id);
+        /** @var Assignment|null $record */
+        $record = query(Assignment::class)->select()->where('uuid', $id)->first();
         if ($record === null || ! $record->active) {
             return 0;
         }
@@ -75,7 +77,8 @@ final readonly class AssignmentExecution
                 $event->payload()['payload'],
                 $event->metadata(),
             );
-            $record = $this->assignments->find($id);
+            /** @var Assignment|null $record */
+            $record = query(Assignment::class)->select()->where('uuid', $id)->first();
             ($record?->priority === Priority::Interactive ? $this->runtime->interactive : $this->runtime->activityQueue)->send(
                 new Envelope($message),
             );
@@ -90,12 +93,14 @@ final readonly class AssignmentExecution
      */
     public function start(StartAssignment $message): void
     {
-        $record = $this->assignments->find($message->id);
+        /** @var Assignment|null $record */
+        $record = query(Assignment::class)->select()->where('uuid', $message->id)->first();
         if ($record === null || ! $record->active) {
             return;
         }
 
-        $demand = $this->assignments->pending($message->id);
+        /** @var Demand|null $demand */
+        $demand = query(Demand::class)->select()->where('assignment_id', $message->id)->where('satisfied', false)->orderBy('uuid')->first();
         if ($demand === null) {
             return;
         }
@@ -114,7 +119,8 @@ final readonly class AssignmentExecution
      */
     public function execute(string $assignment, string $demand): ?string
     {
-        $input = $this->assignments->demand($demand) ?? throw new RuntimeException('Admitted input is missing.');
+        /** @var Demand $input */
+        $input = query(Demand::class)->select()->where('uuid', $demand)->first() ?? throw new RuntimeException('Admitted input is missing.');
         if ($input->assignment_id !== $assignment) {
             throw new InvalidArgumentException('Input belongs to another Assignment.');
         }
@@ -123,7 +129,8 @@ final readonly class AssignmentExecution
             return $input->next_id;
         }
 
-        $record = $this->assignments->find($assignment) ?? throw new RuntimeException('Assignment disappeared before execution.');
+        /** @var Assignment $record */
+        $record = query(Assignment::class)->select()->where('uuid', $assignment)->first() ?? throw new RuntimeException('Assignment disappeared before execution.');
         $handler = new ClassReflector($this->registry->handler($this->registry->job($record->job_type)))->getMethod('__invoke');
         $job = map(json_decode($input->payload, true, flags: JSON_THROW_ON_ERROR))->to($this->registry->job($record->job_type));
         if (! $job instanceof Job) {
@@ -146,15 +153,26 @@ final readonly class AssignmentExecution
         }
 
         return $this->authority->protect($context, function () use ($input, $record, $assignment, $context): ?string {
-            $this->assignments->lock($record->job_type, $record->work_key);
-            $this->assignments->satisfy($input, null);
-            $next = $this->assignments->pending($assignment);
+            $this->admission->lock($record->job_type, $record->work_key);
+            query(Demand::class)
+                ->update(satisfied: true)
+                ->where('uuid', (string) $input->uuid)
+                ->execute();
+            /** @var Demand|null $next */
+            $next = query(Demand::class)->select()->where('assignment_id', $assignment)->where('satisfied', false)->orderBy('uuid')->first();
             $nextId = $next === null ? null : (string) $next->uuid;
-            $this->assignments->satisfy($input, $nextId);
+            query(Demand::class)
+                ->update(next_id: $nextId)
+                ->where('uuid', (string) $input->uuid)
+                ->execute();
             if ($next === null) {
-                $record = $this->assignments->find($assignment) ?? throw new RuntimeException('Assignment disappeared during execution.');
+                /** @var Assignment $record */
+                $record = query(Assignment::class)->select()->where('uuid', $assignment)->first() ?? throw new RuntimeException('Assignment disappeared during execution.');
                 $record->active = false;
-                $this->assignments->update($record);
+                query(Assignment::class)
+                    ->update(priority: $record->priority, active: $record->active, error: $record->error)
+                    ->where('uuid', (string) $record->uuid)
+                    ->execute();
             }
 
             query(Attempt::class)
@@ -182,7 +200,10 @@ final readonly class AssignmentExecution
 
             $record->active = false;
             $record->error = $event->failureMessage();
-            $this->assignments->update($record);
+            query(Assignment::class)
+                ->update(priority: $record->priority, active: $record->active, error: $record->error)
+                ->where('uuid', (string) $record->uuid)
+                ->execute();
         }
     }
 }

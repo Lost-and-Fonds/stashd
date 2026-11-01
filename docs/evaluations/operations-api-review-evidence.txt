@@ -72,3 +72,25 @@ Neither failure was suppressed or marked incomplete.
 
 C02 and C03 remain partial. Historical Messenger baseline success and raw-Durable
 unsafe characterisation success are not counted as new-department safety proofs.
+
+Structural cleanup — 2026-11-01
+Production-backed revocation test: live PHP and PostgreSQL session, pg_advisory_unlock_all(), read-only Queued observation, four rejected domain mutations, fresh successor before stale exit: passed (17 assertions).
+Negative controls: 10 violations detected; all original files restored in finally.
+omitted-outbox: True; fault run exit 1
+propagated-scheduling-error: True; fault run exit 1
+omitted-final-mutation-check: True; fault run exit 1
+bypassed-journal-fence: True; fault run exit 1
+ignored-input-conflict: True; fault run exit 1
+lost-lock-status: True; fault run exit 1
+checkpoint-fence: True; fault run exit 1
+custody-fence: True; fault run exit 1
+reconciliation-fence: True; fault run exit 1
+result-fence: True; fault run exit 1
+baseline: Tests:    6 deprecated (51 assertions)
+restored: Tests:    6 deprecated (51 assertions)
+Focused command: STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Feature/Durable/OperationsDepartmentTest.php tests/Acceptance/Operations/WorkAdmissionTest.php --colors=never
+Tests:    20 deprecated, 6 passed (205 assertions)
+Full canonical QA: Lerd composer qa; exit success.
+mago fmt, mago lint (including fix pass), mago analyse: passed; retained informational archival/registry checks only.
+Tests: 36 deprecated, 33 incomplete, 467 passed (24,052 assertions); 126.39s; 8 processes.
+No failures. PHP 8.5 ReflectionProperty::setAccessible deprecations remain external.

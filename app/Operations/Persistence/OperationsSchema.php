@@ -51,6 +51,7 @@ final class OperationsSchema implements MigratesUp, ShouldMigrate
                 ->foreignUuid('demand_id', 'operation_demands.uuid')
                 ->integer('backend_pid')
                 ->text('backend_start')
+                ->raw('lock_key BIGINT NOT NULL')
                 ->text('outcome')
                 ->datetime('started_at')
                 ->datetime('ended_at', nullable: true)

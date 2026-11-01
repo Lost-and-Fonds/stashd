@@ -57,6 +57,7 @@ final readonly class PublicationAuthority
                 $demand,
                 $owner->pid,
                 $owner->backendStart,
+                $owner->lockKey,
                 AttemptOutcome::Running,
                 $now,
             );

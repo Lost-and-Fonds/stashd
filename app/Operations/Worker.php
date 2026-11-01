@@ -6,11 +6,14 @@ namespace App\Operations;
 
 use App\Identity\Identifier;
 use App\Identity\IdentifierType;
+use App\Operations\Authority\SessionActivityClaims;
+use App\Operations\DTO\ActivityOwnership;
 use App\Operations\Durable\DurableRuntime;
 use App\Operations\Durable\JobRegistry;
 use App\Operations\Durable\StartAssignment;
+use App\Operations\Models\Attempt;
 use App\Operations\Models\Demand;
-use App\Operations\Persistence\Assignments;
+use App\Operations\Persistence\AdmissionLock;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\ExecutionId;
 use InvalidArgumentException;
@@ -18,6 +21,7 @@ use Tempest\Container\Singleton;
 use Tempest\Database\PrimaryKey;
 use Tempest\Validation\Rules\HasLength;
 
+use function Tempest\Database\query;
 use function Tempest\Mapper\map;
 
 /**
@@ -27,7 +31,7 @@ use function Tempest\Mapper\map;
 final readonly class Worker
 {
     public function __construct(
-        private Assignments $assignments,
+        private AdmissionLock $admission,
         private DurableRuntime $runtime,
         private JobRegistry $registry,
         private AssignmentExecution $execution,
@@ -49,10 +53,11 @@ final readonly class Worker
         }
 
         $payload = map($job)->toJson();
-        $id = $this->assignments->database->transactional(function () use ($priority, $type, $key, $observation, $payload): Identifier {
-            $this->assignments->lock($type, $key);
+        $id = $this->admission->database->transactional(function () use ($priority, $type, $key, $observation, $payload): Identifier {
+            $this->admission->lock($type, $key);
             $dispatch = false;
-            $assignment = $this->assignments->active($type, $key);
+            /** @var Assignment|null $assignment */
+            $assignment = query(Assignment::class)->select()->where('job_type', $type)->where('work_key', $key)->where('active', true)->first();
             if ($assignment !== null) {
                 // Only admission reconciles terminal failure; status reads never write.
                 $this->execution->reconcileFailure($assignment);
@@ -65,25 +70,30 @@ final readonly class Worker
                 $dispatch = true;
                 $id = Identifier::create(IdentifierType::Assignment);
                 $assignment = new Assignment(new PrimaryKey($id->uuidFor(IdentifierType::Assignment)), $type, $key, $priority);
-                $this->assignments->insert($assignment);
+                query($assignment)->insert($assignment)->execute();
             } elseif ($priority === Priority::Interactive && $assignment->priority === Priority::Routine) {
                 $dispatch = true;
                 $assignment->priority = $priority;
-                $this->assignments->update($assignment);
+                query(Assignment::class)
+                    ->update(priority: $assignment->priority, active: $assignment->active, error: $assignment->error)
+                    ->where('uuid', (string) $assignment->uuid)
+                    ->execute();
                 $this->execution->recover((string) $assignment->uuid);
             }
 
             $uuid = (string) $assignment->uuid;
             $observationKey = hash('sha256', $observation);
-            $existing = $this->assignments->observed($uuid, $observationKey);
+            /** @var Demand|null $existing */
+            $existing = query(Demand::class)->select()->where('assignment_id', $uuid)->where('observation_key', $observationKey)->first();
             if ($existing === null) {
-                $this->assignments->insert(new Demand(
+                $demand = new Demand(
                     new PrimaryKey(Identifier::create(IdentifierType::Demand)->uuidFor(IdentifierType::Demand)),
                     $uuid,
                     $observation,
                     $observationKey,
                     $payload,
-                ));
+                );
+                query($demand)->insert($demand)->execute();
             } elseif ($existing->observation !== $observation || $existing->payload !== $payload) {
                 throw new InvalidArgumentException('An observation already identifies different Job input.');
             }
@@ -104,7 +114,8 @@ final readonly class Worker
     public function status(Identifier $id): Assignment
     {
         $uuid = $id->uuidFor(IdentifierType::Assignment);
-        $assignment = $this->assignments->find($uuid) ?? throw new InvalidArgumentException('Assignment not found.');
+        /** @var Assignment $assignment */
+        $assignment = query(Assignment::class)->select()->where('uuid', $uuid)->first() ?? throw new InvalidArgumentException('Assignment not found.');
         if (! $assignment->active) {
             return $assignment;
         }
@@ -120,13 +131,21 @@ final readonly class Worker
             return $assignment;
         }
 
-        // An old start event says nothing about a later, still queued demand.
-        $running = $this->assignments->database->fetchOne(
-            "SELECT EXISTS(SELECT 1 FROM operation_demands d JOIN operation_attempts a ON a.uuid = d.current_attempt JOIN pg_stat_activity s ON s.pid = a.backend_pid AND s.backend_start::text = a.backend_start WHERE d.assignment_id = ? AND NOT d.satisfied AND a.outcome = 'running' AND a.ended_at IS NULL)",
-            [$uuid],
-        );
-        if ($running) {
-            $assignment->state = AssignmentState::Running;
+        /** @var Demand $demand */
+        foreach (query(Demand::class)->select()->where('assignment_id', $uuid)->where('satisfied', false)->all() as $demand) {
+            if ($demand->current_attempt === null) {
+                continue;
+            }
+
+            /** @var Attempt|null $attempt */
+            $attempt = query(Attempt::class)->select()->where('uuid', $demand->current_attempt)->where('outcome', AttemptOutcome::Running)->where('ended_at IS NULL')->first();
+            if (
+                $attempt !== null
+                && SessionActivityClaims::owns($this->admission->database, new ActivityOwnership($attempt->backend_pid, $attempt->backend_start, $attempt->lock_key))
+            ) {
+                $assignment->state = AssignmentState::Running;
+                break;
+            }
         }
 
         return $assignment;

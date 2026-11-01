@@ -107,10 +107,8 @@ test('eight independent admissions overlap and survive a fresh worker restart', 
         expect($this->worker->status(Identifier::parse($ids[0], IdentifierType::Assignment))->state)->toBe(AssignmentState::Completed);
         expect($this->department->connections->application->fetchFirstColumn('SELECT value FROM effects'))->toBe(['concurrent:refresh:one']);
     } finally {
-        foreach ($children as $child) {
-            if ($child->running) {
-                $child->signal(9)->wait();
-            }
+        foreach (array_filter($children, static fn ($child): bool => $child->running) as $child) {
+            $child->signal(9)->wait();
         }
 
         foreach (glob($path . '.*') as $file) {
@@ -604,4 +602,57 @@ test('Job-owned keys distinguish composite identity boundaries', function (): vo
     $right = $this->worker->do(new DepartmentJob('asset', mode: 'refresh:complete'));
     expect($left->id)->not->toEqual($right->id);
     expect($this->department->connections->application->fetchOne('SELECT count(*) FROM operation_assignments'))->toBe(2);
+});
+
+test('a living session without its advisory lock is queued and every handoff mutation is fenced', function (): void {
+    $assignment = $this->worker->do(new DepartmentJob('unlocked'));
+    $runtime = $this->department->runtime;
+    $runtime->drain('outbox');
+    $runtime->drain('activities');
+    $runtime->drain('resumes');
+    $path = tempnam(sys_get_temp_dir(), 'department-unlock-');
+    unlink($path);
+    $child = department_process($this->department, ['handlerBarrier' => $path]);
+    try {
+        $owner = department_barrier($path, $child);
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Running);
+        file_put_contents($path . '.revoke', 'revoke');
+        $deadline = microtime(true) + 5;
+        while (! is_file($path . '.revoked') && microtime(true) < $deadline) {
+            usleep(10_000);
+        }
+
+        expect(is_file($path . '.revoked'))->toBeTrue($child->errorOutput);
+        expect($child->running)->toBeTrue();
+        expect($this->department->admin->query('SELECT count(*) FROM pg_stat_activity WHERE pid = ' . (int) $owner['pid'])->fetchColumn())->toBe(1);
+        $db = $this->department->connections->application;
+        $before = $db->fetchAllAssociative('SELECT * FROM operation_attempts');
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Queued);
+        expect($db->fetchAllAssociative('SELECT * FROM operation_attempts'))->toBe($before);
+        expect(json_decode(file_get_contents($path . '.revoked'), true))->toBe([
+            'checkpoint' => 'rejected',
+            'custody' => 'rejected',
+            'reconciliation' => 'rejected',
+            'result' => 'rejected',
+        ]);
+        foreach (['checkpoints', 'custody_receipts', 'reconciliations', 'results'] as $table) {
+            expect($db->fetchOne('SELECT count(*) FROM operation_' . $table))->toBe(0);
+        }
+
+        department_redeliver($this->department);
+        $successor = department_process($this->department)->wait();
+        expect($successor->exitCode)->toBe(0, $successor->errorOutput);
+        expect($child->running)->toBeTrue();
+        file_put_contents($path . '.release', 'release');
+        $child->wait();
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
+    } finally {
+        if ($child->running) {
+            $child->signal(9)->wait();
+        }
+
+        foreach (glob($path . '*') as $file) {
+            unlink($file);
+        }
+    }
 });

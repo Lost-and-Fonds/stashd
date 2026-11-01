@@ -93,3 +93,28 @@ The four accepted admission/priority contracts retain their assertions. Only fix
 Focused: **41 successful cases**, 226 assertions (22 passed, 19 deprecated), no failures. Full: **467 passed, 35 deprecated, 33 incomplete**, 24,032 assertions, no failures, 159.65 seconds. Deprecations report `ReflectionProperty::setAccessible()` under PHP 8.5. Formatting passes; lint and analysis report no errors or warnings (two and four informational help notices respectively). Commands and negative-control failures are recorded in [verification evidence](operations-api-review-evidence.txt).
 
 C02/C03 completeness remains explicitly unclaimed. The existing delivery/fencing driver work, specification review for session ownership versus TTL expiry, full Vault publication and deployment/schema evolution remain outstanding. This refactor neither relaxes those contracts nor treats the old unsafe Durable characterisations as passed safety guarantees.
+
+## Structural cleanup — 2026-11-01
+
+Removed production `ExecutionArtifacts` and `Persistence/Assignments`. Ordinary Assignment/Demand reads and writes now use Tempest queries at their transaction owner. `AdmissionLock` retains only the shared `(job_type, work_key)` PostgreSQL transaction lock and its application connection: admission and final demand satisfaction must serialize on exactly the same key. The partial unique index, immutable observation conflict check and native outbox transaction remain unchanged.
+
+Handler API (the runnable DepartmentHandler exercises these operations):
+
+```php
+Checkpoint::record($authority, $context, 'staged');
+$custody->acknowledge($context, 'acquired-bytes', $immutableStagingPath);
+$custody->reconcile($context);
+Result::adopt($authority, $context, 'verified');
+```
+
+Checkpoint and Result own their protected database operations; authority is explicit, with no service lookup or stored connection on the models. `CustodyHandoff` is retained because acknowledging and independently verifying immutable staged files crosses filesystem, receipt and reconciliation boundaries. It owns no OCFL publication. Digests are computed outside short protected transactions; callers must keep staging immutable. Verification does not authorize a later filesystem rename or guarantee bytes cannot subsequently change.
+
+Worker still owns admission and read-only observation; AssignmentExecution coordinates upstream workflow start/recovery and handler acknowledgment. PublicationAuthority remains the protected transaction boundary. JobRegistry retains discovery validation and stable persisted aliases. ActivityDelivery retains real Messenger priority routing and recoverable enqueue failure semantics. The connection adapters and Durable initializer remain necessary framework boundaries; none is replaced with a new repository or execution engine. Further cleanup candidates are incidental runtime wiring and repeated query shapes, not justification for restoring a generic CRUD facade.
+
+Running now requires an unsatisfied Demand's current Attempt token, Running outcome, no end time, and ownership of the **exact** advisory lock in the correct database by the recorded PID/backend-start session. Attempt stores `lock_key`; SessionActivityClaims shares its read-only `owns()` predicate with PublicationAuthority. A live backend without that lock is Queued. Status does not update Attempts or admission state. Session death also fails the same predicate. This is a snapshot, never permission for a subsequent mutation.
+
+The new independent-process regression releases advisory locks **without killing PHP or its PostgreSQL session**, queries status before takeover, checks read-only persistence and exercises rejection through Checkpoint, custody acknowledgement, reconciliation and Result adoption. A fresh successor then executes while the stale process remains alive. Existing killed-worker custody, changed-byte rejection, idempotent acknowledgement, conflicting Result rejection, retry, outbox and accepted C01/C06 assertions remain exercised.
+
+The unreleased fresh-schema definition adds Attempt.lock_key. Existing development schemas require an explicit reset or migration; no non-test database was modified. A trial delivering only after stale-handler rejection reached the failure-transport recovery boundary rather than ordinary completion. That broader failed-transport replay scenario remains outstanding C02 work; the new regression proves takeover before the stale handler exits, not automatic recovery from every rejected delivery. C02/C03 completeness remains unclaimed.
+
+Verification for this section: focused 26 successful cases (6 passed, 20 deprecated), 205 assertions; full Lerd `composer qa` passed formatting, lint, analysis and all executable tests: **467 passed, 36 deprecated, 33 incomplete**, zero failures, 24,052 assertions, 126.39 seconds. Ten negative controls failed their intended assertions; the restored combined suite passed. Deprecations still report ReflectionProperty::setAccessible() under PHP 8.5. No review threads were resolved.

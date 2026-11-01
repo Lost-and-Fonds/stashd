@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Operations\Durable;
 
-use App\Operations\Persistence\Assignments;
+use App\Operations\Assignment;
 use App\Operations\Priority;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use LogicException;
@@ -12,6 +12,8 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\TransportException;
 use Symfony\Component\Messenger\Transport\Sender\SenderInterface;
+
+use function Tempest\Database\query;
 
 /**
  * Route departmental activities by admitted priority and retain recoverable scheduling.
@@ -28,7 +30,6 @@ final readonly class ActivityDelivery implements SenderInterface
     public function __construct(
         private SenderInterface $routine,
         private SenderInterface $interactive,
-        private Assignments $assignments,
         private LoggerInterface $logger,
     ) {}
 
@@ -42,7 +43,8 @@ final readonly class ActivityDelivery implements SenderInterface
             throw new LogicException('Activity routing requires an ActivityMessage.');
         }
 
-        $record = isset($message->payload['assignment']) ? $this->assignments->find($message->payload['assignment']) : null;
+        /** @var Assignment|null $record */
+        $record = isset($message->payload['assignment']) ? query(Assignment::class)->select()->where('uuid', $message->payload['assignment'])->first() : null;
         $sender = $record?->priority === Priority::Interactive ? $this->interactive : $this->routine;
         try {
             return $sender->send($envelope);

@@ -108,10 +108,8 @@ final class DepartmentOperationsDriver implements OperationsDriver
                     $database->rollBack();
                 }
 
-                foreach ($children as $child) {
-                    if ($child->running) {
-                        $child->signal(9)->wait();
-                    }
+                foreach (array_filter($children, static fn ($child): bool => $child->running) as $child) {
+                    $child->signal(9)->wait();
                 }
             }
         }
