@@ -1,0 +1,54 @@
+Full canonical suite on 0b4616b
+  Tests:    30 deprecated, 33 incomplete, 451 passed (23972 assertions)
+  Duration: 158.38s
+[1A  Parallel: 4 processes
+
+New department plus accepted admission and historical delivery baseline
+  Tests:    14 deprecated, 13 passed (329 assertions)
+  Duration: 72.35s
+
+Restored negative controls
+  Tests:    4 deprecated (29 assertions)
+  Duration: 7.43s
+
+Negative control: Omitted admission publication
+FAILED  Tests\Feature\Durable\OperationsDepartmentTest > a rejected nativ…   
+  Exception with message [admission rejected] not thrown.
+  Tests:    1 failed (1 assertions)
+
+Negative control: Bypassed journal authority fence
+FAILED  Tests\Feature\Durable\OperationsDepartmentTest > a late stale han…   
+  Failed asserting that two arrays are identical.
+  -Array &0 []
+  +Array &0 [
+  +    9 => Gplanchat\Durable\Event\ActivityTaskFailed Object #3145 (
+  +        'executionId' => Gplanchat\Durable\ExecutionId Object #3109 (
+  +            'value' => '01a194e4-7471-7559-9a74-6fb9e507f3a4',
+  +        ),
+  +        'activityId' => '01a194e4-74b9-7cbd-a095-7454dc25fea9',
+  +        'activityName' => 'operations.execute',
+  +        'attempt' => 1,
+  +        'failureClass' => 'App\Operations\Authority\AuthorityLost',
+  +        'failureMessage' => 'A successor replaced this Attempt.',
+  +        'retryState' => Gplanchat\Durable\Failure\ActivityRetryState Enum #3160 (InProgress, 'in_progress'),
+  +    ),
+  +    10 => Gplanchat\Durable\Event\ActivityRetryQueued Object #3159 (
+  +        'executionId' => Gplanchat\Durable\ExecutionId Object #3133 (
+  +            'value' => '01a194e4-7471-7559-9a74-6fb9e507f3a4',
+  +        ),
+  +        'activityId' => '01a194e4-74b9-7cbd-a095-7454dc25fea9',
+  +        'attempt' => 2,
+  +    ),
+  +]
+  
+  Tests:    1 failed (6 assertions)
+
+Negative control: Omitted final mutation check
+FAILED  Tests\Feature\Durable\OperationsDepartmentTest > authority loss d…   
+  Failed asserting that 1 is identical to 0.
+  Tests:    1 failed (3 assertions)
+
+Negative control: Propagated initial scheduling error
+FAILED  Tests\Feature\Durable\OperationsDepartmentTest > enqueue rejectio…   
+  Expecting App\Operations\AssignmentState Enum (Failed, 'failed') not to be App\Operations\AssignmentState Enum #2811 (Failed, 'failed').
+  Tests:    1 failed (1 assertions)

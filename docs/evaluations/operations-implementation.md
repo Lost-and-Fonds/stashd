@@ -237,3 +237,38 @@ readiness proof observes repeated native transport polling from its PostgreSQL s
 SIGTERM then produces exit 0. The setup command is also exercised for tracked-migration
 idempotence. Normal fixtures now use the real tracked Tempest initialization path rather
 than hand-compiling the new schema.
+
+## Final verification record
+
+Verified implementation commit: `0b4616b` (following dependency milestone `bd7be5c`).
+
+- Final full canonical test run: **451 passed, 33 incomplete, 30 deprecated, zero
+  failures; 23,972 assertions; 158.38 seconds**, four parallel processes.
+- Focused run: the 16 new department tests, four unchanged accepted admission/priority
+  tests and seven historical delivery-baseline tests completed with **27 successful
+  tests, 329 assertions, zero failures** (14 were labeled deprecated by Pest).
+- The historical delivery successes remain baseline evidence, not proof that all
+  corresponding Durable driver actions have been ported.
+- Whole-repository Mago formatting check passes. Lint has no errors or warnings,
+  with two stylistic help messages about cleanup loops. Analysis has no errors or
+  warnings: three existing help messages and one about deliberate registration
+  validation. QA components ran separately, with all tests using `bin/test.sh`.
+- Four deliberate implementation breakages were observed failing: omitted outbox
+  publication, propagated initial scheduling rejection, omitted final mutation
+  ownership check, and bypassed Activity journal fencing. All were restored;
+  the four focused restored controls passed (29 assertions), followed by full QA.
+- The suite's incomplete contracts remain incomplete. PHP 8.5 deprecations from the
+  external Lerd collector remain visible. They are not relabeled as clean passes.
+
+The new Operations source totals 2,615 physical lines, including documentation,
+blank lines, models and the retained historical engine. The application change
+(including Integration connection configuration) adds 1,941 and removes 89 lines
+relative to the original spike checkpoint. This is **not** a demonstrated net
+infrastructure reduction versus a feature-equivalent Ecotone department. The
+connection-config wrapper was actually removed; deleting the old runtime must
+wait for the remaining accepted delivery/fencing coverage and real domain adapter.
+
+Recommendation: keep PR #83 as the working draft and continue from this usable
+admission/execution/handoff foundation. Do not replace the Ecotone direction or
+merge/deploy until the outstanding acceptance and canonical publication gates
+above have been satisfied.
