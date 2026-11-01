@@ -2,7 +2,7 @@
     "name": "tempest/app",
     "type": "project",
     "require": {
-        "tempest/framework": "^3.0",
+        "tempest/framework": "dev-fix/2325-injected-connections#5e56e440298e4c30e8059030ef078e7a71e4fbf6",
         "ext-intl": "*",
         "ottosmops/ocfl": "dev-fix/atomic-inventory-sidecars as 1.0.1",
         "symfony/lock": "^8.1",
@@ -84,7 +84,12 @@
     },
     "repositories": [
         {
-            "type": "vcs",
+            "name": "tempest-injected",
+            "type": "git",
+            "url": "https://github.com/hipsterjazzbo/tempest-framework.git"
+        },
+        {
+            "type": "git",
             "url": "https://github.com/hipsterjazzbo/ocfl"
         }
     ]
