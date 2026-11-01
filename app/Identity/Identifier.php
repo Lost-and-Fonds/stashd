@@ -29,8 +29,15 @@ final readonly class Identifier implements Stringable, JsonSerializable
         return new self($type, Uuid::v7());
     }
 
-    public static function fromUuid(IdentifierType $type, string $uuid): self
+    /**
+     * Reconstitute a typed identity from an enum or an explicitly mapped model class.
+     *
+     * @param IdentifierType|class-string $type
+     */
+    public static function fromUuid(IdentifierType|string $type, string $uuid): self
     {
+        $type = is_string($type) ? IdentifierType::forModel($type) : $type;
+
         return new self($type, Uuid::fromString($uuid));
     }
 

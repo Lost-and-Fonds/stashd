@@ -1,0 +1,255 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Identity\Identifier;
+use App\Identity\IdentifierType;
+use App\Operations\Authority\AuthorityLost;
+use App\Operations\Authority\PublicationAuthority;
+use App\Operations\Authority\SessionActivityClaims;
+use App\Operations\Persistence\ApplicationConnection;
+use App\Operations\Worker;
+use App\Persistence\Model;
+use Gplanchat\Durable\ExecutionId;
+use Tempest\Clock\Clock;
+use Tempest\Clock\MockClock;
+use Tempest\Database\Connection\Connection;
+use Tempest\Database\Exceptions\QueryWasInvalid;
+use Tempest\Database\PrimaryKey;
+use Tempest\Database\Query;
+use Tempest\Database\QueryStatements\CreateTableStatement;
+use Tempest\Validation\Exceptions\ValidationFailed;
+use Tests\Support\Durable\DepartmentFixture;
+use Tests\Support\Durable\DepartmentJob;
+use Tests\Support\Persistence\AllowedRecord;
+use Tests\Support\Persistence\FencedRecord;
+use Tests\Support\Persistence\ForbiddenRecord;
+use Tests\Support\Persistence\InsertOnlyRecord;
+
+beforeEach(function (): void {
+    $this->fixture = new DepartmentFixture();
+    $this->clock = new MockClock('2026-11-01T12:00:00Z');
+    $this->fixture->container->singleton(Clock::class, $this->clock);
+    new Query(
+        new CreateTableStatement('foundation_records')
+            ->uuid('uuid')
+            ->text('value')
+            ->datetime('started_at', nullable: true)
+            ->datetime('created_at')
+            ->datetime('updated_at')
+            ->raw("CHECK (value <> 'rejected')"),
+    )
+        ->execute();
+});
+
+afterEach(function (): void {
+    if (isset($this->release)) {
+        ($this->release)();
+    }
+
+    if (isset($this->fixture)) {
+        $this->fixture->dispose();
+    }
+});
+
+/**
+ * Establish real session ownership and an Attempt using ordinary admission and authority services.
+ *
+ * @return array{App\Operations\DTO\AssignmentContext, Closure}
+ */
+function foundation_execution(DepartmentFixture $fixture): array
+{
+    $assignment = $fixture->container->get(Worker::class)->do(new DepartmentJob('foundation'));
+    $uuid = $assignment->id->uuidFor(IdentifierType::Assignment);
+    $demand = $fixture->connections->application->fetchOne('SELECT uuid FROM operation_demands WHERE assignment_id = ?', [$uuid]);
+    $release = $fixture->container->get(SessionActivityClaims::class)->claim(ExecutionId::fromString($uuid), 'foundation', 1);
+    expect($release)->toBeInstanceOf(Closure::class);
+
+    return [$fixture->container->get(PublicationAuthority::class)->begin($uuid, $demand), $release];
+}
+
+test('identity is lazy UUIDv7 and remains stable before insertion and after hydration', function (): void {
+    $row = new AllowedRecord('first');
+    expect(isset($row->uuid))->toBeFalse();
+    $id = $row->id;
+    expect($id->uuid::class)->toBe(Symfony\Component\Uid\UuidV7::class);
+    expect($row->id)->toEqual($id);
+    expect((string) $row->uuid)->toBe($id->uuidFor(IdentifierType::Item));
+    expect($row->insert())->toBe($row);
+    expect(AllowedRecord::get($id)->id)->toEqual($id);
+    expect(AllowedRecord::get($row->uuid)->id)->toEqual($id);
+    expect(AllowedRecord::select()->where('value', 'first')->first()->id)->toEqual($id);
+
+    $unobserved = new AllowedRecord('unobserved')->insert();
+    expect($unobserved->id->uuidFor(IdentifierType::Item))->toBe((string) $unobserved->uuid);
+    expect(AllowedRecord::get((string) $unobserved->uuid)->id)->toEqual($unobserved->id);
+
+    $preassigned = new AllowedRecord('preassigned');
+    $preassigned->uuid = new PrimaryKey('018fba1c-020c-7000-8000-000000000001');
+    $preassignedId = $preassigned->id;
+    $preassigned->insert();
+    expect($preassigned->id)->toEqual($preassignedId);
+    expect(AllowedRecord::get($preassigned->id)->uuid->value)->toBe($preassigned->uuid->value);
+    expect($preassigned->insert(...))->toThrow(QueryWasInvalid::class);
+    expect(AllowedRecord::get($preassignedId)->value)->toBe('preassigned');
+    expect(fn () => AllowedRecord::get(Identifier::create(IdentifierType::Attempt)))->toThrow(InvalidArgumentException::class);
+    expect(Identifier::fromUuid(App\Operations\Models\Attempt::class, (string) $row->uuid)->type)->toBe(IdentifierType::Attempt);
+    expect(fn () => Identifier::fromUuid(stdClass::class, (string) $row->uuid))->toThrow(InvalidArgumentException::class);
+    $unknown = new /**
+     * Exercise explicit failure for a model with no declared identity domain.
+     */ class extends Model {};
+    expect(fn () => $unknown->id)->toThrow(InvalidArgumentException::class);
+});
+
+test('failed validation and database writes preserve the instance and persisted timestamps', function (): void {
+    $invalid = new AllowedRecord('');
+    expect($invalid->insert(...))->toThrow(ValidationFailed::class);
+    expect(isset($invalid->uuid))->toBeFalse();
+    expect(isset($invalid->created_at))->toBeFalse();
+    $rejected = new AllowedRecord('rejected');
+    expect($rejected->insert(...))->toThrow(QueryWasInvalid::class);
+    expect(isset($rejected->created_at))->toBeFalse();
+    expect(AllowedRecord::select()->all())->toHaveCount(0);
+
+    $row = new AllowedRecord('valid')->insert();
+    $updated = $row->updated_at;
+    $this->clock->plus(60);
+    expect(fn () => $row->update(value: ''))->toThrow(ValidationFailed::class);
+    expect(fn () => $row->update(value: 'rejected'))->toThrow(QueryWasInvalid::class);
+    expect($row->value)->toBe('valid');
+    expect($row->updated_at)->toEqual($updated);
+    expect($row->refresh()->updated_at)->toEqual($updated);
+});
+
+test('Tempest maps persistence timestamps and preserves domain and creation timestamps', function (): void {
+    $started = new DateTimeImmutable('2020-01-01T00:00:00Z');
+    $row = new AllowedRecord('before', $started)->insert();
+    $created = $row->created_at;
+    expect($created)->toEqual($this->clock->toPsrClock()->now());
+    expect($row->updated_at)->toEqual($created);
+    $this->clock->plus(60);
+    expect($row->update(value: 'after'))->toBe($row);
+    expect($row->created_at)->toEqual($created);
+    expect($row->updated_at)->toEqual($this->clock->toPsrClock()->now());
+    $row->value = 'unsaved';
+    expect($row->refresh())->toBe($row);
+    expect($row->value)->toBe('after');
+    expect($row->started_at)->toEqual($started);
+    expect($row->created_at)->toEqual($created);
+    expect($row->updated_at)->toEqual($this->clock->toPsrClock()->now());
+    foreach (['uuid' => $row->uuid, 'id' => $row->id, 'created_at' => $created, 'updated_at' => $created] as $field => $value) {
+        expect(fn () => $row->update(...[$field => $value]))->toThrow(LogicException::class);
+    }
+
+    $row->delete();
+    expect(AllowedRecord::get($row->id))->toBeNull();
+    expect($row->refresh(...))->toThrow(RuntimeException::class);
+});
+
+test('missing attributes and unspecified operations forbid mutation before changing the instance', function (): void {
+    $row = new ForbiddenRecord('forbidden');
+    expect($row->insert(...))->toThrow(LogicException::class);
+    expect(fn () => $row->update(value: 'changed'))->toThrow(LogicException::class);
+    expect($row->delete(...))->toThrow(LogicException::class);
+    expect(isset($row->uuid))->toBeFalse();
+    expect(isset($row->created_at))->toBeFalse();
+    expect($row->value)->toBe('forbidden');
+    expect(AllowedRecord::select()->all())->toHaveCount(0);
+
+    $insertOnly = new InsertOnlyRecord('retained')->insert();
+    expect(fn () => $insertOnly->update(value: 'changed'))->toThrow(LogicException::class);
+    expect($insertOnly->delete(...))->toThrow(LogicException::class);
+    expect($insertOnly->refresh()->value)->toBe('retained');
+});
+
+test('an arbitrary transaction cannot supply missing execution authority', function (): void {
+    $db = $this->fixture->connections->application;
+    $db->beginTransaction();
+    try {
+        $row = new FencedRecord('unauthorised');
+        expect($row->insert(...))->toThrow(AuthorityLost::class);
+        expect(fn () => $row->update(value: 'changed'))->toThrow(AuthorityLost::class);
+        expect($row->delete(...))->toThrow(AuthorityLost::class);
+        expect(isset($row->uuid))->toBeFalse();
+        expect(isset($row->created_at))->toBeFalse();
+        expect($db->getTransactionNestingLevel())->toBe(1);
+    } finally {
+        $db->rollBack();
+    }
+
+    expect(AllowedRecord::select()->all())->toHaveCount(0);
+});
+
+test('standalone fenced writes require the live Attempt and exact session claim', function (): void {
+    [$context, $this->release] = foundation_execution($this->fixture);
+    $row = new FencedRecord('authorised')->insert();
+    $this->clock->plus(30);
+    $row->update(value: 'updated');
+    expect($row->refresh()->value)->toBe('updated');
+    $deleted = new FencedRecord('delete')->insert();
+    $deleted->delete();
+    expect(FencedRecord::get($deleted->id))->toBeNull();
+
+    $db = $this->fixture->connections->application;
+    $demand = $context->demandId->uuidFor(IdentifierType::Demand);
+    $db->executeStatement('UPDATE operation_demands SET current_attempt = NULL WHERE uuid = ?', [$demand]);
+    expect(fn () => new FencedRecord('stale')->insert())->toThrow(AuthorityLost::class);
+    expect(fn () => $row->update(value: 'stale'))->toThrow(AuthorityLost::class);
+    expect($row->delete(...))->toThrow(AuthorityLost::class);
+    expect($row->refresh()->value)->toBe('updated');
+
+    $db->executeStatement('UPDATE operation_demands SET current_attempt = ? WHERE uuid = ?', [$context->attemptId->uuidFor(IdentifierType::Attempt), $demand]);
+    $this->fixture->connections->claims->executeQuery('SELECT pg_advisory_unlock_all()');
+    expect(fn () => new FencedRecord('revoked')->insert())->toThrow(AuthorityLost::class);
+    expect(fn () => $row->update(value: 'revoked'))->toThrow(AuthorityLost::class);
+    expect($row->delete(...))->toThrow(AuthorityLost::class);
+    expect(FencedRecord::select()->all())->toHaveCount(1);
+});
+
+test('fenced models join the service transaction on the actual shared application connection', function (): void {
+    [$context, $this->release] = foundation_execution($this->fixture);
+    $db = $this->fixture->connections->application;
+    $adapter = $this->fixture->container->get(Connection::class);
+    expect($adapter)->toBeInstanceOf(ApplicationConnection::class);
+    expect($adapter->database)->toBe($db);
+    expect(new Query('SELECT pg_backend_pid() AS pid')->fetchFirst()['pid'])->toBe($db->fetchOne('SELECT pg_backend_pid()'));
+    $authority = $this->fixture->container->get(PublicationAuthority::class);
+    $authority->protect($context, function () use ($db): void {
+        expect($db->getTransactionNestingLevel())->toBe(1);
+        new FencedRecord('one')->insert();
+        new FencedRecord('two')->insert();
+        expect($db->getTransactionNestingLevel())->toBe(1);
+        expect(FencedRecord::select()->all())->toHaveCount(2);
+        expect($this->fixture->connections->journal->fetchOne('SELECT count(*) FROM foundation_records'))->toBe(0);
+    });
+    expect($this->fixture->connections->journal->fetchOne('SELECT count(*) FROM foundation_records'))->toBe(2);
+    expect($db->isTransactionActive())->toBeFalse();
+});
+
+test('coordinated Tempest writes roll back with DBAL writes when the service fails', function (): void {
+    [$context, $this->release] = foundation_execution($this->fixture);
+    $authority = $this->fixture->container->get(PublicationAuthority::class);
+    $db = $this->fixture->connections->application;
+    expect(fn () => $authority->protect($context, function () use ($db): void {
+        $db->insert('effects', ['assignment' => 'fixture', 'value' => 'rollback']);
+        new FencedRecord('one')->insert();
+        new FencedRecord('two')->insert();
+        throw new RuntimeException('service failed');
+    }))
+        ->toThrow('service failed');
+    expect(FencedRecord::select()->all())->toHaveCount(0);
+    expect($db->fetchOne('SELECT count(*) FROM effects'))->toBe(0);
+    expect($db->isTransactionActive())->toBeFalse();
+});
+
+test('revocation after coordinated model writes rolls back the whole protected transaction', function (): void {
+    [$context, $this->release] = foundation_execution($this->fixture);
+    $authority = $this->fixture->container->get(PublicationAuthority::class);
+    expect(fn () => $authority->protect($context, function (): void {
+        new FencedRecord('one')->insert();
+        new FencedRecord('two')->insert();
+        $this->fixture->connections->claims->executeQuery('SELECT pg_advisory_unlock_all()');
+    }))
+        ->toThrow(AuthorityLost::class);
+    expect(FencedRecord::select()->all())->toHaveCount(0);
+});

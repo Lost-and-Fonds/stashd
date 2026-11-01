@@ -89,6 +89,21 @@ final readonly class PublicationAuthority
     }
 
     /**
+     * Protect a model write using the current Activity, including inside a service transaction.
+     * DBAL owns nesting; an open transaction alone never establishes authority.
+     *
+     * @template T
+     * @param callable(): T $mutation
+     * @return T
+     */
+    public function protectCurrent(callable $mutation): mixed
+    {
+        $context = $this->claims->domain ?? throw new AuthorityLost('No current Assignment execution.');
+
+        return $this->protect($context, $mutation);
+    }
+
+    /**
      * Fence activity journal writes on the journal connection's own short transaction.
      */
     public function journal(callable $append): void
