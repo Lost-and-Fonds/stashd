@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Identity\Identifier;
+use App\Identity\IdentifierType;
 use App\Operations\AssignmentState;
 use App\Operations\Priority;
 use App\Operations\Worker;
@@ -22,21 +24,21 @@ test('typed discovered Jobs coalesce but retain unmet observations and distinct 
     $a = $this->worker->do(new DepartmentJob('asset'));
     expect($a->state)->toBe(AssignmentState::Queued);
     expect($this->department->connections->application->fetchOne('SELECT count(*) FROM effects'))->toBe(0);
-    expect($this->worker->do(new DepartmentJob('asset', 'two'))->id)->toBe($a->id);
-    expect($this->worker->do(new DepartmentJob('asset'))->id)->toBe($a->id);
+    expect($this->worker->do(new DepartmentJob('asset', 'two'))->id)->toEqual($a->id);
+    expect($this->worker->do(new DepartmentJob('asset'))->id)->toEqual($a->id);
     $other = $this->worker->do(new DepartmentJob('asset', mode: 'complete'));
-    expect($other->id)->not->toBe($a->id);
+    expect($other->id)->not->toEqual($a->id);
     $this->department->runtime->drain();
-    expect($this->worker->find($a->id)->state)->toBe(AssignmentState::Completed);
+    expect($this->worker->status($a->id)->state)->toBe(AssignmentState::Completed);
     expect($this->department->connections->application->fetchFirstColumn('SELECT value FROM effects ORDER BY id'))->toEqualCanonicalizing([
         'asset:refresh:one',
         'asset:refresh:two',
         'asset:complete:one',
     ]);
     $later = $this->worker->do(new DepartmentJob('asset'));
-    expect($later->id)->not->toBe($a->id);
+    expect($later->id)->not->toEqual($a->id);
     $this->department->runtime->drain();
-    expect($this->worker->find($later->id)->state)->toBe(AssignmentState::Completed);
+    expect($this->worker->status($later->id)->state)->toBe(AssignmentState::Completed);
 });
 
 test('a rejected native outbox insertion rolls back Tempest model admission and demand', function (): void {
@@ -51,14 +53,14 @@ test('a rejected native outbox insertion rolls back Tempest model admission and 
     $db->executeStatement('DROP TRIGGER reject_admission ON messenger_messages');
     $a = $this->worker->do(new DepartmentJob('rollback'));
     $this->department->runtime->drain();
-    expect($this->worker->find($a->id)->state)->toBe(AssignmentState::Completed);
+    expect($this->worker->status($a->id)->state)->toBe(AssignmentState::Completed);
 });
 
 test('queued interactive promotion changes real execution ordering and retains identity', function (): void {
     $this->worker->do(new DepartmentJob('older'));
     $routine = $this->worker->do(new DepartmentJob('promoted'));
     $promoted = $this->worker->do(new DepartmentJob('promoted'), Priority::Interactive);
-    expect($promoted->id)->toBe($routine->id);
+    expect($promoted->id)->toEqual($routine->id);
     $this->department->runtime->drain('outbox');
     $this->department->runtime->drain();
     expect($this->department->connections->application->fetchFirstColumn('SELECT value FROM effects ORDER BY id'))->toBe(['promoted:refresh:one', 'older:refresh:one']);
@@ -102,7 +104,7 @@ test('eight independent admissions overlap and survive a fresh worker restart', 
         expect(array_unique($ids))->toHaveCount(1);
         $result = department_process($this->department)->wait();
         expect($result->exitCode)->toBe(0, $result->errorOutput);
-        expect($this->worker->find($ids[0])->state)->toBe(AssignmentState::Completed);
+        expect($this->worker->status(Identifier::parse($ids[0], IdentifierType::Assignment))->state)->toBe(AssignmentState::Completed);
         expect($this->department->connections->application->fetchFirstColumn('SELECT value FROM effects'))->toBe(['concurrent:refresh:one']);
     } finally {
         foreach ($children as $child) {
@@ -127,9 +129,9 @@ test('enqueue rejection keeps a resumable schedule and recovers without replayin
     );
     $db->executeStatement('CREATE TRIGGER reject_activity BEFORE INSERT ON messenger_messages FOR EACH ROW EXECUTE FUNCTION reject_activity()');
     $this->department->runtime->drain();
-    expect($this->worker->find($a->id)->state)->not->toBe(AssignmentState::Failed);
+    expect($this->worker->status($a->id)->state)->not->toBe(AssignmentState::Failed);
     expect($db->fetchOne('SELECT count(*) FROM effects'))->toBe(0);
-    $events = iterator_to_array($this->department->runtime->events->readStream(Gplanchat\Durable\ExecutionId::fromString($a->id)));
+    $events = iterator_to_array($this->department->runtime->events->readStream(Gplanchat\Durable\ExecutionId::fromString($a->id->uuidFor(IdentifierType::Assignment))));
     expect(array_filter($events, fn ($event) => $event instanceof Gplanchat\Durable\Event\WorkflowExecutionFailed))->toBe([]);
     expect(array_filter($events, fn ($event) => $event instanceof Gplanchat\Durable\Event\ActivityScheduled))->toHaveCount(1);
     $db->executeStatement('DROP TRIGGER reject_activity ON messenger_messages');
@@ -137,7 +139,7 @@ test('enqueue rejection keeps a resumable schedule and recovers without replayin
     expect($this->worker->recover($a->id))->toBe(1); // Repeated operator recovery is harmless.
     $result = department_process($this->department)->wait();
     expect($result->exitCode)->toBe(0, $result->errorOutput);
-    expect($this->worker->find($a->id)->state)->toBe(AssignmentState::Completed);
+    expect($this->worker->status($a->id)->state)->toBe(AssignmentState::Completed);
     expect($db->fetchFirstColumn('SELECT value FROM effects'))->toBe(['schedule:refresh:one']);
     expect($this->worker->recover($a->id))->toBe(0);
 });
@@ -154,7 +156,7 @@ test('promotion after workflow scheduling moves pending activity execution ahead
         'promoted-activity:refresh:one',
         'older-activity:refresh:one',
     ]);
-    expect($this->worker->find($a->id)->state)->toBe(AssignmentState::Completed);
+    expect($this->worker->status($a->id)->state)->toBe(AssignmentState::Completed);
 });
 
 /**
@@ -197,15 +199,16 @@ test('a stale living handler cannot publish a result or journal completion after
         $owner = department_barrier($path, $a);
         expect($this->department->admin->query('SELECT pg_terminate_backend(' . (int) $owner['pid'] . ')')->fetchColumn())->toBeTrue();
         expect($a->running)->toBeTrue();
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Queued);
         department_redeliver($this->department);
         $b = department_process($this->department)->wait();
         expect($b->exitCode)->toBe(0, $b->errorOutput);
-        expect($this->worker->find($assignment->id)->state)->toBe(AssignmentState::Completed);
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
         file_put_contents($path . '.release', 'go');
         $late = $a->wait();
         expect($late->exitCode)->toBe(0, $late->errorOutput);
         expect($this->department->connections->application->fetchFirstColumn('SELECT value FROM effects'))->toBe(['session-loss:refresh:one']);
-        $events = iterator_to_array($runtime->events->readStream(Gplanchat\Durable\ExecutionId::fromString($assignment->id)));
+        $events = iterator_to_array($runtime->events->readStream(Gplanchat\Durable\ExecutionId::fromString($assignment->id->uuidFor(IdentifierType::Assignment))));
         expect(array_filter($events, fn ($event) => $event instanceof Gplanchat\Durable\Event\ActivityCompleted))->toHaveCount(1);
         expect(array_filter($events, fn ($event) => $event instanceof Gplanchat\Durable\Event\ActivityTaskFailed))->toBe([]);
         expect($this->department->connections->application->fetchFirstColumn('SELECT outcome FROM operation_attempts ORDER BY started_at'))->toBe(['interrupted', 'completed']);
@@ -238,7 +241,7 @@ test('authority loss during the protected mutation rolls back its write before r
         department_redeliver($this->department);
         $b = department_process($this->department)->wait();
         expect($b->exitCode)->toBe(0, $b->errorOutput);
-        expect($this->worker->find($assignment->id)->state)->toBe(AssignmentState::Completed);
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
         expect($this->department->connections->application->fetchFirstColumn('SELECT value FROM effects'))->toBe(['mutation-loss:refresh:one']);
     } finally {
         if ($a->running) {
@@ -265,16 +268,16 @@ test('a late stale handler failure cannot consume Durable retry budget or change
         department_redeliver($this->department);
         $b = department_process($this->department)->wait();
         expect($b->exitCode)->toBe(0, $b->errorOutput);
-        $before = $this->department->connections->application->fetchAllAssociative('SELECT * FROM operation_assignments ORDER BY id');
+        $before = $this->department->connections->application->fetchAllAssociative('SELECT * FROM operation_assignments ORDER BY uuid');
         file_put_contents($path . '.release', 'go');
         $a->wait();
-        expect($this->department->connections->application->fetchAllAssociative('SELECT * FROM operation_assignments ORDER BY id'))->toBe($before);
-        $events = iterator_to_array($runtime->events->readStream(Gplanchat\Durable\ExecutionId::fromString($assignment->id)));
+        expect($this->department->connections->application->fetchAllAssociative('SELECT * FROM operation_assignments ORDER BY uuid'))->toBe($before);
+        $events = iterator_to_array($runtime->events->readStream(Gplanchat\Durable\ExecutionId::fromString($assignment->id->uuidFor(IdentifierType::Assignment))));
         expect(array_filter(
             $events,
             fn ($event) => $event instanceof Gplanchat\Durable\Event\ActivityTaskFailed || $event instanceof Gplanchat\Durable\Event\ActivityRetryQueued,
         ))->toBe([]);
-        expect($this->worker->find($assignment->id)->state)->toBe(AssignmentState::Completed);
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
     } finally {
         if ($a->running) {
             $a->signal(9)->wait();
@@ -299,17 +302,24 @@ test('acknowledged custody survives worker death and a successor verifies it bef
     try {
         department_barrier($path, $a);
         $db = $this->department->connections->application;
-        expect($db->fetchFirstColumn("SELECT digest FROM operation_artifacts WHERE kind = 'custody'"))->toBe([hash_file('sha256', $bytes)]);
-        expect($db->fetchOne("SELECT count(*) FROM operation_artifacts WHERE kind = 'result'"))->toBe(0);
+        expect($db->fetchFirstColumn('SELECT digest FROM operation_custody_receipts'))->toBe([hash_file('sha256', $bytes)]);
+        expect($db->fetchOne('SELECT count(*) FROM operation_results'))->toBe(0);
         $a->signal(9);
         expect($a->wait()->exitCode)->toBe(137);
         department_redeliver($this->department);
         $b = department_process($this->department)->wait();
         expect($b->exitCode)->toBe(0, $b->errorOutput);
-        expect($this->worker->find($assignment->id)->state)->toBe(AssignmentState::Completed);
-        expect($db->fetchFirstColumn("SELECT value FROM operation_artifacts WHERE kind = 'result'"))->toBe(['verified']);
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
+        expect($db->fetchFirstColumn('SELECT coverage FROM operation_results'))->toBe(['verified']);
         expect($db->fetchOne('SELECT count(*) FROM operation_reconciliations'))->toBe(1);
-        expect($db->fetchOne("SELECT count(*) FROM operation_artifacts WHERE kind = 'custody'"))->toBe(1);
+        expect(Tempest\Database\query(App\Operations\Models\Checkpoint::class)->select()->all())->toHaveCount(2);
+        $receipt = Tempest\Database\query(App\Operations\Models\CustodyReceipt::class)->select()->first();
+        expect($receipt->key)->toBe('retained');
+        expect($receipt->digest)->toBe(hash_file('sha256', $bytes));
+        $adopted = Tempest\Database\query(App\Operations\Models\Result::class)->select()->first();
+        expect($adopted->coverage)->toBe('verified');
+        expect($adopted->attempt_id)->not->toBe($receipt->attempt_id);
+        expect($db->fetchOne('SELECT count(*) FROM operation_custody_receipts'))->toBe(1);
     } finally {
         if ($a->running) {
             $a->signal(9)->wait();
@@ -325,7 +335,7 @@ test('Durable owns the bounded handler retry budget and exposes terminal failure
     $this->department->container->singleton(Tests\Support\Durable\DepartmentControl::class, new Tests\Support\Durable\DepartmentControl(fail: true));
     $assignment = $this->worker->do(new DepartmentJob('exhausted'));
     $this->department->runtime->drain();
-    $failed = $this->worker->find($assignment->id);
+    $failed = $this->worker->status($assignment->id);
     expect($failed->state)->toBe(AssignmentState::Failed);
     expect($failed->error)->toContain('identifiable handler failure');
     expect($this->department->connections->application->fetchFirstColumn('SELECT outcome FROM operation_attempts ORDER BY started_at'))->toBe([
@@ -337,9 +347,9 @@ test('Durable owns the bounded handler retry budget and exposes terminal failure
     expect($this->department->connections->application->fetchOne('SELECT count(*) FROM effects'))->toBe(0);
     $this->department->container->singleton(Tests\Support\Durable\DepartmentControl::class, new Tests\Support\Durable\DepartmentControl());
     $new = $this->worker->do(new DepartmentJob('exhausted', 'new-input'));
-    expect($new->id)->not->toBe($failed->id);
+    expect($new->id)->not->toEqual($failed->id);
     $this->department->runtime->drain();
-    expect($this->worker->find($new->id)->state)->toBe(AssignmentState::Completed);
+    expect($this->worker->status($new->id)->state)->toBe(AssignmentState::Completed);
 });
 
 test('changed custody bytes cannot be adopted by the recovering worker', function (): void {
@@ -361,9 +371,9 @@ test('changed custody bytes cannot be adopted by the recovering worker', functio
         department_redeliver($this->department);
         $b = department_process($this->department)->wait();
         expect($b->exitCode)->toBe(0, $b->errorOutput);
-        expect($this->worker->find($assignment->id)->state)->toBe(AssignmentState::Failed);
-        expect($this->department->connections->application->fetchOne("SELECT count(*) FROM operation_artifacts WHERE kind = 'result'"))->toBe(0);
-        expect($this->department->connections->application->fetchFirstColumn("SELECT digest FROM operation_artifacts WHERE kind = 'custody'"))->toBe([$digest]);
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Failed);
+        expect($this->department->connections->application->fetchOne('SELECT count(*) FROM operation_results'))->toBe(0);
+        expect($this->department->connections->application->fetchFirstColumn('SELECT digest FROM operation_custody_receipts'))->toBe([$digest]);
     } finally {
         if ($a->running) {
             $a->signal(9)->wait();
@@ -449,14 +459,15 @@ test('an observation arriving during execution remains durable and runs after th
     $a = department_process($this->department, ['handlerBarrier' => $path]);
     try {
         department_barrier($path, $a);
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Running);
         $joined = $this->worker->do(new DepartmentJob('new-demand', 'newer'));
-        expect($joined->id)->toBe($assignment->id);
+        expect($joined->id)->toEqual($assignment->id);
         expect($this->department->connections->application->fetchOne('SELECT count(*) FROM operation_demands WHERE NOT satisfied'))->toBe(2);
         file_put_contents($path . '.release', 'go');
         $result = $a->wait();
         expect($result->exitCode)->toBe(0, $result->errorOutput);
         $runtime->drain();
-        expect($this->worker->find($assignment->id)->state)->toBe(AssignmentState::Completed);
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
         expect($this->department->connections->application->fetchFirstColumn('SELECT value FROM effects ORDER BY id'))->toBe([
             'new-demand:refresh:original',
             'new-demand:refresh:newer',
@@ -492,7 +503,7 @@ test('native redelivery cannot start another domain Attempt while the healthy wo
         file_put_contents($path . '.release', 'go');
         $a->wait();
         $runtime->drain();
-        expect($this->worker->find($assignment->id)->state)->toBe(AssignmentState::Completed);
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
         expect($this->department->connections->application->fetchFirstColumn('SELECT value FROM effects'))->toBe(['live-exclusion:refresh:one']);
         expect($this->department->connections->application->fetchOne('SELECT count(*) FROM operation_attempts'))->toBe(1);
     } finally {
@@ -521,4 +532,76 @@ test('resolving Tempest database before Worker still rolls back business data an
     expect($connections->application->fetchOne('SELECT count(*) FROM business_proof'))->toBe(0);
     expect($connections->application->fetchOne('SELECT count(*) FROM operation_assignments'))->toBe(0);
     expect($connections->application->fetchOne('SELECT count(*) FROM messenger_messages'))->toBe(0);
+});
+
+test('a repeated observation with conflicting input is rejected atomically', function (): void {
+    $assignment = $this->worker->do(new DepartmentJob('conflicting'));
+    expect(fn () => $this->worker->do(new DepartmentJob('conflicting', custodyPath: '/different/input'), Priority::Interactive))
+        ->toThrow(InvalidArgumentException::class, 'different Job input');
+    $db = $this->department->connections->application;
+    expect($db->fetchOne('SELECT count(*) FROM operation_demands'))->toBe(1);
+    expect($this->worker->status($assignment->id)->priority)->toBe(Priority::Routine);
+    $this->department->runtime->drain();
+    expect($db->fetchFirstColumn('SELECT value FROM effects'))->toBe(['conflicting:refresh:one']);
+});
+
+test('Assignment models and typed execution identities survive serialization and worker restart', function (): void {
+    $assignment = $this->worker->do(new DepartmentJob('identifiers'));
+    $id = (string) $assignment->id;
+    expect($id)->toStartWith('urn:stashd:assignment:');
+    $json = json_decode(json_encode($assignment, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
+    expect($json['id'])->toBe($id);
+    expect($json)->not->toHaveKey('uuid');
+    $model = Tempest\Database\query(App\Operations\Assignment::class)->select()->where('uuid', $assignment->id->uuidFor(IdentifierType::Assignment))->first();
+    expect($model)->toBeInstanceOf(App\Operations\Assignment::class);
+    expect((string) $model->id)->toBe($id);
+    expect($model->job_type)->toBe('department.probe.v1');
+    expect($this->department->connections->application->fetchOne('SELECT payload FROM operation_demands'))->not->toContain(DepartmentJob::class);
+    $result = department_process($this->department)->wait();
+    expect($result->exitCode)->toBe(0, $result->errorOutput);
+    expect((string) $this->worker->status(Identifier::parse($id))->id)->toBe($id);
+    $completed = Tempest\Database\query(App\Operations\Assignment::class)->select()->where('uuid', $assignment->id->uuidFor(IdentifierType::Assignment))->first();
+    expect($completed->state)->toBe(AssignmentState::Completed);
+    $attempt = Tempest\Database\query(App\Operations\Models\Attempt::class)->select()->first();
+    $demand = Tempest\Database\query(App\Operations\Models\Demand::class)->select()->first();
+    expect((string) $attempt->id)->toStartWith('urn:stashd:attempt:');
+    expect((string) $demand->id)->toStartWith('urn:stashd:demand:');
+    $context = new App\Operations\DTO\AssignmentContext($assignment->id, $demand->id, $attempt->id);
+    $restored = Tempest\Mapper\map(json_decode(Tempest\Mapper\map($context)->toJson(), true, flags: JSON_THROW_ON_ERROR))->to(App\Operations\DTO\AssignmentContext::class);
+    expect($restored)->toEqual($context);
+    expect(fn () => $this->worker->status($attempt->id))->toThrow(InvalidArgumentException::class);
+    expect(fn () => new App\Operations\DTO\AssignmentContext($attempt->id, $demand->id, $attempt->id))->toThrow(InvalidArgumentException::class);
+});
+
+test('status reads do not persist terminal failure reconciliation', function (): void {
+    $this->department->container->singleton(Tests\Support\Durable\DepartmentControl::class, new Tests\Support\Durable\DepartmentControl(fail: true));
+    $assignment = $this->worker->do(new DepartmentJob('read-only-status'));
+    $this->department->runtime->drain();
+    $db = $this->department->connections->application;
+    $before = $db->fetchAllAssociative('SELECT * FROM operation_assignments');
+    expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Failed);
+    expect($this->worker->status($assignment->id)->error)->toContain('identifiable handler failure');
+    expect($db->fetchAllAssociative('SELECT * FROM operation_assignments'))->toBe($before);
+});
+
+test('historical starts do not describe the next queued demand as running', function (): void {
+    $assignment = $this->worker->do(new DepartmentJob('status', 'first'));
+    $this->worker->do(new DepartmentJob('status', 'second'));
+    $runtime = $this->department->runtime;
+    $runtime->drain('outbox');
+    $runtime->drain('activities');
+    $runtime->drain('resumes');
+    $runtime->drain('activities', limit: 1);
+    expect($this->department->connections->application->fetchOne('SELECT count(*) FROM operation_attempts'))->toBe(1);
+    expect($this->department->connections->application->fetchOne('SELECT count(*) FROM operation_demands WHERE NOT satisfied'))->toBe(1);
+    expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Queued);
+    $runtime->drain();
+    expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
+});
+
+test('Job-owned keys distinguish composite identity boundaries', function (): void {
+    $left = $this->worker->do(new DepartmentJob('asset:refresh', mode: 'complete'));
+    $right = $this->worker->do(new DepartmentJob('asset', mode: 'refresh:complete'));
+    expect($left->id)->not->toEqual($right->id);
+    expect($this->department->connections->application->fetchOne('SELECT count(*) FROM operation_assignments'))->toBe(2);
 });

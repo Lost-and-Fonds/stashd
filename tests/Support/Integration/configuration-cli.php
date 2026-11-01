@@ -55,7 +55,7 @@ function start_configuration_cli(ArchiveFixture $archive, array $descriptor, arr
 {
     $pipes = [];
     $process = proc_open(
-        [PHP_BINARY, 'tempest', ...$arguments, '--no-interaction'],
+        [PHP_BINARY, str_starts_with($arguments[0], 'job:') ? 'tests/Support/HistoricalOperations/console.php' : 'tempest', ...$arguments, '--no-interaction'],
         [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
         $pipes,
         dirname(__DIR__, 3),

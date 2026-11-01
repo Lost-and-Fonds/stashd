@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Operations\Persistence;
 
 use Doctrine\DBAL\Connection as DbalConnection;
+use LogicException;
 use PDO;
 use PDOStatement;
+use RuntimeException;
 use Tempest\Database\Connection\Connection;
 
 /**
@@ -75,7 +77,7 @@ final readonly class ApplicationConnection implements Connection
      */
     public function prepare(string $sql): PDOStatement
     {
-        return $this->native()->prepare($sql) ?: throw new \RuntimeException('Unable to prepare application query.');
+        return $this->native()->prepare($sql) ?: throw new RuntimeException('Unable to prepare application query.');
     }
 
     /**
@@ -100,7 +102,7 @@ final readonly class ApplicationConnection implements Connection
     public function reconnect(): void
     {
         if ($this->inTransaction()) {
-            throw new \LogicException('Cannot reconnect during an application transaction.');
+            throw new LogicException('Cannot reconnect during an application transaction.');
         }
 
         $this->close();
@@ -122,6 +124,6 @@ final readonly class ApplicationConnection implements Connection
     {
         $native = $this->database->getNativeConnection();
 
-        return $native instanceof PDO ? $native : throw new \LogicException('Operations requires pdo_pgsql.');
+        return $native instanceof PDO ? $native : throw new LogicException('Operations requires pdo_pgsql.');
     }
 }

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Support\Operations;
 
-use App\Operations\DTO\ExecutionContext;
-use App\Operations\Work;
-use App\Operations\WorkExecutor;
 use PDO;
 use RuntimeException;
+use Tests\Support\HistoricalOperations\ExecutionContext;
+use Tests\Support\HistoricalOperations\Work;
+use Tests\Support\HistoricalOperations\WorkExecutor;
 
 /**
  * Persist each real probe execution independently of Operations Job status.

@@ -11,7 +11,7 @@ use App\Operations\HandlesJob;
 /**
  * Record independent observable effects through a constructor-injected service.
  */
-#[HandlesJob(DepartmentJob::class)]
+#[HandlesJob(DepartmentJob::class, 'department.probe.v1')]
 final readonly class DepartmentHandler
 {
     /**
@@ -30,6 +30,7 @@ final readonly class DepartmentHandler
     public function __invoke(DepartmentJob $request, AssignmentContext $execution): void
     {
         if ($request->custodyPath !== null) {
+            $this->artifacts->checkpoint($execution, 'staged');
             $this->artifacts->custody($execution, 'retained', $request->custodyPath);
         }
 
@@ -53,10 +54,19 @@ final readonly class DepartmentHandler
 
             $this->artifacts->reconcile($execution);
             $this->artifacts->result($execution, 'verified');
+            $this->artifacts->result($execution, 'verified');
+            try {
+                $this->artifacts->result($execution, 'conflicting');
+                throw new \LogicException('A conflicting result was adopted.');
+            } catch (\RuntimeException $expected) {
+                if ($expected->getMessage() !== 'A different result was already adopted.') {
+                    throw $expected;
+                }
+            }
         }
 
         $this->authority->protect($execution, function (\Doctrine\DBAL\Connection $database) use ($request, $execution): void {
-            $database->insert('effects', ['assignment' => $execution->assignmentId, 'value' => $request->scope . ':' . $request->mode . ':' . $request->observation]);
+            $database->insert('effects', ['assignment' => (string) $execution->assignmentId, 'value' => $request->scope . ':' . $request->mode . ':' . $request->observation]);
             if ($this->control->insideMutation) {
                 $this->barrier($execution);
             }

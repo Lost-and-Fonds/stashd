@@ -1,7 +1,7 @@
 <?php
 
 use App\Integration\OperationsConfig;
-use App\Operations\JobRuntime;
+use Tests\Support\HistoricalOperations\JobRuntime;
 use Tests\Support\RecordsAndArchives\ArchiveFixture;
 
 require_once dirname(__DIR__, 2) . '/Support/Integration/configuration-cli.php';
@@ -29,7 +29,7 @@ test('jobs are admitted once and relayed to a real worker', function (): void {
         $workerTwo = start_configuration_cli($archive, $descriptor, ['job:work', 'jobs', '--once']);
         expect(finish_configuration_cli($workerOne)['code'])->toBe(0)->and(finish_configuration_cli($workerTwo)['code'])->toBe(0);
         expect($database->query('SELECT status FROM configuration_proof.jobs')->fetchColumn())->toBe('completed');
-        $runtime->handle(new \App\Operations\ExecuteJob($id));
+        $runtime->handle(new \Tests\Support\HistoricalOperations\ExecuteJob($id));
         expect((int) $database->query('SELECT attempts FROM configuration_proof.jobs')->fetchColumn())->toBe(1);
         expect(fn () => $runtime->admit('key', 'different'))->toThrow(InvalidArgumentException::class);
         $database->exec("ALTER TABLE configuration_proof.messenger_messages ADD CONSTRAINT reject_outbox CHECK (queue_name <> 'outbox')");
@@ -99,7 +99,8 @@ test('a killed worker is redelivered after its claim expires', function (): void
         } while ($status !== 'running' && microtime(true) < $deadline);
 
         expect($status)->toBe('running');
-        expect(fn () => $runtime->handle(new \App\Operations\ExecuteJob($id)))->toThrow(\Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException::class);
+        expect(fn () => $runtime->handle(new \Tests\Support\HistoricalOperations\ExecuteJob($id)))
+            ->toThrow(\Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException::class);
         expect((int) $database->query("SELECT attempts FROM configuration_proof.jobs WHERE id = '{$id}'")->fetchColumn())->toBe(1);
         expect(proc_terminate($worker['process'], 9))->toBeTrue();
         $result = finish_configuration_cli($worker);
@@ -210,7 +211,7 @@ test('expired claims are recovered and failures are retried', function (): void 
         $database->exec("UPDATE configuration_proof.jobs SET attempts = 8 WHERE id = '{$failure}'");
         $runtime->work('outbox', true);
         $database->exec("ALTER TABLE configuration_proof.messenger_messages ADD CONSTRAINT reject_retry CHECK (queue_name <> 'outbox')");
-        expect(fn () => $runtime->handle(new \App\Operations\ExecuteJob($failure)))->toThrow(\Symfony\Component\Messenger\Exception\TransportException::class);
+        expect(fn () => $runtime->handle(new \Tests\Support\HistoricalOperations\ExecuteJob($failure)))->toThrow(\Symfony\Component\Messenger\Exception\TransportException::class);
         $state = $database->query("SELECT status FROM configuration_proof.jobs WHERE id = '{$failure}'")->fetchColumn();
         expect($state)->toBe('running');
         $database->exec(

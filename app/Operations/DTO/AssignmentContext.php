@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Operations\DTO;
 
+use App\Identity\Identifier;
+use App\Identity\IdentifierType;
+
 /**
  * Correlate a handler with durable admission and its immutable observed input.
  *
@@ -15,8 +18,12 @@ final readonly class AssignmentContext
      * Keep the demand identity stable across delivery retries and process restarts.
      */
     public function __construct(
-        public string $assignmentId,
-        public string $demandId,
-        public string $attemptId,
-    ) {}
+        public Identifier $assignmentId,
+        public Identifier $demandId,
+        public Identifier $attemptId,
+    ) {
+        $assignmentId->uuidFor(IdentifierType::Assignment);
+        $demandId->uuidFor(IdentifierType::Demand);
+        $attemptId->uuidFor(IdentifierType::Attempt);
+    }
 }

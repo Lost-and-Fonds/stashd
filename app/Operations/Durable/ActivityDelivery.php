@@ -6,6 +6,8 @@ namespace App\Operations\Durable;
 
 use App\Operations\Persistence\Assignments;
 use App\Operations\Priority;
+use Gplanchat\Durable\Transport\ActivityMessage;
+use LogicException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\TransportException;
@@ -36,8 +38,8 @@ final readonly class ActivityDelivery implements SenderInterface
     public function send(Envelope $envelope): Envelope
     {
         $message = $envelope->getMessage();
-        if (! $message instanceof \Gplanchat\Durable\Transport\ActivityMessage) {
-            throw new \LogicException('Activity routing requires an ActivityMessage.');
+        if (! $message instanceof ActivityMessage) {
+            throw new LogicException('Activity routing requires an ActivityMessage.');
         }
 
         $record = isset($message->payload['assignment']) ? $this->assignments->find($message->payload['assignment']) : null;

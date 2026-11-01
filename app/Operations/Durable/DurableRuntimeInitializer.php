@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace App\Operations\Durable;
 
+use App\Operations\AssignmentExecution;
+use App\Operations\Authority\PublicationAuthority;
+use App\Operations\Authority\SessionActivityClaims;
+use App\Operations\Persistence\Assignments;
 use InvalidArgumentException;
 use PDO;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\PostgreSqlStore;
 use Tempest\Container\Container;
@@ -41,15 +46,15 @@ final class DurableRuntimeInitializer implements Initializer
             fn ($routine, $interactive) => new ActivityDelivery(
                 $routine,
                 $interactive,
-                $container->get(\App\Operations\Persistence\Assignments::class),
-                $container->get(\Psr\Log\LoggerInterface::class),
+                $container->get(Assignments::class),
+                $container->get(LoggerInterface::class),
             ),
-            $container->get(\App\Operations\Authority\PublicationAuthority::class),
-            $container->get(\App\Operations\Authority\SessionActivityClaims::class),
+            $container->get(PublicationAuthority::class),
+            $container->get(SessionActivityClaims::class),
         );
         $runtime->workflows->registerClass(AssignmentWorkflow::class);
-        $runtime->on(StartAssignment::class, fn (StartAssignment $message) => $container->get(\App\Operations\Worker::class)->start($message));
-        $runtime->activities->register('operations.execute', fn (array $payload) => $container->get(\App\Operations\Worker::class)->execute(
+        $runtime->on(StartAssignment::class, fn (StartAssignment $message) => $container->get(AssignmentExecution::class)->start($message));
+        $runtime->activities->register('operations.execute', fn (array $payload) => $container->get(AssignmentExecution::class)->execute(
             $payload['assignment'],
             $payload['demand'],
         ));

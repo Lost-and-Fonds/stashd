@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Integration\OperationsConfig;
-use App\Operations\JobRuntime;
-use App\Operations\Jobs;
-use App\Operations\Work;
+use Tests\Support\HistoricalOperations\JobRuntime;
+use Tests\Support\HistoricalOperations\Jobs;
+use Tests\Support\HistoricalOperations\Work;
 use Tests\Support\Operations\LocalOperationsDriver;
 use Tests\Support\Operations\ProbeExecutor;
 

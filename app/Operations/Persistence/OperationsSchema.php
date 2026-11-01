@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace App\Operations\Persistence;
 
+use Tempest\Database\Config\DatabaseDialect;
+use Tempest\Database\Database;
 use Tempest\Database\MigratesUp;
 use Tempest\Database\QueryStatement;
 use Tempest\Database\QueryStatements\CompoundStatement;
 use Tempest\Database\QueryStatements\CreateTableStatement;
 use Tempest\Database\QueryStatements\RawStatement;
+use Tempest\Database\ShouldMigrate;
 
 /**
  * Define departmental admission tables while leaving upstream schemas upstream.
  */
-final class OperationsSchema implements MigratesUp, \Tempest\Database\ShouldMigrate
+final class OperationsSchema implements MigratesUp, ShouldMigrate
 {
     public string $name = '2026-11-01_01_operations_assignments';
 
@@ -24,60 +27,67 @@ final class OperationsSchema implements MigratesUp, \Tempest\Database\ShouldMigr
     {
         return new CompoundStatement(
             new CreateTableStatement('operation_assignments')
-                ->primary(uuid: true)
-                ->text('work_type')
-                ->text('work_scope')
-                ->text('work_mode')
+                ->primary('uuid', uuid: true)
+                ->text('job_type')
+                ->text('work_key')
                 ->text('priority')
                 ->boolean('active', default: true)
                 ->text('error', nullable: true)
                 ->raw("CHECK (priority IN ('routine', 'interactive'))"),
-            new RawStatement('CREATE UNIQUE INDEX operation_active_work ON operation_assignments(work_type, work_scope, work_mode) WHERE active'),
+            new RawStatement('CREATE UNIQUE INDEX operation_active_work ON operation_assignments(job_type, work_key) WHERE active'),
             new CreateTableStatement('operation_demands')
-                ->primary(uuid: true)
-                ->foreignUuid('assignment_id', 'operation_assignments')
+                ->primary('uuid', uuid: true)
+                ->foreignUuid('assignment_id', 'operation_assignments.uuid')
                 ->text('observation')
                 ->text('observation_key')
-                ->text('job_class')
                 ->text('payload')
                 ->boolean('satisfied', default: false)
-                ->foreignUuid('next_id', 'operation_demands', nullable: true)
+                ->foreignUuid('next_id', 'operation_demands.uuid', nullable: true)
                 ->raw('current_attempt UUID NULL')
                 ->raw('UNIQUE(assignment_id, observation_key)'),
             new CreateTableStatement('operation_attempts')
-                ->primary(uuid: true)
-                ->foreignUuid('assignment_id', 'operation_assignments')
-                ->foreignUuid('demand_id', 'operation_demands')
+                ->primary('uuid', uuid: true)
+                ->foreignUuid('assignment_id', 'operation_assignments.uuid')
+                ->foreignUuid('demand_id', 'operation_demands.uuid')
                 ->integer('backend_pid')
                 ->text('backend_start')
                 ->text('outcome')
                 ->datetime('started_at')
                 ->datetime('ended_at', nullable: true)
                 ->raw("CHECK (outcome IN ('running', 'completed', 'failed', 'interrupted'))"),
-            new RawStatement('ALTER TABLE operation_demands ADD FOREIGN KEY (current_attempt) REFERENCES operation_attempts(id)'),
-            new CreateTableStatement('operation_artifacts')
+            new RawStatement('ALTER TABLE operation_demands ADD FOREIGN KEY (current_attempt) REFERENCES operation_attempts(uuid)'),
+            new CreateTableStatement('operation_checkpoints')
                 ->primary(uuid: true)
-                ->foreignUuid('assignment_id', 'operation_assignments')
-                ->foreignUuid('demand_id', 'operation_demands')
-                ->foreignUuid('attempt_id', 'operation_attempts')
-                ->text('kind')
-                ->text('value')
-                ->text('path', nullable: true)
-                ->text('digest', nullable: true)
-                ->raw("CHECK (kind IN ('checkpoint', 'custody', 'result'))"),
+                ->foreignUuid('assignment_id', 'operation_assignments.uuid')
+                ->foreignUuid('demand_id', 'operation_demands.uuid')
+                ->foreignUuid('attempt_id', 'operation_attempts.uuid')
+                ->text('value'),
+            new CreateTableStatement('operation_custody_receipts')
+                ->primary(uuid: true)
+                ->foreignUuid('assignment_id', 'operation_assignments.uuid')
+                ->foreignUuid('demand_id', 'operation_demands.uuid')
+                ->foreignUuid('attempt_id', 'operation_attempts.uuid')
+                ->text('key')
+                ->text('path')
+                ->text('digest')
+                ->raw('UNIQUE(assignment_id, key)'),
+            new CreateTableStatement('operation_results')
+                ->primary(uuid: true)
+                ->foreignUuid('assignment_id', 'operation_assignments.uuid')
+                ->foreignUuid('demand_id', 'operation_demands.uuid')
+                ->foreignUuid('attempt_id', 'operation_attempts.uuid')
+                ->text('coverage')
+                ->raw('UNIQUE(demand_id)'),
             new CreateTableStatement('operation_reconciliations')
                 ->primary(uuid: true)
-                ->foreignUuid('attempt_id', 'operation_attempts')
-                ->foreignUuid('artifact_id', 'operation_artifacts')
-                ->raw('UNIQUE(attempt_id, artifact_id)'),
+                ->foreignUuid('attempt_id', 'operation_attempts.uuid')
+                ->foreignUuid('receipt_id', 'operation_custody_receipts')
+                ->raw('UNIQUE(attempt_id, receipt_id)'),
         );
     }
 
-    /**
-     * Require PostgreSQL for partial uniqueness and the domain authority boundary.
-     */
-    public function shouldMigrate(\Tempest\Database\Database $database): bool
+    public function shouldMigrate(Database $database): bool
     {
-        return $database->dialect === \Tempest\Database\Config\DatabaseDialect::POSTGRESQL;
+        return $database->dialect === DatabaseDialect::POSTGRESQL;
     }
 }

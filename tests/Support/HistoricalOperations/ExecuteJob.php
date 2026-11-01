@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Operations;
+namespace Tests\Support\HistoricalOperations;
 
 final readonly class ExecuteJob
 {

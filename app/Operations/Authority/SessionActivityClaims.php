@@ -7,12 +7,17 @@ namespace App\Operations\Authority;
 use App\Operations\DTO\ActivityOwnership;
 use App\Operations\DTO\AssignmentContext;
 use App\Operations\Durable\DurableConnections;
+use Closure;
+use Doctrine\DBAL\Connection;
 use Gplanchat\Bridge\Dbal\Messenger\LockActivityAttemptClaim;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Port\ActivityAttemptClaimInterface;
+use LogicException;
+use PDO;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\PostgreSqlStore;
 use Tempest\Container\Singleton;
+use Throwable;
 
 /**
  * Expose upstream session ownership to the protected domain mutation boundary.
@@ -34,8 +39,8 @@ final class SessionActivityClaims implements ActivityAttemptClaimInterface
         private DurableConnections $connections,
     ) {
         $pdo = $connections->claims->getNativeConnection();
-        if (! $pdo instanceof \PDO) {
-            throw new \LogicException('Session claims require pdo_pgsql.');
+        if (! $pdo instanceof PDO) {
+            throw new LogicException('Session claims require pdo_pgsql.');
         }
 
         $this->claims = new LockActivityAttemptClaim(new LockFactory(new PostgreSqlStore($pdo)));
@@ -44,7 +49,7 @@ final class SessionActivityClaims implements ActivityAttemptClaimInterface
     /**
      * Retain the exact granted lock until upstream releases the activity episode.
      */
-    public function claim(ExecutionId $executionId, string $activityId, int $attempt): ?\Closure
+    public function claim(ExecutionId $executionId, string $activityId, int $attempt): ?Closure
     {
         $release = $this->claims->claim($executionId, $activityId, $attempt);
         if ($release === null) {
@@ -61,7 +66,7 @@ final class SessionActivityClaims implements ActivityAttemptClaimInterface
         $this->current = $ownership;
         try {
             $this->requireOwned($this->connections->journal);
-        } catch (\Throwable $error) {
+        } catch (Throwable $error) {
             $release();
             $this->current = null;
             throw $error;
@@ -70,7 +75,7 @@ final class SessionActivityClaims implements ActivityAttemptClaimInterface
         return function () use ($release): void {
             try {
                 $release();
-            } catch (\Throwable $error) {
+            } catch (Throwable $error) {
                 // A dead session already released the lock; do not turn fenced rejection into retry.
                 $this->requireOwned($this->connections->journal);
                 throw $error;
@@ -84,7 +89,7 @@ final class SessionActivityClaims implements ActivityAttemptClaimInterface
     /**
      * Check the exact granted advisory lock using another live database session.
      */
-    public function requireOwned(\Doctrine\DBAL\Connection $database): void
+    public function requireOwned(Connection $database): void
     {
         $owner = $this->current ?? throw new AuthorityLost('No current Activity ownership.');
         if (! $database->fetchOne(

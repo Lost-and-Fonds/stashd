@@ -4,156 +4,138 @@ declare(strict_types=1);
 
 namespace App\Operations;
 
+use App\Identity\IdentifierType;
 use App\Operations\Authority\PublicationAuthority;
 use App\Operations\DTO\AssignmentContext;
-use App\Operations\Models\ExecutionArtifact;
+use App\Operations\Models\Checkpoint;
+use App\Operations\Models\CustodyReceipt;
 use App\Operations\Models\Reconciliation;
-use Gplanchat\Durable\ExecutionId;
+use App\Operations\Models\Result;
 use RuntimeException;
+use Symfony\Component\Uid\Uuid;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
 
 /**
- * Protect bounded custody and result handoff without pretending SQL publishes Vault files.
- *
- * Callers stage and retain immutable files. A receipt acknowledges their digest;
- * every adopting Attempt must independently verify them before publishing results.
+ * Callers retain immutable staged files; SQL acknowledges evidence, not Vault publication.
+ * Each adopting Attempt must independently verify those bytes before publishing results.
  */
 final readonly class ExecutionArtifacts
 {
-    /**
-     * Route every authoritative database mutation through the current Activity fence.
-     */
     public function __construct(
         private PublicationAuthority $authority,
     ) {}
 
-    /**
-     * Append a domain checkpoint without granting publication rights to its context.
-     */
     public function checkpoint(AssignmentContext $context, string $value): void
     {
-        $this->authority->protect($context, fn () => $this->insert($context, ArtifactKind::Checkpoint, $value));
+        $this->authority->protect($context, function () use ($context, $value): void {
+            $checkpoint = new Checkpoint(
+                new PrimaryKey((string) Uuid::v7()),
+                $context->assignmentId->uuidFor(IdentifierType::Assignment),
+                $context->demandId->uuidFor(IdentifierType::Demand),
+                $context->attemptId->uuidFor(IdentifierType::Attempt),
+                $value,
+            );
+            query($checkpoint)->insert($checkpoint)->execute();
+        });
     }
 
-    /**
-     * Acknowledge caller-retained immutable bytes after hashing outside the transaction.
-     *
-     * This performs no filesystem publication. The caller must retain these bytes
-     * beyond the worker lifetime; later reconciliation rejects changed or lost files.
-     */
-    public function custody(AssignmentContext $context, string $key, string $path): string
+    // Hash outside the transaction; the caller must keep acknowledged bytes immutable.
+    public function custody(AssignmentContext $context, string $key, string $path): void
     {
         $digest = is_file($path) ? hash_file('sha256', $path) : false;
         if ($digest === false) {
             throw new RuntimeException('Custody bytes are unavailable.');
         }
 
-        return $this->authority->protect($context, function () use ($context, $key, $path, $digest): string {
-            /** @var ExecutionArtifact|null $existing */
-            $existing = query(ExecutionArtifact::class)
-                ->select()
-                ->where('assignment_id', $context->assignmentId)
-                ->where('kind', ArtifactKind::Custody->value)
-                ->where('value', $key)
-                ->first();
+        $this->authority->protect($context, function () use ($context, $key, $path, $digest): void {
+            $assignment = $context->assignmentId->uuidFor(IdentifierType::Assignment);
+            $existing = query(CustodyReceipt::class)->select()->where('assignment_id', $assignment)->where('key', $key)->first();
             if ($existing !== null) {
+                assert($existing instanceof CustodyReceipt, 'Tempest must hydrate the requested domain entity.');
                 if ($existing->digest !== $digest || $existing->path !== $path) {
                     throw new RuntimeException('Custody key already acknowledges different retained bytes.');
                 }
 
-                return (string) $existing->id;
+                return;
             }
 
-            return $this->insert($context, ArtifactKind::Custody, $key, $path, $digest);
+            $receipt = new CustodyReceipt(
+                new PrimaryKey((string) Uuid::v7()),
+                $assignment,
+                $context->demandId->uuidFor(IdentifierType::Demand),
+                $context->attemptId->uuidFor(IdentifierType::Attempt),
+                $key,
+                $path,
+                $digest,
+            );
+            query($receipt)->insert($receipt)->execute();
         });
     }
 
-    /**
-     * Verify all acknowledged custody and durably record this Attempt's reconciliation.
-     *
-     * @return list<string> Verified receipt keys.
-     */
+    /** @return list<string> Verified custody keys. */
     public function reconcile(AssignmentContext $context): array
     {
-        /** @var list<ExecutionArtifact> $receipts */
-        $receipts = query(ExecutionArtifact::class)->select()->where('assignment_id', $context->assignmentId)->where('kind', ArtifactKind::Custody->value)->all();
+        /** @var list<CustodyReceipt> $receipts */
+        $receipts = query(CustodyReceipt::class)->select()->where('assignment_id', $context->assignmentId->uuidFor(IdentifierType::Assignment))->all();
         foreach ($receipts as $receipt) {
-            if ($receipt->path === null || ! is_file($receipt->path) || hash_file('sha256', $receipt->path) !== $receipt->digest) {
+            if (! is_file($receipt->path) || hash_file('sha256', $receipt->path) !== $receipt->digest) {
                 throw new RuntimeException('Retained custody failed verification.');
             }
         }
 
         return $this->authority->protect($context, function () use ($context, $receipts): array {
             foreach ($receipts as $receipt) {
+                $attempt = $context->attemptId->uuidFor(IdentifierType::Attempt);
                 if (
                     query(Reconciliation::class)
                         ->select()
-                        ->where('attempt_id', $context->attemptId)
-                        ->where('artifact_id', (string) $receipt->id)
+                        ->where('attempt_id', $attempt)
+                        ->where('receipt_id', (string) $receipt->id)
                         ->first() !== null
                 ) {
                     continue;
                 }
 
-                $record = new Reconciliation();
-                $record->id = new PrimaryKey((string) ExecutionId::generate());
-                $record->attempt_id = $context->attemptId;
-                $record->artifact_id = (string) $receipt->id;
+                $record = new Reconciliation(new PrimaryKey((string) Uuid::v7()), $attempt, (string) $receipt->id);
                 query($record)->insert($record)->execute();
             }
 
-            return array_map(static fn (ExecutionArtifact $receipt): string => $receipt->value, $receipts);
+            return array_map(static fn (CustodyReceipt $receipt): string => $receipt->key, $receipts);
         });
     }
 
-    /**
-     * Adopt a result only after this Attempt reconciled every retained custody receipt.
-     */
     public function result(AssignmentContext $context, string $coverage): void
     {
         $this->authority->protect($context, function () use ($context, $coverage): void {
-            /** @var list<ExecutionArtifact> $receipts */
-            $receipts = query(ExecutionArtifact::class)->select()->where('assignment_id', $context->assignmentId)->where('kind', ArtifactKind::Custody->value)->all();
+            $assignment = $context->assignmentId->uuidFor(IdentifierType::Assignment);
+            $demand = $context->demandId->uuidFor(IdentifierType::Demand);
+            $attempt = $context->attemptId->uuidFor(IdentifierType::Attempt);
+            /** @var list<CustodyReceipt> $receipts */
+            $receipts = query(CustodyReceipt::class)->select()->where('assignment_id', $assignment)->all();
             foreach ($receipts as $receipt) {
                 if (
                     query(Reconciliation::class)
                         ->select()
-                        ->where('attempt_id', $context->attemptId)
-                        ->where('artifact_id', (string) $receipt->id)
+                        ->where('attempt_id', $attempt)
+                        ->where('receipt_id', (string) $receipt->id)
                         ->first() === null
                 ) {
                     throw new RuntimeException('Retained custody requires reconciliation.');
                 }
             }
 
-            /** @var ExecutionArtifact|null $existing */
-            $existing = query(ExecutionArtifact::class)->select()->where('demand_id', $context->demandId)->where('kind', ArtifactKind::Result->value)->first();
+            $existing = query(Result::class)->select()->where('demand_id', $demand)->first();
             if ($existing === null) {
-                $this->insert($context, ArtifactKind::Result, $coverage);
-            } elseif ($existing->value !== $coverage) {
-                throw new RuntimeException('A different result was already adopted.');
+                $result = new Result(new PrimaryKey((string) Uuid::v7()), $assignment, $demand, $attempt, $coverage);
+                query($result)->insert($result)->execute();
+            } else {
+                assert($existing instanceof Result, 'Tempest must hydrate the requested domain entity.');
+                if ($existing->coverage !== $coverage) {
+                    throw new RuntimeException('A different result was already adopted.');
+                }
             }
         });
-    }
-
-    /**
-     * Persist evidence through a Tempest model inside the caller's protected transaction.
-     */
-    private function insert(AssignmentContext $context, ArtifactKind $kind, string $value, ?string $path = null, ?string $digest = null): string
-    {
-        $artifact = new ExecutionArtifact();
-        $artifact->id = new PrimaryKey((string) ExecutionId::generate());
-        $artifact->assignment_id = $context->assignmentId;
-        $artifact->demand_id = $context->demandId;
-        $artifact->attempt_id = $context->attemptId;
-        $artifact->kind = $kind;
-        $artifact->value = $value;
-        $artifact->path = $path;
-        $artifact->digest = $digest;
-        query($artifact)->insert($artifact)->execute();
-
-        return (string) $artifact->id;
     }
 }

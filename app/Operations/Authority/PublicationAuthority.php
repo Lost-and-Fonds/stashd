@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Operations\Authority;
 
+use App\Identity\Identifier;
+use App\Identity\IdentifierType;
+use App\Operations\AttemptOutcome;
 use App\Operations\DTO\AssignmentContext;
 use App\Operations\Durable\DurableConnections;
-use App\Operations\Models\AttemptRecord;
+use App\Operations\Models\Attempt;
 use App\Operations\Models\Demand;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
-use Gplanchat\Durable\ExecutionId;
 use Tempest\Container\Singleton;
 use Tempest\Database\PrimaryKey;
 
@@ -40,31 +42,36 @@ final readonly class PublicationAuthority
     public function begin(string $assignment, string $demand): AssignmentContext
     {
         return $this->connections->application->transactional(function (Connection $db) use ($assignment, $demand): AssignmentContext {
-            $db->fetchOne('SELECT id FROM operation_demands WHERE id = ? FOR UPDATE', [$demand]);
+            $db->fetchOne('SELECT uuid FROM operation_demands WHERE uuid = ? FOR UPDATE', [$demand]);
             $this->claims->requireOwned($db);
             $owner = $this->claims->current ?? throw new AuthorityLost('The claim disappeared.');
             $now = new DateTimeImmutable();
-            query(AttemptRecord::class)
-                ->update(outcome: \App\Operations\AttemptOutcome::Interrupted, ended_at: $now)
+            query(Attempt::class)
+                ->update(outcome: AttemptOutcome::Interrupted, ended_at: $now)
                 ->where('demand_id', $demand)
                 ->where('ended_at IS NULL')
                 ->execute();
-            $attempt = new AttemptRecord();
-            $attempt->id = new PrimaryKey((string) ExecutionId::generate());
-            $attempt->assignment_id = $assignment;
-            $attempt->demand_id = $demand;
-            $attempt->backend_pid = $owner->pid;
-            $attempt->backend_start = $owner->backendStart;
-            $attempt->outcome = \App\Operations\AttemptOutcome::Running;
-            $attempt->started_at = $now;
+            $attempt = new Attempt(
+                new PrimaryKey(Identifier::create(IdentifierType::Attempt)->uuidFor(IdentifierType::Attempt)),
+                $assignment,
+                $demand,
+                $owner->pid,
+                $owner->backendStart,
+                AttemptOutcome::Running,
+                $now,
+            );
             query($attempt)->insert($attempt)->execute();
             query(Demand::class)
-                ->update(current_attempt: (string) $attempt->id)
-                ->where('id', $demand)
+                ->update(current_attempt: (string) $attempt->uuid)
+                ->where('uuid', $demand)
                 ->execute();
             $this->claims->requireOwned($db);
 
-            return $this->claims->domain = new AssignmentContext($assignment, $demand, (string) $attempt->id);
+            return $this->claims->domain = new AssignmentContext(
+                Identifier::fromUuid(IdentifierType::Assignment, $assignment),
+                Identifier::fromUuid(IdentifierType::Demand, $demand),
+                $attempt->id,
+            );
         });
     }
 
@@ -107,13 +114,16 @@ final readonly class PublicationAuthority
      */
     private function protectOn(Connection $database, AssignmentContext $context, callable $mutation): mixed
     {
-        if ($this->claims->domain?->attemptId !== $context->attemptId) {
+        if ((string) $this->claims->domain?->attemptId !== (string) $context->attemptId) {
             throw new AuthorityLost('Context does not belong to the current Activity.');
         }
 
         return $database->transactional(function (Connection $db) use ($context, $mutation): mixed {
-            $token = $db->fetchOne('SELECT current_attempt FROM operation_demands WHERE id = ? AND assignment_id = ? FOR UPDATE', [$context->demandId, $context->assignmentId]);
-            if (! is_string($token) || ! hash_equals($token, $context->attemptId)) {
+            $token = $db->fetchOne('SELECT current_attempt FROM operation_demands WHERE uuid = ? AND assignment_id = ? FOR UPDATE', [
+                $context->demandId->uuidFor(IdentifierType::Demand),
+                $context->assignmentId->uuidFor(IdentifierType::Assignment),
+            ]);
+            if (! is_string($token) || ! hash_equals($token, $context->attemptId->uuidFor(IdentifierType::Attempt))) {
                 throw new AuthorityLost('A successor replaced this Attempt.');
             }
 

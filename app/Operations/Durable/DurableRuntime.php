@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Operations\Durable;
 
+use App\Operations\Authority\AuthorityJournal;
+use App\Operations\Authority\PublicationAuthority;
 use App\Operations\Priority;
+use Closure;
 use Doctrine\DBAL\Connection;
 use Gplanchat\Bridge\Dbal\Messenger\LockActivityAttemptClaim;
 use Gplanchat\Bridge\Dbal\Messenger\SingleResumeLockMiddleware;
@@ -21,7 +24,9 @@ use Gplanchat\Durable\Bundle\Transport\MessengerWorkflowTimerDispatcher;
 use Gplanchat\Durable\ExecutionEngine;
 use Gplanchat\Durable\ExecutionRuntime;
 use Gplanchat\Durable\Handler\ResumeWorkflowHandler;
+use Gplanchat\Durable\Port\ActivityAttemptClaimInterface;
 use Gplanchat\Durable\RegistryActivityExecutor;
+use Gplanchat\Durable\Store\FencedEventStoreInterface;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ResumeWorkflowMessage;
 use Gplanchat\Durable\Worker\ActivityMessageProcessor;
@@ -56,7 +61,7 @@ use Symfony\Component\Messenger\Worker;
  */
 final class DurableRuntime
 {
-    public \Gplanchat\Durable\Store\FencedEventStoreInterface $events;
+    public FencedEventStoreInterface $events;
     public DbalWorkflowMetadataStore $metadata;
     public WorkflowRegistry $workflows;
     public RegistryActivityExecutor $activities;
@@ -79,14 +84,14 @@ final class DurableRuntime
         Connection $application,
         LockFactory $locks,
         int $visibilitySeconds = 1,
-        ?\Closure $activitySender = null,
-        ?\App\Operations\Authority\PublicationAuthority $authority = null,
-        ?\Gplanchat\Durable\Port\ActivityAttemptClaimInterface $claims = null,
+        ?Closure $activitySender = null,
+        ?PublicationAuthority $authority = null,
+        ?ActivityAttemptClaimInterface $claims = null,
     ) {
         $schema = new DurableSchema($journal);
         $schema->ensure();
         $events = new DbalEventStore($journal, $schema);
-        $this->events = $authority === null ? $events : new \App\Operations\Authority\AuthorityJournal($events, $authority);
+        $this->events = $authority === null ? $events : new AuthorityJournal($events, $authority);
         $this->metadata = new DbalWorkflowMetadataStore($journal, $schema);
         $links = new DbalChildWorkflowParentLinkStore($journal, $schema);
         $loader = new WorkflowDefinitionLoader();

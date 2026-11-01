@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Support\OperationsDelivery;
 
-use App\Operations\ExecuteJob;
 use PDO;
 use PHPUnit\Framework\Assert;
 use RuntimeException;
@@ -13,6 +12,7 @@ use Tempest\DateTime\Duration;
 use Tempest\Process\GenericProcessExecutor;
 use Tempest\Process\PendingProcess;
 use Tempest\Process\ProcessResult;
+use Tests\Support\HistoricalOperations\ExecuteJob;
 use Tests\Support\Operations\LocalOperationsDriver;
 
 /**

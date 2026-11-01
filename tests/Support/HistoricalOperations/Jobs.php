@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Operations;
+namespace Tests\Support\HistoricalOperations;
 
 /**
  * Expose durable admission while keeping Work separate from execution identity.

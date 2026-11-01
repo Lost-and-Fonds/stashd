@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use App\Integration\OperationsConfig;
-use App\Operations\DTO\ExecutionContext;
-use App\Operations\JobRuntime;
-use App\Operations\Jobs;
-use App\Operations\Work;
-use App\Operations\WorkExecutor;
+use Tests\Support\HistoricalOperations\ExecutionContext;
+use Tests\Support\HistoricalOperations\JobRuntime;
+use Tests\Support\HistoricalOperations\Jobs;
+use Tests\Support\HistoricalOperations\Work;
+use Tests\Support\HistoricalOperations\WorkExecutor;
 use Tests\Support\RecordsAndArchives\ArchiveFixture;
 
 require_once dirname(__DIR__, 2) . '/Support/Integration/configuration-cli.php';

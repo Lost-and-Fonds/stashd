@@ -1,9 +1,8 @@
 <?php
 
-namespace App\Operations;
+namespace Tests\Support\HistoricalOperations;
 
 use App\Integration\OperationsConfig;
-use App\Operations\DTO\ExecutionContext;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;

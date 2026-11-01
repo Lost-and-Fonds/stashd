@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Support\Durable;
 
+use App\Identity\Identifier;
+use App\Identity\IdentifierType;
 use PDO;
 use RuntimeException;
 use Tempest\Process\GenericProcessExecutor;
@@ -115,21 +117,26 @@ final class DepartmentOperationsDriver implements OperationsDriver
         }
 
         if ($action === 'jobs.for_work') {
-            $query = $database->prepare('SELECT id, NOT active AS terminal FROM operation_assignments WHERE work_scope = ? AND work_mode = ? ORDER BY id');
-            $query->execute([$arguments['scope_id'], $arguments['mode']]);
+            $query = $database->prepare('SELECT uuid AS id, NOT active AS terminal FROM operation_assignments WHERE work_key = ? ORDER BY uuid');
+            $query->execute([json_encode([$arguments['scope_id'], $arguments['mode']], JSON_THROW_ON_ERROR)]);
 
-            return ['jobs' => $query->fetchAll(PDO::FETCH_ASSOC)];
+            return ['jobs' => array_map(static fn (array $job): array => [
+                ...$job,
+                'id' => (string) Identifier::fromUuid(IdentifierType::Assignment, $job['id']),
+            ], $query->fetchAll(PDO::FETCH_ASSOC))];
         }
 
         if ($action === 'jobs.read') {
             $query = $database->prepare(
-                "SELECT id, CASE WHEN active THEN CASE WHEN EXISTS(SELECT 1 FROM operation_attempts WHERE assignment_id = a.id) THEN 'running' ELSE 'queued' END WHEN error IS NULL THEN 'completed' ELSE 'failed' END AS state, priority AS desired_priority, NOT active AS terminal, (SELECT count(*) FROM operation_attempts WHERE assignment_id = a.id) AS attempt_count FROM operation_assignments a WHERE id = ?",
+                "SELECT uuid AS id, CASE WHEN active THEN CASE WHEN EXISTS(SELECT 1 FROM operation_attempts WHERE assignment_id = a.uuid) THEN 'running' ELSE 'queued' END WHEN error IS NULL THEN 'completed' ELSE 'failed' END AS state, priority AS desired_priority, NOT active AS terminal, (SELECT count(*) FROM operation_attempts WHERE assignment_id = a.uuid) AS attempt_count FROM operation_assignments a WHERE uuid = ?",
             );
-            $query->execute([$arguments['job_id']]);
+            $query->execute([Identifier::parse($arguments['job_id'], IdentifierType::Assignment)->uuidFor(IdentifierType::Assignment)]);
             $job = $query->fetch(PDO::FETCH_ASSOC);
             if ($job === false) {
                 throw new RuntimeException('Assignment does not exist.');
             }
+
+            $job['id'] = (string) Identifier::fromUuid(IdentifierType::Assignment, $job['id']);
 
             return ['job' => $job];
         }

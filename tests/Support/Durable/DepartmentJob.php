@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Support\Durable;
 
 use App\Operations\Job;
-use App\Operations\Work;
 
 /**
  * Exercise real departmental admission using a small immutable typed request.
@@ -23,10 +22,15 @@ final readonly class DepartmentJob implements Job
     ) {}
 
     /**
-     * Use a stable operation type while retaining each observation as input.
+     * Encode component boundaries so different scope/mode pairs cannot collide.
      */
-    public function work(): Work
+    public function key(): string
     {
-        return new Work('department.probe', $this->scope, $this->mode, $this->observation);
+        return json_encode([$this->scope, $this->mode], JSON_THROW_ON_ERROR);
+    }
+
+    public function observation(): string
+    {
+        return $this->observation;
     }
 }

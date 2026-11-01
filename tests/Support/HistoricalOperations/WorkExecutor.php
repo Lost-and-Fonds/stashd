@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Operations;
-
-use App\Operations\DTO\ExecutionContext;
+namespace Tests\Support\HistoricalOperations;
 
 /**
  * Execute registered domain Work after Operations has persisted its claim.

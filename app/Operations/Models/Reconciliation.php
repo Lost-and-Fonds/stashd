@@ -8,12 +8,14 @@ use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 
 /**
- * Record which retained custody receipt a particular execution independently verified.
+ * Durable evidence that this Attempt independently verified a retained custody receipt.
  */
 #[Table('operation_reconciliations')]
 final class Reconciliation
 {
-    public PrimaryKey $id;
-    public string $attempt_id;
-    public string $artifact_id;
+    public function __construct(
+        public PrimaryKey $id,
+        public string $attempt_id,
+        public string $receipt_id,
+    ) {}
 }

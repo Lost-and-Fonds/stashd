@@ -8,6 +8,9 @@ use InvalidArgumentException;
 use Tempest\Mapper\Caster;
 use Tempest\Mapper\Serializer;
 
+/**
+ * Keep typed identities as URNs when Tempest retains or reconstructs input.
+ */
 final readonly class IdentifierMapper implements Caster, Serializer
 {
     public function cast(mixed $input): Identifier

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Operations;
+namespace Tests\Support\HistoricalOperations;
 
 use Tempest\Console\Console;
 use Tempest\Console\ConsoleCommand;

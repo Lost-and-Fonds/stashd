@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Identity\Identifier;
 use App\Identity\IdentifierType;
 
-
 test('Stashd identifiers round trip every declared namespace', function (IdentifierType $type): void {
     $id = Identifier::create($type);
     expect((string) $id)->toStartWith('urn:stashd:' . $type->value . ':');

@@ -3,7 +3,7 @@
 namespace App\Identity;
 
 /**
- * Distinguish Item, Asset and Vault namespaces when formatting permanent Stashd URNs.
+ * Keep archive and Operations identities in distinct Stashd URN namespaces.
  */
 enum IdentifierType: string
 {

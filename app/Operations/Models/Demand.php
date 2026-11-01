@@ -4,24 +4,31 @@ declare(strict_types=1);
 
 namespace App\Operations\Models;
 
+use App\Identity\Identifier;
+use App\Identity\IdentifierType;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\Database\Virtual;
 
 /**
- * Retain an observed input until a handler acknowledges that exact snapshot.
- *
- * New demand never replaces the input of an activity already executing.
+ * Retain each immutable input until that exact snapshot is acknowledged.
  */
 #[Table('operation_demands')]
 final class Demand
 {
-    public PrimaryKey $id;
-    public string $assignment_id;
-    public string $observation;
-    public string $observation_key;
-    public string $job_class;
-    public string $payload;
-    public bool $satisfied = false;
-    public ?string $next_id = null;
-    public ?string $current_attempt = null;
+    #[Virtual]
+    public Identifier $id {
+        get => Identifier::fromUuid(IdentifierType::Demand, (string) $this->uuid);
+    }
+
+    public function __construct(
+        public PrimaryKey $uuid,
+        public string $assignment_id,
+        public string $observation,
+        public string $observation_key,
+        public string $payload,
+        public bool $satisfied = false,
+        public ?string $next_id = null,
+        public ?string $current_attempt = null,
+    ) {}
 }

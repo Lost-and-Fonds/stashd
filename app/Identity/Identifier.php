@@ -12,6 +12,9 @@ use Symfony\Component\Uid\Uuid;
 use Tempest\Mapper\CastWith;
 use Tempest\Mapper\SerializeWith;
 
+/**
+ * A namespace and UUID identify one domain object; neither proves existence or authority.
+ */
 #[CastWith(IdentifierMapper::class)]
 #[SerializeWith(IdentifierMapper::class)]
 final readonly class Identifier implements Stringable, JsonSerializable

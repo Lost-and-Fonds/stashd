@@ -6,18 +6,16 @@ namespace App\Operations;
 
 use Attribute;
 
-/**
- * Associate one injectable invokable handler with a concrete Job class.
- */
 #[Attribute(Attribute::TARGET_CLASS)]
 final readonly class HandlesJob
 {
     /**
-     * Retain the supported request class for discovery and validation at admission.
+     * The stable type alias survives PHP class renames; retain compatible input fields.
      *
      * @param class-string<Job> $job
      */
     public function __construct(
         public string $job,
+        public string $type,
     ) {}
 }
