@@ -4,17 +4,23 @@ declare(strict_types=1);
 
 use App\Identity\Identifier;
 use App\Identity\IdentifierType;
+use App\Operations\AssignmentState;
 use App\Operations\Authority\AuthorityLost;
 use App\Operations\Authority\PublicationAuthority;
 use App\Operations\Authority\SessionActivityClaims;
+use App\Operations\Models\Checkpoint;
 use App\Operations\Persistence\ApplicationConnection;
+use App\Operations\Persistence\UpgradeCheckpoints;
 use App\Operations\Worker;
 use App\Persistence\Model;
+use App\Persistence\MutationAuthority;
 use Gplanchat\Durable\ExecutionId;
 use Tempest\Clock\Clock;
 use Tempest\Clock\MockClock;
 use Tempest\Database\Connection\Connection;
 use Tempest\Database\Exceptions\QueryWasInvalid;
+use Tempest\Database\Migrations\CreateMigrationsTable;
+use Tempest\Database\Migrations\MigrationManager;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Query;
 use Tempest\Database\QueryStatements\CreateTableStatement;
@@ -25,6 +31,8 @@ use Tests\Support\Persistence\AllowedRecord;
 use Tests\Support\Persistence\FencedRecord;
 use Tests\Support\Persistence\ForbiddenRecord;
 use Tests\Support\Persistence\InsertOnlyRecord;
+
+use function Tempest\Database\query;
 
 beforeEach(function (): void {
     $this->fixture = new DepartmentFixture();
@@ -114,6 +122,7 @@ test('failed validation and database writes preserve the instance and persisted 
     $row = new AllowedRecord('valid')->insert();
     $updated = $row->updated_at;
     $this->clock->plus(60);
+    expect(fn () => $row->update(value: 'changed', related: []))->toThrow(LogicException::class, 'Update related models separately.');
     expect(fn () => $row->update(value: ''))->toThrow(ValidationFailed::class);
     expect(fn () => $row->update(value: 'rejected'))->toThrow(QueryWasInvalid::class);
     expect($row->value)->toBe('valid');
@@ -145,6 +154,22 @@ test('Tempest maps persistence timestamps and preserves domain and creation time
     expect(AllowedRecord::get($row->id))->toBeNull();
     expect($row->refresh(...))->toThrow(RuntimeException::class);
 });
+
+test('a deleted model cannot report a successful update or delete', function (string $model): void {
+    if ($model === FencedRecord::class) {
+        [, $this->release] = foundation_execution($this->fixture);
+    }
+
+    $row = new $model('retained')->insert();
+    $updated = $row->updated_at;
+    $model::get($row->uuid)->delete();
+    $this->clock->plus(60);
+    expect(fn () => $row->update(value: 'missing'))->toThrow(RuntimeException::class, 'The model no longer exists.');
+    expect($row->value)->toBe('retained');
+    expect($row->updated_at)->toEqual($updated);
+    expect($row->delete(...))->toThrow(RuntimeException::class, 'The model no longer exists.');
+    expect($model::get($row->uuid))->toBeNull();
+})->with([AllowedRecord::class, FencedRecord::class]);
 
 test('missing attributes and unspecified operations forbid mutation before changing the instance', function (): void {
     $row = new ForbiddenRecord('forbidden');
@@ -214,6 +239,7 @@ test('fenced models join the service transaction on the actual shared applicatio
     expect($adapter->database)->toBe($db);
     expect(new Query('SELECT pg_backend_pid() AS pid')->fetchFirst()['pid'])->toBe($db->fetchOne('SELECT pg_backend_pid()'));
     $authority = $this->fixture->container->get(PublicationAuthority::class);
+    expect($this->fixture->container->get(MutationAuthority::class))->toBe($authority);
     $authority->protect($context, function () use ($db): void {
         expect($db->getTransactionNestingLevel())->toBe(1);
         new FencedRecord('one')->insert();
@@ -252,4 +278,66 @@ test('revocation after coordinated model writes rolls back the whole protected t
     }))
         ->toThrow(AuthorityLost::class);
     expect(FencedRecord::select()->all())->toHaveCount(0);
+});
+
+test('the real handler records a typed timestamped checkpoint through the shared foundation', function (): void {
+    $path = tempnam(sys_get_temp_dir(), 'model-checkpoint-');
+    file_put_contents($path, 'retained checkpoint input');
+    try {
+        $worker = $this->fixture->container->get(Worker::class);
+        $assignment = $worker->do(new DepartmentJob('model-checkpoint', custodyPath: $path));
+        $this->fixture->runtime->drain();
+        expect($worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
+        $rows = Checkpoint::select()->all();
+        expect($rows)->toHaveCount(1);
+        $row = $rows[0];
+        expect($row)->toBeInstanceOf(Model::class);
+        expect($row->value)->toBe('staged');
+        expect($row->assignment_id)->toBe($assignment->id->uuidFor(IdentifierType::Assignment));
+        expect($row->id->type)->toBe(IdentifierType::Checkpoint);
+        expect(Checkpoint::get($row->id)->uuid->value)->toBe($row->uuid->value);
+        expect($row->created_at)->toEqual($this->clock->toPsrClock()->now());
+        expect($row->updated_at)->toEqual($row->created_at);
+        expect(fn () => $row->update(value: 'changed'))->toThrow(LogicException::class);
+        expect($row->delete(...))->toThrow(LogicException::class);
+        expect($row->insert(...))->toThrow(AuthorityLost::class);
+        expect(Checkpoint::get($row->id)->value)->toBe('staged');
+    } finally {
+        unlink($path);
+    }
+});
+
+test('checkpoint migration preserves legacy UUIDs and progress values', function (): void {
+    $db = $this->fixture->connections->application;
+    $db->executeStatement('CREATE SCHEMA legacy_checkpoints');
+    $db->executeStatement('SET search_path TO legacy_checkpoints');
+    $migrations = $this->fixture->container->get(MigrationManager::class);
+    $migrations->executeUp(new CreateMigrationsTable());
+    new Query(
+        new CreateTableStatement('operation_checkpoints')
+            ->uuid()
+            ->text('assignment_id')
+            ->text('demand_id')
+            ->text('attempt_id')
+            ->text('value'),
+    )
+        ->execute();
+    $id = Identifier::create(IdentifierType::Checkpoint);
+    $values = [
+        'assignment_id' => Identifier::create(IdentifierType::Assignment)->uuidFor(IdentifierType::Assignment),
+        'demand_id' => Identifier::create(IdentifierType::Demand)->uuidFor(IdentifierType::Demand),
+        'attempt_id' => Identifier::create(IdentifierType::Attempt)->uuidFor(IdentifierType::Attempt),
+        'value' => 'retained progress',
+    ];
+    query('operation_checkpoints')->insert(...['id' => $id->uuidFor(IdentifierType::Checkpoint), ...$values])->execute();
+    $migrations->executeUp(new UpgradeCheckpoints());
+    $row = Checkpoint::get($id);
+    expect($row->id)->toEqual($id);
+    expect($row->value)->toBe($values['value']);
+    expect($row->assignment_id)->toBe($values['assignment_id']);
+    expect($row->demand_id)->toBe($values['demand_id']);
+    expect($row->attempt_id)->toBe($values['attempt_id']);
+    expect($row->created_at)->toBeInstanceOf(DateTimeImmutable::class);
+    expect($row->updated_at)->toEqual($row->created_at);
+    expect(fn () => query('operation_checkpoints')->insert(...['uuid' => (string) Symfony\Component\Uid\Uuid::v7(), ...$values])->execute())->toThrow(QueryWasInvalid::class);
 });

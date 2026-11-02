@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 use App\Identity\Identifier;
 use App\Identity\IdentifierType;
+use App\Operations\Assignment;
+use App\Operations\Models\Attempt;
+use App\Operations\Models\Checkpoint;
+use App\Operations\Models\Demand;
 
 test('Stashd identifiers round trip every declared namespace', function (IdentifierType $type): void {
     $id = Identifier::create($type);
@@ -29,3 +33,13 @@ test('an arbitrary domain UUID cannot be substituted for another identifier type
     expect(fn () => Identifier::parse((string) $attempt, IdentifierType::Assignment))->toThrow(InvalidArgumentException::class);
     expect(fn () => $attempt->uuidFor(IdentifierType::Demand))->toThrow(InvalidArgumentException::class);
 });
+
+test('model identity types come from their declarations', function (string $model, IdentifierType $type): void {
+    $id = Identifier::create($type);
+    expect(Identifier::fromUuid($model, $id->uuidFor($type)))->toEqual($id);
+})->with([
+    [Assignment::class, IdentifierType::Assignment],
+    [Attempt::class,    IdentifierType::Attempt],
+    [Demand::class,     IdentifierType::Demand],
+    [Checkpoint::class, IdentifierType::Checkpoint],
+]);

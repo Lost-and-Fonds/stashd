@@ -6,7 +6,6 @@ namespace App\Persistence;
 
 use App\Identity\Identifier;
 use App\Identity\IdentifierType;
-use App\Operations\Authority\PublicationAuthority;
 use DateTimeImmutable;
 use LogicException;
 use RuntimeException;
@@ -15,6 +14,7 @@ use Tempest\Clock\Clock;
 use Tempest\Database\Builder\QueryBuilders\QueryBuilder;
 use Tempest\Database\Builder\QueryBuilders\SelectQueryBuilder;
 use Tempest\Database\PrimaryKey;
+use Tempest\Database\Query;
 use Tempest\Database\Uuid as UuidColumn;
 use Tempest\Database\Virtual;
 use Tempest\Reflection\PropertyReflector;
@@ -28,8 +28,7 @@ use function Tempest\Database\query;
  *
  * Mutation policies apply to these instance methods. Direct Tempest query builders
  * remain a lower-level API and do not enforce these policies or set timestamps.
- * New identity domains declare an IDENTIFIER_TYPE constant; existing model mappings
- * live in IdentifierType. Neither approach repeats UUID or identifier properties.
+ * Models declare their identity domain with an IDENTIFIER_TYPE constant.
  */
 abstract class Model
 {
@@ -94,8 +93,10 @@ abstract class Model
     }
 
     /**
-     * Validate and update named domain fields, preserving identity and creation time.
+     * Validate and update named value fields, preserving identity and creation time.
      * In-memory values change only after the protected database call succeeds.
+     * A missing row fails explicitly, just like refresh().
+     * Persist related models separately within the service's transaction.
      */
     final public function update(mixed ...$values): static
     {
@@ -106,9 +107,16 @@ abstract class Model
                 }
             }
 
+            $model = inspect($this);
+            foreach (array_keys($values) as $field) {
+                if ($model->isRelation((string) $field)) {
+                    throw new LogicException('Update related models separately.');
+                }
+            }
+
             $values['updated_at'] = get(Clock::class)->toPsrClock()->now();
-            inspect($this)->validate(...$values);
-            query($this)->update(...$values)->where('uuid', $this->uuid)->execute();
+            $model->validate(...$values);
+            $this->mutateExisting(query($this)->update(...$values)->where('uuid', $this->uuid)->build());
 
             return $values;
         });
@@ -121,11 +129,12 @@ abstract class Model
 
     /**
      * Delete only this UUID, after the concrete model's policy has been checked.
+     * A missing row fails explicitly rather than claiming a deletion occurred.
      */
     final public function delete(): void
     {
         $this->persist(Persistence::forModel(static::class)->delete, function (): void {
-            query($this)->delete()->where('uuid', $this->uuid)->execute();
+            $this->mutateExisting(query($this)->delete()->where('uuid', $this->uuid)->build());
         });
     }
 
@@ -143,6 +152,18 @@ abstract class Model
     }
 
     /**
+     * Use PostgreSQL RETURNING to detect absence atomically with the mutation.
+     * Tempest builds and executes the query but does not expose affected-row counts.
+     */
+    private function mutateExisting(Query $query): void
+    {
+        $row = new Query($query->compile()->toString() . ' RETURNING "uuid"', $query->bindings)->fetchFirst();
+        if ($row === null) {
+            throw new RuntimeException('The model no longer exists.');
+        }
+    }
+
+    /**
      * Check permission before invoking any code that mutates the model or database.
      *
      * @template T
@@ -154,7 +175,7 @@ abstract class Model
         return match ($policy) {
             Policy::Allowed => $mutation(),
             Policy::Forbidden => throw new LogicException('This model mutation is forbidden: ' . static::class),
-            Policy::Fenced => get(PublicationAuthority::class)->protectCurrent($mutation),
+            Policy::Fenced => get(MutationAuthority::class)->protectCurrent($mutation),
         };
     }
 }

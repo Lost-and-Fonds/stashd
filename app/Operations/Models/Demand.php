@@ -16,9 +16,11 @@ use Tempest\Database\Virtual;
 #[Table('operation_demands')]
 final class Demand
 {
+    public const IdentifierType IDENTIFIER_TYPE = IdentifierType::Demand;
+
     #[Virtual]
     public Identifier $id {
-        get => Identifier::fromUuid(IdentifierType::Demand, (string) $this->uuid);
+        get => Identifier::fromUuid(static::class, (string) $this->uuid);
     }
 
     public function __construct(

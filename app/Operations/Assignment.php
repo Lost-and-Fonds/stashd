@@ -17,9 +17,11 @@ use Tempest\Database\Virtual;
 #[Table('operation_assignments')]
 final class Assignment implements JsonSerializable
 {
+    public const IdentifierType IDENTIFIER_TYPE = IdentifierType::Assignment;
+
     #[Virtual]
     public Identifier $id {
-        get => Identifier::fromUuid(IdentifierType::Assignment, (string) $this->uuid);
+        get => Identifier::fromUuid(static::class, (string) $this->uuid);
     }
 
     #[Virtual]

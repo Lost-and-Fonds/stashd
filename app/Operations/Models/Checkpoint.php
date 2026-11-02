@@ -7,20 +7,24 @@ namespace App\Operations\Models;
 use App\Identity\IdentifierType;
 use App\Operations\Authority\PublicationAuthority;
 use App\Operations\DTO\AssignmentContext;
-use Symfony\Component\Uid\Uuid;
-use Tempest\Database\PrimaryKey;
+use App\Persistence\Model;
+use App\Persistence\Persistence;
+use App\Persistence\Policy;
 use Tempest\Database\Table;
-
-use function Tempest\Database\query;
 
 /**
  * A protected progress marker, retained with the Attempt that published it.
  */
 #[Table('operation_checkpoints')]
-final class Checkpoint
+#[Persistence(insert: Policy::Fenced)]
+final class Checkpoint extends Model
 {
+    public const IdentifierType IDENTIFIER_TYPE = IdentifierType::Checkpoint;
+
+    /**
+     * Retain the execution that published this progress value.
+     */
     public function __construct(
-        public PrimaryKey $id,
         public string $assignment_id,
         public string $demand_id,
         public string $attempt_id,
@@ -34,13 +38,12 @@ final class Checkpoint
     {
         $authority->protect($context, function () use ($context, $value): void {
             $checkpoint = new Checkpoint(
-                new PrimaryKey((string) Uuid::v7()),
                 $context->assignmentId->uuidFor(IdentifierType::Assignment),
                 $context->demandId->uuidFor(IdentifierType::Demand),
                 $context->attemptId->uuidFor(IdentifierType::Attempt),
                 $value,
             );
-            query($checkpoint)->insert($checkpoint)->execute();
+            $checkpoint->insert();
         });
     }
 }

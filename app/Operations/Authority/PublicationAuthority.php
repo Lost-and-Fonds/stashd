@@ -11,6 +11,7 @@ use App\Operations\DTO\AssignmentContext;
 use App\Operations\Durable\DurableConnections;
 use App\Operations\Models\Attempt;
 use App\Operations\Models\Demand;
+use App\Persistence\MutationAuthority;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Tempest\Container\Singleton;
@@ -26,7 +27,7 @@ use function Tempest\Database\query;
  * revocation during a callback rolls its database writes back.
  */
 #[Singleton]
-final readonly class PublicationAuthority
+final readonly class PublicationAuthority implements MutationAuthority
 {
     /**
      * Separate the publication connection from the journal's fencing transactions.
