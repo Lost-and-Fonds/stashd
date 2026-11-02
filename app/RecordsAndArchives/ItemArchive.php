@@ -2,7 +2,6 @@
 
 namespace App\RecordsAndArchives;
 
-use App\Identity\IdentifierType;
 use JsonException;
 use League\Uri\Urn;
 use Ottosmops\Ocfl\OcflObject;
@@ -53,7 +52,7 @@ final readonly class ItemArchive
     public function commitRevision(string $uri, array $metadata = [], array $pins = [], ?array $transaction = null): OcflObject
     {
         $uuid = $this->identity->uuidForUri($uri);
-        $id = $this->vault->urnFromUuid(IdentifierType::Item, $uuid);
+        $id = $this->vault->urnFromUuid('item', $uuid);
         $pins = $this->pinReferences($pins);
         foreach ($pins as $pin) {
             try {
@@ -89,7 +88,7 @@ final readonly class ItemArchive
 
         if (! $root->hasObject($id->toString()) || $this->vault->getObject($id)->head() === '') {
             // shortcut: concurrent first creators may race here; Vault rejects the loser under its write lock. Retry the commitRevision call.
-            return $this->vault->createObject(IdentifierType::Item, $uuid, $files);
+            return $this->vault->createObject('item', $uuid, $files);
         }
 
         // Refuse to append to an unrelated or incompatible Object at this identity.

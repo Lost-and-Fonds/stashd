@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Operations\Models;
 
-use App\Identity\IdentifierType;
+use App\Operations\Assignment;
 use App\Operations\Authority\PublicationAuthority;
 use App\Operations\DTO\AssignmentContext;
 use RuntimeException;
@@ -34,9 +34,9 @@ final class Result
     public static function adopt(PublicationAuthority $authority, AssignmentContext $context, string $coverage): void
     {
         $authority->protect($context, function () use ($context, $coverage): void {
-            $assignment = $context->assignmentId->uuidFor(IdentifierType::Assignment);
-            $demand = $context->demandId->uuidFor(IdentifierType::Demand);
-            $attempt = $context->attemptId->uuidFor(IdentifierType::Attempt);
+            $assignment = $context->assignmentId->uuidFor(Assignment::class);
+            $demand = $context->demandId->uuidFor(Demand::class);
+            $attempt = $context->attemptId->uuidFor(Attempt::class);
             /** @var list<CustodyReceipt> $receipts */
             $receipts = query(CustodyReceipt::class)->select()->where('assignment_id', $assignment)->all();
             foreach ($receipts as $receipt) {

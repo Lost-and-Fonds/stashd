@@ -3,7 +3,6 @@
 namespace App\RecordsAndArchives;
 
 use App\Identity\Identifier;
-use App\Identity\IdentifierType;
 use App\RecordsAndArchives\Concurrency\ObjectWriteLock;
 use App\RecordsAndArchives\Storage\ArchiveStorage;
 use App\RecordsAndArchives\Storage\OcflFilesystemAdapter;
@@ -175,7 +174,7 @@ class Vault
         $this->identity = new VaultIdentity(
             format: self::VAULT_FORMAT,
             version: self::VAULT_VERSION,
-            identifier: $this->urnFromUuid(IdentifierType::Vault),
+            identifier: $this->urnFromUuid('vault'),
             createdAt: now(),
         );
 
@@ -195,10 +194,10 @@ class Vault
      * @param array<string, string|array{contents: string}> $files
      * @throws OcflException When committed history already exists or OCFL publication fails.
      */
-    public function createObject(IdentifierType $type, ?Uuid $uuid = null, array $files = []): OcflObject
+    public function createObject(string $namespace, ?Uuid $uuid = null, array $files = []): OcflObject
     {
         $this->validateFiles($files);
-        $id = $this->urnFromUuid($type, $uuid);
+        $id = $this->urnFromUuid($namespace, $uuid);
 
         return $this->exclusivePublication(fn (): OcflObject => $this->writeLock->exclusiveWrite($id, function () use ($id, $files): OcflObject {
             $root = $this->open();
@@ -523,8 +522,8 @@ class Vault
      * A supplied UUID gives reproducible identity; omitting it generates a
      * random UUID. No Object is created or checked for existence.
      */
-    public function urnFromUuid(IdentifierType $type, ?Uuid $uuid = null): Urn
+    public function urnFromUuid(string $namespace, ?Uuid $uuid = null): Urn
     {
-        return Urn::new(new Identifier($type, $uuid ?? Uuid::v4()));
+        return Urn::new(new Identifier($namespace, $uuid ?? Uuid::v4()));
     }
 }

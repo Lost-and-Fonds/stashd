@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Operations;
 
-use App\Identity\IdentifierType;
 use App\Operations\Authority\PublicationAuthority;
 use App\Operations\DTO\AssignmentContext;
+use App\Operations\Models\Attempt;
 use App\Operations\Models\CustodyReceipt;
+use App\Operations\Models\Demand;
 use App\Operations\Models\Reconciliation;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
@@ -34,7 +35,7 @@ final readonly class CustodyHandoff
         }
 
         $this->authority->protect($context, function () use ($context, $key, $path, $digest): void {
-            $assignment = $context->assignmentId->uuidFor(IdentifierType::Assignment);
+            $assignment = $context->assignmentId->uuidFor(Assignment::class);
             $existing = query(CustodyReceipt::class)->select()->where('assignment_id', $assignment)->where('key', $key)->first();
             if ($existing !== null) {
                 assert($existing instanceof CustodyReceipt, 'Tempest must hydrate the requested domain entity.');
@@ -48,8 +49,8 @@ final readonly class CustodyHandoff
             $receipt = new CustodyReceipt(
                 new PrimaryKey((string) Uuid::v7()),
                 $assignment,
-                $context->demandId->uuidFor(IdentifierType::Demand),
-                $context->attemptId->uuidFor(IdentifierType::Attempt),
+                $context->demandId->uuidFor(Demand::class),
+                $context->attemptId->uuidFor(Attempt::class),
                 $key,
                 $path,
                 $digest,
@@ -62,7 +63,7 @@ final readonly class CustodyHandoff
     public function reconcile(AssignmentContext $context): array
     {
         /** @var list<CustodyReceipt> $receipts */
-        $receipts = query(CustodyReceipt::class)->select()->where('assignment_id', $context->assignmentId->uuidFor(IdentifierType::Assignment))->all();
+        $receipts = query(CustodyReceipt::class)->select()->where('assignment_id', $context->assignmentId->uuidFor(Assignment::class))->all();
         foreach ($receipts as $receipt) {
             if (! is_file($receipt->path) || hash_file('sha256', $receipt->path) !== $receipt->digest) {
                 throw new RuntimeException('Retained custody failed verification.');
@@ -71,7 +72,7 @@ final readonly class CustodyHandoff
 
         return $this->authority->protect($context, function () use ($context, $receipts): array {
             foreach ($receipts as $receipt) {
-                $attempt = $context->attemptId->uuidFor(IdentifierType::Attempt);
+                $attempt = $context->attemptId->uuidFor(Attempt::class);
                 if (
                     query(Reconciliation::class)
                         ->select()

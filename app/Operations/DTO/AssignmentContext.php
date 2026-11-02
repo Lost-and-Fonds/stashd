@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Operations\DTO;
 
 use App\Identity\Identifier;
-use App\Identity\IdentifierType;
+use App\Operations\Assignment;
+use App\Operations\Models\Attempt;
+use App\Operations\Models\Demand;
 
 /**
  * Correlate a handler with durable admission and its immutable observed input.
@@ -22,8 +24,8 @@ final readonly class AssignmentContext
         public Identifier $demandId,
         public Identifier $attemptId,
     ) {
-        $assignmentId->uuidFor(IdentifierType::Assignment);
-        $demandId->uuidFor(IdentifierType::Demand);
-        $attemptId->uuidFor(IdentifierType::Attempt);
+        $assignmentId->uuidFor(Assignment::class);
+        $demandId->uuidFor(Demand::class);
+        $attemptId->uuidFor(Attempt::class);
     }
 }

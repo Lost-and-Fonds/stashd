@@ -13,11 +13,21 @@ use Tempest\Mapper\Serializer;
  */
 final readonly class IdentifierMapper implements Caster, Serializer
 {
+    /**
+     * Reconstruct a retained URN or reuse an already typed identifier.
+     */
     public function cast(mixed $input): Identifier
     {
-        return $input instanceof Identifier ? $input : Identifier::parse($input);
+        return match (true) {
+            $input instanceof Identifier => $input,
+            is_string($input) => Identifier::parse($input),
+            default => throw new InvalidArgumentException('Expected a Stashd identifier or URN string.'),
+        };
     }
 
+    /**
+     * Persist only the public namespace and UUID, without a model registry.
+     */
     public function serialize(mixed $input): string
     {
         if (! $input instanceof Identifier) {

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Identity\Identifier;
-use App\Identity\IdentifierType;
+use App\Operations\Assignment;
 use App\Operations\AssignmentState;
 use App\Operations\Priority;
 use App\Operations\Worker;
@@ -104,7 +104,7 @@ test('eight independent admissions overlap and survive a fresh worker restart', 
         expect(array_unique($ids))->toHaveCount(1);
         $result = department_process($this->department)->wait();
         expect($result->exitCode)->toBe(0, $result->errorOutput);
-        expect($this->worker->status(Identifier::parse($ids[0], IdentifierType::Assignment))->state)->toBe(AssignmentState::Completed);
+        expect($this->worker->status(Identifier::parse($ids[0], Assignment::class))->state)->toBe(AssignmentState::Completed);
         expect($this->department->connections->application->fetchFirstColumn('SELECT value FROM effects'))->toBe(['concurrent:refresh:one']);
     } finally {
         foreach (array_filter($children, static fn ($child): bool => $child->running) as $child) {
@@ -129,7 +129,7 @@ test('enqueue rejection keeps a resumable schedule and recovers without replayin
     $this->department->runtime->drain();
     expect($this->worker->status($a->id)->state)->not->toBe(AssignmentState::Failed);
     expect($db->fetchOne('SELECT count(*) FROM effects'))->toBe(0);
-    $events = iterator_to_array($this->department->runtime->events->readStream(Gplanchat\Durable\ExecutionId::fromString($a->id->uuidFor(IdentifierType::Assignment))));
+    $events = iterator_to_array($this->department->runtime->events->readStream(Gplanchat\Durable\ExecutionId::fromString($a->id->uuidFor(Assignment::class))));
     expect(array_filter($events, fn ($event) => $event instanceof Gplanchat\Durable\Event\WorkflowExecutionFailed))->toBe([]);
     expect(array_filter($events, fn ($event) => $event instanceof Gplanchat\Durable\Event\ActivityScheduled))->toHaveCount(1);
     $db->executeStatement('DROP TRIGGER reject_activity ON messenger_messages');
@@ -206,7 +206,7 @@ test('a stale living handler cannot publish a result or journal completion after
         $late = $a->wait();
         expect($late->exitCode)->toBe(0, $late->errorOutput);
         expect($this->department->connections->application->fetchFirstColumn('SELECT value FROM effects'))->toBe(['session-loss:refresh:one']);
-        $events = iterator_to_array($runtime->events->readStream(Gplanchat\Durable\ExecutionId::fromString($assignment->id->uuidFor(IdentifierType::Assignment))));
+        $events = iterator_to_array($runtime->events->readStream(Gplanchat\Durable\ExecutionId::fromString($assignment->id->uuidFor(Assignment::class))));
         expect(array_filter($events, fn ($event) => $event instanceof Gplanchat\Durable\Event\ActivityCompleted))->toHaveCount(1);
         expect(array_filter($events, fn ($event) => $event instanceof Gplanchat\Durable\Event\ActivityTaskFailed))->toBe([]);
         expect($this->department->connections->application->fetchFirstColumn('SELECT outcome FROM operation_attempts ORDER BY started_at'))->toBe(['interrupted', 'completed']);
@@ -270,7 +270,7 @@ test('a late stale handler failure cannot consume Durable retry budget or change
         file_put_contents($path . '.release', 'go');
         $a->wait();
         expect($this->department->connections->application->fetchAllAssociative('SELECT * FROM operation_assignments ORDER BY uuid'))->toBe($before);
-        $events = iterator_to_array($runtime->events->readStream(Gplanchat\Durable\ExecutionId::fromString($assignment->id->uuidFor(IdentifierType::Assignment))));
+        $events = iterator_to_array($runtime->events->readStream(Gplanchat\Durable\ExecutionId::fromString($assignment->id->uuidFor(Assignment::class))));
         expect(array_filter(
             $events,
             fn ($event) => $event instanceof Gplanchat\Durable\Event\ActivityTaskFailed || $event instanceof Gplanchat\Durable\Event\ActivityRetryQueued,
@@ -550,7 +550,7 @@ test('Assignment models and typed execution identities survive serialization and
     $json = json_decode(json_encode($assignment, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
     expect($json['id'])->toBe($id);
     expect($json)->not->toHaveKey('uuid');
-    $model = Tempest\Database\query(App\Operations\Assignment::class)->select()->where('uuid', $assignment->id->uuidFor(IdentifierType::Assignment))->first();
+    $model = Tempest\Database\query(App\Operations\Assignment::class)->select()->where('uuid', $assignment->id->uuidFor(Assignment::class))->first();
     expect($model)->toBeInstanceOf(App\Operations\Assignment::class);
     expect((string) $model->id)->toBe($id);
     expect($model->job_type)->toBe('department.probe.v1');
@@ -558,7 +558,7 @@ test('Assignment models and typed execution identities survive serialization and
     $result = department_process($this->department)->wait();
     expect($result->exitCode)->toBe(0, $result->errorOutput);
     expect((string) $this->worker->status(Identifier::parse($id))->id)->toBe($id);
-    $completed = Tempest\Database\query(App\Operations\Assignment::class)->select()->where('uuid', $assignment->id->uuidFor(IdentifierType::Assignment))->first();
+    $completed = Tempest\Database\query(App\Operations\Assignment::class)->select()->where('uuid', $assignment->id->uuidFor(Assignment::class))->first();
     expect($completed->state)->toBe(AssignmentState::Completed);
     $attempt = Tempest\Database\query(App\Operations\Models\Attempt::class)->select()->first();
     $demand = Tempest\Database\query(App\Operations\Models\Demand::class)->select()->first();

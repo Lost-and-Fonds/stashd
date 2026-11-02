@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Operations;
 
-use App\Identity\IdentifierType;
 use App\Operations\Authority\PublicationAuthority;
 use App\Operations\Durable\AssignmentWorkflow;
 use App\Operations\Durable\DurableRuntime;
@@ -146,7 +145,7 @@ final readonly class AssignmentExecution
             $this->authority->protect($context, function () use ($context): void {
                 query(Attempt::class)
                     ->update(outcome: AttemptOutcome::Failed, ended_at: new DateTimeImmutable())
-                    ->where('uuid', $context->attemptId->uuidFor(IdentifierType::Attempt))
+                    ->where('uuid', $context->attemptId->uuidFor(Attempt::class))
                     ->execute();
             });
             throw $error;
@@ -177,7 +176,7 @@ final readonly class AssignmentExecution
 
             query(Attempt::class)
                 ->update(outcome: AttemptOutcome::Completed, ended_at: new DateTimeImmutable())
-                ->where('uuid', $context->attemptId->uuidFor(IdentifierType::Attempt))
+                ->where('uuid', $context->attemptId->uuidFor(Attempt::class))
                 ->execute();
 
             return $nextId;

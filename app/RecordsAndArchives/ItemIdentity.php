@@ -2,7 +2,6 @@
 
 namespace App\RecordsAndArchives;
 
-use App\Identity\IdentifierType;
 use League\Uri\Exceptions\SyntaxError;
 use League\Uri\Uri;
 use League\Uri\Urn;
@@ -30,7 +29,7 @@ final readonly class ItemIdentity
      */
     public function objectIdForUri(string $uri): Urn
     {
-        return $this->vault->urnFromUuid(IdentifierType::Item, $this->uuidForUri($uri));
+        return $this->vault->urnFromUuid('item', $this->uuidForUri($uri));
     }
 
     /**

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Operations\Models;
 
 use App\Identity\Identifier;
-use App\Identity\IdentifierType;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 use Tempest\Database\Virtual;
@@ -16,8 +15,6 @@ use Tempest\Database\Virtual;
 #[Table('operation_demands')]
 final class Demand
 {
-    public const IdentifierType IDENTIFIER_TYPE = IdentifierType::Demand;
-
     #[Virtual]
     public Identifier $id {
         get => Identifier::fromUuid(static::class, (string) $this->uuid);

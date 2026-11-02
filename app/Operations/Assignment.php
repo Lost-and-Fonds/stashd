@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Operations;
 
 use App\Identity\Identifier;
-use App\Identity\IdentifierType;
 use JsonSerializable;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
@@ -17,8 +16,6 @@ use Tempest\Database\Virtual;
 #[Table('operation_assignments')]
 final class Assignment implements JsonSerializable
 {
-    public const IdentifierType IDENTIFIER_TYPE = IdentifierType::Assignment;
-
     #[Virtual]
     public Identifier $id {
         get => Identifier::fromUuid(static::class, (string) $this->uuid);

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Persistence;
 
 use App\Identity\Identifier;
-use App\Identity\IdentifierType;
 use DateTimeImmutable;
 use LogicException;
 use RuntimeException;
@@ -28,7 +27,7 @@ use function Tempest\Database\query;
  *
  * Mutation policies apply to these instance methods. Direct Tempest query builders
  * remain a lower-level API and do not enforce these policies or set timestamps.
- * Models declare their identity domain with an IDENTIFIER_TYPE constant.
+ * Identity namespaces follow concrete class names unless an Identity attribute overrides them.
  */
 abstract class Model
 {
@@ -62,7 +61,7 @@ abstract class Model
     public static function get(Identifier|PrimaryKey|string $id): ?static
     {
         if ($id instanceof Identifier) {
-            $id = $id->uuidFor(IdentifierType::forModel(static::class));
+            $id = $id->uuidFor(static::class);
         }
 
         return static::select()->get($id instanceof PrimaryKey ? $id : new PrimaryKey($id));

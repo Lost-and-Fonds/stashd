@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Support\Durable;
 
 use App\Identity\Identifier;
-use App\Identity\IdentifierType;
+use App\Operations\Assignment;
 use PDO;
 use RuntimeException;
 use Tempest\Process\GenericProcessExecutor;
@@ -120,7 +120,7 @@ final class DepartmentOperationsDriver implements OperationsDriver
 
             return ['jobs' => array_map(static fn (array $job): array => [
                 ...$job,
-                'id' => (string) Identifier::fromUuid(IdentifierType::Assignment, $job['id']),
+                'id' => (string) Identifier::fromUuid(Assignment::class, $job['id']),
             ], $query->fetchAll(PDO::FETCH_ASSOC))];
         }
 
@@ -128,13 +128,13 @@ final class DepartmentOperationsDriver implements OperationsDriver
             $query = $database->prepare(
                 "SELECT uuid AS id, CASE WHEN active THEN CASE WHEN EXISTS(SELECT 1 FROM operation_attempts WHERE assignment_id = a.uuid) THEN 'running' ELSE 'queued' END WHEN error IS NULL THEN 'completed' ELSE 'failed' END AS state, priority AS desired_priority, NOT active AS terminal, (SELECT count(*) FROM operation_attempts WHERE assignment_id = a.uuid) AS attempt_count FROM operation_assignments a WHERE uuid = ?",
             );
-            $query->execute([Identifier::parse($arguments['job_id'], IdentifierType::Assignment)->uuidFor(IdentifierType::Assignment)]);
+            $query->execute([Identifier::parse($arguments['job_id'], Assignment::class)->uuidFor(Assignment::class)]);
             $job = $query->fetch(PDO::FETCH_ASSOC);
             if ($job === false) {
                 throw new RuntimeException('Assignment does not exist.');
             }
 
-            $job['id'] = (string) Identifier::fromUuid(IdentifierType::Assignment, $job['id']);
+            $job['id'] = (string) Identifier::fromUuid(Assignment::class, $job['id']);
 
             return ['job' => $job];
         }

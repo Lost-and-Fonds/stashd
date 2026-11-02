@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Operations;
 
 use App\Identity\Identifier;
-use App\Identity\IdentifierType;
 use App\Operations\Durable\DurableRuntime;
 use Tempest\Console\Console;
 use Tempest\Console\ConsoleCommand;
@@ -21,7 +20,7 @@ final readonly class OperationsCommands
     #[ConsoleCommand('operations:inspect')]
     public function inspect(string $assignment): void
     {
-        $this->console->writeRaw(json_encode($this->worker->status(Identifier::parse($assignment, IdentifierType::Assignment)), JSON_THROW_ON_ERROR) . PHP_EOL);
+        $this->console->writeRaw(json_encode($this->worker->status(Identifier::parse($assignment, Assignment::class)), JSON_THROW_ON_ERROR) . PHP_EOL);
     }
 
     /**
@@ -30,7 +29,7 @@ final readonly class OperationsCommands
     #[ConsoleCommand('operations:recover')]
     public function recover(string $assignment): void
     {
-        $this->console->success('Reissued ' . $this->worker->recover(Identifier::parse($assignment, IdentifierType::Assignment)) . ' pending activity deliveries.');
+        $this->console->success('Reissued ' . $this->worker->recover(Identifier::parse($assignment, Assignment::class)) . ' pending activity deliveries.');
     }
 
     #[ConsoleCommand('operations:work')]

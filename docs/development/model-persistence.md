@@ -2,8 +2,27 @@
 
 `App\Persistence\Model` supplies UUIDv7 identity, a typed virtual `id`, timestamps,
 and explicit `insert()`, `update(...)`, `delete()` and `refresh()` methods. Reads
-use Tempest's normal `select()` builder and `get()` hydration. Each model declares
-one `IDENTIFIER_TYPE` constant; there is no central class-to-type registry.
+use Tempest's normal `select()` builder and `get()` hydration.
+
+Identifiers retain a public namespace and UUID, without a type enum or reverse
+model registry. A concrete model's lowercase short class name is its default
+namespace: `Attempt` becomes `attempt`, `HTTPAttempts` becomes `httpattempts`, and
+`HTTP_Attempts` becomes `http_attempts`. Plurals and separators are preserved;
+there is no word splitting or singularisation. Classes with the same short name
+share a namespace unless an explicit override distinguishes them.
+
+Use `#[Identity('stable-name')]` on a concrete model to preserve published URNs
+across a PHP class rename. Overrides are not inherited; a subclass defaults to its
+own concrete name. Namespaces must match `[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*`.
+Noncanonical spellings are rejected rather than silently rewritten. Class names
+that do not fit this ASCII grammar need an override.
+
+`Identifier::create(ModelClass::class)` and `fromUuid(ModelClass::class, $uuid)`
+derive the model namespace. `parse($urn)` retains any valid namespace without
+looking up a class; `new Identifier($namespace, $uuid)` also needs no PHP model.
+`uuidFor(ModelClass::class)`, `parse($urn, ModelClass::class)` and `Model::get($id)`
+reject mismatched namespaces. Existing `item`, `asset`, `vault`, `assignment`,
+`attempt`, `demand` and `checkpoint` URNs retain their exact public spelling.
 
 `#[Persistence]` defaults every mutation to forbidden. Fenced writes resolve the
 small `MutationAuthority` interface. Operations binds that interface to its existing

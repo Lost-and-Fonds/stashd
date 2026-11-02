@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Operations\Models;
 
-use App\Identity\IdentifierType;
+use App\Operations\Assignment;
 use App\Operations\Authority\PublicationAuthority;
 use App\Operations\DTO\AssignmentContext;
 use App\Persistence\Model;
@@ -19,8 +19,6 @@ use Tempest\Database\Table;
 #[Persistence(insert: Policy::Fenced)]
 final class Checkpoint extends Model
 {
-    public const IdentifierType IDENTIFIER_TYPE = IdentifierType::Checkpoint;
-
     /**
      * Retain the execution that published this progress value.
      */
@@ -38,9 +36,9 @@ final class Checkpoint extends Model
     {
         $authority->protect($context, function () use ($context, $value): void {
             $checkpoint = new Checkpoint(
-                $context->assignmentId->uuidFor(IdentifierType::Assignment),
-                $context->demandId->uuidFor(IdentifierType::Demand),
-                $context->attemptId->uuidFor(IdentifierType::Attempt),
+                $context->assignmentId->uuidFor(Assignment::class),
+                $context->demandId->uuidFor(Demand::class),
+                $context->attemptId->uuidFor(Attempt::class),
                 $value,
             );
             $checkpoint->insert();

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Operations\Models;
 
 use App\Identity\Identifier;
-use App\Identity\IdentifierType;
 use App\Operations\AttemptOutcome;
 use DateTimeImmutable;
 use Tempest\Database\PrimaryKey;
@@ -18,8 +17,6 @@ use Tempest\Database\Virtual;
 #[Table('operation_attempts')]
 final class Attempt
 {
-    public const IdentifierType IDENTIFIER_TYPE = IdentifierType::Attempt;
-
     #[Virtual]
     public Identifier $id {
         get => Identifier::fromUuid(static::class, (string) $this->uuid);

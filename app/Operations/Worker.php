@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Operations;
 
 use App\Identity\Identifier;
-use App\Identity\IdentifierType;
 use App\Operations\Authority\SessionActivityClaims;
 use App\Operations\DTO\ActivityOwnership;
 use App\Operations\Durable\DurableRuntime;
@@ -68,8 +67,8 @@ final readonly class Worker
 
             if ($assignment === null) {
                 $dispatch = true;
-                $id = Identifier::create(IdentifierType::Assignment);
-                $assignment = new Assignment(new PrimaryKey($id->uuidFor(IdentifierType::Assignment)), $type, $key, $priority);
+                $id = Identifier::create(Assignment::class);
+                $assignment = new Assignment(new PrimaryKey($id->uuidFor(Assignment::class)), $type, $key, $priority);
                 query($assignment)->insert($assignment)->execute();
             } elseif ($priority === Priority::Interactive && $assignment->priority === Priority::Routine) {
                 $dispatch = true;
@@ -87,7 +86,7 @@ final readonly class Worker
             $existing = query(Demand::class)->select()->where('assignment_id', $uuid)->where('observation_key', $observationKey)->first();
             if ($existing === null) {
                 $demand = new Demand(
-                    new PrimaryKey(Identifier::create(IdentifierType::Demand)->uuidFor(IdentifierType::Demand)),
+                    new PrimaryKey(Identifier::create(Demand::class)->uuidFor(Demand::class)),
                     $uuid,
                     $observation,
                     $observationKey,
@@ -113,7 +112,7 @@ final readonly class Worker
      */
     public function status(Identifier $id): Assignment
     {
-        $uuid = $id->uuidFor(IdentifierType::Assignment);
+        $uuid = $id->uuidFor(Assignment::class);
         /** @var Assignment $assignment */
         $assignment = query(Assignment::class)->select()->where('uuid', $uuid)->first() ?? throw new InvalidArgumentException('Assignment not found.');
         if (! $assignment->active) {
@@ -153,6 +152,6 @@ final readonly class Worker
 
     public function recover(Identifier $id): int
     {
-        return $this->execution->recover($id->uuidFor(IdentifierType::Assignment));
+        return $this->execution->recover($id->uuidFor(Assignment::class));
     }
 }

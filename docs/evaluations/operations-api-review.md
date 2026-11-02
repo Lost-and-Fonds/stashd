@@ -4,9 +4,9 @@ This supersedes the API/model portions of [the implementation checkpoint](operat
 
 ## Identity and public API
 
-`App\Identity\Identifier` and backed `IdentifierType` share the existing archival convention: `urn:stashd:<type>:<uuid>`. The archival enum moved into this shared namespace. Vault's existing helper now delegates formatting to it; supplied archival UUIDs, UUIDv4 generation, deterministic archival identities, external Item URIs and plugin URIs retain their semantics. The repository's Vault implementation/tests establish the convention; the consulted Working Specification and PREMIS notes supplied no conflicting Operations format.
+`App\Identity\Identifier` carries a namespace and UUID using the existing archival convention: `urn:stashd:<namespace>:<uuid>`. Model namespaces default to the lowercase concrete short class name, with an optional `#[Identity('stable-name')]` override. No enum or reverse model registry is needed. Vault's existing helper delegates formatting to the shared identifier; supplied archival UUIDs, UUIDv4 generation, deterministic archival identities, external Item URIs and plugin URIs retain their semantics. The repository's Vault implementation/tests establish the convention; the consulted Working Specification and PREMIS notes supplied no conflicting Operations format.
 
-Assignment, Attempt and Demand have distinct enum cases. `Identifier::parse($urn, $expectedType)` rejects bare UUIDs, unknown namespaces/types and malformed UUIDs. `uuidFor($expectedType)` rejects cross-type substitution. Tempest casting/serialization and JSON use the URN. AssignmentContext validates all three types; its IDs describe correlation, never authority.
+Assignment, Attempt and Demand have distinct model-derived namespaces. `Identifier::parse($urn)` rejects bare UUIDs and malformed URNs while retaining unfamiliar valid namespaces. Passing an expected model to `parse($urn, $model)` or `uuidFor($model)` rejects cross-namespace substitution. Tempest casting/serialization and JSON use the URN. AssignmentContext validates all three model namespaces; its IDs describe correlation, never authority.
 
 Each entity has one UUID primary key named `uuid`. Its virtual `id` computes the typed URN from that same UUID. There is no additional identity record or persisted URN. Assignment UUID is also Durable's execution UUID. The internal dispatcher, workflow payload and foreign keys use UUIDs deliberately; handlers and the public Worker boundary use typed identifiers. Assignment JSON exposes its URN, state, priority and error, excluding storage fields.
 
@@ -14,7 +14,7 @@ Each entity has one UUID primary key named `uuid`. Its virtual `id` computes the
 // Executable example: tests/Support/Durable/DepartmentJob.php and DepartmentHandler.php.
 $assignment = $worker->do(new DepartmentJob('asset-42'), Priority::Interactive);
 $id = (string) $assignment->id; // urn:stashd:assignment:...
-$latest = $worker->status(Identifier::parse($id, IdentifierType::Assignment));
+$latest = $worker->status(Identifier::parse($id, Assignment::class));
 if ($latest->state === AssignmentState::Failed) {
     report($latest->error); // department-specific reporting
 }

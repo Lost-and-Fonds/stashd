@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Operations\Authority;
 
 use App\Identity\Identifier;
-use App\Identity\IdentifierType;
+use App\Operations\Assignment;
 use App\Operations\AttemptOutcome;
 use App\Operations\DTO\AssignmentContext;
 use App\Operations\Durable\DurableConnections;
@@ -53,7 +53,7 @@ final readonly class PublicationAuthority implements MutationAuthority
                 ->where('ended_at IS NULL')
                 ->execute();
             $attempt = new Attempt(
-                new PrimaryKey(Identifier::create(IdentifierType::Attempt)->uuidFor(IdentifierType::Attempt)),
+                new PrimaryKey(Identifier::create(Attempt::class)->uuidFor(Attempt::class)),
                 $assignment,
                 $demand,
                 $owner->pid,
@@ -70,8 +70,8 @@ final readonly class PublicationAuthority implements MutationAuthority
             $this->claims->requireOwned($db);
 
             return $this->claims->domain = new AssignmentContext(
-                Identifier::fromUuid(IdentifierType::Assignment, $assignment),
-                Identifier::fromUuid(IdentifierType::Demand, $demand),
+                Identifier::fromUuid(Assignment::class, $assignment),
+                Identifier::fromUuid(Demand::class, $demand),
                 $attempt->id,
             );
         });
@@ -137,10 +137,10 @@ final readonly class PublicationAuthority implements MutationAuthority
 
         return $database->transactional(function (Connection $db) use ($context, $mutation): mixed {
             $token = $db->fetchOne('SELECT current_attempt FROM operation_demands WHERE uuid = ? AND assignment_id = ? FOR UPDATE', [
-                $context->demandId->uuidFor(IdentifierType::Demand),
-                $context->assignmentId->uuidFor(IdentifierType::Assignment),
+                $context->demandId->uuidFor(Demand::class),
+                $context->assignmentId->uuidFor(Assignment::class),
             ]);
-            if (! is_string($token) || ! hash_equals($token, $context->attemptId->uuidFor(IdentifierType::Attempt))) {
+            if (! is_string($token) || ! hash_equals($token, $context->attemptId->uuidFor(Attempt::class))) {
                 throw new AuthorityLost('A successor replaced this Attempt.');
             }
 
