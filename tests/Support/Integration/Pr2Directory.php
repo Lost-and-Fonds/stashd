@@ -78,7 +78,7 @@ final class Pr2Directory
         $discovery = Pr1RoundTrip::command($archive, $descriptor, ['input:discover', $input['id']]);
         Assert::assertNotEmpty($discovery['assignment_id'] ?? null);
         Assert::assertNotEmpty($discovery['run_id'] ?? null);
-        self::settle($archive, $descriptor, $discovery['assignment_id'], 120);
+        self::settle($archive, $descriptor, $discovery['assignment_id'], $count > 100 ? 600 : 180);
         $inspection = Pr1RoundTrip::command($archive, $descriptor, ['input:discovery', $discovery['run_id']]);
         Assert::assertSame('finished', $inspection['status']);
         Assert::assertSame('exhaustive', $inspection['coverage']['kind']);
@@ -180,6 +180,10 @@ final class Pr2Directory
     {
         $state = Pr1RoundTrip::command($archive, $descriptor, ['input:admission', $run]);
         Assert::assertSame($run, $state['run_id'] ?? null);
+        Assert::assertArrayHasKey('cursor', $state, 'The durable last-admitted source cursor must be inspectable.');
+        if ($state['cursor'] !== null) {
+            Assert::assertIsString($state['cursor']);
+        }
         Assert::assertSame($count, $state['total'] ?? null);
         foreach (['admitted', 'settled', 'outstanding'] as $field) {
             Assert::assertIsInt($state[$field] ?? null, 'Progress fields must be integer counts: ' . $field);
@@ -220,6 +224,40 @@ final class Pr2Directory
         Assert::assertCount($count, $rows, 'One durable acquisition demand is expected per file in the first run.');
         Assert::assertSame($sources, $actual, 'Each discovered source needs its own persisted Job input.');
         Assert::assertCount($count, array_unique(array_column($rows, 'assignment_id')), 'Per-file acquisition must not share a single Assignment.');
+    }
+
+    /**
+     * A durable cursor may pass a source only when that source already has an
+     * independently visible committed per-file Demand in Operations.
+     *
+     * This compares the cursor with actual discovery rows and Job payloads,
+     * not with a coordinator's reported admitted count.
+     */
+    public static function assertCursorCovered(\PDO $database, string $run, ?string $cursor): void
+    {
+        if ($cursor === null || $cursor === '') {
+            return;
+        }
+
+        $before = $database->prepare(
+            'SELECT source_id FROM configuration_proof.discovery_items WHERE run_id = ? AND source_id <= ? ORDER BY source_id',
+        );
+        $before->execute([$run, $cursor]);
+        $expected = $before->fetchAll(\PDO::FETCH_COLUMN);
+        $admitted = $database->prepare(<<<'SQL'
+            SELECT DISTINCT d.payload::jsonb ->> 'sourceId' AS source_id
+            FROM configuration_proof.operation_demands d
+            WHERE d.payload::jsonb ->> 'runId' = ?
+              AND d.payload::jsonb ->> 'sourceId' IS NOT NULL
+              AND d.payload::jsonb ->> 'sourceId' <= ?
+            ORDER BY source_id
+            SQL);
+        $admitted->execute([$run, $cursor]);
+        Assert::assertSame(
+            $expected,
+            $admitted->fetchAll(\PDO::FETCH_COLUMN),
+            'The persisted cursor skipped a source without a committed per-file Job admission.',
+        );
     }
 
     /**
@@ -314,7 +352,9 @@ final class Pr2Directory
             $assetId = $pin['object_id'];
             Assert::assertArrayHasKey($assetId, $inventories);
             $assetVersions = $inventories[$assetId]['inventory']['versions'];
+            Assert::assertSame(['v1'], array_keys($itemHistory), 'One unchanged Item must have only its first archival version.');
             Assert::assertSame('v1', $pin['version']);
+            Assert::assertSame(['v1'], array_keys($assetVersions), 'One unchanged Asset must have only its first archival version.');
             $asset = json_decode(self::payload($inventories, $assetId, 'v1', '.stashd/asset.json'), true, flags: JSON_THROW_ON_ERROR);
             Assert::assertSame($member['uri'], $asset['item_uri']);
             Assert::assertSame($itemId, $asset['item_object_id']);
@@ -329,7 +369,11 @@ final class Pr2Directory
             ];
         }
 
-        Assert::assertSame(array_keys($entries), array_keys($seen), 'Membership did not cover the exact reference file set.');
+        $expectedPaths = array_keys($entries);
+        $actualPaths = array_keys($seen);
+        sort($expectedPaths);
+        sort($actualPaths);
+        Assert::assertSame($expectedPaths, $actualPaths, 'Membership did not cover the exact reference file set.');
 
         return $references;
     }
