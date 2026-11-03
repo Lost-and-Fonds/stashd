@@ -32,6 +32,8 @@ final readonly class AcquisitionAdmission
     /**
      * Refill available run capacity under its admission lock; retry only failed Assignments.
      * Admission plus the attempt pointer commit together, before the separate inclusive cursor write.
+     * first_assignment_id names the first admitted source's current Assignment, not newly admitted work.
+     * assignment_id remains its compatibility alias for PR 1 clients.
      */
     public function fill(string $runId): array
     {
@@ -86,7 +88,9 @@ final readonly class AcquisitionAdmission
                 query('acquisition_attempts')->select('assignment_id')->where('run_id', $runId)->where('assignment_id IS NOT NULL')->orderBy('source_id')->limit(1),
             );
 
-            return ['assignment_id' => $first === null ? null : (string) Identifier::fromUuid(Assignment::class, $first['assignment_id']), ...$this->read($runId)];
+            $firstId = $first === null ? null : (string) Identifier::fromUuid(Assignment::class, $first['assignment_id']);
+
+            return ['first_assignment_id' => $firstId, 'assignment_id' => $firstId, ...$this->read($runId)];
         } finally {
             $this->database->connect()->execute(new Query('SELECT pg_advisory_unlock(hashtext(current_schema()), hashtext(?))', ['acquisition-admission:' . $runId]));
         }
@@ -108,8 +112,10 @@ final readonly class AcquisitionAdmission
 
     /**
      * Read persisted admission and actual Assignment completion with one bounded attempt page.
-     * Summary counts are a single SQL snapshot, never evidence of preservation or current Vault health.
-     * @return array{run_id: string, total: int, admitted: int, settled: int, outstanding: int, cursor: ?string, status: string, items: array, next: ?string}
+     * Admission totals share a SQL snapshot. Failed counts project that snapshot's unresolved
+     * Assignments through Worker::status, including unreconciled terminal Durable failures.
+     * These observations never establish preservation or current Vault health.
+     * @return array{run_id: string, total: int, admitted: int, settled: int, outstanding: int, failed: int, cursor: ?string, status: string, items: array, next: ?string}
      */
     public function read(string $runId, string $after = ''): array
     {
@@ -119,13 +125,24 @@ final readonly class AcquisitionAdmission
             (SELECT count(*) FROM discovery_items d WHERE d.run_id = r.id) AS total,
             count(a.uuid) AS admitted,
             count(a.uuid) FILTER (WHERE NOT a.active AND a.error IS NULL) AS settled,
-            count(a.uuid) FILTER (WHERE a.active OR a.error IS NOT NULL) AS outstanding
+            count(a.uuid) FILTER (WHERE a.active OR a.error IS NOT NULL) AS outstanding,
+            json_agg(a.uuid) FILTER (WHERE a.active OR a.error IS NOT NULL) AS unresolved_assignments
         FROM discovery_runs r LEFT JOIN acquisition_attempts t ON t.run_id = r.id
         LEFT JOIN operation_assignments a ON a.uuid = t.assignment_id
         WHERE r.id = ? GROUP BY r.id
         SQL, [$runId]));
         if ($row === null) {
             throw new RuntimeException('Discovery run disappeared during admission inspection.');
+        }
+
+        $unresolved = json_decode($row['unresolved_assignments'] ?? '[]', true, flags: JSON_THROW_ON_ERROR);
+        assert(is_array($unresolved), 'The database returns a bounded list of unresolved Assignment UUIDs.');
+        $failed = 0;
+        foreach ($unresolved as $uuid) {
+            assert(is_string($uuid), 'Each unresolved Assignment is identified by UUID.');
+            if ($this->worker->status(Identifier::fromUuid(Assignment::class, $uuid))->state === AssignmentState::Failed) {
+                $failed++;
+            }
         }
 
         $items = $this->attempts->items($runId, $after);
@@ -140,8 +157,9 @@ final readonly class AcquisitionAdmission
             'admitted' => (int) $row['admitted'],
             'settled' => (int) $row['settled'],
             'outstanding' => (int) $row['outstanding'],
+            'failed' => $failed,
             'cursor' => $row['admission_cursor'],
-            'status' => $row['discovery_status'] === 'finished' && (int) $row['settled'] === (int) $row['total'] ? 'complete' : 'running',
+            'status' => $failed > 0 ? 'failed' : ($row['discovery_status'] === 'finished' && (int) $row['settled'] === (int) $row['total'] ? 'complete' : 'running'),
             'items' => $items,
             'next' => $next,
         ];

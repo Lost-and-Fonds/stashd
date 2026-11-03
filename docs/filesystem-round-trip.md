@@ -24,8 +24,12 @@ php tempest input:admission <run UUID>
 
 `input:acquire` refills at most 100 outstanding per-file Assignments. After
 workers settle, repeat it until `input:admission` reports the run complete.
-`assignment_id` identifies one real file Assignment; it is not a directory-wide
-completion flag. Admission inspection returns bounded attempt pages with a `next`
+`first_assignment_id` identifies the first admitted source's current Assignment,
+which can already be completed; it does not identify newly admitted work.
+`assignment_id` is its compatibility alias, not a directory-wide completion flag.
+`outstanding` counts unresolved sources, including terminal failures; do not
+label it “in flight”. The separate `failed` count and status `failed` expose
+terminal failures without reconciling them or starting retries. Admission inspection returns bounded attempt pages with a `next`
 source cursor. An empty finished run has no file Assignment and returns null.
 Inspect physical Vault evidence as well as completed Operations state.
 Once acquisition completes, the source may

@@ -10,9 +10,12 @@ queue, scheduler, generic repository or recovery manager is added.
 
 `input:acquire <run>` is a bounded refill command. It admits individual
 `AcquireFile(runId, sourceId)` Jobs through ordinary `Worker::do()` and returns
-`assignment_id` plus the current progress snapshot. The identifier is a real
-per-file Assignment, retaining PR 1's single-file coalescing and post-commit
-recovery seam. It is not a synthetic run-wide Job or evidence that all files
+`first_assignment_id` plus the current progress snapshot. The identifier names
+the current Assignment of the lexicographically first admitted source. It may
+already be completed, and a terminal retry can replace that source's reference.
+It does not identify newly admitted work from this particular refill.
+`assignment_id` is retained as a compatibility alias with the same semantics,
+preserving PR 1's single-file coalescing and post-commit recovery seam. It is not a synthetic run-wide Job or evidence that all files
 have completed. For an empty finished run it is null: there is no file Job.
 
 `input:admission <run> [after]` is the read-only run-level view. It reports total,
@@ -20,7 +23,15 @@ admitted, settled and outstanding sources, the inclusive last-admitted cursor,
 and at most 100 existing attempt records with a `next` source cursor. Settled
 means the referenced Operations Assignment completed successfully; independent
 OCFL and Microtext checks remain necessary to establish preserved/output bytes.
-Failed Assignments remain unsettled and are retried on the next refill.
+`outstanding` means admitted but unresolved work, including terminal failures;
+it is not a count of queued/running Jobs and must not be labelled “in flight”.
+The separate `failed` count identifies currently referenced terminal failures via
+`Worker::status()`, including Durable journal failures not yet reconciled into
+an Assignment's SQL error field. A positive failed count gives overall status
+`failed`; a later refill retries those sources. Read-only inspection does not
+reconcile, retry or mutate the references. Totals share one SQL snapshot; failure
+projection observes its bounded unresolved set afterward through the existing
+Operations API, so this is not an atomic cross-store health snapshot.
 
 After draining workers, call `input:acquire` again while admission is incomplete.
 There is deliberately no background refill scheduler. This is the concrete API
@@ -144,3 +155,25 @@ Lerd PHP 8.5 environment with generated disposable PostgreSQL databases.
 
 The 10,000-file workflow step remains the independent fixture self-check; a real
 10,000-Item application run remains PR 5. No merge or PR 3 work is included.
+
+## Inspection API review follow-up
+
+The review's receipt concern is handled with explicit naming, rather than a new
+coordinator Job: `first_assignment_id` names the first admitted source's current
+Assignment; `assignment_id` is its compatibility alias. A completed refill can
+return that completed representative without claiming it admitted new work.
+
+Unresolved totals now include a bounded UUID set from the same SQL snapshot.
+The `failed` projection uses the existing read-only Worker status API so it also
+sees terminal Durable failures before SQL admission reconciliation. It does not
+retry, reconcile or change capacity. Consumers must label `outstanding` as
+unresolved work, and display failures separately rather than calling it in-flight.
+
+Both new public-CLI regression tests failed before the fix. Afterward, the
+focused inspection/PR 1/PR 2 run passed **9 tests, 1,954 assertions**. The separate
+101-file competing-refill round trip passed **10,799 assertions**, and final
+`lerd composer qa` passed **584 tests, 42 existing incomplete contracts, zero
+failures**, exit 0 (**27,027 assertions**). Formatting/lint passed; analysis
+retained only the four existing informational notices. The 1,000-file proof is
+not repeated for this inspection-only change; its original evidence remains
+above. Admission, cursor ordering, preservation and delivery policy are unchanged.

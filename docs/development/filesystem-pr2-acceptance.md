@@ -66,7 +66,7 @@ PR 1's existing public commands remain in place, including `input:discover`,
 `broadcast:build`. The PR 2 tests propose:
 
 - **`input:admission <run-id>`**: read-only JSON snapshot with
-  `run_id`, `total`, `admitted`, `settled`, `outstanding`, `cursor` and `status`.
+  `run_id`, `total`, `admitted`, `settled`, `outstanding`, `failed`, `cursor` and `status`.
   Status `complete` means every discovered file has settled; counts must be
   persisted observations, not guesses from a coordinator.
 - **Per-file Job payloads** retain `runId` and `sourceId`. The independent
@@ -104,8 +104,10 @@ making it pass through a mock, direct file copy or private SQL completion writes
 ## Implementation review of the proposed seam
 
 `input:acquire` is a bounded refill command, not an extra run-wide execution Job.
-Its `assignment_id` refers to an actual per-file acquisition Assignment (the first
-persisted one for the run), retaining PR 1's receipt and recovery semantics.
+Its `first_assignment_id` names the first admitted source's current per-file
+Assignment. It may already be completed and is not a receipt for new work from
+this refill. `assignment_id` remains a compatibility alias, retaining PR 1's
+receipt and recovery semantics.
 Run completion is observed through `input:admission`, not by treating that one
 Assignment as the whole directory. Call `input:acquire` again after workers
 settle to refill capacity. The harness already supports direct admission; its
@@ -118,3 +120,10 @@ The 101-file stress case also starts two real refill CLI processes before draini
 workers and requires exactly 100 outstanding Assignments. The existing SQL guard
 checks admission throughout. An added empty-run case prevents a scan with no
 saved observations yet from prematurely reporting acquisition completion.
+
+Inspection semantics: `outstanding` counts unresolved admitted sources, including
+terminal failures; it does not count healthy “in-flight” Jobs. `failed` uses the
+existing Worker status projection for the bounded unresolved set, including
+unreconciled Durable failures. Positive `failed` gives status `failed`. New
+regressions require read-only failure inspection before SQL reconciliation and
+explicit representative naming when refilling an already completed run.

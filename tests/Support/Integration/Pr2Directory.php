@@ -215,7 +215,7 @@ final class Pr2Directory
         }
 
         Assert::assertSame($count, $state['total'] ?? null);
-        foreach (['admitted', 'settled', 'outstanding'] as $field) {
+        foreach (['admitted', 'settled', 'outstanding', 'failed'] as $field) {
             Assert::assertIsInt($state[$field] ?? null, 'Progress fields must be integer counts: ' . $field);
             Assert::assertGreaterThanOrEqual(0, $state[$field]);
         }
@@ -223,6 +223,7 @@ final class Pr2Directory
         Assert::assertLessThanOrEqual($count, $state['admitted']);
         Assert::assertLessThanOrEqual($state['admitted'], $state['settled'] + $state['outstanding']);
         Assert::assertLessThanOrEqual(100, $state['outstanding']);
+        Assert::assertLessThanOrEqual($state['outstanding'], $state['failed']);
 
         return $state;
     }
