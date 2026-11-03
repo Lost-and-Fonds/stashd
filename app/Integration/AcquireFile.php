@@ -7,6 +7,7 @@ namespace App\Integration;
 use App\Operations\Job;
 use InvalidArgumentException;
 use Symfony\Component\Uid\Uuid;
+use Tempest\Validation\Rules\MatchesRegEx;
 
 /**
  * Preserve one discovery's source, independently of the run's other files.
@@ -20,7 +21,7 @@ final readonly class AcquireFile implements Job
         public string $runId,
         public string $sourceId,
     ) {
-        if (! Uuid::isValid($runId) || ! preg_match('/^[a-f0-9]{64}$/D', $sourceId)) {
+        if (! Uuid::isValid($runId) || ! new MatchesRegEx('/^[a-f0-9]{64}$/D')->isValid($sourceId)) {
             throw new InvalidArgumentException('A discovery run UUID and Filesystem source ID are required.');
         }
     }

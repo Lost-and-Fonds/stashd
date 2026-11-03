@@ -71,3 +71,75 @@ jobs:
             echo 'ERROR: verifier accepted corrupted output' >&2
             exit 1
           fi
+
+  directory:
+    name: Filesystem directory round trips (100 / 101 / 1000)
+    needs: corpus
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16.13-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: stashd-disposable-ci
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ENVIRONMENT: testing
+      STASHD_TEST_PROCESSES: '1'
+    steps:
+      - name: Check out merged or released revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962
+        with:
+          php-version: '8.5'
+          extensions: intl, pdo_pgsql, mbstring, dom, xml, xmlwriter
+          coverage: none
+          tools: composer:2.10.3
+
+      - name: Locate Composer download cache
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache locked dependency downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-php85-${{ hashFiles('composer.lock') }}
+
+      - name: Install locked dependencies
+        timeout-minutes: 5
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Configure disposable PostgreSQL fixture administrator
+        run: |
+          echo '127.0.0.1 lerd-postgres' | sudo tee -a /etc/hosts
+          umask 077
+          mkdir -p tmp
+          printf '%s\n' '{"dsn":"pgsql:host=lerd-postgres;port=5432;dbname=postgres","username":"postgres","password":"stashd-disposable-ci"}' > tmp/transaction-projection-admin.json
+          php -r '$db = new PDO("pgsql:host=lerd-postgres;port=5432;dbname=postgres", "postgres", "stashd-disposable-ci"); if ($db->query("SHOW server_version_num")->fetchColumn() < 160000) { exit(1); }'
+
+      - name: Prove bounded per-file acquisition and Vault-only publication
+        timeout-minutes: 50
+        run: ./bin/test.sh tests/Stress/Integration/FilesystemDirectoryPr2StressTest.php --compact --colors=never
+
+      - name: Remove private fixture configuration
+        if: always()
+        run: rm -f tmp/transaction-projection-admin.json
+
+      - name: Ensure quality checks did not modify tracked files
+        if: always()
+        run: git diff --exit-code

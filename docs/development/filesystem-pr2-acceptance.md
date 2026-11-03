@@ -1,12 +1,11 @@
 # PR 2 acceptance contracts: bounded directory runs
 
-These tests describe **the next missing behaviour**, not an existing working feature.
+These contracts are implemented in the PR 2 draft; see [decisions and evidence](../filesystem-pr2-decisions.md).
 PR 1 already handles one authentic source-independent file. PR 2 must preserve
 **each** file in a directory through a distinct durable acquisition Job, without
 rebuilding the established discovery, Catalogue, OCFL or Broadcast machinery.
 
-The tests are intentionally red against merged PR 1, and must not be merged alone
-as if they were an implemented feature. Do not weaken the independent physical
+The tests were demonstrated red against merged PR 1, then green through the real application. The tests-only #88 branch remains a contract, not a standalone implemented feature. Do not weaken the independent physical
 checks or make the success receipts authoritative.
 
 ## Routine acceptance (small)
@@ -99,8 +98,8 @@ making it pass through a mock, direct file copy or private SQL completion writes
   `configuration_proof` database created by the existing fixture and are
   removed afterward. No live database, external filesystem or private key is
   accessed.
-- No claim is made that the suite currently passes, or that `composer qa`
-  was run in Lerd while preparing this tests-only PR.
+- While authoring tests-only #88, the suite and full Lerd QA had not been run.
+  The implementation now records actual passing results in its decisions note.
 
 ## Implementation review of the proposed seam
 
@@ -114,3 +113,8 @@ receipt explanation is clarified accordingly. No behavioural assertion is remove
 The cursor crash proof additionally requires an independently committed per-file
 Demand at the barrier, so a transaction that has not really admitted work cannot
 pass as the requested after-admission interruption.
+
+The 101-file stress case also starts two real refill CLI processes before draining
+workers and requires exactly 100 outstanding Assignments. The existing SQL guard
+checks admission throughout. An added empty-run case prevents a scan with no
+saved observations yet from prematurely reporting acquisition completion.

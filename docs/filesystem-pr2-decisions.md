@@ -112,3 +112,35 @@ metadata/history. Broadcast may stage verified bytes before skipping an already
 matching output, and publication remains atomic per file rather than per tree.
 No hostile-writer, power-loss, rename-inference or broader interruption guarantee
 is added here. PR 3 is not started.
+
+## Verification actually performed
+
+All application tests ran through the canonical `./bin/test.sh` in the intended
+Lerd PHP 8.5 environment with generated disposable PostgreSQL databases.
+
+- Before implementation: **3 application contracts failed** at the existing
+  single-file restriction; the independent missing-page control passed.
+- Combined PR 2 small suite and PR 1 round-trip/fencing/upgrade regressions:
+  **10 passed, 2,015 assertions** (before the additional empty-run case).
+- Opt-in full stress suite: **3 passed, 125,588 assertions**, covering 100, 101
+  and 1,000 files. Observed case durations were 68.31 s, 75.27 s and 645.51 s;
+  total 789.17 s. Each case includes unchanged reacquisition, independent OCFL
+  checks, source removal, two Broadcasts and external verification. These local
+  elapsed times are evidence of execution, not throughput targets or benchmarks.
+- Additional 101-file case with two competing refill processes: **1 passed,
+  10,754 assertions**, 162.63 s while full QA was also running. It requires
+  exactly 100 outstanding Jobs before workers drain, then the complete round trip.
+- Deliberately advancing the cursor before failed Worker admission made the
+  existing fault contract fail with: “The persisted cursor skipped a source
+  without a committed per-file Job admission.” The bad change was restored;
+  the same test then passed (**300 assertions**).
+- Final full `lerd composer qa`: **582 passed, 42 existing incomplete contracts,
+  zero failures**, exit 0, **26,709 assertions**, 213.25 s. Formatting/lint passed;
+  analysis reported only the four existing informational notices.
+- The stress workflow YAML parsed successfully. Its separate directory job uses
+  the existing CI PHP/PostgreSQL fixture setup and runs this opt-in suite only
+  after merge, on release or manual dispatch. It has not been remotely dispatched
+  as part of this draft. Routine PR CI still excludes `tests/Stress`.
+
+The 10,000-file workflow step remains the independent fixture self-check; a real
+10,000-Item application run remains PR 5. No merge or PR 3 work is included.
