@@ -29,6 +29,8 @@ test('a bounded directory run preserves every independent Item across 100-file p
             DECLARE outstanding integer;
             BEGIN
                 IF NEW.payload::jsonb ->> 'sourceId' IS NOT NULL THEN
+                    -- Serialize concurrent probes for this run before counting committed Jobs.
+                    PERFORM pg_advisory_xact_lock(hashtext('pr2-outstanding'), hashtext(NEW.payload::jsonb ->> 'runId'));
                     SELECT count(DISTINCT a.uuid) INTO outstanding
                     FROM configuration_proof.operation_demands d
                     JOIN configuration_proof.operation_assignments a ON a.uuid = d.assignment_id
