@@ -41,7 +41,7 @@ final readonly class AssetArchive
         $item = $this->items->objectIdForUri($itemUri);
         self::validatePath($assetKey);
 
-        return $this->vault->urnFromUuid(IdentifierType::Asset, Uuid::v5(
+        return $this->vault->urnFromUuid('asset', Uuid::v5(
             Uuid::fromString(Uuid::NAMESPACE_URL),
             'stashd:asset:' . self::POLICY . ':' . json_encode([$item->toString(), $assetKey], JSON_THROW_ON_ERROR),
         ));

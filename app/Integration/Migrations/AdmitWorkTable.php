@@ -16,7 +16,7 @@ use Tempest\Database\QueryStatements\TextStatement;
 use Tempest\Database\ShouldMigrate;
 
 /**
- * Store canonical Work identities and append actual Attempt history.
+ * Extend the existing Job store without discarding legacy keys or history.
  */
 final class AdmitWorkTable implements MigratesUp, ShouldMigrate
 {
@@ -25,7 +25,7 @@ final class AdmitWorkTable implements MigratesUp, ShouldMigrate
     /**
      * Reserve canonical Work only while active and retain physical Attempts.
      *
-     * Keyed Job admissions retain their permanent idempotency keys.
+     * Legacy example admissions retain their permanent idempotency keys.
      */
     public function up(): QueryStatement
     {

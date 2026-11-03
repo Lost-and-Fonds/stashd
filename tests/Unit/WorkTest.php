@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Operations\Work;
+use Tests\Support\HistoricalOperations\Work;
 
 test('Work rejects identifiers that cannot be canonical database keys', function (string $identifier): void {
     expect(fn () => new Work('discovery', $identifier, 'refresh', 'revision-1'))->toThrow(InvalidArgumentException::class);

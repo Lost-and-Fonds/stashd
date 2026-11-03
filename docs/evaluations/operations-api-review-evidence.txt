@@ -1,0 +1,96 @@
+Operations API/model review verification — 2026-11-01
+Environment: canonical bin/test.sh -> Lerd PHP 8.5, isolated PostgreSQL databases;
+independent PHP processes for concurrency, death, restart and stale-worker probes.
+No production database or deployment was changed.
+
+Focused command:
+STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Unit/IdentifierTest.php tests/Unit/JobRegistryTest.php tests/Feature/Durable/OperationsDepartmentTest.php tests/Acceptance/Operations/WorkAdmissionTest.php --colors=never
+Result: 19 deprecated, 22 passed (226 assertions), 65.43s; exit 0.
+All 41 cases succeeded. Deprecations come from Lerd's devtools collector calling
+ReflectionProperty::setAccessible() on PHP 8.5, not failed safety assertions.
+
+Historical CLI relocation verification:
+STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/Integration/JobsTest.php
+Result: 7 deprecated (191 assertions), 13.14s; exit 0.
+The original assertions run against the preserved historical engine and test-only
+Tempest console discovery, not the new Durable department.
+
+Full command:
+STASHD_TEST_PROCESSES=4 ./bin/test.sh --colors=never
+Result: 35 deprecated, 33 incomplete, 467 passed (24,032 assertions), 159.65s; exit 0.
+No failures. All deprecations report ReflectionProperty::setAccessible() under PHP 8.5.
+502 successful cases in total; the 33 incomplete cases remain explicitly incomplete.
+
+Quality checks through Lerd:
+mago fmt --check: passed.
+mago lint --reporting-format=rich: no errors/warnings; 2 pre-existing early-continue help notices.
+mago analyse: no errors/warnings; 4 help notices (3 archival checks, 1 retained Job registration trust-boundary validation).
+Tests used the canonical wrapper; quality tools ran individually rather than invoking
+Composer qa's direct Pest command outside that wrapper.
+git diff --check: passed.
+
+Negative controls used bin/test.sh with STASHD_TEST_PROCESSES=1 and a single named
+production-backed test per violation. Every mutation was restored in finally.
+Combined baseline: 6 deprecated (38 assertions), 9.20s; exit 0.
+Combined restored: 6 deprecated (38 assertions), 9.23s; exit 0.
+
+Negative control: omitted-outbox
+Exception with message [admission rejected] not thrown.
+Tests:    1 failed (1 assertions); exit nonzero as required.
+
+Negative control: propagated-scheduling-error
+Expecting App\Operations\AssignmentState Enum (Failed, 'failed') not to be App\Operations\AssignmentState Enum #3165 (Failed, 'failed').
+Tests:    1 failed (1 assertions); exit nonzero as required.
+
+Negative control: omitted-final-mutation-check
+Failed asserting that 1 is identical to 0.
+Tests:    1 failed (3 assertions); exit nonzero as required.
+
+Negative control: bypassed-journal-fence
+Failed asserting that two arrays are identical.
+  -Array &0 []
+  +Array &0 [
+  +    9 => Gplanchat\Durable\Event\ActivityTaskFailed Object #3196 (
+Tests:    1 failed (6 assertions); exit nonzero as required.
+
+Negative control: ignored-input-conflict
+Exception [InvalidArgumentException] not thrown.
+Tests:    1 failed (1 assertions); exit nonzero as required.
+
+Negative control: historical-running-status
+Failed asserting that two variables reference the same object.
+  -App\Operations\AssignmentState Enum #3199 (Queued, 'queued')
+  +App\Operations\AssignmentState Enum #3934 (Running, 'running')
+Tests:    1 failed (3 assertions); exit nonzero as required.
+
+Intermediate regression runs identified two refactor mistakes before final verification:
+- 4 historical CLI failures after removing production legacy commands: fixed by
+  test-only historical command discovery, preserving the original assertions.
+- Direct ORM retrieval left a constructor-initialized transient state uninitialized:
+  fixed by a virtual state projection derived from hydrated persisted fields.
+Neither failure was suppressed or marked incomplete.
+
+C02 and C03 remain partial. Historical Messenger baseline success and raw-Durable
+unsafe characterisation success are not counted as new-department safety proofs.
+
+Structural cleanup — 2026-11-01
+Production-backed revocation test: live PHP and PostgreSQL session, pg_advisory_unlock_all(), read-only Queued observation, four rejected domain mutations, fresh successor before stale exit: passed (17 assertions).
+Negative controls: 10 violations detected; all original files restored in finally.
+omitted-outbox: True; fault run exit 1
+propagated-scheduling-error: True; fault run exit 1
+omitted-final-mutation-check: True; fault run exit 1
+bypassed-journal-fence: True; fault run exit 1
+ignored-input-conflict: True; fault run exit 1
+lost-lock-status: True; fault run exit 1
+checkpoint-fence: True; fault run exit 1
+custody-fence: True; fault run exit 1
+reconciliation-fence: True; fault run exit 1
+result-fence: True; fault run exit 1
+baseline: Tests:    6 deprecated (51 assertions)
+restored: Tests:    6 deprecated (51 assertions)
+Focused command: STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Feature/Durable/OperationsDepartmentTest.php tests/Acceptance/Operations/WorkAdmissionTest.php --colors=never
+Tests:    20 deprecated, 6 passed (205 assertions)
+Full canonical QA: Lerd composer qa; exit success.
+mago fmt, mago lint (including fix pass), mago analyse: passed; retained informational archival/registry checks only.
+Tests: 36 deprecated, 33 incomplete, 467 passed (24,052 assertions); 126.39s; 8 processes.
+No failures. PHP 8.5 ReflectionProperty::setAccessible deprecations remain external.

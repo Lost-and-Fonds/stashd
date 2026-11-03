@@ -8,4 +8,5 @@ secured: true
 services:
   - postgres
 workers:
+  - command_bus
   - schedule
