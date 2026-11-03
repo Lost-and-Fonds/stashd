@@ -77,7 +77,7 @@ final readonly class Worker
                     ->update(priority: $assignment->priority, active: $assignment->active, error: $assignment->error)
                     ->where('uuid', (string) $assignment->uuid)
                     ->execute();
-                $this->execution->recover((string) $assignment->uuid);
+                $this->runtime->promote((string) $assignment->uuid);
             }
 
             $uuid = (string) $assignment->uuid;
@@ -148,10 +148,5 @@ final readonly class Worker
         }
 
         return $assignment;
-    }
-
-    public function recover(Identifier $id): int
-    {
-        return $this->execution->recover($id->uuidFor(Assignment::class));
     }
 }

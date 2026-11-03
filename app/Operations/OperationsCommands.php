@@ -23,15 +23,6 @@ final readonly class OperationsCommands
         $this->console->writeRaw(json_encode($this->worker->status(Identifier::parse($assignment, Assignment::class)), JSON_THROW_ON_ERROR) . PHP_EOL);
     }
 
-    /**
-     * Recover an undelivered, never-started activity from the existing Durable journal.
-     */
-    #[ConsoleCommand('operations:recover')]
-    public function recover(string $assignment): void
-    {
-        $this->console->success('Reissued ' . $this->worker->recover(Identifier::parse($assignment, Assignment::class)) . ' pending activity deliveries.');
-    }
-
     #[ConsoleCommand('operations:work')]
     public function work(bool $once = false, ?int $limit = null, ?string $receiver = null): void
     {

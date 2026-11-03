@@ -13,14 +13,10 @@ use App\Operations\Models\Attempt;
 use App\Operations\Models\Demand;
 use App\Operations\Persistence\AdmissionLock;
 use DateTimeImmutable;
-use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\ExecutionId;
-use Gplanchat\Durable\Store\ActivityEventJournal;
-use Gplanchat\Durable\Transport\ActivityMessage;
 use InvalidArgumentException;
 use RuntimeException;
-use Symfony\Component\Messenger\Envelope;
 use Tempest\Container\Container;
 use Tempest\Container\Singleton;
 use Tempest\Reflection\ClassReflector;
@@ -43,49 +39,6 @@ final readonly class AssignmentExecution
         private Container $container,
         private PublicationAuthority $authority,
     ) {}
-
-    /**
-     * Reissue journalled schedules that never started, without replaying side effects.
-     *
-     * Duplicate invitations are safe through Durable's claim and settled guards.
-     * This deliberately does not retry failed or already-started activities.
-     */
-    public function recover(string $id): int
-    {
-        /** @var Assignment|null $record */
-        $record = query(Assignment::class)->select()->where('uuid', $id)->first();
-        if ($record === null || ! $record->active) {
-            return 0;
-        }
-
-        $execution = ExecutionId::fromString($id);
-        $count = 0;
-        foreach ($this->runtime->events->readStream($execution) as $event) {
-            if (
-                ! $event instanceof ActivityScheduled
-                || ActivityEventJournal::hasActivityTaskStartedForAttempt($this->runtime->events, $id, $event->activityId(), 1)
-                || ActivityEventJournal::hasTerminalOutcomeForActivity($this->runtime->events, $id, $event->activityId())
-            ) {
-                continue;
-            }
-
-            $message = ActivityMessage::fromWireMetadata(
-                $id,
-                $event->activityId(),
-                $event->activityName(),
-                $event->payload()['payload'],
-                $event->metadata(),
-            );
-            /** @var Assignment|null $record */
-            $record = query(Assignment::class)->select()->where('uuid', $id)->first();
-            ($record?->priority === Priority::Interactive ? $this->runtime->interactive : $this->runtime->activityQueue)->send(
-                new Envelope($message),
-            );
-            $count++;
-        }
-
-        return $count;
-    }
 
     /**
      * Initialize upstream metadata after the admission transaction has committed.

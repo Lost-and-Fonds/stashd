@@ -8,19 +8,13 @@ use App\Operations\Assignment;
 use App\Operations\Priority;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use LogicException;
-use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\Exception\TransportException;
 use Symfony\Component\Messenger\Transport\Sender\SenderInterface;
 
 use function Tempest\Database\query;
 
 /**
- * Route departmental activities by admitted priority and retain recoverable scheduling.
- *
- * Durable has already journalled ActivityScheduled before calling this sender.
- * For an infrastructure enqueue error, keep that unresolved event resumable;
- * the recovery command reissues only activities that have never started.
+ * Route departmental activities by admitted priority.
  */
 final readonly class ActivityDelivery implements SenderInterface
 {
@@ -30,11 +24,10 @@ final readonly class ActivityDelivery implements SenderInterface
     public function __construct(
         private SenderInterface $routine,
         private SenderInterface $interactive,
-        private LoggerInterface $logger,
     ) {}
 
     /**
-     * Report a failed physical send without turning it into domain workflow failure.
+     * Preserve native send failures so Durable decides the workflow outcome.
      */
     public function send(Envelope $envelope): Envelope
     {
@@ -46,16 +39,7 @@ final readonly class ActivityDelivery implements SenderInterface
         /** @var Assignment|null $record */
         $record = isset($message->payload['assignment']) ? query(Assignment::class)->select()->where('uuid', $message->payload['assignment'])->first() : null;
         $sender = $record?->priority === Priority::Interactive ? $this->interactive : $this->routine;
-        try {
-            return $sender->send($envelope);
-        } catch (TransportException $failure) {
-            if ($message->attempt !== 1) {
-                throw $failure;
-            }
 
-            $this->logger->error('Activity enqueue failed; its journalled schedule requires operations:recover.', ['execution' => $message->executionId, 'exception' => $failure]);
-
-            return $envelope;
-        }
+        return $sender->send($envelope);
     }
 }

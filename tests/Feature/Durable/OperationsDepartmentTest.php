@@ -117,29 +117,25 @@ test('eight independent admissions overlap and survive a fresh worker restart', 
     }
 });
 
-test('enqueue rejection keeps a resumable schedule and recovers without replaying effects', function (): void {
-    $a = $this->worker->do(new DepartmentJob('schedule'));
+test('initial activity enqueue rejection follows the native Durable failure outcome', function (): void {
+    $assignment = $this->worker->do(new DepartmentJob('native-enqueue-rejection'));
     $this->department->runtime->drain('outbox');
     $this->department->runtime->drain('activities');
     $db = $this->department->connections->application;
     $db->executeStatement(
-        "CREATE FUNCTION reject_activity() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.queue_name = 'durable_activities' THEN RAISE EXCEPTION 'schedule rejected'; END IF; RETURN NEW; END $$",
+        "CREATE FUNCTION reject_activity() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.queue_name = 'durable_activities' THEN RAISE EXCEPTION 'native enqueue rejected'; END IF; RETURN NEW; END $$",
     );
     $db->executeStatement('CREATE TRIGGER reject_activity BEFORE INSERT ON messenger_messages FOR EACH ROW EXECUTE FUNCTION reject_activity()');
-    $this->department->runtime->drain();
-    expect($this->worker->status($a->id)->state)->not->toBe(AssignmentState::Failed);
-    expect($db->fetchOne('SELECT count(*) FROM effects'))->toBe(0);
-    $events = iterator_to_array($this->department->runtime->events->readStream(Gplanchat\Durable\ExecutionId::fromString($a->id->uuidFor(Assignment::class))));
-    expect(array_filter($events, fn ($event) => $event instanceof Gplanchat\Durable\Event\WorkflowExecutionFailed))->toBe([]);
-    expect(array_filter($events, fn ($event) => $event instanceof Gplanchat\Durable\Event\ActivityScheduled))->toHaveCount(1);
-    $db->executeStatement('DROP TRIGGER reject_activity ON messenger_messages');
-    expect($this->worker->recover($a->id))->toBe(1);
-    expect($this->worker->recover($a->id))->toBe(1); // Repeated operator recovery is harmless.
-    $result = department_process($this->department)->wait();
-    expect($result->exitCode)->toBe(0, $result->errorOutput);
-    expect($this->worker->status($a->id)->state)->toBe(AssignmentState::Completed);
-    expect($db->fetchFirstColumn('SELECT value FROM effects'))->toBe(['schedule:refresh:one']);
-    expect($this->worker->recover($a->id))->toBe(0);
+    try {
+        $this->department->runtime->drain();
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Failed);
+        expect($this->worker->status($assignment->id)->error)->toContain('native enqueue rejected');
+        expect($db->fetchOne('SELECT count(*) FROM effects'))->toBe(0);
+        expect($db->fetchOne('SELECT count(*) FROM operation_attempts'))->toBe(0);
+    } finally {
+        $db->executeStatement('DROP TRIGGER reject_activity ON messenger_messages');
+        $db->executeStatement('DROP FUNCTION reject_activity()');
+    }
 });
 
 test('promotion after workflow scheduling moves pending activity execution ahead of routine work', function (): void {
@@ -155,6 +151,36 @@ test('promotion after workflow scheduling moves pending activity execution ahead
         'older-activity:refresh:one',
     ]);
     expect($this->worker->status($a->id)->state)->toBe(AssignmentState::Completed);
+});
+
+test('promotion retains a delayed delivery and never bypasses its native due time', function (): void {
+    $assignment = $this->worker->do(new DepartmentJob('delayed-promotion'));
+    $runtime = $this->department->runtime;
+    $runtime->drain('outbox');
+    $runtime->drain('activities');
+    $runtime->drain('resumes');
+    $db = $this->department->connections->application;
+    $db->executeStatement("UPDATE messenger_messages SET available_at = NOW() + INTERVAL '1 hour' WHERE queue_name = 'durable_activities'");
+    $before = $db->fetchAssociative("SELECT * FROM messenger_messages WHERE queue_name = 'durable_activities'");
+    expect($before)->not->toBeFalse();
+
+    expect(fn () => $this->worker->do(new DepartmentJob('delayed-promotion', custodyPath: '/conflicting'), Priority::Interactive))
+        ->toThrow(InvalidArgumentException::class);
+    expect($db->fetchAssociative('SELECT * FROM messenger_messages WHERE id = ?', [$before['id']]))->toBe($before);
+    expect($this->worker->status($assignment->id)->priority)->toBe(Priority::Routine);
+
+    $this->worker->do(new DepartmentJob('delayed-promotion'), Priority::Interactive);
+    $runtime->drain();
+    expect($db->fetchOne('SELECT count(*) FROM effects'))->toBe(0);
+    expect($db->fetchAssociative('SELECT * FROM messenger_messages WHERE id = ?', [$before['id']]))->toBe([
+        ...$before,
+        'queue_name' => 'operations_interactive',
+    ]);
+    expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Queued);
+    $db->executeStatement("UPDATE messenger_messages SET available_at = NOW() - INTERVAL '1 second' WHERE id = ?", [$before['id']]);
+    $runtime->drain();
+    expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
+    expect($db->fetchFirstColumn('SELECT value FROM effects'))->toBe(['delayed-promotion:refresh:one']);
 });
 
 /**
@@ -195,7 +221,7 @@ test('a stale living handler cannot publish a result or journal completion after
     $a = department_process($this->department, ['handlerBarrier' => $path]);
     try {
         $owner = department_barrier($path, $a);
-        expect($this->department->admin->query('SELECT pg_terminate_backend(' . (int) $owner['pid'] . ')')->fetchColumn())->toBeTrue();
+        expect($this->department->admin->query('SELECT pg_terminate_backend(' . (int) $owner['pid'] . ', 5000)')->fetchColumn())->toBeTrue();
         expect($a->running)->toBeTrue();
         expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Queued);
         department_redeliver($this->department);
@@ -215,8 +241,9 @@ test('a stale living handler cannot publish a result or journal completion after
             $a->signal(9)->wait();
         }
 
-        @unlink($path);
-        @unlink($path . '.release');
+        foreach (glob($path . '*') as $file) {
+            unlink($file);
+        }
     }
 });
 
@@ -232,7 +259,7 @@ test('authority loss during the protected mutation rolls back its write before r
     try {
         $owner = department_barrier($path, $a);
         expect($this->department->connections->application->fetchOne('SELECT count(*) FROM effects'))->toBe(0);
-        $this->department->admin->query('SELECT pg_terminate_backend(' . (int) $owner['pid'] . ')');
+        expect($this->department->admin->query('SELECT pg_terminate_backend(' . (int) $owner['pid'] . ', 5000)')->fetchColumn())->toBeTrue();
         file_put_contents($path . '.release', 'go');
         $a->wait();
         expect($this->department->connections->application->fetchOne('SELECT count(*) FROM effects'))->toBe(0);
@@ -246,8 +273,9 @@ test('authority loss during the protected mutation rolls back its write before r
             $a->signal(9)->wait();
         }
 
-        @unlink($path);
-        @unlink($path . '.release');
+        foreach (glob($path . '*') as $file) {
+            unlink($file);
+        }
     }
 });
 
@@ -262,7 +290,7 @@ test('a late stale handler failure cannot consume Durable retry budget or change
     $a = department_process($this->department, ['handlerBarrier' => $path, 'fail' => true]);
     try {
         $owner = department_barrier($path, $a);
-        $this->department->admin->query('SELECT pg_terminate_backend(' . (int) $owner['pid'] . ')');
+        expect($this->department->admin->query('SELECT pg_terminate_backend(' . (int) $owner['pid'] . ', 5000)')->fetchColumn())->toBeTrue();
         department_redeliver($this->department);
         $b = department_process($this->department)->wait();
         expect($b->exitCode)->toBe(0, $b->errorOutput);
@@ -281,8 +309,9 @@ test('a late stale handler failure cannot consume Durable retry budget or change
             $a->signal(9)->wait();
         }
 
-        @unlink($path);
-        @unlink($path . '.release');
+        foreach (glob($path . '*') as $file) {
+            unlink($file);
+        }
     }
 });
 
@@ -323,8 +352,10 @@ test('acknowledged custody survives worker death and a successor verifies it bef
             $a->signal(9)->wait();
         }
 
-        @unlink($path);
-        @unlink($path . '.release');
+        foreach (glob($path . '*') as $file) {
+            unlink($file);
+        }
+
         @unlink($bytes);
     }
 });
@@ -377,8 +408,10 @@ test('changed custody bytes cannot be adopted by the recovering worker', functio
             $a->signal(9)->wait();
         }
 
-        @unlink($path);
-        @unlink($path . '.release');
+        foreach (glob($path . '*') as $file) {
+            unlink($file);
+        }
+
         @unlink($bytes);
     }
 });
@@ -476,8 +509,9 @@ test('an observation arriving during execution remains durable and runs after th
             $a->signal(9)->wait();
         }
 
-        @unlink($path);
-        @unlink($path . '.release');
+        foreach (glob($path . '*') as $file) {
+            unlink($file);
+        }
     }
 });
 
@@ -509,8 +543,9 @@ test('native redelivery cannot start another domain Attempt while the healthy wo
             $a->signal(9)->wait();
         }
 
-        @unlink($path);
-        @unlink($path . '.release');
+        foreach (glob($path . '*') as $file) {
+            unlink($file);
+        }
     }
 });
 

@@ -9,7 +9,6 @@ use App\Operations\Authority\PublicationAuthority;
 use App\Operations\Authority\SessionActivityClaims;
 use InvalidArgumentException;
 use PDO;
-use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\PostgreSqlStore;
 use Tempest\Container\Container;
@@ -45,7 +44,6 @@ final class DurableRuntimeInitializer implements Initializer
             fn ($routine, $interactive) => new ActivityDelivery(
                 $routine,
                 $interactive,
-                $container->get(LoggerInterface::class),
             ),
             $container->get(PublicationAuthority::class),
             $container->get(SessionActivityClaims::class),

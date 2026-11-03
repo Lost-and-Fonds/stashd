@@ -81,7 +81,7 @@ final class DurableRuntime
      */
     public function __construct(
         Connection $journal,
-        Connection $application,
+        private Connection $application,
         LockFactory $locks,
         int $visibilitySeconds = 1,
         ?Closure $activitySender = null,
@@ -174,6 +174,26 @@ final class DurableRuntime
     public function admit(StartAssignment $message, Priority $priority): void
     {
         $this->bus->dispatch(new Envelope($message, [new TransportNamesStamp([$priority === Priority::Interactive ? 'interactive' : 'admissions'])]));
+    }
+
+    /**
+     * Move existing unclaimed deliveries without changing their retry identity or due time.
+     * Called inside admission's transaction; claimed deliveries remain with their consumer.
+     */
+    public function promote(string $assignment): void
+    {
+        // shortcut: scan pending routine deliveries for v1; index routing identity if queue volume warrants it.
+        foreach ($this->application->iterateColumn("SELECT id FROM messenger_messages WHERE queue_name = 'durable_activities' AND delivered_at IS NULL") as $id) {
+            $message = $this->activityQueue->find($id)?->getMessage();
+            if (! $message instanceof ActivityMessage || $message->executionId !== $assignment) {
+                continue;
+            }
+
+            $this->application->executeStatement(
+                "UPDATE messenger_messages SET queue_name = 'operations_interactive' WHERE id = ? AND queue_name = 'durable_activities' AND delivered_at IS NULL",
+                [$id],
+            );
+        }
     }
 
     /**
