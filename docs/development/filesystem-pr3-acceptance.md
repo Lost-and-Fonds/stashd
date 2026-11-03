@@ -1,10 +1,10 @@
 # PR 3 acceptance: filesystem mutation and historical reconstruction
 
-**Status: routine acceptance verified against the existing implementation.**
+**Status: routine and full mutation acceptance verified against the existing implementation.**
 [PR #87](https://github.com/Lost-and-Fonds/stashd/pull/87) and
 [PR #89](https://github.com/Lost-and-Fonds/stashd/pull/89) are merged into `dev`.
-The substantive PR 3 tests pass without production changes; see the observed
-results below. The 400-file mutation run remains opt-in and has not been run.
+The substantive PR 3 tests and full 400-file mutation workload pass without
+production changes; see the observed results below. The stress test remains opt-in.
 
 The authoritative requirements are
 [the five-PR plan](../plans/filesystem-round-trip.md) and the
@@ -111,8 +111,8 @@ STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/Integration/FilesystemMut
 STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Stress/Integration/FilesystemMutationPr3StressTest.php
 ```
 
-Only after the full mutation run is proven should the opt-in stress suite be
-integrated into the post-merge/release workflow.
+The full mutation run is now proven locally; it remains opt-in. This review
+follow-up does not change the post-merge/release workflow.
 The 10,000-file application stress run remains PR 5. Do not infer throughput
 from this acceptance contract.
 
@@ -133,15 +133,15 @@ from this acceptance contract.
 - The 11 fast Python Microtext regressions, including three mutation-oracle tests,
   passed in [GitHub CI run 41595049598](https://github.com/Lost-and-Fonds/stashd/actions/runs/41595049598).
   That run stopped at Mago formatting (one PHP file), before PHP syntax,
-  static analysis or Pest. Local validation below closes those routine gates,
-  not the optional stress or later PR 4/5 gates.
+  static analysis or Pest. Local validation below closes the routine and full
+  PR 3 mutation gates, not the later PR 4/5 gates.
 
 ## Observed PR 3 validation
 
 Branch `feat/filesystem-pr3-mutations-history` starts from the reviewed #91
 contracts (`4131ba4`). Its production code, Composer files and PHPUnit suites
 match merged `dev` (`39da695`). Only Mago formatting of `Pr3Mutation.php` and
-this validation record were needed beyond those acceptance contracts.
+validation/plan documentation were needed beyond those acceptance contracts.
 
 ### Failure classification
 
@@ -214,7 +214,43 @@ fixture-named databases without active sessions or retained descriptors linking
 them to this worktree. Their ownership could not be established safely, so they
 were left untouched rather than deleting potentially unrelated fixtures.
 
+### Review follow-up: full mutation workload and CI
+
+[CI run #59](https://github.com/Lost-and-Fonds/stashd/actions/runs/41739433866)
+completed **green** on `017594e`, including Python, formatting, lint, analysis
+and the complete Pest suite. This confirms the run named in the #92 review;
+it is not a claim about a later documentation-only commit's CI run.
+
+The review explicitly requested the remaining opt-in workload:
+
+```sh
+STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Stress/Integration/FilesystemMutationPr3StressTest.php --colors=never
+```
+
+Result on the unchanged `017594e` PHP/tests in Lerd PHP 8.5/PostgreSQL:
+**1 passed, 57,329 assertions, exit 0, 270.63 seconds**. No failure or production
+change was needed. This proves the 400-file baseline with 100 additions,
+200 same-path modifications, 50 unchanged-byte renames and 30 removals:
+
+- Exactly **470** live sources after mutation and **550** preserved Items.
+- Stable original Item/Asset identities with retained v1 and exactly **200**
+  matching v2 histories; renamed paths have distinct Items and old paths survive.
+- Frozen exact Item revisions and matching physical Asset pins, independently
+  checked against native OCFL inventories and payload hashes.
+- Both the **400-Item historical** and **550-Item current** outputs published
+  after source deletion and accepted by their separate external manifest oracles.
+
+The private administrator config created for this run was removed, and Lerd
+capture was restored to enabled. Before/after SQL inspection showed exactly the
+same two previously observed, unattributed fixture-named databases, with no active
+sessions; the stress run left no additional fixture database or role. They remain untouched.
+The stress test still lives outside `phpunit.xml`'s routine suites.
+
+The [plan](../plans/filesystem-round-trip.md) now records merged PR 2 and validated
+PR 3. Keep #92 draft for merge review. After #92 is merged, close superseded
+tests-only draft #91 rather than merging both; no merge or closure was performed.
+
 No new queue, history store, coordinator, migrations, runtime dependencies or
-public API were added. No throughput, 400-file, PR 4 recovery-matrix or PR 5
-10,000-Item result is claimed. Existing incomplete tests and informational
-analysis notices remain visible rather than being suppressed.
+public API were added. No throughput, PR 4 recovery-matrix or PR 5 10,000-Item
+result is claimed. Existing incomplete tests and informational analysis notices
+remain visible rather than being suppressed.
