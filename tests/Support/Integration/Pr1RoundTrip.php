@@ -35,9 +35,12 @@ final class Pr1RoundTrip
         $manifest = $archive->path('reference-manifest.json');
         self::python([
             'generate',
-            '--directory', $source,
-            '--manifest', $manifest,
-            '--count', '1',
+            '--directory',
+            $source,
+            '--manifest',
+            $manifest,
+            '--count',
+            '1',
         ]);
         /** @var array{entries: list<array{path: string, sha256: string, bytes: int}>} $decoded */
         $decoded = json_decode((string) file_get_contents($manifest), true, flags: JSON_THROW_ON_ERROR);
@@ -93,6 +96,7 @@ final class Pr1RoundTrip
             if (($status['state'] ?? null) === 'completed') {
                 return $status;
             }
+
             Assert::assertNotSame('failed', $status['state'] ?? null, json_encode($status, JSON_THROW_ON_ERROR));
             usleep(150_000);
         } while (microtime(true) < $deadline);

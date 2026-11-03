@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Integration;
 
+use App\Catalogue\Item;
+use App\Catalogue\ItemSource;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
 use Tempest\Database\Query;
@@ -31,9 +33,14 @@ final readonly class AcquisitionStore
     public function associate(string $input, string $source, string $uri): void
     {
         $database = $this->database->connect();
-        $database->execute(
-            new Query('INSERT INTO acquisition_sources (input_id, source_id, item_uri) VALUES (?, ?, ?) ON CONFLICT (input_id, source_id) DO NOTHING', [$input, $source, $uri]),
-        );
+        if (Item::select()->where('uri', $uri)->first() === null) {
+            new Item($uri)->insert();
+        }
+
+        if (ItemSource::select()->where('input_id', $input)->where('source_id', $source)->first() === null) {
+            new ItemSource($input, $source, $uri)->insert();
+        }
+
         $saved = $database->fetchFirst(query('acquisition_sources')->select('item_uri')->where('input_id', $input)->where('source_id', $source));
         if (($saved['item_uri'] ?? null) !== $uri) {
             throw new RuntimeException('Operational source association contradicts canonical provenance.');

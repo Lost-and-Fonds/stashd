@@ -38,9 +38,12 @@ test('one Microtext Item travels through Stash, real Operations, the Vault and s
         expect(Pr1RoundTrip::verify($corpus['manifest'], $corpus['source']))->toBe(0);
         $scope = Pr1RoundTrip::discover($archive, $descriptor, $corpus['source']);
         $discovery = Pr1RoundTrip::command($archive, $descriptor, ['input:discovery', $scope['run']]);
-        expect($discovery['status'])->toBe('finished')
-            ->and($discovery['coverage']['kind'])->toBe('exhaustive')
-            ->and($discovery['discovered_count'])->toBe(1);
+        expect($discovery['status'])
+            ->toBe('finished')
+            ->and($discovery['coverage']['kind'])
+            ->toBe('exhaustive')
+            ->and($discovery['discovered_count'])
+            ->toBe(1);
 
         // A repeated active request must coalesce without inventing another execution.
         $assignment = Pr1RoundTrip::acquire($archive, $descriptor, $scope['run']);
@@ -50,8 +53,7 @@ test('one Microtext Item travels through Stash, real Operations, the Vault and s
         $item = Pr1RoundTrip::preserved($archive, $scope['item']['object_id'], $corpus['bytes']);
         expect($item['item']['uri'])->toBe($scope['item']['uri']);
         $membership = Pr1RoundTrip::command($archive, $descriptor, ['stash:items', $scope['stash']]);
-        expect($membership['items'])->toHaveCount(1)
-            ->and($membership['items'][0]['uri'])->toBe($scope['item']['uri']);
+        expect($membership['items'])->toHaveCount(1)->and($membership['items'][0]['uri'])->toBe($scope['item']['uri']);
 
         // Remove A *before* asking the application to select and publish from Vault.
         $archive->destroy('inputs');
@@ -68,6 +70,7 @@ test('one Microtext Item travels through Stash, real Operations, the Vault and s
         } catch (AssertionFailedError $failure) {
             $caught = true;
         }
+
         expect($caught)->toBeTrue('Physical corruption must be detected independently of completed Job state.');
     });
 });
@@ -83,15 +86,15 @@ test('killing the real worker after Vault commit but before result acceptance re
         // canonical Vault bytes exist but before Operations accepts the Result.
         $baseline = (int) $database->query('SELECT count(*) FROM configuration_proof.operation_results')->fetchColumn();
         $database->exec(<<<'SQL'
-CREATE FUNCTION configuration_proof.pr1_pause_result() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-    PERFORM pg_advisory_xact_lock(7185, 85);
-    RETURN NEW;
-END
-$$;
-CREATE TRIGGER pr1_pause_result BEFORE INSERT ON configuration_proof.operation_results
-FOR EACH ROW EXECUTE FUNCTION configuration_proof.pr1_pause_result();
-SQL);
+        CREATE FUNCTION configuration_proof.pr1_pause_result() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            PERFORM pg_advisory_xact_lock(7185, 85);
+            RETURN NEW;
+        END
+        $$;
+        CREATE TRIGGER pr1_pause_result BEFORE INSERT ON configuration_proof.operation_results
+        FOR EACH ROW EXECUTE FUNCTION configuration_proof.pr1_pause_result();
+        SQL);
         $database->query('SELECT pg_advisory_lock(7185, 85)');
         $child = start_configuration_cli($archive, $descriptor, ['operations:work', '--once']);
         $atBoundary = false;
@@ -100,10 +103,12 @@ SQL);
         try {
             $deadline = microtime(true) + 15;
             do {
-                $waiting = (int) $database->query(
-                    "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND classid = 7185 AND objid = 85
+                $waiting = (int) $database
+                    ->query(
+                        "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND classid = 7185 AND objid = 85
                     AND NOT granted AND database = (SELECT oid FROM pg_database WHERE datname = current_database())",
-                )->fetchColumn();
+                    )
+                    ->fetchColumn();
                 if ($waiting === 1) {
                     $atBoundary = true;
                     break;
@@ -126,6 +131,7 @@ SQL);
             if ($running) {
                 proc_terminate($child['process'], 9);
             }
+
             finish_configuration_cli($child);
             $database->query('SELECT pg_advisory_unlock(7185, 85)');
             $database->exec('DROP TRIGGER IF EXISTS pr1_pause_result ON configuration_proof.operation_results');

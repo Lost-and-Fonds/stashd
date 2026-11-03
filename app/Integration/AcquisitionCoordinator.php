@@ -104,6 +104,33 @@ final readonly class AcquisitionCoordinator
     }
 
     /**
+     * Catalogue the single saved observation using acquisition's existing identity and recovery rules.
+     * Hold the Input lock while restoring source claims and allocating the reusable attempt.
+     */
+    public function catalogue(string $runId): array
+    {
+        $run = $this->discovery->read($runId);
+        $this->discovery->lock($run['input_id']);
+        try {
+            $this->reassociate($run['input_id']);
+            $page = $this->discovery->items($runId, '', 2);
+            assert(is_array($page['items']), 'Discovery returns a page of saved observations.');
+            if (count($page['items']) > 1 || $page['next'] !== null) {
+                throw new RuntimeException('Operations PR 1 supports a single discovered file per run.');
+            }
+
+            foreach ($page['items'] as $item) {
+                assert(is_array($item), 'Each saved observation is a discovery record.');
+                $this->store->start($runId, $run['input_id'], $item['id']);
+            }
+
+            return $run;
+        } finally {
+            $this->discovery->unlock($run['input_id']);
+        }
+    }
+
+    /**
      * Inspect one bounded attempt page even when the original source is unavailable.
      */
     public function read(string $run, string $after = ''): array

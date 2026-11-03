@@ -21,7 +21,7 @@ final readonly class DiscoveryCommands
     /**
      * Start or resume an Input's scan and print its saved status and completeness result.
      */
-    #[ConsoleCommand(name: 'input:discover', description: 'Recursively discover a configured Input, resuming its unfinished run after interruption.')]
+    #[ConsoleCommand(name: 'input:scan', description: 'Recursively discover a configured Input, resuming its unfinished run after interruption.')]
     public function discover(string $inputId): void
     {
         $this->console->writeRaw(json_encode($this->discovery->discover($inputId), JSON_THROW_ON_ERROR) . PHP_EOL);

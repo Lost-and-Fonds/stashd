@@ -38,8 +38,8 @@ test('Broadcast freezes exact revisions and grants only invocation-scoped verifi
         configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
         configuration_cli($archive, $descriptor, ['vault:init']);
         $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', dirname($source)]));
-        $discovery = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
-        configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $discovery['id']]));
+        $discovery = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
+        configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $discovery['id']]));
         $attempt = configuration_result(configuration_cli($archive, $descriptor, ['input:acquisitions', $discovery['id']]))['items'][0];
         $item = json_decode($attempt['result'], true, flags: JSON_THROW_ON_ERROR)['item']['object_id'];
         $broadcast = configuration_result(configuration_cli($archive, $descriptor, ['broadcast:create', 'filesystem', $archive->path('output')]));
@@ -47,8 +47,8 @@ test('Broadcast freezes exact revisions and grants only invocation-scoped verifi
         file_put_contents($selection, json_encode(['item_id' => $item, 'version' => 'v1']) . "\n");
         $run = configuration_result(configuration_cli($archive, $descriptor, ['broadcast:select', $broadcast['id'], $selection]))['id'];
         file_put_contents($source, 'new bytes');
-        $discovery = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
-        configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $discovery['id']]));
+        $discovery = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
+        configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $discovery['id']]));
         $archive->destroy('inputs');
         $result = configuration_result(broadcast_probe($archive, $descriptor, $run, 'duplicate'));
         expect($result['bytes'])->toBe([base64_encode("old\0bytes")]);
@@ -69,8 +69,8 @@ test('Broadcast discards failed reports and retries the frozen selection with fr
         configuration_cli($archive, $descriptor, ['vault:init']);
         configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
         $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', dirname($source)]));
-        $discovery = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
-        configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $discovery['id']]));
+        $discovery = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
+        configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $discovery['id']]));
         $attempt = configuration_result(configuration_cli($archive, $descriptor, ['input:acquisitions', $discovery['id']]))['items'][0];
         $item = json_decode($attempt['result'], true, flags: JSON_THROW_ON_ERROR)['item']['object_id'];
         $broadcast = configuration_result(configuration_cli($archive, $descriptor, ['broadcast:create', 'filesystem', $archive->path('output')]));
