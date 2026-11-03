@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Operations\Assignment;
 use App\Operations\AssignmentState;
 use App\Operations\Priority;
 use App\Operations\Worker;
@@ -22,7 +21,9 @@ beforeEach(function (): void {
 });
 
 afterEach(function (): void {
-    $this->department->dispose();
+    if (isset($this->department)) {
+        $this->department->dispose();
+    }
 });
 
 test('C02: equivalent admission retains one Assignment and executes one effect', function (): void {
@@ -57,7 +58,10 @@ test('C02: new observations coalesce while retaining distinct immutable demand',
     $this->department->runtime->drain();
 
     expect($this->worker->status($first->id)->state)->toBe(AssignmentState::Completed);
-    expect((int) $db->fetchOne('SELECT count(*) FROM effects'))->toBe(2);
+    expect($db->fetchFirstColumn('SELECT value FROM effects'))->toEqualCanonicalizing([
+        'c02-observations:refresh:revision-one',
+        'c02-observations:refresh:revision-two',
+    ]);
 });
 
 test('C02: the same observation cannot be reused for different retained Job input', function (): void {
@@ -65,13 +69,16 @@ test('C02: the same observation cannot be reused for different retained Job inpu
 
     // The same key and observation with different serialized input is ambiguous.
     // custodyPath is part of the Job payload, not its key or observation.
-    expect(fn () => $this->worker->do(new DepartmentJob('c02-conflict', 'revision-one', 'refresh', '/not-used')))
+    expect(fn () => $this->worker->do(new DepartmentJob('c02-conflict', 'revision-one', 'refresh', '/not-used'), Priority::Interactive))
         ->toThrow(InvalidArgumentException::class);
 
     $db = $this->department->connections->application;
     expect((int) $db->fetchOne('SELECT count(*) FROM operation_assignments'))->toBe(1);
     expect((int) $db->fetchOne('SELECT count(*) FROM operation_demands'))->toBe(1);
-    expect((string) Assignment::get($first->id)->id)->toBe((string) $first->id);
+    expect((string) $this->worker->status($first->id)->id)->toBe((string) $first->id);
+    expect($this->worker->status($first->id)->priority)->toBe(Priority::Routine);
+    $this->department->runtime->drain();
+    expect($db->fetchFirstColumn('SELECT value FROM effects'))->toBe(['c02-conflict:refresh:revision-one']);
 });
 
 test('C02: a terminal Assignment is not silently reused for new work', function (): void {
@@ -82,4 +89,7 @@ test('C02: a terminal Assignment is not silently reused for new work', function 
     $next = $this->worker->do(new DepartmentJob('c02-terminal'));
     expect((string) $next->id)->not->toBe((string) $first->id);
     expect((int) $this->department->connections->application->fetchOne('SELECT count(*) FROM operation_assignments'))->toBe(2);
+    $this->department->runtime->drain();
+    expect($this->worker->status($next->id)->state)->toBe(AssignmentState::Completed);
+    expect((int) $this->department->connections->application->fetchOne('SELECT count(*) FROM effects'))->toBe(2);
 });

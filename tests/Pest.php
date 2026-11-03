@@ -8,7 +8,7 @@ use Tests\TestCase;
 // Acceptance tests receive a disposable workspace. Feature tests do not.
 pest()->extend(TestCase::class)->in('Feature');
 pest()->extend(ArchiveTestCase::class)->in('Acceptance/RecordsAndArchives');
-pest()->extend(OperationsTestCase::class)->in('Acceptance/Operations');
+pest()->extend(OperationsTestCase::class)->in('Acceptance/Operations/WorkAdmissionTest.php');
 pest()->extend(DurableDeliveryTestCase::class)->in('Acceptance/OperationsDelivery');
 
 // Use the production boundary by default; an explicit adapter remains available to independent reviewers.

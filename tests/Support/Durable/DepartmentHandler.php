@@ -88,11 +88,12 @@ final readonly class DepartmentHandler
             return;
         }
 
-        file_put_contents($this->control->barrier, json_encode([
+        file_put_contents($this->control->barrier . '.writing', json_encode([
             'attempt' => $execution->attemptId,
             'demand' => $execution->demandId,
             'pid' => $this->connections->claims->fetchOne('SELECT pg_backend_pid()'),
         ], JSON_THROW_ON_ERROR));
+        rename($this->control->barrier . '.writing', $this->control->barrier);
         $deadline = microtime(true) + 12;
         while (! is_file($this->control->barrier . '.release')) {
             if (microtime(true) > $deadline) {

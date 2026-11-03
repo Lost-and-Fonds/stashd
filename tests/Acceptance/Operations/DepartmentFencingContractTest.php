@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Identity\Identifier;
 use App\Operations\Authority\AuthorityLost;
 use App\Operations\Authority\PublicationAuthority;
 use App\Operations\Authority\SessionActivityClaims;
@@ -28,10 +27,16 @@ afterEach(function (): void {
         ($this->releaseClaim)();
     }
 
-    $this->department->dispose();
+    if (isset($this->department)) {
+        $this->department->dispose();
+    }
 });
 
-/** @return array{\App\Operations\DTO\AssignmentContext, Closure} */
+/**
+ * Establish a real session claim for focused publication-boundary checks.
+ *
+ * @return array{\App\Operations\DTO\AssignmentContext, Closure}
+ */
 function c03_context(DepartmentFixture $fixture): array
 {
     $assignment = $fixture->container->get(Worker::class)->do(new DepartmentJob('c03-fencing'));
@@ -64,25 +69,27 @@ test('C03: protected publication requires the live ownership claim', function ()
         $this->department->container->get(PublicationAuthority::class),
         $context,
         'stale',
-    ))->toThrow(AuthorityLost::class);
+    ))
+        ->toThrow(AuthorityLost::class);
 
     expect((int) $db->fetchOne('SELECT count(*) FROM operation_checkpoints'))->toBe(1);
 });
 
-test('C03: replacing the current Attempt token revokes its predecessor', function (): void {
+test('C03: clearing the current Attempt token revokes publication', function (): void {
     [$context, $this->releaseClaim] = c03_context($this->department);
 
     $db = $this->department->connections->application;
     $demand = $context->demandId->uuidFor(\App\Operations\Models\Demand::class);
 
-    // Simulate a committed takeover of the domain authority row.
+    // Revoke the token directly; independent-process tests prove actual takeover.
     $db->executeStatement('UPDATE operation_demands SET current_attempt = NULL WHERE uuid = ?', [$demand]);
 
     expect(fn () => Checkpoint::record(
         $this->department->container->get(PublicationAuthority::class),
         $context,
         'stale-after-takeover',
-    ))->toThrow(AuthorityLost::class);
+    ))
+        ->toThrow(AuthorityLost::class);
 
     expect((int) $db->fetchOne('SELECT count(*) FROM operation_checkpoints'))->toBe(0);
 });
