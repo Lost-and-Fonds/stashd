@@ -28,6 +28,8 @@ final class OperationsSchema implements MigratesUp, ShouldMigrate
         return new CompoundStatement(
             new CreateTableStatement('operation_assignments')
                 ->primary('uuid', uuid: true)
+                ->datetime('created_at')
+                ->datetime('updated_at')
                 ->text('job_type')
                 ->text('work_key')
                 ->text('priority')
@@ -37,6 +39,8 @@ final class OperationsSchema implements MigratesUp, ShouldMigrate
             new RawStatement('CREATE UNIQUE INDEX operation_active_work ON operation_assignments(job_type, work_key) WHERE active'),
             new CreateTableStatement('operation_demands')
                 ->primary('uuid', uuid: true)
+                ->datetime('created_at')
+                ->datetime('updated_at')
                 ->foreignUuid('assignment_id', 'operation_assignments.uuid')
                 ->text('observation')
                 ->text('observation_key')
@@ -47,6 +51,8 @@ final class OperationsSchema implements MigratesUp, ShouldMigrate
                 ->raw('UNIQUE(assignment_id, observation_key)'),
             new CreateTableStatement('operation_attempts')
                 ->primary('uuid', uuid: true)
+                ->datetime('created_at')
+                ->datetime('updated_at')
                 ->foreignUuid('assignment_id', 'operation_assignments.uuid')
                 ->foreignUuid('demand_id', 'operation_demands.uuid')
                 ->integer('backend_pid')

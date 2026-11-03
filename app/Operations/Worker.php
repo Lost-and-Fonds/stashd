@@ -13,6 +13,7 @@ use App\Operations\Durable\StartAssignment;
 use App\Operations\Models\Attempt;
 use App\Operations\Models\Demand;
 use App\Operations\Persistence\AdmissionLock;
+use DateTimeImmutable;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\ExecutionId;
 use InvalidArgumentException;
@@ -69,12 +70,12 @@ final readonly class Worker
                 $dispatch = true;
                 $id = Identifier::create(Assignment::class);
                 $assignment = new Assignment(new PrimaryKey($id->uuidFor(Assignment::class)), $type, $key, $priority);
-                query($assignment)->insert($assignment)->execute();
+                $assignment->insert();
             } elseif ($priority === Priority::Interactive && $assignment->priority === Priority::Routine) {
                 $dispatch = true;
                 $assignment->priority = $priority;
                 query(Assignment::class)
-                    ->update(priority: $assignment->priority, active: $assignment->active, error: $assignment->error)
+                    ->update(priority: $assignment->priority, active: $assignment->active, error: $assignment->error, updated_at: new DateTimeImmutable())
                     ->where('uuid', (string) $assignment->uuid)
                     ->execute();
                 $this->runtime->promote((string) $assignment->uuid);
@@ -92,7 +93,7 @@ final readonly class Worker
                     $observationKey,
                     $payload,
                 );
-                query($demand)->insert($demand)->execute();
+                $demand->insert();
             } elseif ($existing->observation !== $observation || $existing->payload !== $payload) {
                 throw new InvalidArgumentException('An observation already identifies different Job input.');
             }
@@ -115,6 +116,7 @@ final readonly class Worker
         $uuid = $id->uuidFor(Assignment::class);
         /** @var Assignment $assignment */
         $assignment = query(Assignment::class)->select()->where('uuid', $uuid)->first() ?? throw new InvalidArgumentException('Assignment not found.');
+        $assignment->state = $assignment->active ? AssignmentState::Queued : ($assignment->error === null ? AssignmentState::Completed : AssignmentState::Failed);
         if (! $assignment->active) {
             return $assignment;
         }

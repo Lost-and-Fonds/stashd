@@ -48,7 +48,7 @@ final readonly class PublicationAuthority implements MutationAuthority
             $owner = $this->claims->current ?? throw new AuthorityLost('The claim disappeared.');
             $now = new DateTimeImmutable();
             query(Attempt::class)
-                ->update(outcome: AttemptOutcome::Interrupted, ended_at: $now)
+                ->update(outcome: AttemptOutcome::Interrupted, ended_at: $now, updated_at: $now)
                 ->where('demand_id', $demand)
                 ->where('ended_at IS NULL')
                 ->execute();
@@ -62,9 +62,11 @@ final readonly class PublicationAuthority implements MutationAuthority
                 AttemptOutcome::Running,
                 $now,
             );
+            $attempt->created_at = $now;
+            $attempt->updated_at = $now;
             query($attempt)->insert($attempt)->execute();
             query(Demand::class)
-                ->update(current_attempt: (string) $attempt->uuid)
+                ->update(current_attempt: (string) $attempt->uuid, updated_at: $now)
                 ->where('uuid', $demand)
                 ->execute();
             $this->claims->requireOwned($db);

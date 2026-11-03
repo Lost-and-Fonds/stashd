@@ -97,7 +97,7 @@ final readonly class AssignmentExecution
         } catch (Throwable $error) {
             $this->authority->protect($context, function () use ($context): void {
                 query(Attempt::class)
-                    ->update(outcome: AttemptOutcome::Failed, ended_at: new DateTimeImmutable())
+                    ->update(outcome: AttemptOutcome::Failed, ended_at: new DateTimeImmutable(), updated_at: new DateTimeImmutable())
                     ->where('uuid', $context->attemptId->uuidFor(Attempt::class))
                     ->execute();
             });
@@ -107,14 +107,14 @@ final readonly class AssignmentExecution
         return $this->authority->protect($context, function () use ($input, $record, $assignment, $context): ?string {
             $this->admission->lock($record->job_type, $record->work_key);
             query(Demand::class)
-                ->update(satisfied: true)
+                ->update(satisfied: true, updated_at: new DateTimeImmutable())
                 ->where('uuid', (string) $input->uuid)
                 ->execute();
             /** @var Demand|null $next */
             $next = query(Demand::class)->select()->where('assignment_id', $assignment)->where('satisfied', false)->orderBy('uuid')->first();
             $nextId = $next === null ? null : (string) $next->uuid;
             query(Demand::class)
-                ->update(next_id: $nextId)
+                ->update(next_id: $nextId, updated_at: new DateTimeImmutable())
                 ->where('uuid', (string) $input->uuid)
                 ->execute();
             if ($next === null) {
@@ -122,13 +122,13 @@ final readonly class AssignmentExecution
                 $record = query(Assignment::class)->select()->where('uuid', $assignment)->first() ?? throw new RuntimeException('Assignment disappeared during execution.');
                 $record->active = false;
                 query(Assignment::class)
-                    ->update(priority: $record->priority, active: $record->active, error: $record->error)
+                    ->update(priority: $record->priority, active: $record->active, error: $record->error, updated_at: new DateTimeImmutable())
                     ->where('uuid', (string) $record->uuid)
                     ->execute();
             }
 
             query(Attempt::class)
-                ->update(outcome: AttemptOutcome::Completed, ended_at: new DateTimeImmutable())
+                ->update(outcome: AttemptOutcome::Completed, ended_at: new DateTimeImmutable(), updated_at: new DateTimeImmutable())
                 ->where('uuid', $context->attemptId->uuidFor(Attempt::class))
                 ->execute();
 
@@ -153,7 +153,7 @@ final readonly class AssignmentExecution
             $record->active = false;
             $record->error = $event->failureMessage();
             query(Assignment::class)
-                ->update(priority: $record->priority, active: $record->active, error: $record->error)
+                ->update(priority: $record->priority, active: $record->active, error: $record->error, updated_at: new DateTimeImmutable())
                 ->where('uuid', (string) $record->uuid)
                 ->execute();
         }

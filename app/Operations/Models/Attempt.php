@@ -4,26 +4,25 @@ declare(strict_types=1);
 
 namespace App\Operations\Models;
 
-use App\Identity\Identifier;
 use App\Operations\AttemptOutcome;
+use App\Persistence\Model;
+use App\Persistence\Persistence;
 use DateTimeImmutable;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
-use Tempest\Database\Virtual;
 
 /**
  * Physical handler history and publication ownership; Durable still owns retries.
  */
 #[Table('operation_attempts')]
-final class Attempt
+#[Persistence]
+final class Attempt extends Model
 {
-    #[Virtual]
-    public Identifier $id {
-        get => Identifier::fromUuid(static::class, (string) $this->uuid);
-    }
-
+    /**
+     * Retain session ownership history; PublicationAuthority alone creates and settles episodes.
+     */
     public function __construct(
-        public PrimaryKey $uuid,
+        PrimaryKey $uuid,
         public string $assignment_id,
         public string $demand_id,
         public int $backend_pid,
@@ -32,5 +31,7 @@ final class Attempt
         public AttemptOutcome $outcome,
         public DateTimeImmutable $started_at,
         public ?DateTimeImmutable $ended_at = null,
-    ) {}
+    ) {
+        $this->uuid = $uuid;
+    }
 }
