@@ -150,3 +150,37 @@ The final QA run followed all six negative controls after their changes were
 restored. Source diffs confirmed no intentional breakage remained. Debug capture
 was restored to its original enabled state after verification; the external Lerd
 collector's PHP 8.5 deprecation remains an environment limitation when capture is on.
+
+## Shared Operations models — follow-up
+
+Assignment, Demand and Attempt now inherit identity, typed lookup and persistence
+fields from `App\Persistence\Model`. Existing constructor arguments and the
+Worker submission/status JSON remain unchanged. Assignment and Demand permit
+instance insertion only; instance updates/deletes are forbidden. Attempt instance
+writes are all forbidden: its creation precedes the new execution context and
+must stay inside PublicationAuthority's live-session checks and demand row lock.
+Service-owned conditional and multi-row queries remain explicit and now maintain
+`updated_at`; protected transaction boundaries are unchanged.
+
+Assignment has no state calculation. Only `Worker::status()` populates its virtual
+state. Raw ORM reads expose persisted facts and leave state unset; callers needing
+operational state must use Worker. No extra model machinery was needed.
+
+The fresh Operations schema includes non-null inherited timestamps on all three
+tables. Existing development schemas need a reset; this change supplies no upgrade
+migration for previously installed tables. Lifecycle timestamps such as
+`started_at` and `ended_at` remain distinct from model persistence timestamps.
+
+Follow-up verification: the focused selection passed **65 tests, 574 assertions**,
+including revised C02/C03 (**15 tests, 135 assertions**) and Operations feature
+coverage (**23 tests, 183 assertions**). The new model contract first failed
+against the previous non-Model Assignment. Two temporary negative controls then
+failed at the expected assertions: omitting the final publication fence leaked
+one effect, and omitting the terminal Assignment timestamp update retained an
+outdated `updated_at`. Both changes were restored before full QA.
+
+Follow-up canonical `lerd composer qa` exited **0**: **557 passed, 33 existing
+archive contracts incomplete, 24,574 assertions**, in 235.43 seconds. Formatting
+and lint are clean; analysis retains the same four existing advisory messages.
+There were no remaining test failures. The earlier lint suggestions in the new
+test were corrected to first-class callable syntax before this final run.
