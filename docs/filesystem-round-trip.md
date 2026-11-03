@@ -8,7 +8,7 @@ The lifecycle work follows [issue #28](https://github.com/Lost-and-Fonds/stashd/
 
 ## Stash round trip through Operations
 
-After configuration initialization below, PR 1 supports one discovered file:
+After configuration initialization below, discovery catalogues a directory in bounded pages:
 
 ```sh
 php tempest stash:create "My collection"
@@ -19,10 +19,20 @@ php tempest stash:items <stash UUID>
 php tempest input:acquire <returned run UUID>
 php tempest operations:work --once
 php tempest operations:inspect <returned Assignment URN>
+php tempest input:admission <run UUID>
 ```
 
-Drain again if an Assignment is still queued. Inspect physical Vault evidence as
-well as completed Operations state. Once acquisition completes, the source may
+`input:acquire` refills at most 100 outstanding per-file Assignments. After
+workers settle, repeat it until `input:admission` reports the run complete.
+`first_assignment_id` identifies the first admitted source's current Assignment,
+which can already be completed; it does not identify newly admitted work.
+`assignment_id` is its compatibility alias, not a directory-wide completion flag.
+`outstanding` counts unresolved sources, including terminal failures; do not
+label it “in flight”. The separate `failed` count and status `failed` expose
+terminal failures without reconciling them or starting retries. Admission inspection returns bounded attempt pages with a `next`
+source cursor. An empty finished run has no file Assignment and returns null.
+Inspect physical Vault evidence as well as completed Operations state.
+Once acquisition completes, the source may
 be unavailable before selection and publication:
 
 ```sh
@@ -34,8 +44,9 @@ php tempest broadcast:publication <selection UUID>
 
 Execution commands return `assignment_id`; discovery also returns `run_id`.
 Selection returns `id`. These receipts describe admission, not completion.
-The [PR 1 decisions](filesystem-roundtrip-pr1-decisions.md) explain identity
-migration, replay, the execution CLI transition and remaining limits.
+The [PR 1 decisions](filesystem-roundtrip-pr1-decisions.md) cover identity and
+recovery; [PR 2 decisions](filesystem-pr2-decisions.md) explain bounded refill,
+per-file receipts, transaction boundaries and remaining limits.
 The synchronous commands documented below remain available for diagnostics.
 
 ## Configure through the CLI

@@ -83,18 +83,22 @@ final readonly class Catalogue
     public function discovered(string $runId, AssignmentContext $context): void
     {
         $run = $this->discovery->read($runId);
-        $this->authority->protect($context, function () use ($runId, $run): void {
-            foreach ($this->acquisition->items($runId) as $attempt) {
-                assert(is_array($attempt), 'Acquisition returns saved attempt records.');
-                /**
-                 * @var StashInput $attached
-                 */
-                foreach (StashInput::select()->where('input_id', $run['input_id'])->orderBy('stash_id')->all() as $attached) {
-                    $this->lockStash($attached->stash_id);
-                    $this->link($attached->stash_id, $attempt['item_uri']);
+        $after = '';
+        do {
+            $rows = $this->acquisition->items($runId, $after);
+            $this->authority->protect($context, function () use ($rows, $run): void {
+                foreach ($rows as $attempt) {
+                    assert(is_array($attempt), 'Acquisition returns saved attempt records.');
+                    /** @var StashInput $attached */
+                    foreach (StashInput::select()->where('input_id', $run['input_id'])->orderBy('stash_id')->all() as $attached) {
+                        $this->lockStash($attached->stash_id);
+                        $this->link($attached->stash_id, $attempt['item_uri']);
+                    }
                 }
-            }
-        });
+            });
+            $last = end($rows);
+            $after = count($rows) === 100 && is_array($last) ? $last['source_id'] : null;
+        } while ($after !== null);
     }
 
     /**

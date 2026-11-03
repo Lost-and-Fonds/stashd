@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Integration;
 
 use App\Operations\Worker;
-use RuntimeException;
 use Tempest\Console\Console;
 use Tempest\Console\ConsoleCommand;
 
@@ -23,6 +22,7 @@ final readonly class IntegrationWorkCommands
         private IntegrationConfigurations $configurations,
         private DiscoveryStore $discovery,
         private BroadcastStore $broadcast,
+        private AcquisitionAdmission $admission,
     ) {}
 
     /**
@@ -45,18 +45,21 @@ final readonly class IntegrationWorkCommands
     }
 
     /**
-     * Admit the finished single-file run, coalescing repeated active requests.
+     * Refill at most 100 outstanding per-file Assignments; report actual persisted run progress.
      */
     #[ConsoleCommand('input:acquire')]
     public function acquire(string $runId): void
     {
-        $run = $this->discovery->read($runId);
-        if ($run['status'] !== 'finished' || $run['discovered_count'] !== 1) {
-            throw new RuntimeException('Operations PR 1 requires a finished single-file discovery run.');
-        }
+        $this->report($this->admission->fill($runId));
+    }
 
-        $assignment = $this->worker->do(new AcquireInput($runId));
-        $this->report(['assignment_id' => (string) $assignment->id]);
+    /**
+     * Inspect a bounded page of durable admission progress without executing work.
+     */
+    #[ConsoleCommand('input:admission')]
+    public function admission(string $runId, string $after = ''): void
+    {
+        $this->report($this->admission->read($runId, $after));
     }
 
     /**

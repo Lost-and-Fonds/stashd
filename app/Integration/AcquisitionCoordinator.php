@@ -106,30 +106,66 @@ final readonly class AcquisitionCoordinator
     }
 
     /**
-     * Catalogue the single saved observation using acquisition's existing identity and recovery rules.
+     * Catalogue saved observations using acquisition's existing identity and recovery rules.
      * Hold the Input lock while restoring source claims and allocating the reusable attempt.
      * Only short SQL writes are fenced; canonical recovery and filesystem reads stay outside.
      */
-    public function catalogue(string $runId, AssignmentContext $context): array
+    public function catalogue(string $runId, ?AssignmentContext $context): array
     {
         $run = $this->discovery->read($runId);
         $this->discovery->lock($run['input_id']);
         try {
             $this->reassociate($run['input_id'], $context);
-            $page = $this->discovery->items($runId, '', 2);
-            assert(is_array($page['items']), 'Discovery returns a page of saved observations.');
-            if (count($page['items']) > 1 || $page['next'] !== null) {
-                throw new RuntimeException('Operations PR 1 supports a single discovered file per run.');
-            }
+            $after = '';
+            do {
+                $page = $this->discovery->items($runId, $after, 100);
+                assert(is_array($page['items']), 'Discovery returns bounded saved observations.');
+                foreach ($page['items'] as $item) {
+                    assert(is_array($item), 'Each observation is a discovery record.');
+                    $this->store->start($runId, $run['input_id'], $item['id'], $context);
+                }
 
-            foreach ($page['items'] as $item) {
-                assert(is_array($item), 'Each saved observation is a discovery record.');
-                $this->store->start($runId, $run['input_id'], $item['id'], $context);
-            }
+                $after = $page['next'];
+            } while ($after !== null);
 
             return $run;
         } finally {
             $this->discovery->unlock($run['input_id']);
+        }
+    }
+
+    /**
+     * Preserve exactly one saved observation under its Input lock and existing transaction identity.
+     * Discovery already restored canonical source claims; replay verifies this attempt before source access.
+     */
+    public function acquireFile(string $runId, string $sourceId, AssignmentContext $context): array
+    {
+        $run = $this->discovery->read($runId);
+        if ($run['status'] !== 'finished') {
+            throw new RuntimeException('Finish discovery before acquiring a file.');
+        }
+
+        $input = $this->configurations->read('input', $run['input_id']);
+        if ($input['component'] !== 'filesystem') {
+            throw new RuntimeException('No acquisition adapter is registered for this Input.');
+        }
+
+        $this->discovery->lock($input['id']);
+        try {
+            $item = map($this->discovery->item($runId, $sourceId))->to(DiscoveredItem::class);
+            assert($item instanceof DiscoveredItem, 'The mapper returns a saved discovery.');
+            $attempt = $this->store->start($runId, $input['id'], $sourceId, $context);
+            try {
+                $result = $this->one($input, $item, $attempt);
+                $this->store->save($attempt['id'], $result['status'], $result);
+
+                return $result;
+            } catch (Throwable $error) {
+                $this->store->fail($attempt['id'], $error->getMessage());
+                throw $error;
+            }
+        } finally {
+            $this->discovery->unlock($input['id']);
         }
     }
 

@@ -1,6 +1,6 @@
 # Filesystem round-trip implementation plan
 
-**Status:** PR 1 implemented for draft review; see [implementation decisions and proof](../filesystem-roundtrip-pr1-decisions.md). PRs 2–5 remain unstarted.
+**Status:** PR 1 merged in #87. PR 2 implemented for draft review; see [bounded admission decisions and proof](../filesystem-pr2-decisions.md). PRs 3–5 remain unstarted.
 
 ## Basis and approach
 
@@ -38,8 +38,8 @@ Keep the in-process lifecycle compatible with canonical plugin-api discovery, st
 
 Completion means acceptance evidence, negative controls and required QA pass—not merely that code or tables exist.
 
-- [x] **PR 1 — Authentic single-file round trip.** Acceptance: real Stash/Catalogue → Operations → canonical Vault → source removed → Broadcast; independent bytes verified; duplicate delivery and post-commit replay proven. Dependencies: revised plan reviewed; #85 fixture available. **Status: implemented for draft review; not merged.**
-- [ ] **PR 2 — Bounded directory runs.** Acceptance: 100/1,000 files; bounded admission; crash-safe cursor; unchanged rescans create no additional archival revisions. Dependency: PR 1. **Status: unstarted.**
+- [x] **PR 1 — Authentic single-file round trip.** Acceptance: real Stash/Catalogue → Operations → canonical Vault → source removed → Broadcast; independent bytes verified; duplicate delivery and post-commit replay proven. Dependencies: revised plan reviewed; #85 fixture available. **Status: merged in #87.**
+- [x] **PR 2 — Bounded directory runs.** Acceptance: 100/1,000 files; bounded admission; crash-safe cursor; unchanged rescans create no additional archival revisions. Dependency: PR 1. **Status: implemented for draft review; not merged.**
 - [ ] **PR 3 — Mutations and historical output.** Acceptance: required mutation corpus; stable identity for modified paths; retained history; original and changed selections independently verified. Dependency: PR 2. **Status: unstarted.**
 - [ ] **PR 4 — Broader interruption/recovery.** Acceptance: real worker interruptions, publication recovery and stale-result rejection; no false completion or duplicate authoritative results. Dependencies: PRs 1–3. **Status: unstarted.**
 - [ ] **PR 5 — Measured 10,000-Item workflow.** Acceptance: real application entry points replace illustrative copy; source-independent external verification; truthful counts and resource measurements. Dependencies: PRs 1–4 and #85. **Status: unstarted.**
@@ -113,6 +113,6 @@ Use additive migrations that preserve existing configuration, source association
 
 Defer watchers, external plugin runtime, broad metadata infrastructure, hardlinks and automatic pruning as specified in #28/#85. No automatic merge.
 
-PR 1 was subsequently authorized explicitly and is now implemented for draft review. Do not start PR 2 before that review.
+PR 1 merged after review; PR 2 was subsequently authorized explicitly and is now implemented for draft review. Do not start PR 3 before that review.
 
 The original plan was based on inspection. PR 1 runtime proof and QA are recorded in its implementation PR. Local roots remain operator-controlled, and no hostile-writer, whole-tree atomicity or power-loss guarantee is claimed.
