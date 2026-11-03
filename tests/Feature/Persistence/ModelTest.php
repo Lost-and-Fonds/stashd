@@ -11,6 +11,7 @@ use App\Operations\Authority\SessionActivityClaims;
 use App\Operations\Models\Attempt;
 use App\Operations\Models\Checkpoint;
 use App\Operations\Models\Demand;
+use App\Operations\Models\Result;
 use App\Operations\Persistence\ApplicationConnection;
 use App\Operations\Persistence\UpgradeCheckpoints;
 use App\Operations\Worker;
@@ -367,4 +368,46 @@ test('checkpoint migration preserves legacy UUIDs and progress values', function
     expect($row->created_at)->toBeInstanceOf(DateTimeImmutable::class);
     expect($row->updated_at)->toEqual($row->created_at);
     expect(fn () => query('operation_checkpoints')->insert(...['uuid' => (string) Symfony\Component\Uid\Uuid::v7(), ...$values])->execute())->toThrow(QueryWasInvalid::class);
+});
+
+test('the real handler records a typed timestamped result through the shared foundation', function (): void {
+    $path = tempnam(sys_get_temp_dir(), 'model-result-');
+    file_put_contents($path, 'retained result input');
+    try {
+        $worker = $this->fixture->container->get(Worker::class);
+        $assignment = $worker->do(new DepartmentJob('model-result', custodyPath: $path));
+        $this->fixture->runtime->drain();
+        expect($worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
+        $rows = Result::select()->all();
+        expect($rows)->toHaveCount(1);
+        $row = $rows[0];
+        expect($row)->toBeInstanceOf(Model::class);
+        expect($row->coverage)->toBe('verified');
+        expect($row->assignment_id)->toBe($assignment->id->uuidFor(Assignment::class));
+        expect($row->id->namespace)->toBe('result');
+        expect(Result::get($row->id)->uuid->value)->toBe($row->uuid->value);
+        expect($row->created_at)->toEqual($this->clock->toPsrClock()->now());
+        expect($row->updated_at)->toEqual($row->created_at);
+        expect(fn () => $row->update(coverage: 'changed'))->toThrow(LogicException::class);
+        expect($row->delete(...))->toThrow(LogicException::class);
+        expect($row->insert(...))->toThrow(AuthorityLost::class);
+        expect(Result::get($row->id)->coverage)->toBe('verified');
+    } finally {
+        unlink($path);
+    }
+});
+
+test('recording a Result is idempotent and does not complete the Assignment', function (): void {
+    [$context, $this->release] = foundation_execution($this->fixture);
+    $authority = $this->fixture->container->get(PublicationAuthority::class);
+    Result::record($authority, $context, 'verified');
+    $row = Result::select()->first();
+    $this->clock->plus(60);
+    Result::record($authority, $context, 'verified');
+    expect(Result::select()->all())->toHaveCount(1);
+    expect(Result::get($row->id)->updated_at)->toEqual($row->updated_at);
+    expect(fn () => Result::record($authority, $context, 'different'))->toThrow(RuntimeException::class, 'A different result was already recorded.');
+    expect(Result::get($row->id)->coverage)->toBe('verified');
+    expect($this->fixture->container->get(Worker::class)->status($context->assignmentId)->state)->toBe(AssignmentState::Running);
+    expect(Demand::get($context->demandId)->satisfied)->toBeFalse();
 });

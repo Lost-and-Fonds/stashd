@@ -9,7 +9,6 @@ test('verification identity includes the exact Object and version and survives p
     $restored = new VerifyAsset(...json_decode(json_encode($job, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR));
     expect($restored)->toEqual($job);
     expect($restored->key())->toBe($job->key());
-    expect($restored->observation())->toBe($job->observation());
     expect(new VerifyAsset($job->objectId, 'v01')->version)->toBe('v01');
     expect(new VerifyAsset($job->objectId, 'v2')->key())->not->toBe($job->key());
     expect(new VerifyAsset('urn:example:asset-two', 'v1')->key())->not->toBe($job->key());

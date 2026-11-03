@@ -164,8 +164,17 @@ test('promotion retains a delayed delivery and never bypasses its native due tim
     $before = $db->fetchAssociative("SELECT * FROM messenger_messages WHERE queue_name = 'durable_activities'");
     expect($before)->not->toBeFalse();
 
-    expect(fn () => $this->worker->do(new DepartmentJob('delayed-promotion', custodyPath: '/conflicting'), Priority::Interactive))
-        ->toThrow(InvalidArgumentException::class);
+    $db->executeStatement(
+        "CREATE FUNCTION reject_promotion() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.queue_name = 'operations_outbox' THEN RAISE EXCEPTION 'promotion rejected'; END IF; RETURN NEW; END $$",
+    );
+    $db->executeStatement('CREATE TRIGGER reject_promotion BEFORE INSERT ON messenger_messages FOR EACH ROW EXECUTE FUNCTION reject_promotion()');
+    try {
+        expect(fn () => $this->worker->do(new DepartmentJob('delayed-promotion'), Priority::Interactive))->toThrow('promotion rejected');
+    } finally {
+        $db->executeStatement('DROP TRIGGER reject_promotion ON messenger_messages');
+        $db->executeStatement('DROP FUNCTION reject_promotion()');
+    }
+
     expect($db->fetchAssociative('SELECT * FROM messenger_messages WHERE id = ?', [$before['id']]))->toBe($before);
     expect($this->worker->status($assignment->id)->priority)->toBe(Priority::Routine);
 
@@ -343,9 +352,9 @@ test('acknowledged custody survives worker death and a successor verifies it bef
         $receipt = Tempest\Database\query(App\Operations\Models\CustodyReceipt::class)->select()->first();
         expect($receipt->key)->toBe('retained');
         expect($receipt->digest)->toBe(hash_file('sha256', $bytes));
-        $adopted = Tempest\Database\query(App\Operations\Models\Result::class)->select()->first();
-        expect($adopted->coverage)->toBe('verified');
-        expect($adopted->attempt_id)->not->toBe($receipt->attempt_id);
+        $recorded = Tempest\Database\query(App\Operations\Models\Result::class)->select()->first();
+        expect($recorded->coverage)->toBe('verified');
+        expect($recorded->attempt_id)->not->toBe($receipt->attempt_id);
         expect($db->fetchOne('SELECT count(*) FROM operation_custody_receipts'))->toBe(1);
     } finally {
         if ($a->running) {
@@ -567,15 +576,29 @@ test('resolving Tempest database before Worker still rolls back business data an
     expect($connections->application->fetchOne('SELECT count(*) FROM messenger_messages'))->toBe(0);
 });
 
-test('a repeated observation with conflicting input is rejected atomically', function (): void {
-    $assignment = $this->worker->do(new DepartmentJob('conflicting'));
-    expect(fn () => $this->worker->do(new DepartmentJob('conflicting', custodyPath: '/different/input'), Priority::Interactive))
-        ->toThrow(InvalidArgumentException::class, 'different Job input');
-    $db = $this->department->connections->application;
-    expect($db->fetchOne('SELECT count(*) FROM operation_demands'))->toBe(1);
-    expect($this->worker->status($assignment->id)->priority)->toBe(Priority::Routine);
-    $this->department->runtime->drain();
-    expect($db->fetchFirstColumn('SELECT value FROM effects'))->toBe(['conflicting:refresh:one']);
+test('changed serialized input retains a distinct Demand under the same work key', function (): void {
+    $path = tempnam(sys_get_temp_dir(), 'department-input-');
+    file_put_contents($path, 'retained input');
+    try {
+        $assignment = $this->worker->do(new DepartmentJob('changed-input'));
+        $changed = new DepartmentJob('changed-input', custodyPath: $path);
+        expect($this->worker->do($changed, Priority::Interactive)->id)->toEqual($assignment->id);
+        expect($this->worker->do($changed)->id)->toEqual($assignment->id);
+        $db = $this->department->connections->application;
+        expect($db->fetchOne('SELECT count(*) FROM operation_demands'))->toBe(2);
+        foreach ($db->fetchAllAssociative('SELECT observation, payload FROM operation_demands') as $demand) {
+            expect($demand['observation'])->toBe(hash('sha256', $demand['payload']));
+        }
+
+        expect($this->worker->status($assignment->id)->priority)->toBe(Priority::Interactive);
+        $this->department->runtime->drain();
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
+        expect($db->fetchFirstColumn('SELECT value FROM effects'))->toBe(['changed-input:refresh:one', 'changed-input:refresh:one']);
+        expect($db->fetchOne('SELECT count(*) FROM operation_attempts'))->toBe(2);
+        expect($db->fetchOne('SELECT count(*) FROM operation_results'))->toBe(1);
+    } finally {
+        unlink($path);
+    }
 });
 
 test('Assignment models and typed execution identities survive serialization and worker restart', function (): void {

@@ -33,7 +33,7 @@ final readonly class VerifyAssetHandler
     public function __invoke(VerifyAsset $job, AssignmentContext $context): void
     {
         $record = $this->assets->inspect(Urn::new($job->objectId), $job->version);
-        Result::adopt($this->authority, $context, json_encode([
+        Result::record($this->authority, $context, json_encode([
             'object_id' => $record['object_id'],
             'version' => $record['version'],
             'files' => $record['files'],

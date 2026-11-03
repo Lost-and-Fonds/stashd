@@ -39,20 +39,18 @@ final readonly class Worker
 
     /**
      * Join equivalent active work and retain its input before returning the durable identity.
-     * Reusing an observation for different input rejects the whole admission transaction.
+     * Serialized input determines the observation; changed input retains a distinct Demand.
      */
     public function do(Job $job, Priority $priority = Priority::Routine): Assignment
     {
         $type = $this->registry->type($job);
         $key = $job->key();
-        $observation = $job->observation();
-        foreach ([$key, $observation] as $value) {
-            if (! new HasLength(min: 1, max: 1024)->isValid($value) || str_contains($value, "\0")) {
-                throw new InvalidArgumentException('Job keys and observations require 1 to 1024 characters without null bytes.');
-            }
+        if (! new HasLength(min: 1, max: 1024)->isValid($key) || str_contains($key, "\0")) {
+            throw new InvalidArgumentException('Job keys require 1 to 1024 characters without null bytes.');
         }
 
         $payload = map($job)->toJson();
+        $observation = hash('sha256', $payload);
         $id = $this->admission->database->transactional(function () use ($priority, $type, $key, $observation, $payload): Identifier {
             $this->admission->lock($type, $key);
             $dispatch = false;

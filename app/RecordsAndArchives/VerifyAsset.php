@@ -13,7 +13,7 @@ use Tempest\Validation\Rules\MatchesRegEx;
  * Request a read-only check of one exact Asset Object version against its stored evidence.
  *
  * Equal inputs share active work. A later request after completion checks again;
- * neither identity represents the current health of other versions or future bytes.
+ * its identity does not represent the current health of other versions or future bytes.
  */
 final readonly class VerifyAsset implements Job
 {
@@ -36,13 +36,5 @@ final readonly class VerifyAsset implements Job
     public function key(): string
     {
         return hash('sha256', json_encode([$this->objectId, $this->version], JSON_THROW_ON_ERROR));
-    }
-
-    /**
-     * Identify the same immutable version input across retries and equivalent admissions.
-     */
-    public function observation(): string
-    {
-        return $this->key();
     }
 }
