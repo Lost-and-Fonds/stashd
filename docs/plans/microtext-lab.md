@@ -2,7 +2,7 @@
 
 **Status:** design proposal, not an implemented UI or a test success claim.
 
-**Scope:** a small, read-only page at \`/dev/microtext\` for watching **real** Stashd
+**Scope:** a small, read-only page at `/dev/microtext` for watching **real** Stashd
 Filesystem/Microtext acceptance and stress runs, including the Operations workload
 and Tempest event observations. It is not a general-purpose monitoring product,
 an alternate test runner, a new Operations department or a production feature.
@@ -44,7 +44,7 @@ allowing arbitrary database credentials in a web request, or giving the dashboar
 direct filesystem paths. Instead, provide an opt-in **run-scoped observer** inside
 the test invocation's existing configuration boundary:
 
-\`\`\`text
+```text
      Existing isolated test process / workers
          |  SQL snapshots from the same fixture database
          |  OCFL verifier and process-tree observations
@@ -55,7 +55,7 @@ the test invocation's existing configuration boundary:
                             v
      Read-only Tempest Lab endpoint -> browser
                 snapshot polling / SSE
-\`\`\`
+```
 
 The observer is **not** the work coordinator: it must never change the order of
 admission, preservation, publication or acknowledgement. If it crashes, the test
@@ -63,7 +63,7 @@ continues, and the UI displays a stale-observer warning.
 
 Recommended first version: one file-backed observation spool per Lab run under an
 explicitly configured, private, local development directory (e.g.
-\`.tempest/dev/microtext-lab\`), with owner-only permissions. Append events as
+`.tempest/dev/microtext-lab`), with owner-only permissions. Append events as
 NDJSON; atomically replace a small current-snapshot JSON file. Store no database
 credentials, source content, arbitrary relative/absolute filesystem paths,
 user-supplied metadata, cookies or secret headers. Lab run IDs are random,
@@ -74,13 +74,13 @@ Create the Lab run descriptor **before** discovery starts, then update its
 correlation IDs as they become known. The observer and its workers must share a
 well-defined output directory/container mount if they run in separate Lerd
 processes. Verify that this shared path exists in the intended Lerd workflow;
-do not silently assume host \`/tmp\` is visible inside every container.
+do not silently assume host `/tmp` is visible inside every container.
 
 This first approach avoids a new persistent database table and keeps
 instrumentation outside the correctness paths. If native Tempest EventBus
 middleware or SSE support changes how events reach another process, inspect
 the installed Tempest implementation before coding; do not rely on a past
-RoadRunner/FrankenPHP frontend that is absent from the current \`dev\` baseline.
+RoadRunner/FrankenPHP frontend that is absent from the current `dev` baseline.
 
 ## UI structure
 
@@ -89,7 +89,7 @@ user-facing activity or operations pages.
 
 ### Header and run selector
 
-- \`Microtext Lab\` with **DEV ONLY**, selected Lab run ID and current phase:
+- `Microtext Lab` with **DEV ONLY**, selected Lab run ID and current phase:
   fixture generation, discovery, admission, acquisition, source deletion,
   frozen selection, Broadcast, verification, finished or failed.
 - File count and run preset (3, 100, 101, 1,000; eventually 10,000).
@@ -106,7 +106,7 @@ user-facing activity or operations pages.
 Show **discovered / durably admitted / settled / outstanding capacity / queued /
 running / failed awaiting retry** as distinct numbers.
 
-From PR #89: \`input:admission\` reports \`outstanding\` using active **or failed**
+From PR #89: `input:admission` reports `outstanding` using active **or failed**
 Assignments. Therefore **do not label it “in flight.”** It is unresolved
 capacity occupied; queued, running and failed require their own real status
 projection. Do not derive active workers by subtracting settled counts.
@@ -168,10 +168,10 @@ links as inferred.
 
 ## Events: first real consumer, not a fictional durable event bus
 
-Current \`dev\` has EventManagement **typed definitions** and a source catalogue
-(\`docs/event-management-catalogue.md\`, \`EventCatalogueAudit\`). The audit
+Current `dev` has EventManagement **typed definitions** and a source catalogue
+(`docs/event-management-catalogue.md`, `EventCatalogueAudit`). The audit
 explicitly states emission, verification and consumption are not yet proven.
-\`EventMetadata\` provides event UUID, occurred-at UTC and correlation/causation
+`EventMetadata` provides event UUID, occurred-at UTC and correlation/causation
 references. The event catalogue warns that Tempest dispatch is synchronous and
 does **not** imply a database transaction committed.
 
@@ -208,25 +208,25 @@ implemented and validated:
 
 | Endpoint | Function |
 | --- | --- |
-| \`GET /dev/microtext\` | Development-only HTML page rendered through available Tempest view facilities. |
-| \`GET /dev/microtext/api/runs\` | Bounded, safe list of local Lab runs. |
-| \`GET /dev/microtext/api/runs/{id}/snapshot\` | Latest immutable, scrubbed snapshot for one run. |
-| \`GET /dev/microtext/api/runs/{id}/events?after={seq}\` | Bounded actual event-observation page with monotonic sequence and reconnect cursor. |
-| \`GET /dev/microtext/api/runs/{id}/stream\` | Optional, **after** polling is proven; SSE notifications with resume IDs. |
+| `GET /dev/microtext` | Development-only HTML page rendered through available Tempest view facilities. |
+| `GET /dev/microtext/api/runs` | Bounded, safe list of local Lab runs. |
+| `GET /dev/microtext/api/runs/{id}/snapshot` | Latest immutable, scrubbed snapshot for one run. |
+| `GET /dev/microtext/api/runs/{id}/events?after={seq}` | Bounded actual event-observation page with monotonic sequence and reconnect cursor. |
+| `GET /dev/microtext/api/runs/{id}/stream` | Optional, **after** polling is proven; SSE notifications with resume IDs. |
 
 No POST, PUT, DELETE, start/kill/retry buttons or credentials in URLs.
 
 ## Security and runtime gates
 
 - **Production must not register these routes.** Both environment type
-  \`development\` and an explicit \`STASHD_MICROTEXT_LAB=1\` opt-in must pass.
+  `development` and an explicit `STASHD_MICROTEXT_LAB=1` opt-in must pass.
   A disabled route responds 404, not a leaked HTML skeleton or JSON error
   containing private paths.
 - Guard access through local-only development binding or existing authenticated
-  development access; do not assume a proxy's \`X-Forwarded-For\` is trustworthy.
+  development access; do not assume a proxy's `X-Forwarded-For` is trustworthy.
   If accessed through a remote Lerd/proxy setup, use the existing authentication
   controls rather than trusting any client-supplied header.
-- Never let \`{id}\` become a filesystem path. Validate fixed safe ID grammar and
+- Never let `{id}` become a filesystem path. Validate fixed safe ID grammar and
   use an allow-listed root. Reject symlinks/path traversal and unknown run IDs.
 - Never ship private fixture administrator credentials, PDO DSNs or raw
   event payloads to the browser. Event allow-list and output redaction are
@@ -273,7 +273,7 @@ No POST, PUT, DELETE, start/kill/retry buttons or credentials in URLs.
 Make the Lab in its **own dev-tools PR**, after PR #89 is merged; keep the
 directory-round-trip implementation and core acceptance contracts untouched.
 
-1. Define a small typed \`LabObservation\` DTO/schema and an opt-in observer
+1. Define a small typed `LabObservation` DTO/schema and an opt-in observer
    attached to test fixture configuration. Validate actual run correlation and
    safe file output **before** building any UI. No new business records.
 2. Expose a read-only snapshot/event API through Tempest, with runtime gates
@@ -288,13 +288,13 @@ directory-round-trip implementation and core acceptance contracts untouched.
    100/101/1,000 stress suite on an explicitly opted-in local invocation;
    **do not** make Lab observability mandatory for stress CI.
 
-Review the actual current \`dev\` HTTP/view setup and installed Tempest docs
+Review the actual current `dev` HTTP/view setup and installed Tempest docs
 before implementation. The repository also has older frontend/event work on
 other branches; do not import those assumptions into the current Core.
 
 ## Definition of done
 
-- I can open \`/dev/microtext\` locally during an opted-in actual run and see
+- I can open `/dev/microtext` locally during an opted-in actual run and see
   timely **truthful** progress without opening a terminal.
 - The page survives refresh/reconnection and can inspect a recent completed run.
 - A missing event, stale observer or completed-but-corrupt file is obvious.
