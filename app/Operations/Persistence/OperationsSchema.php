@@ -79,7 +79,9 @@ final class OperationsSchema implements MigratesUp, ShouldMigrate
                 ->text('digest')
                 ->raw('UNIQUE(assignment_id, key)'),
             new CreateTableStatement('operation_results')
-                ->primary(uuid: true)
+                ->primary('uuid', uuid: true)
+                ->datetime('created_at')
+                ->datetime('updated_at')
                 ->foreignUuid('assignment_id', 'operation_assignments.uuid')
                 ->foreignUuid('demand_id', 'operation_demands.uuid')
                 ->foreignUuid('attempt_id', 'operation_attempts.uuid')

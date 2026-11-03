@@ -50,8 +50,8 @@ final readonly class DepartmentHandler
 
         if ($request->custodyPath !== null) {
             try {
-                Result::adopt($this->authority, $execution, 'verified');
-                throw new \LogicException('Adoption succeeded without reconciliation.');
+                Result::record($this->authority, $execution, 'verified');
+                throw new \LogicException('Recording succeeded without reconciliation.');
             } catch (\RuntimeException $expected) {
                 if ($expected->getMessage() !== 'Retained custody requires reconciliation.') {
                     throw $expected;
@@ -59,13 +59,13 @@ final readonly class DepartmentHandler
             }
 
             $this->custody->reconcile($execution);
-            Result::adopt($this->authority, $execution, 'verified');
-            Result::adopt($this->authority, $execution, 'verified');
+            Result::record($this->authority, $execution, 'verified');
+            Result::record($this->authority, $execution, 'verified');
             try {
-                Result::adopt($this->authority, $execution, 'conflicting');
-                throw new \LogicException('A conflicting result was adopted.');
+                Result::record($this->authority, $execution, 'conflicting');
+                throw new \LogicException('A conflicting result was recorded.');
             } catch (\RuntimeException $expected) {
-                if ($expected->getMessage() !== 'A different result was already adopted.') {
+                if ($expected->getMessage() !== 'A different result was already recorded.') {
                     throw $expected;
                 }
             }
@@ -107,7 +107,7 @@ final readonly class DepartmentHandler
                     'checkpoint' => fn () => Checkpoint::record($this->authority, $execution, 'stale'),
                     'custody' => fn () => $this->custody->acknowledge($execution, 'stale', $this->control->barrier),
                     'reconciliation' => fn () => $this->custody->reconcile($execution),
-                    'result' => fn () => Result::adopt($this->authority, $execution, 'stale'),
+                    'result' => fn () => Result::record($this->authority, $execution, 'stale'),
                 ] as $name => $operation) {
                     try {
                         $operation();

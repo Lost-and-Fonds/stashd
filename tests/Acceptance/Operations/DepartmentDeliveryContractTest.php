@@ -64,21 +64,26 @@ test('C02: new observations coalesce while retaining distinct immutable demand',
     ]);
 });
 
-test('C02: the same observation cannot be reused for different retained Job input', function (): void {
-    $first = $this->worker->do(new DepartmentJob('c02-conflict', 'revision-one', 'refresh'));
-
-    // The same key and observation with different serialized input is ambiguous.
-    // custodyPath is part of the Job payload, not its key or observation.
-    expect(fn () => $this->worker->do(new DepartmentJob('c02-conflict', 'revision-one', 'refresh', '/not-used'), Priority::Interactive))
-        ->toThrow(InvalidArgumentException::class);
-
-    $db = $this->department->connections->application;
-    expect((int) $db->fetchOne('SELECT count(*) FROM operation_assignments'))->toBe(1);
-    expect((int) $db->fetchOne('SELECT count(*) FROM operation_demands'))->toBe(1);
-    expect((string) $this->worker->status($first->id)->id)->toBe((string) $first->id);
-    expect($this->worker->status($first->id)->priority)->toBe(Priority::Routine);
-    $this->department->runtime->drain();
-    expect($db->fetchFirstColumn('SELECT value FROM effects'))->toBe(['c02-conflict:refresh:revision-one']);
+test('C02: changing any serialized input retains another Demand under the same work key', function (): void {
+    $path = tempnam(sys_get_temp_dir(), 'c02-input-');
+    file_put_contents($path, 'retained input');
+    try {
+        $first = $this->worker->do(new DepartmentJob('c02-input', 'revision-one', 'refresh'));
+        $changed = new DepartmentJob('c02-input', 'revision-one', 'refresh', $path);
+        expect($this->worker->do($changed, Priority::Interactive)->id)->toEqual($first->id);
+        expect($this->worker->do($changed)->id)->toEqual($first->id);
+        $db = $this->department->connections->application;
+        expect((int) $db->fetchOne('SELECT count(*) FROM operation_assignments'))->toBe(1);
+        expect((int) $db->fetchOne('SELECT count(*) FROM operation_demands'))->toBe(2);
+        expect((int) $db->fetchOne('SELECT count(DISTINCT observation_key) FROM operation_demands'))->toBe(2);
+        expect($this->worker->status($first->id)->priority)->toBe(Priority::Interactive);
+        $this->department->runtime->drain();
+        expect($this->worker->status($first->id)->state)->toBe(AssignmentState::Completed);
+        expect($db->fetchFirstColumn('SELECT value FROM effects'))->toBe(['c02-input:refresh:revision-one', 'c02-input:refresh:revision-one']);
+        expect((int) $db->fetchOne('SELECT count(*) FROM operation_attempts'))->toBe(2);
+    } finally {
+        unlink($path);
+    }
 });
 
 test('C02: a terminal Assignment is not silently reused for new work', function (): void {

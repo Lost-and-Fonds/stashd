@@ -28,9 +28,4 @@ final readonly class DepartmentJob implements Job
     {
         return json_encode([$this->scope, $this->mode], JSON_THROW_ON_ERROR);
     }
-
-    public function observation(): string
-    {
-        return $this->observation;
-    }
 }
