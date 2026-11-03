@@ -1,5 +1,7 @@
 # Operations implementation — 2026-11-01
 
+Current C02/C03 behavior and removal of bespoke recovery: [contract verification](operations-contract-verification.md). The recovery descriptions and counts below are historical checkpoints, not current APIs.
+
 API/model update: [Operations API review](operations-api-review.md) supersedes the original modelling and naming below. Verification counts in this checkpoint describe its original commit.
 
 ## Architectural map
