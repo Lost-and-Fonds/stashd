@@ -31,7 +31,8 @@ afterEach(function (): void {
     $this->department->dispose();
 });
 
-function c03_context(DepartmentFixture $fixture): \App\Operations\DTO\AssignmentContext
+/** @return array{\App\Operations\DTO\AssignmentContext, Closure} */
+function c03_context(DepartmentFixture $fixture): array
 {
     $assignment = $fixture->container->get(Worker::class)->do(new DepartmentJob('c03-fencing'));
     $db = $fixture->connections->application;
@@ -45,15 +46,11 @@ function c03_context(DepartmentFixture $fixture): \App\Operations\DTO\Assignment
     );
     expect($release)->toBeInstanceOf(Closure::class);
 
-    $GLOBALS['c03_release_claim'] = $release;
-
-    return $fixture->container->get(PublicationAuthority::class)->begin($uuid, $demand);
+    return [$fixture->container->get(PublicationAuthority::class)->begin($uuid, $demand), $release];
 }
 
 test('C03: protected publication requires the live ownership claim', function (): void {
-    $context = c03_context($this->department);
-    $this->releaseClaim = $GLOBALS['c03_release_claim'];
-    unset($GLOBALS['c03_release_claim']);
+    [$context, $this->releaseClaim] = c03_context($this->department);
 
     Checkpoint::record($this->department->container->get(PublicationAuthority::class), $context, 'accepted');
 
@@ -73,9 +70,7 @@ test('C03: protected publication requires the live ownership claim', function ()
 });
 
 test('C03: replacing the current Attempt token revokes its predecessor', function (): void {
-    $context = c03_context($this->department);
-    $this->releaseClaim = $GLOBALS['c03_release_claim'];
-    unset($GLOBALS['c03_release_claim']);
+    [$context, $this->releaseClaim] = c03_context($this->department);
 
     $db = $this->department->connections->application;
     $demand = $context->demandId->uuidFor(\App\Operations\Models\Demand::class);
