@@ -594,7 +594,8 @@ test('Assignment models and typed execution identities survive serialization and
     expect($result->exitCode)->toBe(0, $result->errorOutput);
     expect((string) $this->worker->status(Identifier::parse($id))->id)->toBe($id);
     $completed = Tempest\Database\query(App\Operations\Assignment::class)->select()->where('uuid', $assignment->id->uuidFor(Assignment::class))->first();
-    expect($completed->state)->toBe(AssignmentState::Completed);
+    expect($completed->active)->toBeFalse();
+    expect($this->worker->status($completed->id)->state)->toBe(AssignmentState::Completed);
     $attempt = Tempest\Database\query(App\Operations\Models\Attempt::class)->select()->first();
     $demand = Tempest\Database\query(App\Operations\Models\Demand::class)->select()->first();
     expect((string) $attempt->id)->toStartWith('urn:stashd:attempt:');

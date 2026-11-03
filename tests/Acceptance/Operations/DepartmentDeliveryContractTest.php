@@ -93,3 +93,38 @@ test('C02: a terminal Assignment is not silently reused for new work', function 
     expect($this->worker->status($next->id)->state)->toBe(AssignmentState::Completed);
     expect((int) $this->department->connections->application->fetchOne('SELECT count(*) FROM effects'))->toBe(2);
 });
+
+test('C02: Operations records share model identity and timestamps while Worker owns status', function (): void {
+    $assignment = $this->worker->do(new DepartmentJob('c02-models'));
+    expect($assignment)->toBeInstanceOf(App\Persistence\Model::class);
+    $retained = App\Operations\Assignment::get($assignment->id);
+    expect($retained->id)->toEqual($assignment->id);
+    expect(isset($retained->state))->toBeFalse();
+    expect($assignment->state)->toBe(AssignmentState::Queued);
+    $created = $retained->created_at;
+    $db = $this->department->connections->application;
+    // Make transition timestamp checks independent of subsecond execution speed.
+    foreach (['operation_assignments', 'operation_demands'] as $table) {
+        $db->executeStatement("UPDATE {$table} SET updated_at = '2000-01-01'");
+    }
+
+    $this->department->runtime->drain();
+    expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
+    $models = [
+        App\Operations\Assignment::get($assignment->id),
+        App\Operations\Models\Demand::select()->first(),
+        App\Operations\Models\Attempt::select()->first(),
+    ];
+    foreach ($models as $model) {
+        expect($model)->toBeInstanceOf(App\Persistence\Model::class);
+        expect($model::get($model->id)->id)->toEqual($model->id);
+        expect($model->created_at)->toBeInstanceOf(DateTimeImmutable::class);
+        expect($model->updated_at >= $model->created_at)->toBeTrue();
+        expect($model->update(...))->toThrow(LogicException::class);
+        expect($model->delete(...))->toThrow(LogicException::class);
+    }
+
+    expect($models[0]->created_at)->toEqual($created);
+    expect(isset($models[0]->state))->toBeFalse();
+    expect($models[2]->insert(...))->toThrow(LogicException::class);
+});
