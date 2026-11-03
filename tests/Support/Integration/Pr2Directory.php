@@ -200,11 +200,13 @@ final class Pr2Directory
     /**
      * Require exactly one durable per-file acquisition input for every discovered
      * source ID. A run-wide Job containing all files cannot satisfy this evidence.
+     * Recovery may legitimately admit another Assignment after terminal failure;
+     * the normal path still expects one initial Demand per file.
      *
      * Each per-file Job has persisted runId and sourceId in its serialized input.
      * The naming is a proposed internal boundary for PR 2, not a public SDK API.
      */
-    public static function assertPerFileAssignments(\PDO $database, string $run, int $count): void
+    public static function assertPerFileAssignments(\PDO $database, string $run, int $count, bool $allowRetries = false): void
     {
         $statement = $database->prepare(<<<'SQL'
             SELECT d.payload::jsonb ->> 'sourceId' AS source_id, a.uuid::text AS assignment_id
@@ -221,9 +223,13 @@ final class Pr2Directory
         $sources = $expected->fetchAll(\PDO::FETCH_COLUMN);
         sort($actual);
         sort($sources);
-        Assert::assertCount($count, $rows, 'One durable acquisition demand is expected per file in the first run.');
+        if ($allowRetries) {
+            Assert::assertGreaterThanOrEqual($count, count($rows), 'Retryable admissions still need a persisted Job for every source.');
+        } else {
+            Assert::assertCount($count, $rows, 'A fault-free first run needs one durable acquisition Demand per file.');
+        }
         Assert::assertSame($sources, $actual, 'Each discovered source needs its own persisted Job input.');
-        Assert::assertCount($count, array_unique(array_column($rows, 'assignment_id')), 'Per-file acquisition must not share a single Assignment.');
+        Assert::assertGreaterThanOrEqual($count, count(array_unique(array_column($rows, 'assignment_id'))), 'One run-wide Assignment cannot represent individual files.');
     }
 
     /**
