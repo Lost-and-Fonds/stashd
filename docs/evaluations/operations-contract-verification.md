@@ -184,3 +184,18 @@ archive contracts incomplete, 24,574 assertions**, in 235.43 seconds. Formatting
 and lint are clean; analysis retains the same four existing advisory messages.
 There were no remaining test failures. The earlier lint suggestions in the new
 test were corrected to first-class callable syntax before this final run.
+
+## Integration with current dev
+
+PR #83 targets `dev` and deliberately subtracts the Ecotone replacement merged
+there by PR #80. Reconciliation keeps the validated Messenger + Durable runtime,
+its locked dependencies and historical Messenger baseline fixtures. Ecotone-only
+runtime/configuration, installation probes and framework-specific delivery tests
+are removed with that implementation.
+
+The independent OPS-C03 contracts, their disposal tests and the POSIX/container
+routing fix in `bin/test.sh` are retained from current dev. The nine older
+lease/renewal scenarios still have no installed adapter and remain explicitly
+incomplete; they are not replaced with passing session-ownership assertions.
+The revised session-based C02/C03 suite remains the production-backed evidence.
+The test-wrapper regression checks pass (3 tests).
