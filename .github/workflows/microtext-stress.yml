@@ -1,0 +1,73 @@
+name: Microtext corpus stress (post-merge and release)
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [dev]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: microtext-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  corpus:
+    # A PR closing without a merge must not run the expensive fixture.
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out merged or released revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
+
+      - name: Run generator/verifier regression tests
+        run: python3 -m unittest discover -s tools/fixtures -p 'test_microtext.py' -v
+
+      - name: Generate and verify the pinned 10,000-file corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$(mktemp -d)"
+          trap 'rm -rf -- "$workspace"' EXIT
+          python3 tools/fixtures/microtext.py generate \
+            --directory "$workspace/source" \
+            --manifest "$workspace/manifest.json" \
+            --count 10000
+          python3 tools/fixtures/microtext.py verify \
+            --directory "$workspace/source" \
+            --manifest "$workspace/manifest.json" \
+            --reference tests/fixtures/microtext/reference-v1.json
+
+          # Exercise source-independent validation only, not Stashd yet.
+          mkdir "$workspace/output"
+          cp -a "$workspace/source/." "$workspace/output/"
+          rm -rf -- "$workspace/source"
+          python3 tools/fixtures/microtext.py verify \
+            --directory "$workspace/output" \
+            --manifest "$workspace/manifest.json" \
+            --reference tests/fixtures/microtext/reference-v1.json
+
+          # Negative control: an altered output must be rejected by the checker.
+          python3 - "$workspace" <<'PY'
+          import json
+          import pathlib
+          import sys
+          root = pathlib.Path(sys.argv[1])
+          first = json.loads((root / 'manifest.json').read_text())['entries'][0]['path']
+          (root / 'output' / first).write_bytes(b'corrupted output\n')
+          PY
+          if python3 tools/fixtures/microtext.py verify \
+            --directory "$workspace/output" \
+            --manifest "$workspace/manifest.json" \
+            --reference tests/fixtures/microtext/reference-v1.json; then
+            echo 'ERROR: verifier accepted corrupted output' >&2
+            exit 1
+          fi
