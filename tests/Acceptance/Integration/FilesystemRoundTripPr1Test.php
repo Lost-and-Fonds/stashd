@@ -81,16 +81,16 @@ test('killing the real worker after Vault commit but before result acceptance re
         // This pause is in PostgreSQL's real result-insert path, not a test-only
         // handler or fake transaction. It forces a process-crash window after the
         // canonical Vault bytes exist but before Operations accepts the Result.
-        $baseline = (int) $database->query('SELECT count(*) FROM public.operation_results')->fetchColumn();
+        $baseline = (int) $database->query('SELECT count(*) FROM configuration_proof.operation_results')->fetchColumn();
         $database->exec(<<<'SQL'
-CREATE FUNCTION public.pr1_pause_result() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION configuration_proof.pr1_pause_result() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     PERFORM pg_advisory_xact_lock(7185, 85);
     RETURN NEW;
 END
 $$;
-CREATE TRIGGER pr1_pause_result BEFORE INSERT ON public.operation_results
-FOR EACH ROW EXECUTE FUNCTION public.pr1_pause_result();
+CREATE TRIGGER pr1_pause_result BEFORE INSERT ON configuration_proof.operation_results
+FOR EACH ROW EXECUTE FUNCTION configuration_proof.pr1_pause_result();
 SQL);
         $database->query('SELECT pg_advisory_lock(7185, 85)');
         $child = start_configuration_cli($archive, $descriptor, ['operations:work', '--once']);
@@ -119,7 +119,7 @@ SQL);
 
             expect($atBoundary)->toBeTrue('Worker did not reach the blocked result write after physical publication.');
             $before = Pr1RoundTrip::preserved($archive, $scope['item']['object_id'], $corpus['bytes']);
-            expect((int) $database->query('SELECT count(*) FROM public.operation_results')->fetchColumn())->toBe($baseline);
+            expect((int) $database->query('SELECT count(*) FROM configuration_proof.operation_results')->fetchColumn())->toBe($baseline);
             $archive->destroy('inputs');
         } finally {
             $running = proc_get_status($child['process'])['running'];
@@ -128,13 +128,13 @@ SQL);
             }
             finish_configuration_cli($child);
             $database->query('SELECT pg_advisory_unlock(7185, 85)');
-            $database->exec('DROP TRIGGER IF EXISTS pr1_pause_result ON public.operation_results');
-            $database->exec('DROP FUNCTION IF EXISTS public.pr1_pause_result()');
+            $database->exec('DROP TRIGGER IF EXISTS pr1_pause_result ON configuration_proof.operation_results');
+            $database->exec('DROP FUNCTION IF EXISTS configuration_proof.pr1_pause_result()');
         }
 
         expect($before)->not->toBeNull();
         Pr1RoundTrip::settle($archive, $descriptor, $assignment);
-        expect((int) $database->query('SELECT count(*) FROM public.operation_results')->fetchColumn())->toBe($baseline + 1);
+        expect((int) $database->query('SELECT count(*) FROM configuration_proof.operation_results')->fetchColumn())->toBe($baseline + 1);
         $after = Pr1RoundTrip::preserved($archive, $scope['item']['object_id'], $corpus['bytes']);
         expect($after['pin'])->toBe($before['pin']);
         expect(hash_file('sha256', $after['payload']))->toBe($corpus['digest']);
