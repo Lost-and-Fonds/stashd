@@ -117,6 +117,7 @@ test('failed Worker admission leaves a replayable source instead of skipping it'
             expect($visits)->toBeGreaterThanOrEqual(2, 'The fault must actually reject a per-file demand.');
             $status = Pr2Directory::admission($archive, $descriptor, $scope['run'], 3);
             expect($status['status'])->not->toBe('complete');
+            Pr2Directory::assertCursorCovered($database, $scope['run'], $status['cursor']);
         } finally {
             $database->exec('DROP TRIGGER pr2_reject_admission ON configuration_proof.operation_demands');
             $database->exec('DROP FUNCTION configuration_proof.pr2_reject_admission()');
@@ -191,6 +192,9 @@ test('worker admission committed before cursor advancement is safe after SIGKILL
             $database->exec('DROP TRIGGER pr2_hold_cursor ON configuration_proof.discovery_runs');
             $database->exec('DROP FUNCTION configuration_proof.pr2_hold_cursor()');
         }
+
+        $interrupted = Pr2Directory::admission($archive, $descriptor, $scope['run'], 3);
+        Pr2Directory::assertCursorCovered($database, $scope['run'], $interrupted['cursor']);
 
         // Only test-fixture queue visibility is accelerated; no production TTL
         // policy is changed to make this failure proof finish quickly.
