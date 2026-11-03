@@ -6,7 +6,7 @@ use Tests\Support\Integration\Pr1RoundTrip;
 use Tests\Support\Integration\Pr2Directory;
 use Tests\Support\RecordsAndArchives\ArchiveFixture;
 
-require_once dirname(__DIR__, 3) . '/Support/Integration/configuration-cli.php';
+require_once dirname(__DIR__, 2) . '/Support/Integration/configuration-cli.php';
 
 /**
  * Exercise real 100/101/1,000-file runs outside routine Pest suites.
