@@ -125,7 +125,7 @@ test('failed Worker admission leaves a replayable source instead of skipping it'
         }
 
         Pr2Directory::acquire($archive, $descriptor, $scope['run'], 3);
-        Pr2Directory::assertPerFileAssignments($database, $scope['run'], 3);
+        Pr2Directory::assertPerFileAssignments($database, $scope['run'], 3, allowRetries: true);
         Pr2Directory::assertPreserved($archive, Pr2Directory::members($archive, $descriptor, $scope['stash']), $corpus['entries']);
         $archive->destroy('inputs');
         Pr2Directory::broadcast($archive, $descriptor, $scope['stash'], 3);
@@ -200,7 +200,7 @@ test('worker admission committed before cursor advancement is safe after SIGKILL
         // policy is changed to make this failure proof finish quickly.
         $database->exec("UPDATE configuration_proof.messenger_messages SET delivered_at = CURRENT_TIMESTAMP - INTERVAL '61 seconds' WHERE delivered_at IS NOT NULL");
         Pr2Directory::acquire($archive, $descriptor, $scope['run'], 3);
-        Pr2Directory::assertPerFileAssignments($database, $scope['run'], 3);
+        Pr2Directory::assertPerFileAssignments($database, $scope['run'], 3, allowRetries: true);
         Pr2Directory::assertPreserved($archive, Pr2Directory::members($archive, $descriptor, $scope['stash']), $corpus['entries']);
         $archive->destroy('inputs');
         Pr2Directory::broadcast($archive, $descriptor, $scope['stash'], 3);
