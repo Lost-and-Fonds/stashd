@@ -83,6 +83,20 @@ final class Pr2Directory
         Assert::assertSame('finished', $inspection['status']);
         Assert::assertSame('exhaustive', $inspection['coverage']['kind']);
         Assert::assertSame($count, $inspection['discovered_count']);
+        $cursor = '';
+        $found = [];
+        do {
+            $page = Pr1RoundTrip::command($archive, $descriptor, ['input:discoveries', $discovery['run_id'], $cursor]);
+            Assert::assertLessThanOrEqual(100, count($page['items']));
+            foreach ($page['items'] as $item) {
+                Assert::assertArrayNotHasKey($item['id'], $found, 'Discovery repeated a source across pages.');
+                $found[$item['id']] = true;
+            }
+
+            $cursor = $page['next'];
+        } while ($cursor !== null);
+
+        Assert::assertCount($count, $found);
         Assert::assertCount($count, self::members($archive, $descriptor, $stash['id']));
 
         return ['stash' => $stash['id'], 'input' => $input['id'], 'run' => $discovery['run_id']];
@@ -166,6 +180,21 @@ final class Pr2Directory
         Assert::assertSame($count, $state['admitted']);
         Assert::assertSame($count, $state['settled']);
         Assert::assertSame(0, $state['outstanding']);
+        $cursor = '';
+        $sources = [];
+        do {
+            $page = Pr1RoundTrip::command($archive, $descriptor, ['input:admission', $run, $cursor]);
+            Assert::assertLessThanOrEqual(100, count($page['items']));
+            foreach ($page['items'] as $item) {
+                Assert::assertArrayNotHasKey($item['source_id'], $sources, 'Admission repeated a source across pages.');
+                Assert::assertNotEmpty($item['assignment_id']);
+                $sources[$item['source_id']] = true;
+            }
+
+            $cursor = $page['next'];
+        } while ($cursor !== null);
+
+        Assert::assertCount($count, $sources);
 
         return $state;
     }
@@ -315,15 +344,16 @@ final class Pr2Directory
                 continue;
             }
 
-            foreach ($inventory['manifest'][$digest] ?? [] as $path) {
-                Assert::assertIsString($path);
-                Assert::assertFalse(str_starts_with($path, '/') || str_contains($path, '..'), 'Unsafe OCFL manifest path.');
-                $physical = $object['root'] . '/' . $path;
-                Assert::assertFileExists($physical);
-                Assert::assertSame($digest, hash_file($inventory['digestAlgorithm'], $physical), 'OCFL manifest digest disagrees with physical bytes.');
+            $paths = $inventory['manifest'][$digest] ?? [];
+            Assert::assertNotEmpty($paths, 'A referenced digest requires a physical manifest path.');
+            $path = $paths[0];
+            Assert::assertIsString($path);
+            Assert::assertFalse(str_starts_with($path, '/') || str_contains($path, '..'), 'Unsafe OCFL manifest path.');
+            $physical = $object['root'] . '/' . $path;
+            Assert::assertFileExists($physical);
+            Assert::assertSame($digest, hash_file($inventory['digestAlgorithm'], $physical), 'OCFL manifest digest disagrees with physical bytes.');
 
-                return (string) file_get_contents($physical);
-            }
+            return (string) file_get_contents($physical);
         }
 
         Assert::fail('Missing exact physical payload ' . $objectId . '/' . $version . '/' . $logical);
@@ -461,6 +491,7 @@ final class Pr2Directory
         foreach ($entries as $relative => $entry) {
             $path = $output . '/' . $relative;
             Assert::assertFileExists($path);
+            clearstatcache(true, $path);
             $inode = fileinode($path);
             Assert::assertIsInt($inode);
             $ids[$relative] = $inode;

@@ -166,6 +166,24 @@ final readonly class DiscoveryStore
     }
 
     /**
+     * Read one exact saved source observation without scanning any other discovery or source file.
+     */
+    public function item(string $run, string $source): array
+    {
+        $row = $this->database->connect()->fetchFirst(query('discovery_items')->select('item')->where('run_id', $run)->where('source_id', $source));
+        if ($row === null) {
+            throw new InvalidArgumentException('Discovered source not found in this run.');
+        }
+
+        $item = json_decode($row['item'], true, flags: JSON_THROW_ON_ERROR);
+        if (! is_array($item)) {
+            throw new RuntimeException('Malformed persisted observation.');
+        }
+
+        return $item;
+    }
+
+    /**
      * Read one page of saved files without opening the source directory.
      */
     public function items(string $id, string $after, int $limit): array

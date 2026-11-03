@@ -48,6 +48,15 @@ test('a bounded directory run preserves every independent Item across 100-file p
         FOR EACH ROW EXECUTE FUNCTION configuration_proof.pr2_enforce_bound();
         SQL);
         try {
+            if ($count === 101) {
+                // Competing refills must share the same capacity and cannot admit source 101 early.
+                $firstRefill = start_configuration_cli($archive, $descriptor, ['input:acquire', $scope['run']]);
+                $secondRefill = start_configuration_cli($archive, $descriptor, ['input:acquire', $scope['run']]);
+                configuration_result(finish_configuration_cli($firstRefill));
+                configuration_result(finish_configuration_cli($secondRefill));
+                expect(Pr2Directory::admission($archive, $descriptor, $scope['run'], $count)['outstanding'])->toBe(100);
+            }
+
             Pr2Directory::acquire($archive, $descriptor, $scope['run'], $count, $count >= 1_000 ? 1_800 : 600);
         } finally {
             $database->exec('DROP TRIGGER pr2_enforce_bound ON configuration_proof.operation_demands');

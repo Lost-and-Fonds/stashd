@@ -86,7 +86,10 @@ final readonly class AcquisitionStore
             $uri = $saved['item_uri'] ?? 'urn:uuid:' . Uuid::v7()->toString();
             $this->associate($input, $source, $uri);
             $attempt = $database->fetchFirst(
-                query('acquisition_attempts')->select('id', 'run_id', 'source_id', 'item_uri', 'status', 'result', 'error')->where('run_id', $run)->where('source_id', $source),
+                query('acquisition_attempts')
+                    ->select('id', 'run_id', 'source_id', 'item_uri', 'status', 'result', 'error', 'assignment_id')
+                    ->where('run_id', $run)
+                    ->where('source_id', $source),
             );
             if ($attempt !== null) {
                 if ($attempt['item_uri'] !== $uri) {
@@ -136,7 +139,7 @@ final readonly class AcquisitionStore
             ->connect()
             ->fetch(
                 query('acquisition_attempts')
-                    ->select('id', 'run_id', 'source_id', 'item_uri', 'status', 'result', 'error')
+                    ->select('id', 'run_id', 'source_id', 'item_uri', 'status', 'result', 'error', 'assignment_id')
                     ->where('run_id', $run)
                     ->whereRaw('source_id > ?', $after)
                     ->orderBy('source_id')

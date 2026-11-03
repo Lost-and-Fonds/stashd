@@ -212,3 +212,22 @@ test('worker admission committed before cursor advancement is safe after SIGKILL
         expect(Pr1RoundTrip::verify($corpus['manifest'], $archive->path('output')))->toBe(0);
     });
 });
+
+/**
+ * An unfinished empty scan is not a completed acquisition, while a finished empty run needs no fake Job.
+ */
+test('empty discovery is only complete after its scan finishes', function (): void {
+    with_configuration_database(function (ArchiveFixture $archive, array $descriptor, PDO $database): void {
+        expect(mkdir($archive->path('inputs'), 0o700))->toBeTrue();
+        Pr1RoundTrip::command($archive, $descriptor, ['vault:init']);
+        Pr1RoundTrip::command($archive, $descriptor, ['integration:init']);
+        $input = Pr1RoundTrip::command($archive, $descriptor, ['input:create', 'filesystem', $archive->path('inputs')]);
+        $scan = Pr1RoundTrip::command($archive, $descriptor, ['input:discover', $input['id']]);
+        $pending = Pr2Directory::admission($archive, $descriptor, $scan['run_id'], 0);
+        expect($pending['status'])->not->toBe('complete');
+        Pr2Directory::settle($archive, $descriptor, $scan['assignment_id'], 60);
+        $empty = Pr1RoundTrip::command($archive, $descriptor, ['input:acquire', $scan['run_id']]);
+        expect($empty['assignment_id'])->toBeNull()->and($empty['status'])->toBe('complete');
+        Pr2Directory::assertPerFileAssignments($database, $scan['run_id'], 0);
+    });
+});
