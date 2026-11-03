@@ -10,6 +10,8 @@ use App\Integration\DiscoveryStore;
 use App\Integration\DTO\BroadcastSelection;
 use App\Integration\IntegrationConfigurations;
 use App\Integration\OperationsDatabase;
+use App\Operations\Authority\PublicationAuthority;
+use App\Operations\DTO\AssignmentContext;
 use App\RecordsAndArchives\ItemArchive;
 use App\RecordsAndArchives\Vault;
 use Generator;
@@ -33,6 +35,7 @@ final readonly class Catalogue
         private ItemArchive $archive,
         private Vault $vault,
         private BroadcastCoordinator $broadcast,
+        private PublicationAuthority $authority,
     ) {}
 
     /**
@@ -75,11 +78,12 @@ final readonly class Catalogue
 
     /**
      * Add the run's canonical Items to every attached Stash without copying source facts.
+     * Commit membership only while this worker still holds its Assignment authority.
      */
-    public function discovered(string $runId): void
+    public function discovered(string $runId, AssignmentContext $context): void
     {
         $run = $this->discovery->read($runId);
-        $this->database->transaction(function () use ($runId, $run): void {
+        $this->authority->protect($context, function () use ($runId, $run): void {
             foreach ($this->acquisition->items($runId) as $attempt) {
                 assert(is_array($attempt), 'Acquisition returns saved attempt records.');
                 /**

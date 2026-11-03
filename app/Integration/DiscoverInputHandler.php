@@ -33,8 +33,8 @@ final readonly class DiscoverInputHandler
     {
         $run = $this->discovery->read($job->runId);
         $result = $this->discovery->discover($run['input_id'], $job->runId);
-        $this->acquisition->catalogue($job->runId);
-        $this->catalogue->discovered($job->runId);
+        $this->acquisition->catalogue($job->runId, $context);
+        $this->catalogue->discovered($job->runId, $context);
         Result::record($this->authority, $context, json_encode($result, JSON_THROW_ON_ERROR));
     }
 }

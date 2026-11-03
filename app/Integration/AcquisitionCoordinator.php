@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Integration;
 
 use App\Integration\DTO\DiscoveredItem;
+use App\Operations\DTO\AssignmentContext;
 use App\RecordsAndArchives\AssetArchive;
 use App\RecordsAndArchives\ItemArchive;
 use App\RecordsAndArchives\PreservationTransaction;
@@ -43,8 +44,9 @@ final readonly class AcquisitionCoordinator
      *
      * Earlier unfinished work is recovered first. Failures retain retry identities,
      * release the lock, and propagate rather than inventing preservation success.
+     * Worker callers pass their context for identity writes; filesystem effects are not in that SQL fence.
      */
-    public function acquire(string $runId): array
+    public function acquire(string $runId, ?AssignmentContext $context = null): array
     {
         $run = $this->discovery->read($runId);
         if ($run['status'] !== 'finished') {
@@ -73,7 +75,7 @@ final readonly class AcquisitionCoordinator
                 $this->store->save($pending['id'], 'preserved', $recovered);
             }
 
-            $this->reassociate($input['id']);
+            $this->reassociate($input['id'], $context);
             $after = '';
             $counts = [];
             do {
@@ -82,7 +84,7 @@ final readonly class AcquisitionCoordinator
                 foreach ($page['items'] as $observation) {
                     $item = map($observation)->to(DiscoveredItem::class);
                     assert($item instanceof DiscoveredItem, 'The mapper must return a discovered Item.');
-                    $attempt = $this->store->start($runId, $input['id'], $item->id);
+                    $attempt = $this->store->start($runId, $input['id'], $item->id, $context);
                     try {
                         $result = $this->one($input, $item, $attempt);
                         $status = $result['status'];
@@ -106,13 +108,14 @@ final readonly class AcquisitionCoordinator
     /**
      * Catalogue the single saved observation using acquisition's existing identity and recovery rules.
      * Hold the Input lock while restoring source claims and allocating the reusable attempt.
+     * Only short SQL writes are fenced; canonical recovery and filesystem reads stay outside.
      */
-    public function catalogue(string $runId): array
+    public function catalogue(string $runId, AssignmentContext $context): array
     {
         $run = $this->discovery->read($runId);
         $this->discovery->lock($run['input_id']);
         try {
-            $this->reassociate($run['input_id']);
+            $this->reassociate($run['input_id'], $context);
             $page = $this->discovery->items($runId, '', 2);
             assert(is_array($page['items']), 'Discovery returns a page of saved observations.');
             if (count($page['items']) > 1 || $page['next'] !== null) {
@@ -121,7 +124,7 @@ final readonly class AcquisitionCoordinator
 
             foreach ($page['items'] as $item) {
                 assert(is_array($item), 'Each saved observation is a discovery record.');
-                $this->store->start($runId, $run['input_id'], $item['id']);
+                $this->store->start($runId, $run['input_id'], $item['id'], $context);
             }
 
             return $run;
@@ -266,7 +269,7 @@ final readonly class AcquisitionCoordinator
      * journals or Item history are damaged. Those failures block this Input.
      * Unreadable unrelated Objects remain isolated and are never rewritten.
      */
-    private function reassociate(string $input): void
+    private function reassociate(string $input, ?AssignmentContext $context): void
     {
         $relevant = [];
         foreach ($this->transactions->candidates() as $candidate) {
@@ -326,6 +329,6 @@ final readonly class AcquisitionCoordinator
             }
         }
 
-        $this->store->restore($input, $claims);
+        $this->store->restore($input, $claims, $context);
     }
 }

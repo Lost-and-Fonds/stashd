@@ -139,6 +139,8 @@ test('killing the real worker after Vault commit but before result acceptance re
         }
 
         expect($before)->not->toBeNull();
+        // Force transport eligibility only after SIGKILL; production retains its 60-second visibility.
+        $database->exec("UPDATE configuration_proof.messenger_messages SET delivered_at = CURRENT_TIMESTAMP - INTERVAL '61 seconds' WHERE delivered_at IS NOT NULL");
         Pr1RoundTrip::settle($archive, $descriptor, $assignment);
         expect((int) $database->query('SELECT count(*) FROM configuration_proof.operation_results')->fetchColumn())->toBe($baseline + 1);
         $after = Pr1RoundTrip::preserved($archive, $scope['item']['object_id'], $corpus['bytes']);

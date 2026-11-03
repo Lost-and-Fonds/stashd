@@ -40,8 +40,7 @@ final class DurableRuntimeInitializer implements Initializer
             $connections->journal,
             $connections->application,
             new LockFactory(new PostgreSqlStore($native)),
-            // Session claims exclude healthy owners; short delivery visibility permits prompt crash recovery.
-            1,
+            60,
             fn ($routine, $interactive) => new ActivityDelivery(
                 $routine,
                 $interactive,

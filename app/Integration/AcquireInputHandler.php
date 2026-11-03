@@ -29,7 +29,7 @@ final readonly class AcquireInputHandler
      */
     public function __invoke(AcquireInput $job, AssignmentContext $context): void
     {
-        $result = $this->acquisition->acquire($job->runId);
+        $result = $this->acquisition->acquire($job->runId, $context);
         if (array_diff(array_keys($result['counts']), ['preserved', 'unchanged']) !== []) {
             throw new RuntimeException('Acquisition has unpreserved files.');
         }

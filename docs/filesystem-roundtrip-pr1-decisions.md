@@ -2,7 +2,7 @@
 
 This slice connects existing Integration work to Catalogue and Operations. The
 acceptance contracts from #86 keep their command names, response fields and
-observable assertions. Mago reformats them without changing their assertions.
+observable assertions. The SIGKILL proof explicitly backdates its disposable Messenger delivery only after the worker exits; production visibility does not set the test deadline.
 
 ## Persistence and authority
 
@@ -38,7 +38,15 @@ Revisit these exceptions if Tempest exposes the required operations directly.
 Three scalar Jobs retain saved run UUIDs and use `Worker::do`, existing Messenger
 outbox delivery and Durable Activities. The existing coordinators perform the
 actual work. Only `Result::record` accepts successful coverage, under the existing
-Operations authority fence. Admission receipts never claim completion.
+Operations authority fence. Worker-derived Item/source/attempt allocation and
+canonical source-map restoration also use `PublicationAuthority::protect` with
+the handler's explicit AssignmentContext. Stash membership derived from discovery
+requires that context and commits under the same fence. These callbacks use the
+shared Tempest/DBAL application connection and contain only short SQL mutations;
+filesystem reads, recovery and publication stay outside them. Ordinary user Stash
+creation/attachment and synchronous diagnostic acquisition remain available
+without an Assignment. No Catalogue model is globally marked Fenced.
+Admission receipts never claim completion.
 
 Discovery saves its run before admission; failed admission leaves replayable
 state. Its Job resumes that exact run and links stable acquisition identities to
@@ -52,11 +60,12 @@ PostgreSQL barrier proves actual physical Item/Asset v1 publication before Resul
 acceptance, then removes the source and kills the real worker. Recovery accepts
 one result for the same Assignment and creates no additional OCFL versions.
 
-Production transport visibility is shortened from 60 to one second so a killed
-worker recovers within the acceptance window. PostgreSQL session claims still
-exclude a healthy owner from duplicate execution. This can increase delivery
-polling for long-running work; it does not grant exactly-once arbitrary effects.
-The existing healthy-owner and takeover contracts remain required regressions.
+Production transport visibility remains 60 seconds. The crash acceptance test
+makes the disposable queued delivery eligible explicitly after SIGKILL by
+backdating `delivered_at`; it never edits Results, Assignments or archival facts.
+This separates the test's prompt recovery from production polling economics.
+PostgreSQL session claims still exclude healthy owners from duplicate execution;
+no exactly-once arbitrary-effects guarantee is implied.
 
 ## CLI naming for review
 
@@ -89,7 +98,7 @@ per-file atomicity and operator-controlled-root assumptions. Whole-tree atomicit
 hostile concurrent filesystem writers, power loss, publication interruption and
 the wider stale-worker matrix are not established by PR 1.
 
-## Verification performed
+## Initial PR 1 verification
 
 In the intended Lerd PHP 8.5 environment with disposable PostgreSQL databases:
 
@@ -110,3 +119,37 @@ Local setup required Python 3 in the Lerd image and the documented private
 projection test-admin file. Lerd debug capture was disabled during tests because
 its collector prints a PHP 8.5 `ReflectionProperty::setAccessible` deprecation
 into JSON CLI output. No application assertion was relaxed to hide it.
+
+## Review follow-up: Catalogue fencing and transport policy
+
+The review's stale-worker concern was reproduced before implementation in three
+real CLI/Worker tests. A PostgreSQL AFTER INSERT trigger blocks new Item/source
+creation, Stash membership, or restoration of a source identity from canonical
+provenance. Another database session terminates the actual claim backend while
+the application transaction stays alive. Before the fix all three tests failed
+because stale Catalogue state committed despite rejected Results. With the fix,
+the in-flight SQL rolls back, no Result is accepted from the old worker, and a
+successor completes the same Assignment. Earlier authorized identities remain
+unchanged; canonical restoration also retains the original URI and OCFL v1.
+
+Both discovery and acquisition handlers pass context through every source-map
+allocation/restoration call. The existing `PublicationAuthority` owns the
+transaction; Tempest models share that DBAL connection through the existing
+`ApplicationConnection`. No nested OperationsDatabase transaction wraps the
+protected callback, and no filesystem operation runs inside it.
+
+The one-second production change was removed. No new transport configuration
+is needed for this test-only forced redelivery boundary.
+
+Follow-up validation in the same intended Lerd environment:
+
+- Before the fix, all **3** new real-worker revocation cases failed because stale
+  Catalogue state committed. This is the negative control for the SQL fence.
+- Focused round-trip, upgrade and revocation suite: **6 passed**.
+- Final full `lerd composer qa`: **577 passed, 42 existing incomplete contracts,
+  zero failures**, exit 0 (25,277 assertions). Formatting/lint passed; analysis
+  retained the same four existing informational notices and no errors.
+
+The final revocation cases additionally require exactly one accepted Result,
+interrupted/completed Attempts, retained earlier authorized identities, and
+source-independent canonical provenance restoration without extra OCFL versions.
