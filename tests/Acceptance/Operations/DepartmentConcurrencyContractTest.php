@@ -226,3 +226,70 @@ test('C02: native outbox rejection rolls back admission and retained demand toge
     expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
     expect($db->fetchFirstColumn('SELECT value FROM effects'))->toBe(['c02-atomic:refresh:one']);
 });
+
+test('C03: a late stale failure does not consume the successor retry budget', function (): void {
+    $assignment = $this->worker->do(new DepartmentJob('c03-late-failure'));
+    acceptance_scheduled($this->department);
+    $path = tempnam(sys_get_temp_dir(), 'c03-late-');
+    unlink($path);
+    $old = acceptance_child($this->department, ['handlerBarrier' => $path, 'fail' => true]);
+    try {
+        $observed = acceptance_barrier($path, $old);
+        $this->department->admin->query('SELECT pg_terminate_backend(' . (int) $observed['pid'] . ')');
+        acceptance_redeliver($this->department);
+        $next = acceptance_child($this->department)->wait();
+        expect($next->exitCode)->toBe(0, $next->errorOutput);
+        $db = $this->department->connections->application;
+        $before = $db->fetchAllAssociative('SELECT * FROM operation_assignments ORDER BY uuid');
+        file_put_contents($path . '.release', 'go');
+        $old->wait();
+        expect($db->fetchAllAssociative('SELECT * FROM operation_assignments ORDER BY uuid'))->toBe($before);
+
+        $events = iterator_to_array($this->department->runtime->events->readStream(
+            Gplanchat\Durable\ExecutionId::fromString($assignment->id->uuidFor(Assignment::class)),
+        ));
+        expect(array_filter($events, fn ($event) => $event instanceof Gplanchat\Durable\Event\ActivityTaskFailed
+            || $event instanceof Gplanchat\Durable\Event\ActivityRetryQueued))->toBe([]);
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
+    } finally {
+        if ($old->running) {
+            $old->signal(9)->wait();
+        }
+        foreach (glob($path . '*') as $file) {
+            unlink($file);
+        }
+    }
+});
+
+test('C03: retained custody is reverified before a successor adopts coverage', function (): void {
+    $bytes = tempnam(sys_get_temp_dir(), 'c03-bytes-');
+    file_put_contents($bytes, 'original preserved bytes');
+    $assignment = $this->worker->do(new DepartmentJob('c03-custody', custodyPath: $bytes));
+    acceptance_scheduled($this->department);
+    $path = tempnam(sys_get_temp_dir(), 'c03-custody-');
+    unlink($path);
+    $old = acceptance_child($this->department, ['handlerBarrier' => $path]);
+    try {
+        acceptance_barrier($path, $old);
+        $db = $this->department->connections->application;
+        expect($db->fetchFirstColumn('SELECT digest FROM operation_custody_receipts'))->toBe([hash_file('sha256', $bytes)]);
+        expect((int) $db->fetchOne('SELECT count(*) FROM operation_results'))->toBe(0);
+        $old->signal(9)->wait();
+        acceptance_redeliver($this->department);
+        $next = acceptance_child($this->department)->wait();
+        expect($next->exitCode)->toBe(0, $next->errorOutput);
+
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
+        expect($db->fetchFirstColumn('SELECT coverage FROM operation_results'))->toBe(['verified']);
+        expect((int) $db->fetchOne('SELECT count(*) FROM operation_reconciliations'))->toBe(1);
+        expect((int) $db->fetchOne('SELECT count(*) FROM operation_custody_receipts'))->toBe(1);
+    } finally {
+        if ($old->running) {
+            $old->signal(9)->wait();
+        }
+        foreach (glob($path . '*') as $file) {
+            unlink($file);
+        }
+        unlink($bytes);
+    }
+});
