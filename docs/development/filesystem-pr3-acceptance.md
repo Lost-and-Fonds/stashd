@@ -1,9 +1,8 @@
 # PR 3 acceptance: filesystem mutation and historical reconstruction
 
-**Status: acceptance-first tests, not implementation.** This stack starts from the
-PR 2 feature branch while [#89](https://github.com/Lost-and-Fonds/stashd/pull/89)
-is still being finished. The tests-only PR should target that branch until #89
-merges. Rebase/retarget to `dev` afterward; do not merge the tests alone.
+**Status: acceptance-first tests, not implementation.** [PR #89](https://github.com/Lost-and-Fonds/stashd/pull/89)
+is merged into `dev`; this tests-only branch targets `dev`. Do not merge the
+intentionally incomplete contracts alone.
 
 The authoritative requirements are
 [the five-PR plan](../plans/filesystem-round-trip.md) and the
@@ -129,7 +128,9 @@ from this acceptance contract.
 - No actual process crashes or custody-failure matrix: those belong to PR 4.
 - Test roots and databases are disposable, and mutation manifests never live
   inside the scanned source directory.
-- Full PHP QA and Lerd integration have **not yet been demonstrated** for
-  this tests-only branch. Main acceptance tests may intentionally be red
-  until PR 3 is implemented. The Python fixture needs independent execution
-  before claiming it passes.
+- The 11 fast Python Microtext regressions, including three mutation-oracle tests,
+  passed in [GitHub CI run 41595049598](https://github.com/Lost-and-Fonds/stashd/actions/runs/41595049598).
+  That run stopped at Mago formatting (one PHP file), before PHP syntax,
+  static analysis or Pest. Full PHP QA and Lerd integration have **not** been
+  demonstrated for this tests-only branch. Fix formatting and establish the
+  genuine failing acceptance baseline before claiming PR 3 behaviour is complete.
