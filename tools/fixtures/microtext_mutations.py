@@ -180,8 +180,8 @@ def verify_snapshot(directory: Path, manifest_path: Path) -> tuple[int, list[str
     checked = 0
     for row in data["entries"]:
         if (not isinstance(row, dict) or set(row) != {"path", "bytes", "sha256"}
-                or not _safe_path(row["path"]) or type(row["bytes"]) is not int
-                or row["bytes"] <= 0 or not isinstance(row["sha256"], str)
+                or not _safe_path(row.get("path")) or type(row.get("bytes")) is not int
+                or row["bytes"] <= 0 or not isinstance(row.get("sha256"), str)
                 or not DIGEST.fullmatch(row["sha256"]) or row["path"] in expected):
             errors.append("invalid or duplicated expected file")
             continue
