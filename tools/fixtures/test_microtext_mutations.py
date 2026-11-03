@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -56,20 +57,15 @@ class MutationFixturesTest(unittest.TestCase):
             after_preserved = base / "after-preserved.json"
             operations_file = base / "operations.json"
             generate(source, original, count=7, seed="historical-negative")
-            baseline = json.loads(original.read_bytes())
+            restored = base / "wrong-historical-output"
+            shutil.copytree(source, restored)
+            self.assertEqual(verify_original(restored, original)[1], [])
             mutation = mutate(source, original, after_source, after_preserved, operations_file,
                               added=1, changed=2, renamed=1, removed=1)
-            # Create a stand-in *only for the external verifier's negative control*.
-            # No application code, output or Vault claim is being fabricated.
-            restored = base / "wrong-historical-output"
-            for row in baseline["entries"]:
-                target = restored / row["path"]
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(
-                    source.joinpath(row["path"]).read_bytes()
-                    if row["path"] in {change["path"] for change in mutation["changed"]}
-                    else b"wrong historical bytes\n"
-                )
+            # Substitute ONLY the modified files' latest bytes in a once-correct old
+            # output. This tests the independent historical oracle, not Stashd.
+            for change in mutation["changed"]:
+                (restored / change["path"]).write_bytes((source / change["path"]).read_bytes())
             _, failures = verify_original(restored, original)
             self.assertTrue(failures, "The frozen original oracle must reject substituted latest bytes.")
             _, failures = verify_snapshot(restored, after_preserved)
