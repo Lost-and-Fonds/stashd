@@ -194,7 +194,25 @@ preservation facilities were unchanged.
 | `python3 -m unittest discover -s tools/fixtures -p 'test_microtext*.py' -v` | All 11 passed. |
 | `STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/Integration/FilesystemMutationPr3Test.php` | 2 passed, 2,048 assertions after environment setup. |
 | Same focused test with `--filter='modified paths'`, temporary head-and-size substitution | 1 expected failure at the historical byte oracle, 1,510 assertions. |
+| Combined focused regressions below, after restoring production code | 38 passed, 6,689 assertions, exit 0. |
 | `lerd composer qa` (repeated after restoring negative controls) | Exit 0: formatting/lint passed; 586 passed, 42 existing incomplete, 29,082 assertions, eight processes. Analysis reported four existing informational notices, no errors. |
+
+The combined focused command was:
+
+```sh
+STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/Integration/{FilesystemRoundTripPr1,FilesystemDirectoryPr2,FilesystemMutationPr3,Acquisition,Broadcast,FilesystemPublication,Discovery}Test.php --colors=never
+```
+
+The first attempt exceeded the shell tool's 120-second output deadline; the
+complete rerun used a longer deadline and finished in 524.97 seconds while QA
+also ran. This is execution evidence, not a performance benchmark.
+
+After testing, both private test-admin configurations created for this run were
+removed and Lerd debug capture was restored to its original enabled state.
+No test PHP processes remained. Final PostgreSQL inspection found two generated
+fixture-named databases without active sessions or retained descriptors linking
+them to this worktree. Their ownership could not be established safely, so they
+were left untouched rather than deleting potentially unrelated fixtures.
 
 No new queue, history store, coordinator, migrations, runtime dependencies or
 public API were added. No throughput, 400-file, PR 4 recovery-matrix or PR 5
