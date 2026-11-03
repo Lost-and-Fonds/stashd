@@ -1,0 +1,6 @@
+{
+  "format": "stashd-microtext-reference-v1",
+  "seed": "stashd-microtext-v1",
+  "count": 10000,
+  "manifest_sha256": "1d604b9465c44815103437de83ab88cda22f18e388083139e3f83ef6197009c6"
+}
