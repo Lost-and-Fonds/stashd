@@ -1,8 +1,10 @@
 # PR 3 acceptance: filesystem mutation and historical reconstruction
 
-**Status: acceptance-first tests, not implementation.** [PR #89](https://github.com/Lost-and-Fonds/stashd/pull/89)
-is merged into `dev`; this tests-only branch targets `dev`. Do not merge the
-intentionally incomplete contracts alone.
+**Status: routine acceptance verified against the existing implementation.**
+[PR #87](https://github.com/Lost-and-Fonds/stashd/pull/87) and
+[PR #89](https://github.com/Lost-and-Fonds/stashd/pull/89) are merged into `dev`.
+The substantive PR 3 tests pass without production changes; see the observed
+results below. The 400-file mutation run remains opt-in and has not been run.
 
 The authoritative requirements are
 [the five-PR plan](../plans/filesystem-round-trip.md) and the
@@ -109,8 +111,8 @@ STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/Integration/FilesystemMut
 STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Stress/Integration/FilesystemMutationPr3StressTest.php
 ```
 
-Only after the implementation and tests are proven should the opt-in
-stress suite be integrated into the post-merge/release workflow.
+Only after the full mutation run is proven should the opt-in stress suite be
+integrated into the post-merge/release workflow.
 The 10,000-file application stress run remains PR 5. Do not infer throughput
 from this acceptance contract.
 
@@ -131,6 +133,70 @@ from this acceptance contract.
 - The 11 fast Python Microtext regressions, including three mutation-oracle tests,
   passed in [GitHub CI run 41595049598](https://github.com/Lost-and-Fonds/stashd/actions/runs/41595049598).
   That run stopped at Mago formatting (one PHP file), before PHP syntax,
-  static analysis or Pest. Full PHP QA and Lerd integration have **not** been
-  demonstrated for this tests-only branch. Fix formatting and establish the
-  genuine failing acceptance baseline before claiming PR 3 behaviour is complete.
+  static analysis or Pest. Local validation below closes those routine gates,
+  not the optional stress or later PR 4/5 gates.
+
+## Observed PR 3 validation
+
+Branch `feat/filesystem-pr3-mutations-history` starts from the reviewed #91
+contracts (`4131ba4`). Its production code, Composer files and PHPUnit suites
+match merged `dev` (`39da695`). Only Mago formatting of `Pr3Mutation.php` and
+this validation record were needed beyond those acceptance contracts.
+
+### Failure classification
+
+1. **Formatting:** installed Mago reformatted the Python argument list in
+   `tests/Support/Integration/Pr3Mutation.php`. No assertions changed.
+2. **Environment prerequisite:** the first focused run failed twice with
+   `An explicit private local projection test-admin configuration is required.`
+   Provisioning the existing ignored 0600 fixture configuration resolved it.
+   Each scenario creates and disposes its own unprivileged PostgreSQL database
+   and role; application database settings and working Vaults were not changed.
+3. **Environment instrumentation:** the next run failed JSON decoding because
+   `/usr/local/etc/lerd/devtools-collector.php:644` printed PHP 8.5's
+   `ReflectionProperty::setAccessible()` deprecation before an otherwise valid
+   discovery receipt. Disabling Lerd debug capture resolved it. No JSON parsing
+   or application error checks were weakened. A temporary diagnostic change
+   that exposed the raw output was removed.
+4. **Product behavior:** both substantive contracts then passed unchanged:
+   **2 tests, 2,048 assertions**. Same-path changes retain Item/Asset identity
+   with v1/v2, renamed paths get new Items, missing originals remain members,
+   unchanged Items stay at v1, and both frozen outputs reconstruct after source
+   deletion. There is no demonstrated missing production behavior to implement.
+
+### Latest-head negative control
+
+The independent Python latest-head substitution test passes by rejecting the
+wrong historical bytes. An additional temporary production mutation in
+`BroadcastInvocation::next()` replaced every frozen Asset revision and size
+with its current head and current size before granting reads. Both real
+Broadcast Jobs still completed after source deletion, but the acceptance test
+failed at `FilesystemMutationPr3Test.php:109`: the original external manifest
+rejected `historical-output` (verifier exit 1 rather than 0). This demonstrates
+that successful Jobs and a correct file count cannot hide latest-head reads.
+The mutation was removed; no production diff remains.
+
+A narrower initial mutation changed only `AssetArchive::readStream()` to read
+head. It failed earlier at the existing stream-length guard, because the frozen
+size no longer matched. Updating both the revision and size for the second
+control ensured that the independent historical oracle itself was exercised.
+
+### Commands and results
+
+All PHP runs used Lerd's PHP 8.5 environment and the existing local PostgreSQL
+fixture. The installed dependencies and existing Tempest/Catalogue/Operations/
+preservation facilities were unchanged.
+
+| Command | Observed result |
+| --- | --- |
+| `lerd composer fmt` | One file formatted; subsequent `lerd composer github:fmt` passed. |
+| `python3 -m unittest discover -s tools/fixtures -p 'test_microtext_mutations.py' -v` | 3 passed, including latest-head substitution rejection. |
+| `python3 -m unittest discover -s tools/fixtures -p 'test_microtext*.py' -v` | All 11 passed. |
+| `STASHD_TEST_PROCESSES=1 ./bin/test.sh tests/Acceptance/Integration/FilesystemMutationPr3Test.php` | 2 passed, 2,048 assertions after environment setup. |
+| Same focused test with `--filter='modified paths'`, temporary head-and-size substitution | 1 expected failure at the historical byte oracle, 1,510 assertions. |
+| `lerd composer qa` (repeated after restoring negative controls) | Exit 0: formatting/lint passed; 586 passed, 42 existing incomplete, 29,082 assertions, eight processes. Analysis reported four existing informational notices, no errors. |
+
+No new queue, history store, coordinator, migrations, runtime dependencies or
+public API were added. No throughput, 400-file, PR 4 recovery-matrix or PR 5
+10,000-Item result is claimed. Existing incomplete tests and informational
+analysis notices remain visible rather than being suppressed.
