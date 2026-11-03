@@ -78,8 +78,8 @@ PR 1's existing public commands remain in place, including `input:discover`,
   advance only past durable per-file admission, not before it. The cursor
   checker compares actual persisted Operations Demands to all discoveries
   through that source ID.
-- **Run-level `input:acquire`** remains the caller entry point, returns an
-  admission Assignment, and is safe to invoke repeatedly to resume an unfinished
+- **Run-level `input:acquire`** remains the caller entry point, returns a
+  per-file Assignment receipt from its bounded admission batch, and is safe to invoke repeatedly to resume an unfinished
   admission run. Per-file Jobs are admitted in bounded pages. Repeated active
   requests coalesce where appropriate; retries after a *terminal failure* may
   create another Assignment but must not duplicate canonical archival versions.
@@ -101,3 +101,16 @@ making it pass through a mock, direct file copy or private SQL completion writes
   accessed.
 - No claim is made that the suite currently passes, or that `composer qa`
   was run in Lerd while preparing this tests-only PR.
+
+## Implementation review of the proposed seam
+
+`input:acquire` is a bounded refill command, not an extra run-wide execution Job.
+Its `assignment_id` refers to an actual per-file acquisition Assignment (the first
+persisted one for the run), retaining PR 1's receipt and recovery semantics.
+Run completion is observed through `input:admission`, not by treating that one
+Assignment as the whole directory. Call `input:acquire` again after workers
+settle to refill capacity. The harness already supports direct admission; its
+receipt explanation is clarified accordingly. No behavioural assertion is removed.
+The cursor crash proof additionally requires an independently committed per-file
+Demand at the barrier, so a transaction that has not really admitted work cannot
+pass as the requested after-admission interruption.

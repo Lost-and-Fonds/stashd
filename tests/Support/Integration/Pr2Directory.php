@@ -144,7 +144,7 @@ final class Pr2Directory
         $state = [];
         do {
             $admission = Pr1RoundTrip::command($archive, $descriptor, ['input:acquire', $run]);
-            Assert::assertNotEmpty($admission['assignment_id'] ?? null, 'Admission must return a durable run Assignment.');
+            Assert::assertNotEmpty($admission['assignment_id'] ?? null, 'Admission must return a durable per-file Assignment receipt.');
             $state = self::admission($archive, $descriptor, $run, $count);
             if ($state['status'] === 'complete') {
                 break;
@@ -184,6 +184,7 @@ final class Pr2Directory
         if ($state['cursor'] !== null) {
             Assert::assertIsString($state['cursor']);
         }
+
         Assert::assertSame($count, $state['total'] ?? null);
         foreach (['admitted', 'settled', 'outstanding'] as $field) {
             Assert::assertIsInt($state[$field] ?? null, 'Progress fields must be integer counts: ' . $field);
@@ -209,12 +210,12 @@ final class Pr2Directory
     public static function assertPerFileAssignments(\PDO $database, string $run, int $count, bool $allowRetries = false): void
     {
         $statement = $database->prepare(<<<'SQL'
-            SELECT d.payload::jsonb ->> 'sourceId' AS source_id, a.uuid::text AS assignment_id
-            FROM configuration_proof.operation_demands d
-            JOIN configuration_proof.operation_assignments a ON a.uuid = d.assignment_id
-            WHERE d.payload::jsonb ->> 'runId' = ?
-                AND d.payload::jsonb ->> 'sourceId' IS NOT NULL
-            SQL);
+        SELECT d.payload::jsonb ->> 'sourceId' AS source_id, a.uuid::text AS assignment_id
+        FROM configuration_proof.operation_demands d
+        JOIN configuration_proof.operation_assignments a ON a.uuid = d.assignment_id
+        WHERE d.payload::jsonb ->> 'runId' = ?
+            AND d.payload::jsonb ->> 'sourceId' IS NOT NULL
+        SQL);
         $statement->execute([$run]);
         $rows = $statement->fetchAll(\PDO::FETCH_ASSOC);
         $actual = array_unique(array_column($rows, 'source_id'));
@@ -228,6 +229,7 @@ final class Pr2Directory
         } else {
             Assert::assertCount($count, $rows, 'A fault-free first run needs one durable acquisition Demand per file.');
         }
+
         Assert::assertSame($sources, $actual, 'Each discovered source needs its own persisted Job input.');
         Assert::assertGreaterThanOrEqual($count, count(array_unique(array_column($rows, 'assignment_id'))), 'One run-wide Assignment cannot represent individual files.');
     }
@@ -251,13 +253,13 @@ final class Pr2Directory
         $before->execute([$run, $cursor]);
         $expected = $before->fetchAll(\PDO::FETCH_COLUMN);
         $admitted = $database->prepare(<<<'SQL'
-            SELECT DISTINCT d.payload::jsonb ->> 'sourceId' AS source_id
-            FROM configuration_proof.operation_demands d
-            WHERE d.payload::jsonb ->> 'runId' = ?
-              AND d.payload::jsonb ->> 'sourceId' IS NOT NULL
-              AND d.payload::jsonb ->> 'sourceId' <= ?
-            ORDER BY source_id
-            SQL);
+        SELECT DISTINCT d.payload::jsonb ->> 'sourceId' AS source_id
+        FROM configuration_proof.operation_demands d
+        WHERE d.payload::jsonb ->> 'runId' = ?
+          AND d.payload::jsonb ->> 'sourceId' IS NOT NULL
+          AND d.payload::jsonb ->> 'sourceId' <= ?
+        ORDER BY source_id
+        SQL);
         $admitted->execute([$run, $cursor]);
         Assert::assertSame(
             $expected,

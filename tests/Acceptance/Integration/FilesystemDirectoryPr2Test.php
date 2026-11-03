@@ -92,22 +92,22 @@ test('failed Worker admission leaves a replayable source instead of skipping it'
         $corpus = Pr2Directory::corpus($archive, 3);
         $scope = Pr2Directory::discover($archive, $descriptor, $corpus['source'], 3);
         $database->exec(<<<'SQL'
-            CREATE SEQUENCE configuration_proof.pr2_admission_visits;
-            CREATE FUNCTION configuration_proof.pr2_reject_admission() RETURNS trigger LANGUAGE plpgsql AS $$
-            DECLARE visited bigint;
-            BEGIN
-                IF NEW.payload::jsonb ->> 'sourceId' IS NOT NULL THEN
-                    visited := nextval('configuration_proof.pr2_admission_visits');
-                    IF visited >= 2 THEN
-                        RAISE EXCEPTION 'PR2 intentional per-file admission rejection';
-                    END IF;
+        CREATE SEQUENCE configuration_proof.pr2_admission_visits;
+        CREATE FUNCTION configuration_proof.pr2_reject_admission() RETURNS trigger LANGUAGE plpgsql AS $$
+        DECLARE visited bigint;
+        BEGIN
+            IF NEW.payload::jsonb ->> 'sourceId' IS NOT NULL THEN
+                visited := nextval('configuration_proof.pr2_admission_visits');
+                IF visited >= 2 THEN
+                    RAISE EXCEPTION 'PR2 intentional per-file admission rejection';
                 END IF;
-                RETURN NEW;
-            END
-            $$;
-            CREATE TRIGGER pr2_reject_admission BEFORE INSERT ON configuration_proof.operation_demands
-            FOR EACH ROW EXECUTE FUNCTION configuration_proof.pr2_reject_admission();
-            SQL);
+            END IF;
+            RETURN NEW;
+        END
+        $$;
+        CREATE TRIGGER pr2_reject_admission BEFORE INSERT ON configuration_proof.operation_demands
+        FOR EACH ROW EXECUTE FUNCTION configuration_proof.pr2_reject_admission();
+        SQL);
         try {
             // The coordinator may admit directly or through a Job. Both use the
             // real production Worker and must encounter this durable DB trigger.
@@ -146,17 +146,17 @@ test('worker admission committed before cursor advancement is safe after SIGKILL
         $corpus = Pr2Directory::corpus($archive, 3);
         $scope = Pr2Directory::discover($archive, $descriptor, $corpus['source'], 3);
         $database->exec(<<<'SQL'
-            CREATE FUNCTION configuration_proof.pr2_hold_cursor() RETURNS trigger LANGUAGE plpgsql AS $$
-            BEGIN
-                IF NEW.admission_cursor IS DISTINCT FROM OLD.admission_cursor THEN
-                    PERFORM pg_advisory_xact_lock(7188, 2);
-                END IF;
-                RETURN NEW;
-            END
-            $$;
-            CREATE TRIGGER pr2_hold_cursor BEFORE UPDATE OF admission_cursor ON configuration_proof.discovery_runs
-            FOR EACH ROW EXECUTE FUNCTION configuration_proof.pr2_hold_cursor();
-            SQL);
+        CREATE FUNCTION configuration_proof.pr2_hold_cursor() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF NEW.admission_cursor IS DISTINCT FROM OLD.admission_cursor THEN
+                PERFORM pg_advisory_xact_lock(7188, 2);
+            END IF;
+            RETURN NEW;
+        END
+        $$;
+        CREATE TRIGGER pr2_hold_cursor BEFORE UPDATE OF admission_cursor ON configuration_proof.discovery_runs
+        FOR EACH ROW EXECUTE FUNCTION configuration_proof.pr2_hold_cursor();
+        SQL);
         $database->query('SELECT pg_advisory_lock(7188, 2)');
         $children = [];
         $blocked = false;
@@ -167,10 +167,12 @@ test('worker admission committed before cursor advancement is safe after SIGKILL
             $children[] = start_configuration_cli($archive, $descriptor, ['operations:work', '--once']);
             $deadline = microtime(true) + 15;
             do {
-                $waiting = (int) $database->query(
-                    "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND classid = 7188 AND objid = 2
+                $waiting = (int) $database
+                    ->query(
+                        "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND classid = 7188 AND objid = 2
                     AND NOT granted AND database = (SELECT oid FROM pg_database WHERE datname = current_database())",
-                )->fetchColumn();
+                    )
+                    ->fetchColumn();
                 if ($waiting > 0) {
                     $blocked = true;
                     break;
@@ -178,7 +180,10 @@ test('worker admission committed before cursor advancement is safe after SIGKILL
 
                 usleep(20_000);
             } while (microtime(true) < $deadline);
+
             expect($blocked)->toBeTrue('An actual cursor write must reach the post-admission barrier before the crash.');
+            expect((int) $database->query("SELECT count(*) FROM configuration_proof.operation_demands WHERE payload::jsonb ->> 'sourceId' IS NOT NULL")->fetchColumn())
+                ->toBeGreaterThan(0, 'Per-file admission must already be committed before the cursor barrier.');
         } finally {
             foreach ($children as $child) {
                 if (proc_get_status($child['process'])['running']) {

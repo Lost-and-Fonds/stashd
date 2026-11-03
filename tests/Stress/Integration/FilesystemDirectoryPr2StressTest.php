@@ -25,28 +25,28 @@ test('a bounded directory run preserves every independent Item across 100-file p
         // If more than 100 per-file Assignments are simultaneously active,
         // PostgreSQL rejects admission even if a CLI status receipt lies.
         $database->exec(<<<'SQL'
-            CREATE FUNCTION configuration_proof.pr2_enforce_bound() RETURNS trigger LANGUAGE plpgsql AS $$
-            DECLARE outstanding integer;
-            BEGIN
-                IF NEW.payload::jsonb ->> 'sourceId' IS NOT NULL THEN
-                    -- Serialize concurrent probes for this run before counting committed Jobs.
-                    PERFORM pg_advisory_xact_lock(hashtext('pr2-outstanding'), hashtext(NEW.payload::jsonb ->> 'runId'));
-                    SELECT count(DISTINCT a.uuid) INTO outstanding
-                    FROM configuration_proof.operation_demands d
-                    JOIN configuration_proof.operation_assignments a ON a.uuid = d.assignment_id
-                    WHERE a.active
-                      AND d.payload::jsonb ->> 'sourceId' IS NOT NULL
-                      AND d.payload::jsonb ->> 'runId' = NEW.payload::jsonb ->> 'runId';
-                    IF outstanding > 100 THEN
-                        RAISE EXCEPTION 'PR2 more than 100 outstanding per-file Assignments: %', outstanding;
-                    END IF;
+        CREATE FUNCTION configuration_proof.pr2_enforce_bound() RETURNS trigger LANGUAGE plpgsql AS $$
+        DECLARE outstanding integer;
+        BEGIN
+            IF NEW.payload::jsonb ->> 'sourceId' IS NOT NULL THEN
+                -- Serialize concurrent probes for this run before counting committed Jobs.
+                PERFORM pg_advisory_xact_lock(hashtext('pr2-outstanding'), hashtext(NEW.payload::jsonb ->> 'runId'));
+                SELECT count(DISTINCT a.uuid) INTO outstanding
+                FROM configuration_proof.operation_demands d
+                JOIN configuration_proof.operation_assignments a ON a.uuid = d.assignment_id
+                WHERE a.active
+                  AND d.payload::jsonb ->> 'sourceId' IS NOT NULL
+                  AND d.payload::jsonb ->> 'runId' = NEW.payload::jsonb ->> 'runId';
+                IF outstanding > 100 THEN
+                    RAISE EXCEPTION 'PR2 more than 100 outstanding per-file Assignments: %', outstanding;
                 END IF;
-                RETURN NEW;
-            END
-            $$;
-            CREATE TRIGGER pr2_enforce_bound AFTER INSERT ON configuration_proof.operation_demands
-            FOR EACH ROW EXECUTE FUNCTION configuration_proof.pr2_enforce_bound();
-            SQL);
+            END IF;
+            RETURN NEW;
+        END
+        $$;
+        CREATE TRIGGER pr2_enforce_bound AFTER INSERT ON configuration_proof.operation_demands
+        FOR EACH ROW EXECUTE FUNCTION configuration_proof.pr2_enforce_bound();
+        SQL);
         try {
             Pr2Directory::acquire($archive, $descriptor, $scope['run'], $count, $count >= 1_000 ? 1_800 : 600);
         } finally {
