@@ -176,3 +176,53 @@ test('C03: loss of ownership during a protected transaction rolls back its effec
         }
     }
 });
+
+test('C03: a superseded living handler cannot publish a second result', function (): void {
+    $assignment = $this->worker->do(new DepartmentJob('c03-superseded'));
+    acceptance_scheduled($this->department);
+    $path = tempnam(sys_get_temp_dir(), 'c03-superseded-');
+    unlink($path);
+    $old = acceptance_child($this->department, ['handlerBarrier' => $path]);
+    try {
+        $observed = acceptance_barrier($path, $old);
+        expect($this->department->admin->query('SELECT pg_terminate_backend(' . (int) $observed['pid'] . ')')->fetchColumn())->toBeTrue();
+        acceptance_redeliver($this->department);
+        $next = acceptance_child($this->department)->wait();
+        expect($next->exitCode)->toBe(0, $next->errorOutput);
+        file_put_contents($path . '.release', 'go');
+        $old->wait();
+
+        $db = $this->department->connections->application;
+        expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
+        expect($db->fetchFirstColumn('SELECT value FROM effects'))->toBe(['c03-superseded:refresh:one']);
+        expect($db->fetchFirstColumn('SELECT outcome FROM operation_attempts ORDER BY started_at'))->toBe(['interrupted', 'completed']);
+    } finally {
+        if ($old->running) {
+            $old->signal(9)->wait();
+        }
+        foreach (glob($path . '*') as $file) {
+            unlink($file);
+        }
+    }
+});
+
+test('C02: native outbox rejection rolls back admission and retained demand together', function (): void {
+    $db = $this->department->connections->application;
+    $db->executeStatement(
+        "CREATE FUNCTION c02_reject_outbox() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.queue_name = 'operations_outbox' THEN RAISE EXCEPTION 'C02 rejected delivery'; END IF; RETURN NEW; END $$",
+    );
+    $db->executeStatement('CREATE TRIGGER c02_reject_outbox BEFORE INSERT ON messenger_messages FOR EACH ROW EXECUTE FUNCTION c02_reject_outbox()');
+    try {
+        expect(fn () => $this->worker->do(new DepartmentJob('c02-atomic')))->toThrow('C02 rejected delivery');
+        expect((int) $db->fetchOne('SELECT count(*) FROM operation_assignments'))->toBe(0);
+        expect((int) $db->fetchOne('SELECT count(*) FROM operation_demands'))->toBe(0);
+        expect((int) $db->fetchOne('SELECT count(*) FROM messenger_messages'))->toBe(0);
+    } finally {
+        $db->executeStatement('DROP TRIGGER c02_reject_outbox ON messenger_messages');
+        $db->executeStatement('DROP FUNCTION c02_reject_outbox()');
+    }
+    $assignment = $this->worker->do(new DepartmentJob('c02-atomic'));
+    $this->department->runtime->drain();
+    expect($this->worker->status($assignment->id)->state)->toBe(AssignmentState::Completed);
+    expect($db->fetchFirstColumn('SELECT value FROM effects'))->toBe(['c02-atomic:refresh:one']);
+});
