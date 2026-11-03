@@ -36,15 +36,24 @@ final class Pr3Mutation
         $operations = $archive->path('mutation-operations.json');
         $result = self::python([
             'mutate',
-            '--directory', $source,
-            '--original-manifest', $originalManifest,
-            '--after-source-manifest', $afterSource,
-            '--after-preserved-manifest', $afterPreserved,
-            '--operations-manifest', $operations,
-            '--add', (string) $add,
-            '--change', (string) $change,
-            '--rename', (string) $rename,
-            '--remove', (string) $remove,
+            '--directory',
+            $source,
+            '--original-manifest',
+            $originalManifest,
+            '--after-source-manifest',
+            $afterSource,
+            '--after-preserved-manifest',
+            $afterPreserved,
+            '--operations-manifest',
+            $operations,
+            '--add',
+            (string) $add,
+            '--change',
+            (string) $change,
+            '--rename',
+            (string) $rename,
+            '--remove',
+            (string) $remove,
         ]);
         Assert::assertSame(0, $result['code'], $result['output'] . $result['errors']);
         $operationsData = json_decode((string) file_get_contents($operations), true, flags: JSON_THROW_ON_ERROR);
