@@ -45,7 +45,7 @@ test('manual CLI discovery keeps stable associations and observes rescans withou
         $beforeSource = TransactionProbe::snapshot($root);
         configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
         $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', $root]));
-        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
         expect($run['status'])
             ->toBe('finished')
             ->and($run['coverage'])
@@ -90,7 +90,7 @@ test('manual CLI discovery keeps stable associations and observes rescans withou
         file_put_contents($root . '/one/same.bin', 'modified longer file');
         unlink($root . '/two/same.bin');
         $archive->input('addition.dat', 'new');
-        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
         expect($next['id'])->not->toBe($run['id'])->and($next['discovered_count'])->toBe(count($manifest));
         $latest = array_column(discovered_items($archive, $descriptor, $next['id']), null, 'id');
         expect($latest[hash('sha256', 'one/same.bin')]['size_bytes'])
@@ -107,7 +107,7 @@ test('manual CLI discovery keeps stable associations and observes rescans withou
             ->toMatchArray(['first_run' => $run['id'], 'last_run' => $next['id']])
             ->and($associations[hash('sha256', 'two/same.bin')])
             ->toMatchArray(['first_run' => $run['id'], 'last_run' => $run['id']]);
-        $again = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        $again = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
         expect($again['discovered_count'])
             ->toBe($next['discovered_count'])
             ->and((int) $database->query('SELECT count(*) FROM configuration_proof.source_associations')->fetchColumn())
@@ -136,7 +136,7 @@ test('Filesystem discovery reports excluded links names and special files as par
         try {
             configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
             $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', $root]));
-            $run = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+            $run = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
             expect($run['status'])->toBe('finished')->and($run['discovered_count'])->toBe(1)->and($run['coverage']['kind'])->toBe('partial');
             $deficiency = $run['coverage']['deficiencies'][0];
             expect($deficiency['disposition'])
@@ -154,7 +154,7 @@ test('Filesystem discovery reports excluded links names and special files as par
                 ->toBe(1);
             mkdir($archive->path('empty'));
             $empty = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', $archive->path('empty')]));
-            $emptyRun = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $empty['id']]));
+            $emptyRun = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $empty['id']]));
             expect($emptyRun['discovered_count'])
                 ->toBe(0)
                 ->and($emptyRun['batches'])
@@ -176,7 +176,7 @@ test('discovery rechecks live roots and retains a failed run for retry after the
         rename($root, $archive->path('moved'));
         symlink($archive->path('vault'), $root);
         try {
-            $failure = configuration_cli($archive, $descriptor, ['input:discover', $input['id']]);
+            $failure = configuration_cli($archive, $descriptor, ['input:scan', $input['id']]);
             expect($failure['code'])->not->toBe(0);
             $row = $database->query('SELECT id::text, status, error FROM configuration_proof.discovery_runs')->fetch(PDO::FETCH_ASSOC);
             expect($row['status'])
@@ -190,7 +190,7 @@ test('discovery rechecks live roots and retains a failed run for retry after the
             rename($archive->path('moved'), $root);
         }
 
-        $resumed = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        $resumed = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
         expect($resumed['id'])
             ->toBe($row['id'])
             ->and($resumed['status'])
@@ -203,7 +203,7 @@ test('discovery rechecks live roots and retains a failed run for retry after the
             ->toBe($vaultBefore);
         $output = $archive->path('output');
         configuration_result(configuration_cli($archive, $descriptor, ['broadcast:create', 'filesystem', $output]));
-        $failure = configuration_cli($archive, $descriptor, ['input:discover', $input['id']], ['VAULT_ROOT' => $output]);
+        $failure = configuration_cli($archive, $descriptor, ['input:scan', $input['id']], ['VAULT_ROOT' => $output]);
         expect($failure['code'])
             ->not
             ->toBe(0)
@@ -224,7 +224,7 @@ test('failed terminal SQL rolls back observations associations and coverage toge
         CREATE TRIGGER reject_finish BEFORE UPDATE ON configuration_proof.discovery_runs
         FOR EACH ROW WHEN (NEW.status = 'finished') EXECUTE FUNCTION configuration_proof.reject_finish();
         SQL);
-        $failure = configuration_cli($archive, $descriptor, ['input:discover', $input['id']]);
+        $failure = configuration_cli($archive, $descriptor, ['input:scan', $input['id']]);
         expect($failure['code'])->not->toBe(0);
         $run = $database->query('SELECT id::text, status, batches, continuation, coverage, error FROM configuration_proof.discovery_runs')->fetch(PDO::FETCH_ASSOC);
         expect($run['status'])
@@ -242,7 +242,7 @@ test('failed terminal SQL rolls back observations associations and coverage toge
             ->and($run['error'])
             ->toContain('fixture rejects terminal checkpoint');
         $database->exec('DROP TRIGGER reject_finish ON configuration_proof.discovery_runs');
-        $resumed = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        $resumed = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
         expect($resumed['id'])->toBe($run['id'])->and($resumed['status'])->toBe('finished')->and($resumed['discovered_count'])->toBe(1);
     });
 });
@@ -264,7 +264,7 @@ test('a killed real CLI retains its first batch and resumes without duplicate as
         $database->query('SELECT pg_advisory_lock(7861, 28)');
         $child = null;
         try {
-            $child = start_configuration_cli($archive, $descriptor, ['input:discover', $input['id']]);
+            $child = start_configuration_cli($archive, $descriptor, ['input:scan', $input['id']]);
             $deadline = microtime(true) + 10;
             do {
                 $waiting = (int) $database->query("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted
@@ -287,7 +287,7 @@ test('a killed real CLI retains its first batch and resumes without duplicate as
                 ->toBe(100)
                 ->and((int) $database->query('SELECT count(*) FROM configuration_proof.source_associations')->fetchColumn())
                 ->toBe(100);
-            $competing = configuration_cli($archive, $descriptor, ['input:discover', strtoupper($input['id'])]);
+            $competing = configuration_cli($archive, $descriptor, ['input:scan', strtoupper($input['id'])]);
             expect($competing['code'])
                 ->not
                 ->toBe(0)
@@ -325,7 +325,7 @@ test('a killed real CLI retains its first batch and resumes without duplicate as
         foreach ([$unsafe, $alias] as $invalid) {
             $continuation->execute([json_encode($invalid, JSON_THROW_ON_ERROR), $checkpoint['id']]);
             try {
-                $rejected = configuration_cli($archive, $descriptor, ['input:discover', $input['id']]);
+                $rejected = configuration_cli($archive, $descriptor, ['input:scan', $input['id']]);
                 expect($rejected['code'])
                     ->not
                     ->toBe(0)
@@ -341,7 +341,7 @@ test('a killed real CLI retains its first batch and resumes without duplicate as
         $update = $database->prepare('UPDATE configuration_proof.configurations SET settings = ? WHERE id = ?');
         $update->execute([json_encode(['root' => $archive->path('changed-root')], JSON_THROW_ON_ERROR), $input['id']]);
         try {
-            $changed = configuration_cli($archive, $descriptor, ['input:discover', $input['id']]);
+            $changed = configuration_cli($archive, $descriptor, ['input:scan', $input['id']]);
             expect($changed['code'])
                 ->not
                 ->toBe(0)
@@ -351,7 +351,7 @@ test('a killed real CLI retains its first batch and resumes without duplicate as
             $update->execute([json_encode($input['settings'], JSON_THROW_ON_ERROR), $input['id']]);
         }
 
-        $resumed = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        $resumed = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
         expect($resumed['id'])
             ->toBe($checkpoint['id'])
             ->and($resumed['status'])

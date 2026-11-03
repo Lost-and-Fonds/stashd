@@ -11,7 +11,7 @@ use Throwable;
  * Start or resume an Input scan, validate its output, and ask the store to save it.
  *
  * An unfinished run keeps its original configuration and complete-scan intent.
- * Discovery records source locations; it does not create canonical Item URIs.
+ * Discovery records source locations; its Operations handler subsequently links canonical Catalogue identities.
  */
 final readonly class DiscoveryCoordinator
 {
@@ -33,8 +33,9 @@ final readonly class DiscoveryCoordinator
      * A failure keeps earlier saved batches for retry. Once a finished result is
      * saved, a later adapter error cannot undo it. Only one caller may scan this
      * Input at a time; the database releases its lock when the process exits.
+     * A supplied run ID confines Job replay to that exact run, including after completion.
      */
-    public function discover(string $inputId): array
+    public function discover(string $inputId, ?string $runId = null): array
     {
         $configuration = $this->configurations->read('input', $inputId);
         $inputId = $configuration['id'];
@@ -44,7 +45,22 @@ final readonly class DiscoveryCoordinator
         };
         $this->store->lock($inputId);
         try {
+            if ($runId !== null) {
+                $saved = $this->store->read($runId);
+                if ($saved['input_id'] !== $inputId) {
+                    throw new InvalidArgumentException('Discovery run belongs to another Input.');
+                }
+
+                if ($saved['status'] === 'finished') {
+                    return $saved;
+                }
+            }
+
             $run = $this->store->start($configuration);
+            if ($runId !== null && $run['id'] !== $runId) {
+                throw new RuntimeException('Discovery run is no longer active.');
+            }
+
             $id = $run['id'];
             $continuation = $run['continuation'];
             $active = true;

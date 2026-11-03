@@ -26,7 +26,7 @@ final readonly class AcquisitionCommands
      *
      * Retrying the same run reuses persisted transaction identities.
      */
-    #[ConsoleCommand(name: 'input:acquire', description: 'Preserve a finished discovery run, resuming saved transaction attempts on retry.')]
+    #[ConsoleCommand(name: 'input:preserve', description: 'Preserve a finished discovery run, resuming saved transaction attempts on retry.')]
     public function acquire(string $runId): void
     {
         $result = $this->acquisition->acquire($runId);

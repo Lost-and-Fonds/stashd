@@ -6,6 +6,38 @@ The [Tempest alignment note](filesystem-tempest-decisions.md) records the PR1
 retrospective, installed APIs and narrow exceptions retained after review.
 The lifecycle work follows [issue #28](https://github.com/Lost-and-Fonds/stashd/issues/28).
 
+## Stash round trip through Operations
+
+After configuration initialization below, PR 1 supports one discovered file:
+
+```sh
+php tempest stash:create "My collection"
+php tempest stash:input:attach <stash UUID> <input UUID>
+php tempest input:discover <input UUID>
+php tempest operations:work --once
+php tempest stash:items <stash UUID>
+php tempest input:acquire <returned run UUID>
+php tempest operations:work --once
+php tempest operations:inspect <returned Assignment URN>
+```
+
+Drain again if an Assignment is still queued. Inspect physical Vault evidence as
+well as completed Operations state. Once acquisition completes, the source may
+be unavailable before selection and publication:
+
+```sh
+php tempest stash:broadcast:select <stash UUID> <broadcast UUID>
+php tempest broadcast:build <returned selection UUID>
+php tempest operations:work --once
+php tempest broadcast:publication <selection UUID>
+```
+
+Execution commands return `assignment_id`; discovery also returns `run_id`.
+Selection returns `id`. These receipts describe admission, not completion.
+The [PR 1 decisions](filesystem-roundtrip-pr1-decisions.md) explain identity
+migration, replay, the execution CLI transition and remaining limits.
+The synchronous commands documented below remain available for diagnostics.
+
 ## Configure through the CLI
 
 Use the normal Lerd shell (`lerd shell`) and Tempest CLI. Provision a PostgreSQL
@@ -59,13 +91,13 @@ Run `integration:init` again to add discovery tables to an existing operational
 schema, preserving configuration and prior observations. Then:
 
 ```sh
-php tempest input:discover <input UUID>
+php tempest input:scan <input UUID>
 php tempest input:discovery <run UUID>
 php tempest input:discoveries <run UUID>
 php tempest input:discoveries <run UUID> <next cursor>
 ```
 
-`input:discover` recursively enumerates every eligible regular file, including
+`input:scan` recursively enumerates every eligible regular file, including
 binary, media, document, hidden and zero-byte files. It returns compact JSON run
 status/counts and coverage. `finished` means the enumeration ended coherently;
 inspect `coverage.kind` for `exhaustive` (no known skips) or `partial` (some entries
@@ -84,7 +116,7 @@ complete-scan intent; efficient refresh and scheduling are deferred. PostgreSQL
 session locks prevent simultaneous scans of one Input and release on process death.
 
 On failure the command exits nonzero, retaining earlier checkpoints and an
-operational error. Repeat `input:discover` for the same Input to resume its
+operational error. Repeat `input:scan` for the same Input to resume its
 unfinished run in a fresh process. After terminal completion the same command
 starts a new complete scan. Inspections work with the source offline.
 
@@ -110,7 +142,7 @@ Acquisition must still snapshot/hash bytes and compare canonical evidence.
 
 ## Acquisition
 
-After `vault:init` and `integration:init`, run `input:acquire <discovery-run-id>`.
+After `vault:init` and `integration:init`, run `input:preserve <discovery-run-id>`.
 Retry that same command after interruption. `input:acquisitions <run-id> [after]`
 returns at most 100 persisted attempts and the next cursor. Acquisition is serial,
 uses the Input's discovery lock, and saves the transaction UUID before staging.
@@ -143,7 +175,7 @@ loading the whole file. Duplicate Item identities and invalid or missing revisio
 reject the entire selection. Empty selections are valid.
 
 `broadcast:publication <run UUID> [after-position]` exposes status and at most 100
-committed reports. `broadcast:build <run UUID>` executes that existing selection
+committed reports. `broadcast:publish <run UUID>` executes that existing selection
 through `BroadcastCoordinator::execute` and `FilesystemPublisher`. Failure exits
 nonzero and saves an operational diagnostic. Retry the same UUID; completed runs
 return without touching destination files. Create another selection/run to publish again.
@@ -188,12 +220,12 @@ operational state and do not establish preservation or survive SQL loss by desig
 php tempest vault:init
 php tempest integration:init
 php tempest input:create filesystem /absolute/directory-A
-php tempest input:discover <input UUID>
-php tempest input:acquire <discovery-run UUID>
+php tempest input:scan <input UUID>
+php tempest input:preserve <discovery-run UUID>
 php tempest input:acquisitions <discovery-run UUID>
 php tempest broadcast:create filesystem /absolute/directory-B
 php tempest broadcast:select <broadcast UUID> selection.jsonl
-php tempest broadcast:build <publication-run UUID>
+php tempest broadcast:publish <publication-run UUID>
 php tempest broadcast:publication <publication-run UUID>
 ```
 

@@ -1,6 +1,6 @@
 # Filesystem round-trip implementation plan
 
-**Status:** revised for review. All five implementation PRs remain unstarted. PR 1 must wait for review of this revision.
+**Status:** PR 1 implemented for draft review; see [implementation decisions and proof](../filesystem-roundtrip-pr1-decisions.md). PRs 2–5 remain unstarted.
 
 ## Basis and approach
 
@@ -38,7 +38,7 @@ Keep the in-process lifecycle compatible with canonical plugin-api discovery, st
 
 Completion means acceptance evidence, negative controls and required QA pass—not merely that code or tables exist.
 
-- [ ] **PR 1 — Authentic single-file round trip.** Acceptance: real Stash/Catalogue → Operations → canonical Vault → source removed → Broadcast; independent bytes verified; duplicate delivery and post-commit replay proven. Dependencies: revised plan reviewed; #85 fixture available. **Status: unstarted — awaiting revised-plan review.**
+- [x] **PR 1 — Authentic single-file round trip.** Acceptance: real Stash/Catalogue → Operations → canonical Vault → source removed → Broadcast; independent bytes verified; duplicate delivery and post-commit replay proven. Dependencies: revised plan reviewed; #85 fixture available. **Status: implemented for draft review; not merged.**
 - [ ] **PR 2 — Bounded directory runs.** Acceptance: 100/1,000 files; bounded admission; crash-safe cursor; unchanged rescans create no additional archival revisions. Dependency: PR 1. **Status: unstarted.**
 - [ ] **PR 3 — Mutations and historical output.** Acceptance: required mutation corpus; stable identity for modified paths; retained history; original and changed selections independently verified. Dependency: PR 2. **Status: unstarted.**
 - [ ] **PR 4 — Broader interruption/recovery.** Acceptance: real worker interruptions, publication recovery and stale-result rejection; no false completion or duplicate authoritative results. Dependencies: PRs 1–3. **Status: unstarted.**
@@ -113,6 +113,6 @@ Use additive migrations that preserve existing configuration, source association
 
 Defer watchers, external plugin runtime, broad metadata infrastructure, hardlinks and automatic pruning as specified in #28/#85. No automatic merge.
 
-This document does not start PR 1. Its implementation remains on hold until the revised plan has been reviewed.
+PR 1 was subsequently authorized explicitly and is now implemented for draft review. Do not start PR 2 before that review.
 
-Planning inspection only; runtime tests and QA were not rerun. Local roots remain operator-controlled, and no hostile-writer, whole-tree atomicity or power-loss guarantee is claimed.
+The original plan was based on inspection. PR 1 runtime proof and QA are recorded in its implementation PR. Local roots remain operator-controlled, and no hostile-writer, whole-tree atomicity or power-loss guarantee is claimed.

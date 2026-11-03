@@ -21,8 +21,8 @@ function filesystem_publication_run(ArchiveFixture $archive, array $descriptor, 
  */
 function filesystem_publication_acquire(ArchiveFixture $archive, array $descriptor, string $input): array
 {
-    $scan = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input]));
-    configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $scan['id']]));
+    $scan = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input]));
+    configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $scan['id']]));
     $attempts = configuration_result(configuration_cli($archive, $descriptor, ['input:acquisitions', $scan['id']]))['items'];
 
     return array_map(static function (array $attempt) use ($archive): array {
@@ -74,8 +74,8 @@ test('Filesystem reconstructs historical files after source removal using fresh 
         $newRun = filesystem_publication_run($archive, $descriptor, $new, 'new-output');
         $archive->destroy('inputs');
         expect(is_dir($archive->path('inputs')))->toBeFalse();
-        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:build', $oldRun]));
-        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:build', $newRun]));
+        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publish', $oldRun]));
+        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publish', $newRun]));
         foreach ($witnesses as $path => $witness) {
             expect(filesize($archive->path('old-output/' . $path)))->toBe($witness['size']);
             expect(hash_file('sha512', $archive->path('old-output/' . $path)))->toBe($witness['sha512']);
@@ -83,13 +83,13 @@ test('Filesystem reconstructs historical files after source removal using fresh 
 
         expect(file_get_contents($archive->path('new-output/binary.bin')))->toBe('new historical bytes');
         $inode = fileinode($archive->path('old-output/binary.bin'));
-        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:build', $oldRun]));
+        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publish', $oldRun]));
         expect(fileinode($archive->path('old-output/binary.bin')))->toBe($inode);
         $inspection = configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publication', $oldRun]));
         expect($inspection['run']['status'])->toBe('complete')->and($inspection['results'])->toHaveCount(count($files));
         file_put_contents($archive->path('old-output/binary.bin'), 'consumer changed export');
         $isolated = filesystem_publication_run($archive, $descriptor, $old, 'isolated-output');
-        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:build', $isolated]));
+        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publish', $isolated]));
         expect(hash_file('sha512', $archive->path('isolated-output/binary.bin')))->toBe($witnesses['binary.bin']['sha512']);
     });
 });
@@ -125,7 +125,7 @@ test('Filesystem rejects unsafe destinations and invalid provenance before copyi
         }
 
         $archive->destroy('inputs');
-        expect(configuration_cli($archive, $descriptor, ['broadcast:build', $run])['code'])->not->toBe(0);
+        expect(configuration_cli($archive, $descriptor, ['broadcast:publish', $run])['code'])->not->toBe(0);
         $inspection = configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publication', $run]));
         expect($inspection['run']['status'])->toBe('failed')->and($inspection['results'])->toBe([]);
         expect(file_exists($archive->path('outside/file.txt')))->toBeFalse();
@@ -154,7 +154,7 @@ test('Filesystem preflights duplicate case-folded and structural selection colli
             $update->execute([json_encode($record, JSON_THROW_ON_ERROR), $run, $row['position']]);
         }
 
-        expect(configuration_cli($archive, $descriptor, ['broadcast:build', $run])['code'])->not->toBe(0);
+        expect(configuration_cli($archive, $descriptor, ['broadcast:publish', $run])['code'])->not->toBe(0);
         expect(file_exists($archive->path('output/file.txt')))->toBeFalse();
         $inspection = configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publication', $run]));
         expect($inspection['run']['status'])->toBe('failed')->and($inspection['results'])->toBe([]);
@@ -186,7 +186,7 @@ test('Filesystem refuses missing or corrupt selected Vault payloads without a fi
         }
 
         $archive->destroy('inputs');
-        expect(configuration_cli($archive, $descriptor, ['broadcast:build', $run])['code'])->not->toBe(0);
+        expect(configuration_cli($archive, $descriptor, ['broadcast:publish', $run])['code'])->not->toBe(0);
         expect(file_exists($archive->path('output/file.bin')))->toBeFalse();
         $inspection = configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publication', $run]));
         expect($inspection['run']['status'])->toBe('failed')->and($inspection['results'])->toBe([]);
@@ -215,7 +215,7 @@ test('Filesystem interruption during staging never exposes a partial final filen
         $items = filesystem_publication_acquire($archive, $descriptor, $input['id']);
         $run = filesystem_publication_run($archive, $descriptor, $items, 'output');
         $archive->destroy('inputs');
-        $child = start_configuration_cli($archive, $descriptor, ['broadcast:build', $run]);
+        $child = start_configuration_cli($archive, $descriptor, ['broadcast:publish', $run]);
         $observed = false;
         $deadline = microtime(true) + 20;
         do {
@@ -241,7 +241,7 @@ test('Filesystem interruption during staging never exposes a partial final filen
         expect(file_exists($archive->path('output/large.bin')))->toBeFalse();
         $inspection = configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publication', $run]));
         expect($inspection['results'])->toBe([]);
-        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:build', $run]));
+        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publish', $run]));
         expect(filesize($archive->path('output/large.bin')))->toBe($size);
         expect(hash_file('sha512', $archive->path('output/large.bin')))->toBe($digest);
     });
@@ -264,7 +264,7 @@ test('Filesystem retries after real process death between rename and report ackn
         FOR EACH ROW EXECUTE FUNCTION configuration_proof.pause_report();
         SQL);
         $database->query('SELECT pg_advisory_lock(7861, 75)');
-        $child = start_configuration_cli($archive, $descriptor, ['broadcast:build', $run]);
+        $child = start_configuration_cli($archive, $descriptor, ['broadcast:publish', $run]);
         try {
             $deadline = microtime(true) + 15;
             do {
@@ -293,7 +293,7 @@ test('Filesystem retries after real process death between rename and report ackn
             $database->exec('DROP TRIGGER pause_report ON configuration_proof.broadcast_reports');
         }
 
-        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:build', $run]));
+        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publish', $run]));
         expect(fileinode($archive->path('output/file.bin')))->toBe($inode);
         expect(hash_file('sha512', $archive->path('output/file.bin')))->toBe($digest);
         $inspection = configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publication', $run]));
@@ -313,13 +313,13 @@ test('Filesystem refuses differing bytes and retries the same selection without 
         file_put_contents($archive->path('output/file.txt'), 'different');
         file_put_contents($archive->path('output/unrelated'), 'retain');
         $archive->destroy('inputs');
-        expect(configuration_cli($archive, $descriptor, ['broadcast:build', $run])['code'])->not->toBe(0);
+        expect(configuration_cli($archive, $descriptor, ['broadcast:publish', $run])['code'])->not->toBe(0);
         expect(file_get_contents($archive->path('output/file.txt')))->toBe('different');
         $inspection = configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publication', $run]));
         expect($inspection['run']['status'])->toBe('failed')->and($inspection['results'])->toBe([]);
         file_put_contents($archive->path('output/file.txt'), 'preserved');
         $inode = fileinode($archive->path('output/file.txt'));
-        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:build', $run]));
+        configuration_result(configuration_cli($archive, $descriptor, ['broadcast:publish', $run]));
         expect(fileinode($archive->path('output/file.txt')))->toBe($inode);
         expect(file_get_contents($archive->path('output/unrelated')))->toBe('retain');
         expect(glob($archive->path('output/.stashd-publication-*')))->toBe([]);

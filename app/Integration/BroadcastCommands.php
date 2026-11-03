@@ -38,7 +38,7 @@ final readonly class BroadcastCommands
     /**
      * Execute or retry an existing frozen run without creating a replacement selection.
      */
-    #[ConsoleCommand(name: 'broadcast:build', description: 'Publish an existing frozen run from verified Vault bytes.')]
+    #[ConsoleCommand(name: 'broadcast:publish', description: 'Publish an existing frozen run from verified Vault bytes.')]
     public function build(string $runId): void
     {
         $run = $this->broadcast->execute($runId, $this->filesystem);

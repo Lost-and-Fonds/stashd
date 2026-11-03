@@ -13,8 +13,8 @@ test('CLI acquisition preserves bytes, skips equal rescans and recovers identiti
         configuration_cli($archive, $descriptor, ['vault:init']);
         configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
         $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', $root]));
-        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
-        $result = configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $run['id']]));
+        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
+        $result = configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $run['id']]));
         expect($result['counts'])->toBe(['preserved' => 2]);
         $attempts = configuration_result(configuration_cli($archive, $descriptor, ['input:acquisitions', $run['id']]))['items'];
         foreach ($attempts as $attempt) {
@@ -31,25 +31,25 @@ test('CLI acquisition preserves bytes, skips equal rescans and recovers identiti
 
         $before = TransactionProbe::snapshot($archive->path('vault'));
         $database->exec("UPDATE configuration_proof.acquisition_attempts SET status = 'acquiring', result = NULL");
-        configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $run['id']]));
+        configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $run['id']]));
         expect(TransactionProbe::snapshot($archive->path('vault')))->toBe($before);
-        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
-        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $next['id']]))['counts'])->toBe(['unchanged' => 2]);
+        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
+        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $next['id']]))['counts'])->toBe(['unchanged' => 2]);
         expect(TransactionProbe::snapshot($archive->path('vault')))->toBe($before);
         $database->exec('DELETE FROM configuration_proof.acquisition_attempts; DELETE FROM configuration_proof.acquisition_sources');
-        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
-        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $next['id']]))['counts'])->toBe(['unchanged' => 2]);
+        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
+        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $next['id']]))['counts'])->toBe(['unchanged' => 2]);
         expect(TransactionProbe::snapshot($archive->path('vault')))->toBe($before);
         $restored = $database->query('SELECT item_uri FROM configuration_proof.acquisition_sources ORDER BY item_uri')->fetchAll(PDO::FETCH_COLUMN);
         $uris = array_column($attempts, 'item_uri');
         sort($uris);
         expect($restored)->toBe($uris);
         file_put_contents($root . '/document.bin', "other\0bytes");
-        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
-        $counts = configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $next['id']]))['counts'];
+        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
+        $counts = configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $next['id']]))['counts'];
         expect($counts['preserved'])->toBe(1)->and($counts['unchanged'])->toBe(1);
         $archive->destroy('inputs');
-        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $next['id']]))['counts'])->toBe($counts);
+        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $next['id']]))['counts'])->toBe($counts);
         foreach ($attempts as $attempt) {
             $result = json_decode($attempt['result'], true, flags: JSON_THROW_ON_ERROR);
             $record = TransactionProbe::json(OcflInspector::payloadPath($archive->path('vault'), $result['item']['object_id'], 'v1', 'item.json'));
@@ -66,16 +66,16 @@ test('acquisition refuses a replaced symlink and retries the same attempt after 
         configuration_cli($archive, $descriptor, ['vault:init']);
         configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
         $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', dirname($path)]));
-        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
         unlink($path);
         file_put_contents($archive->path('outside'), 'outside');
         symlink($archive->path('outside'), $path);
-        expect(configuration_cli($archive, $descriptor, ['input:acquire', $run['id']])['code'])->not->toBe(0);
+        expect(configuration_cli($archive, $descriptor, ['input:preserve', $run['id']])['code'])->not->toBe(0);
         $attempt = configuration_result(configuration_cli($archive, $descriptor, ['input:acquisitions', $run['id']]))['items'][0];
         expect($attempt['status'])->toBe('retryable_failure');
         unlink($path);
         file_put_contents($path, 'safe');
-        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $run['id']]))['counts'])->toBe(['preserved' => 1]);
+        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $run['id']]))['counts'])->toBe(['preserved' => 1]);
         $retried = configuration_result(configuration_cli($archive, $descriptor, ['input:acquisitions', $run['id']]))['items'][0];
         expect($retried['id'])->toBe($attempt['id'])->and($retried['item_uri'])->toBe($attempt['item_uri']);
     });
@@ -87,9 +87,9 @@ test('a sealed persisted attempt resumes through CLI after its acquisition sourc
         configuration_cli($archive, $descriptor, ['vault:init']);
         configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
         $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', dirname($path)]));
-        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
         unlink($path);
-        expect(configuration_cli($archive, $descriptor, ['input:acquire', $run['id']])['code'])->not->toBe(0);
+        expect(configuration_cli($archive, $descriptor, ['input:preserve', $run['id']])['code'])->not->toBe(0);
         $attempt = configuration_result(configuration_cli($archive, $descriptor, ['input:acquisitions', $run['id']]))['items'][0];
         file_put_contents($path, 'sealed bytes');
         $workspace = dirname($archive->path('vault'));
@@ -103,9 +103,9 @@ test('a sealed persisted attempt resumes through CLI after its acquisition sourc
         ];
         expect(TransactionProbe::run($workspace, $request)['status'])->toBe('sealed');
         $archive->destroy('inputs');
-        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $run['id']]))['counts'])->toBe(['preserved' => 1]);
+        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $run['id']]))['counts'])->toBe(['preserved' => 1]);
         $before = TransactionProbe::snapshot($archive->path('vault'));
-        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $run['id']]))['counts'])->toBe(['preserved' => 1]);
+        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $run['id']]))['counts'])->toBe(['preserved' => 1]);
         expect(TransactionProbe::snapshot($archive->path('vault')))->toBe($before);
     });
 });
@@ -116,7 +116,7 @@ test('killed acquisition after Vault commit retries without source bytes or dupl
         configuration_cli($archive, $descriptor, ['vault:init']);
         configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
         $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', dirname($path)]));
-        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
         $database->exec(<<<'SQL'
         CREATE FUNCTION configuration_proof.pause_ack() RETURNS trigger LANGUAGE plpgsql AS $$
         BEGIN IF NEW.status = 'preserved' THEN PERFORM pg_advisory_xact_lock(7863, 28); END IF; RETURN NEW; END $$;
@@ -124,7 +124,7 @@ test('killed acquisition after Vault commit retries without source bytes or dupl
         FOR EACH ROW EXECUTE FUNCTION configuration_proof.pause_ack();
         SQL);
         $database->query('SELECT pg_advisory_lock(7863, 28)');
-        $child = start_configuration_cli($archive, $descriptor, ['input:acquire', $run['id']]);
+        $child = start_configuration_cli($archive, $descriptor, ['input:preserve', $run['id']]);
         try {
             $deadline = microtime(true) + 10;
             do {
@@ -159,7 +159,7 @@ test('killed acquisition after Vault commit retries without source bytes or dupl
 
         expect($status['signaled'])->toBeTrue()->and($status['termsig'])->toBe(9);
         $database->query('SELECT id FROM configuration_proof.acquisition_attempts FOR UPDATE')->fetchAll();
-        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $run['id']]))['counts'])->toBe(['preserved' => 1]);
+        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $run['id']]))['counts'])->toBe(['preserved' => 1]);
         expect(TransactionProbe::snapshot($archive->path('vault')))->toBe($before);
     });
 });
@@ -189,11 +189,11 @@ test('healthy acquisition and reassociation isolate unrelated damaged Items and 
         $sealedDirectory = $archive->path('vault/extensions/stashd-transactions/' . hash('sha256', 'unrelated-sealed'));
         $beforeJournal = TransactionProbe::snapshot($journal);
         $beforeSealed = TransactionProbe::snapshot($sealedDirectory);
-        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
-        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $run['id']]))['counts'])->toBe(['preserved' => 1]);
+        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
+        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $run['id']]))['counts'])->toBe(['preserved' => 1]);
         $database->exec('DELETE FROM configuration_proof.acquisition_attempts; DELETE FROM configuration_proof.acquisition_sources');
-        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
-        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $next['id']]))['counts'])->toBe(['unchanged' => 1]);
+        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
+        expect(configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $next['id']]))['counts'])->toBe(['unchanged' => 1]);
         expect(TransactionProbe::snapshot($journal))->toBe($beforeJournal);
         expect(TransactionProbe::snapshot($sealedDirectory))->toBe($beforeSealed);
         expect(file_get_contents($itemPath))->toBe('damaged unrelated Item');
@@ -206,15 +206,15 @@ test('relevant damaged journals cannot mint replacement identities after associa
         configuration_cli($archive, $descriptor, ['vault:init']);
         configuration_result(configuration_cli($archive, $descriptor, ['integration:init']));
         $input = configuration_result(configuration_cli($archive, $descriptor, ['input:create', 'filesystem', dirname($path)]));
-        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
-        configuration_result(configuration_cli($archive, $descriptor, ['input:acquire', $run['id']]));
+        $run = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
+        configuration_result(configuration_cli($archive, $descriptor, ['input:preserve', $run['id']]));
         $attempt = configuration_result(configuration_cli($archive, $descriptor, ['input:acquisitions', $run['id']]))['items'][0];
         $journal = $archive->path('vault/extensions/stashd-transactions/' . hash('sha256', $attempt['id']));
         file_put_contents($journal . '/complete.json', '{damaged');
         $database->exec('DELETE FROM configuration_proof.acquisition_attempts; DELETE FROM configuration_proof.acquisition_sources');
-        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:discover', $input['id']]));
+        $next = configuration_result(configuration_cli($archive, $descriptor, ['input:scan', $input['id']]));
         $before = TransactionProbe::snapshot($archive->path('vault'));
-        expect(configuration_cli($archive, $descriptor, ['input:acquire', $next['id']])['code'])->not->toBe(0);
+        expect(configuration_cli($archive, $descriptor, ['input:preserve', $next['id']])['code'])->not->toBe(0);
         expect((int) $database->query('SELECT count(*) FROM configuration_proof.acquisition_sources')->fetchColumn())->toBe(0);
         expect(TransactionProbe::snapshot($archive->path('vault')))->toBe($before);
     });

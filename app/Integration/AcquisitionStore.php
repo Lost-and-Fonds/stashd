@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Integration;
 
+use App\Catalogue\Item;
+use App\Catalogue\ItemSource;
+use App\Operations\Authority\PublicationAuthority;
+use App\Operations\DTO\AssignmentContext;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
 use Tempest\Database\Query;
@@ -23,6 +27,7 @@ final readonly class AcquisitionStore
      */
     public function __construct(
         private OperationsDatabase $database,
+        private PublicationAuthority $authority,
     ) {}
 
     /**
@@ -31,9 +36,14 @@ final readonly class AcquisitionStore
     public function associate(string $input, string $source, string $uri): void
     {
         $database = $this->database->connect();
-        $database->execute(
-            new Query('INSERT INTO acquisition_sources (input_id, source_id, item_uri) VALUES (?, ?, ?) ON CONFLICT (input_id, source_id) DO NOTHING', [$input, $source, $uri]),
-        );
+        if (Item::select()->where('uri', $uri)->first() === null) {
+            new Item($uri)->insert();
+        }
+
+        if (ItemSource::select()->where('input_id', $input)->where('source_id', $source)->first() === null) {
+            new ItemSource($input, $source, $uri)->insert();
+        }
+
         $saved = $database->fetchFirst(query('acquisition_sources')->select('item_uri')->where('input_id', $input)->where('source_id', $source));
         if (($saved['item_uri'] ?? null) !== $uri) {
             throw new RuntimeException('Operational source association contradicts canonical provenance.');
@@ -44,26 +54,33 @@ final readonly class AcquisitionStore
      * Install verified source claims together, rolling back every insertion on conflict.
      *
      * The caller holds the Input lock and validates the complete claim set first.
+     * Worker calls supply their context so revocation rolls back identity restoration.
      *
      * @param array<string, string> $claims Source ID to canonical Item URI.
      */
-    public function restore(string $input, array $claims): void
+    public function restore(string $input, array $claims, ?AssignmentContext $context = null): void
     {
-        $this->database->transaction(function () use ($input, $claims): void {
+        $work = function () use ($input, $claims): void {
             foreach ($claims as $source => $uri) {
                 $this->associate($input, $source, $uri);
             }
-        });
+        };
+        if ($context === null) {
+            $this->database->transaction($work);
+        } else {
+            $this->authority->protect($context, $work);
+        }
     }
 
     /**
      * Save an Item URI and transaction UUID atomically before any bytes are staged.
      *
      * Retries return the existing attempt. The caller must hold the Input lock.
+     * A worker context fences Item, source mapping and attempt creation together.
      */
-    public function start(string $run, string $input, string $source): array
+    public function start(string $run, string $input, string $source, ?AssignmentContext $context = null): array
     {
-        return $this->database->transaction(function () use ($run, $input, $source): array {
+        $work = function () use ($run, $input, $source): array {
             $database = $this->database->connect();
             $saved = $database->fetchFirst(query('acquisition_sources')->select('item_uri')->where('input_id', $input)->where('source_id', $source));
             $uri = $saved['item_uri'] ?? 'urn:uuid:' . Uuid::v7()->toString();
@@ -83,7 +100,9 @@ final readonly class AcquisitionStore
             $database->execute(query('acquisition_attempts')->insert(...$attempt));
 
             return $attempt;
-        });
+        };
+
+        return $context === null ? $this->database->transaction($work) : $this->authority->protect($context, $work);
     }
 
     /**
