@@ -143,6 +143,13 @@ def mutate(
         source_entries[relative] = preserved_entries[relative] = _entry(relative, data)
         operations["added"].append({"path": relative, "sha256": digest})
 
+    # Remove only now-empty source directories. The external verifier deliberately
+    # rejects surprising directory entries, not just unexpected files.
+    for parent, _, _ in os.walk(directory, topdown=False, followlinks=False):
+        candidate = Path(parent)
+        if candidate != directory and not any(candidate.iterdir()):
+            candidate.rmdir()
+
     _save(source_manifest, _snapshot("after-source", source_entries))
     _save(preserved_manifest, _snapshot("after-preservation", preserved_entries))
     _save(operations_manifest, operations)
