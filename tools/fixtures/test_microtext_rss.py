@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import json
+import signal
 from pathlib import Path
 import subprocess
 import sys
@@ -14,8 +15,31 @@ import unittest
 from process_tree_rss import process_status, sample
 
 
-@unittest.skipUnless(os.path.isdir("/proc"), "Linux /proc is required for PR5 resource measurement")
+@unittest.skipUnless(os.path.isdir("/proc"), "Linux /proc is required for Filesystem stress resource measurement")
 class ProcessTreeMemoryTest(unittest.TestCase):
+    def test_terminal_cancellation_retains_samples_until_the_supervisor_stops(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            monitor = subprocess.Popen([
+                sys.executable, str(Path(__file__).with_name('process_tree_rss.py')),
+                '--pid', str(os.getpid()), '--stop', str(root / 'stop'),
+                '--output', str(root / 'rss.json'), '--interval', '0.05',
+            ])
+            try:
+                deadline = time.monotonic() + 5
+                while not (root / 'rss.jsonl').exists() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue((root / 'rss.jsonl').exists())
+                monitor.send_signal(signal.SIGINT)
+                monitor.send_signal(signal.SIGTERM)
+                (root / 'stop').touch()
+                self.assertEqual(monitor.wait(timeout=5), 0)
+                self.assertGreater(json.loads((root / 'rss.json').read_text())['samples'], 0)
+            finally:
+                if monitor.poll() is None:
+                    monitor.kill()
+                monitor.wait(timeout=5)
+
     def test_monitor_stops_when_root_exits_and_retains_timestamped_samples(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
