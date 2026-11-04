@@ -68,10 +68,7 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Verify formatting
-        run: |
-          vendor/bin/mago fmt
-          git diff -- tests/Acceptance/Integration/FilesystemRecoveryPr4Test.php tests/Support/Integration/Pr4Recovery.php
-          git diff --exit-code
+        run: composer github:fmt
 
       - name: Lint
         run: composer github:lint
