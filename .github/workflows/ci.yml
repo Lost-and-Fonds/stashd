@@ -43,7 +43,7 @@ jobs:
           persist-credentials: false
 
       - name: Microtext smoke/regression checks (small, no 10k run)
-        run: python3 -m unittest discover -s tools/fixtures -p 'test_microtext.py' -v
+        run: python3 -m unittest discover -s tools/fixtures -p 'test_microtext*.py' -v
 
       - name: Set up PHP
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962

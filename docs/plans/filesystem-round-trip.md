@@ -1,6 +1,6 @@
 # Filesystem round-trip implementation plan
 
-**Status:** PR 1 merged in #87. PR 2 implemented for draft review; see [bounded admission decisions and proof](../filesystem-pr2-decisions.md). PRs 3–5 remain unstarted.
+**Status:** PR 1 merged in #87; PR 2 merged in #89 (see [bounded admission decisions and proof](../filesystem-pr2-decisions.md)). PR 3 is validated and under review in draft #92: routine acceptance, the full 400-file mutation workload, latest-head negative control, focused regressions and full QA pass against existing production code. See [PR 3 evidence](../development/filesystem-pr3-acceptance.md). PRs 4–5 remain unstarted. No automatic merge.
 
 ## Basis and approach
 
@@ -39,8 +39,8 @@ Keep the in-process lifecycle compatible with canonical plugin-api discovery, st
 Completion means acceptance evidence, negative controls and required QA pass—not merely that code or tables exist.
 
 - [x] **PR 1 — Authentic single-file round trip.** Acceptance: real Stash/Catalogue → Operations → canonical Vault → source removed → Broadcast; independent bytes verified; duplicate delivery and post-commit replay proven. Dependencies: revised plan reviewed; #85 fixture available. **Status: merged in #87.**
-- [x] **PR 2 — Bounded directory runs.** Acceptance: 100/1,000 files; bounded admission; crash-safe cursor; unchanged rescans create no additional archival revisions. Dependency: PR 1. **Status: implemented for draft review; not merged.**
-- [ ] **PR 3 — Mutations and historical output.** Acceptance: required mutation corpus; stable identity for modified paths; retained history; original and changed selections independently verified. Dependency: PR 2. **Status: unstarted.**
+- [x] **PR 2 — Bounded directory runs.** Acceptance: 100/1,000 files; bounded admission; crash-safe cursor; unchanged rescans create no additional archival revisions. Dependency: PR 1. **Status: merged in #89.**
+- [x] **PR 3 — Mutations and historical output.** Acceptance: required mutation corpus; stable identity for modified paths; retained history; original and changed selections independently verified. Dependency: PR 2. **Status: validation complete without production changes, including the 400-file workload; draft #92 awaits merge review.**
 - [ ] **PR 4 — Broader interruption/recovery.** Acceptance: real worker interruptions, publication recovery and stale-result rejection; no false completion or duplicate authoritative results. Dependencies: PRs 1–3. **Status: unstarted.**
 - [ ] **PR 5 — Measured 10,000-Item workflow.** Acceptance: real application entry points replace illustrative copy; source-independent external verification; truthful counts and resource measurements. Dependencies: PRs 1–4 and #85. **Status: unstarted.**
 
@@ -81,6 +81,10 @@ Tests written first verify modified-path identity, rename-as-new behaviour, reta
 
 Keep observations in existing discovery persistence. No new archival-history store or rename inference.
 
+Observed proof in #92: the routine mutation suite passed **2 tests / 2,048 assertions**; combined PR 1–3, acquisition, discovery and publication regressions passed **38 tests / 6,689 assertions**. Temporarily substituting latest-head Asset revisions **and sizes** let both Broadcast Jobs complete, but the independent historical-byte oracle rejected the output. The mutation was removed; no production change was needed. Full Lerd QA passed **586 tests**, with **42 existing incomplete contracts** and four existing informational analysis notices. [CI run #59](https://github.com/Lost-and-Fonds/stashd/actions/runs/41739433866), on `017594e`, completed green including full Pest.
+
+The explicitly requested opt-in 400-file mutation run passed **1 test / 57,329 assertions** in Lerd PHP 8.5/PostgreSQL: 100 added, 200 changed, 50 renamed and 30 removed; 470 live source files, 550 preserved Items, and independently verified 400-Item historical / 550-Item current outputs after source deletion. Elapsed time was **270.63 seconds**, not a throughput benchmark. The stress test remains outside routine PHPUnit suites; the command and cleanup evidence are in the linked PR 3 record.
+
 ### PR 4 — Broader interruption and recovery
 
 Extend beyond PR 1's mandatory acquisition replay proof: interrupt accepted custody, OCFL commit, staged Broadcast and rename-before-acknowledgement. Exercise stale workers and concurrent recovery using real processes.
@@ -113,6 +117,6 @@ Use additive migrations that preserve existing configuration, source association
 
 Defer watchers, external plugin runtime, broad metadata infrastructure, hardlinks and automatic pruning as specified in #28/#85. No automatic merge.
 
-PR 1 merged after review; PR 2 was subsequently authorized explicitly and is now implemented for draft review. Do not start PR 3 before that review.
+PRs 1 and 2 merged after review. PR 3's contracts were reviewed in #91 and validated in draft #92. After #92 is merged, close superseded tests-only draft #91; do not merge both. Neither PR is authorized for automatic merge. PRs 4 and 5 remain separate, unstarted work.
 
 The original plan was based on inspection. PR 1 runtime proof and QA are recorded in its implementation PR. Local roots remain operator-controlled, and no hostile-writer, whole-tree atomicity or power-loss guarantee is claimed.
