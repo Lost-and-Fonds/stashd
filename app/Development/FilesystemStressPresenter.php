@@ -7,6 +7,7 @@ namespace App\Development;
 use App\Development\DTO\FilesystemStressProgress;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Output\StreamOutput;
+use Symfony\Component\Console\Terminal;
 use Tempest\Console\Console;
 
 /**
@@ -53,9 +54,24 @@ final class FilesystemStressPresenter
         );
         $phaseProgress = $value($progress->phaseCompleted) . '/' . $progress->phaseTotal . ' ' . $progress->phaseUnit;
         if ($this->bar !== null) {
-            $this->bar->setMessage($message);
-            $this->bar->setMessage($phaseProgress, 'phase_progress');
-            $this->bar->setFormat("%message%\n%bar% %phase_progress%");
+            $width = max(10, new Terminal()->getWidth() - 1);
+            $counter = $value($progress->phaseCompleted) . '/' . $progress->phaseTotal;
+            $rows = [
+                sprintf('%s | %.1fs', $progress->phase, $progress->elapsedSeconds),
+                sprintf('Items: discovered %s | admitted %s | settled %s', $value($progress->discovered), $value($progress->admitted), $value($progress->settled)),
+                sprintf('Checked: preserved %d | output %d', $progress->preserved, $progress->verified),
+                sprintf('Jobs: outstanding %s | failed %s | workers %d', $value($progress->outstanding), $value($progress->failed), $progress->activeWorkers),
+                sprintf(
+                    'Peak RSS: %s MiB | %s settled/total-s',
+                    $progress->peakRssKib === null ? '?' : sprintf('%.1f', $progress->peakRssKib / 1024),
+                    $progress->settled === null ? '?' : sprintf('%.2f', $progress->settled / max(0.001, $progress->elapsedSeconds)),
+                ),
+            ];
+            $this->bar->setMessage(wordwrap(implode("\n", $rows), $width, "\n", true));
+            $this->bar->setMessage($counter, 'phase_progress');
+            $this->bar->setMessage(wordwrap($progress->phaseUnit, $width, "\n", true), 'phase_unit');
+            $this->bar->setBarWidth(max(1, min(28, $width - strlen($counter) - 1)));
+            $this->bar->setFormat("%message%\n%bar% %phase_progress%\n%phase_unit%");
             if ($this->phase !== $progress->phase) {
                 $this->bar->clear();
                 $this->bar->start($progress->phaseTotal);
@@ -68,6 +84,17 @@ final class FilesystemStressPresenter
         }
 
         $this->phase = $progress->phase;
+    }
+
+    /**
+     * Keep verifier and failure messages above the live display instead of corrupting its cursor position.
+     * Messages remain on stderr so JSON stdout stays machine-readable.
+     */
+    public function diagnostic(string $message): void
+    {
+        $this->bar?->clear();
+        fwrite(STDERR, $message);
+        $this->bar?->display();
     }
 
     /**

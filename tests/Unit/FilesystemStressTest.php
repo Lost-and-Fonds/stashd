@@ -117,12 +117,119 @@ test('the live bar follows each phase and resets despite previously verified out
         expect($bar->getProgress())->toBe($completed ?? 0);
         expect($bar->getMaxSteps())->toBe($total);
         $rendered = $output->fetch();
-        expect($rendered)->toContain($phase, ($completed ?? '?') . '/' . $total . ' ' . $unit);
+        expect($rendered)->toContain($phase, ($completed ?? '?') . '/' . $total, $unit);
         expect($rendered)->not->toContain('PASS:');
     }
 
     $presenter->finish(['status' => 'failed'], true);
     expect($output->fetch())->not->toContain('PASS:');
+});
+
+test('diagnostics clear and restore the live display without advancing its counter', function (): void {
+    $presenter = new FilesystemStressPresenter($this->createStub(Console::class), false);
+    $output = new BufferedOutput(decorated: true);
+    $bar = new ProgressBar($output, 100);
+    $bar->setFormat('%bar% %current%/%max%');
+    $bar->setProgress(42);
+    new ReflectionProperty($presenter, 'bar')->setValue($presenter, $bar);
+    $output->fetch();
+
+    $presenter->diagnostic("Verifier diagnostic.\n");
+
+    expect($bar->getProgress())->toBe(42);
+    expect($output->fetch())->toContain("\e[2K", '42/100');
+});
+
+test('interactive progress stays within narrow terminal columns', function (int $columns): void {
+    $previous = getenv('COLUMNS');
+    try {
+        putenv('COLUMNS=' . $columns);
+        $console = $this->createStub(Console::class);
+        $presenter = new FilesystemStressPresenter($console, false);
+        $output = new BufferedOutput(decorated: true);
+        $bar = new ProgressBar($output, 100);
+        new ReflectionProperty($presenter, 'bar')->setValue($presenter, $bar);
+        $presenter->update(new FilesystemStressProgress(
+            'verify_repeat_publication',
+            123.4,
+            100,
+            100,
+            100,
+            100,
+            100,
+            0,
+            0,
+            1,
+            123_456,
+            0,
+            100,
+            'output files and stable inodes independently checked',
+        ));
+        foreach (explode("\n", $bar->getMessage()) as $line) {
+            expect(strlen($line))->toBeLessThan($columns);
+        }
+
+        foreach (explode("\n", $bar->getMessage('phase_unit')) as $line) {
+            expect(strlen($line))->toBeLessThan($columns);
+        }
+
+        expect($bar->getBarWidth() + 1 + strlen($bar->getMessage('phase_progress')))->toBeLessThan($columns);
+    } finally {
+        putenv($previous === false ? 'COLUMNS' : 'COLUMNS=' . $previous);
+    }
+})->with([40, 80, 100]);
+
+test('interactive setup declines safely with Tempest rich prompts', function (): void {
+    if (! shell_exec('command -v tput')) {
+        $this->markTestSkipped('The rich terminal test requires tput.');
+    }
+
+    $script = <<<'PYTHON'
+    import errno, fcntl, os, pty, select, struct, subprocess, sys, termios, time
+    master, slave = pty.openpty()
+    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 80, 0, 0))
+    child = subprocess.Popen([sys.argv[1], 'tempest', 'stress:filesystem'], stdin=slave, stdout=slave, stderr=slave, env={**os.environ, 'TERM': 'xterm-256color'})
+    os.close(slave)
+    output = b''
+    try:
+        declined = False
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            if not select.select([master], [], [], 0.1)[0]:
+                if child.poll() is not None:
+                    break
+                continue
+            try:
+                chunk = os.read(master, 65536)
+            except OSError as error:
+                if error.errno == errno.EIO:
+                    break
+                raise
+            output += chunk
+            if b'\x1b[6n' in chunk:
+                os.write(master, b'\x1b[1;1R')
+            if b'Run the 100-Item stress test?' in output and not declined:
+                os.write(master, b'\r')
+                declined = True
+        assert child.wait(timeout=1) == 1, output
+        assert b'Run the 100-Item stress test?' in output, output
+        assert b'tput:' not in output and b'\x1b[6n' in output, output
+        assert b'generate_source' not in output and b'PASS:' not in output, output
+        print('Tempest rich setup declined safely in an 80-column terminal.')
+    finally:
+        if child.poll() is None:
+            child.kill()
+        child.wait(timeout=5)
+        os.close(master)
+    PYTHON;
+    $process = proc_open(
+        ['python3', '-c', $script, PHP_BINARY],
+        [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+        $pipes,
+        env_vars: [...getenv(), 'ENVIRONMENT' => 'testing', 'SIGNING_KEY' => base64_encode(str_repeat('x', 32))],
+    );
+    $result = finish_configuration_cli(['process' => $process, 'pipes' => $pipes]);
+    expect($result['code'])->toBe(0, $result['output'] . $result['errors']);
 });
 
 test('live RSS reads only appended samples and keeps an incremental maximum', function (): void {

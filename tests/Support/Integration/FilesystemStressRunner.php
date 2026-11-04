@@ -26,8 +26,9 @@ final class FilesystemStressRunner
      * Execute one serial round trip and retain credential-free evidence, including failures.
      * The CLI restricts count to 100; the existing explicit stress suite retains larger cases.
      * SIGINT and SIGTERM unwind supervised workers and disposable fixtures, never a success.
+     * A diagnostic callback lets the CLI print verifier messages without breaking its live display.
      */
-    public static function run(int $count, ?Closure $observer = null, ?string $reportDirectory = null): array
+    public static function run(int $count, ?Closure $observer = null, ?string $reportDirectory = null, ?Closure $diagnostic = null): array
     {
         if (! in_array($count, [100, 1_000, 10_000], true)) {
             throw new InvalidArgumentException('Unsupported acceptance workload.');
@@ -49,6 +50,7 @@ final class FilesystemStressRunner
         }
 
         require_once __DIR__ . '/configuration-cli.php';
+        $diagnostic ??= static fn (string $message) => fwrite(STDERR, $message);
         $name = 'filesystem-stress-' . $count . '-' . bin2hex(random_bytes(5));
         $report = ['format' => 'stashd-filesystem-stress-1', 'files' => $count, 'status' => 'incomplete', 'phases' => []];
         $metrics = null;
@@ -78,6 +80,7 @@ final class FilesystemStressRunner
             with_configuration_database(function (ArchiveFixture $archive, array $descriptor, PDO $database) use (
                 $count,
                 $observe,
+                $diagnostic,
                 $reportDirectory,
                 $name,
                 &$metrics,
@@ -86,12 +89,11 @@ final class FilesystemStressRunner
                 $metrics = new FilesystemStressObserver($archive, $database, $count, $observe, $reportDirectory, $name);
                 $archive->onProcessTick = $metrics->refresh(...);
                 try {
-                    self::roundTrip($archive, $descriptor, $database, $count, $metrics);
+                    self::roundTrip($archive, $descriptor, $database, $count, $metrics, $diagnostic);
                     $metrics->phase('cleanup', 'fixture removed', 1);
                     $report = $metrics->finish($archive->path('vault'), pendingCleanup: true);
                 } catch (Throwable $error) {
-                    fwrite(
-                        STDERR,
+                    $diagnostic(
                         'Stress phase failed: '
                         . str_replace(
                             [$descriptor['dsn'], $descriptor['username'], $descriptor['password']],
@@ -159,14 +161,14 @@ final class FilesystemStressRunner
      * Run the independent acceptance checks in their original order, including the unchanged negative control.
      * No progress observation or completed Job may substitute for these assertions.
      */
-    private static function roundTrip(ArchiveFixture $archive, array $descriptor, PDO $database, int $count, FilesystemStressObserver $metrics): void
+    private static function roundTrip(ArchiveFixture $archive, array $descriptor, PDO $database, int $count, FilesystemStressObserver $metrics, Closure $diagnostic): void
     {
         $metrics->phase('generate_source', 'source files generated');
         $corpus = Pr2Directory::corpus($archive, $count);
         $metrics->checkpoint('fixture_generated', ['expected_files' => $count]);
         $metrics->progress($count);
         $metrics->phase('verify_source', 'source files independently checked');
-        Assert::assertSame(0, FilesystemStressObserver::verify($corpus['manifest'], $corpus['source'], $count));
+        Assert::assertSame(0, FilesystemStressObserver::verify($corpus['manifest'], $corpus['source'], $count, $diagnostic));
         $metrics->checkpoint('source_fixture_verified');
         $metrics->progress($count);
 
@@ -216,7 +218,7 @@ final class FilesystemStressRunner
         $first = self::broadcast($archive, $descriptor, $scope['stash'], $count, $metrics);
         $metrics->checkpoint('first_broadcast_settled', ['reported_files' => $count]);
         $metrics->phase('verify_first_publication', 'output files independently checked');
-        Assert::assertSame(0, FilesystemStressObserver::verify($corpus['manifest'], $archive->path('output'), $count));
+        Assert::assertSame(0, FilesystemStressObserver::verify($corpus['manifest'], $archive->path('output'), $count, $diagnostic));
         $inodes = Pr2Directory::inodes($archive->path('output'), $corpus['entries']);
         $metrics->checkpoint('source_independent_broadcast_verified', ['reported_files' => $count]);
         $metrics->progress($count);
@@ -225,7 +227,7 @@ final class FilesystemStressRunner
         self::broadcast($archive, $descriptor, $scope['stash'], $count, $metrics, $first['broadcast']);
         $metrics->checkpoint('repeat_broadcast_settled', ['reported_files' => $count]);
         $metrics->phase('verify_repeat_publication', 'output files and stable inodes independently checked');
-        Assert::assertSame(0, FilesystemStressObserver::verify($corpus['manifest'], $archive->path('output'), $count));
+        Assert::assertSame(0, FilesystemStressObserver::verify($corpus['manifest'], $archive->path('output'), $count, $diagnostic));
         Assert::assertSame($inodes, Pr2Directory::inodes($archive->path('output'), $corpus['entries']));
         $metrics->checkpoint('repeat_broadcast_verified', ['reported_files' => $count]);
         $metrics->progress($count);
@@ -236,7 +238,7 @@ final class FilesystemStressRunner
         file_put_contents($archive->path('output/' . $firstPath), "deliberately altered output\n");
         Assert::assertNotSame(
             0,
-            FilesystemStressObserver::verify($corpus['manifest'], $archive->path('output'), $count),
+            FilesystemStressObserver::verify($corpus['manifest'], $archive->path('output'), $count, $diagnostic),
             'Corruption must defeat the independent external verifier.',
         );
         $metrics->checkpoint('negative_control_rejected');

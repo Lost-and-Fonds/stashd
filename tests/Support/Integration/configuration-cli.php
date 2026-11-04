@@ -54,12 +54,19 @@ function configuration_cli(ArchiveFixture $archive, array $descriptor, array $ar
  * Start a CLI command without waiting, so tests can check concurrent callers.
  *
  * The caller must finish the child and close both output pipes.
+ * Observed stress children disable only Lerd's collector to keep measurements and JSON clean.
  */
 function start_configuration_cli(ArchiveFixture $archive, array $descriptor, array $arguments, array $overrides = [], ?string $bootstrap = null): array
 {
+    $php = [PHP_BINARY];
+    if ($archive->onProcessTick !== null && ini_get('lerd.devtools_flag') !== false) {
+        // Keep measured children free of collector output without changing global capture or PHP extensions.
+        $php = [...$php, '-d', 'lerd.devtools_flag=/disabled-for-filesystem-stress-measurement'];
+    }
+
     $pipes = [];
     $process = proc_open(
-        [PHP_BINARY, $bootstrap ?? (str_starts_with($arguments[0], 'job:') ? 'tests/Support/HistoricalOperations/console.php' : 'tempest'), ...$arguments, '--no-interaction'],
+        [...$php, $bootstrap ?? (str_starts_with($arguments[0], 'job:') ? 'tests/Support/HistoricalOperations/console.php' : 'tempest'), ...$arguments, '--no-interaction'],
         [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
         $pipes,
         dirname(__DIR__, 3),

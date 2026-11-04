@@ -25,6 +25,7 @@ test('measured directory workflow preserves and republishes every independent It
             );
             $result = finish_configuration_cli(['process' => $process, 'pipes' => $pipes]);
             $report = configuration_result($result);
+            expect($result['errors'])->not->toContain('Deprecated:', 'devtools-collector.php');
             foreach (['verify_preservation', 'verify_unchanged_preservation', 'verify_first_publication', 'verify_repeat_publication'] as $phase) {
                 expect($result['errors'])->toMatch('/^' . $phase . ' \|[^\n]*\| phase 0\/100 /m');
             }

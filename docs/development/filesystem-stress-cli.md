@@ -23,6 +23,10 @@ diagnostic is followed by success **only when that negative control was rejected
 - Composer development dependencies, PHP 8.5, Linux `/proc`, `pcntl`, Python 3,
   and the existing PostgreSQL integration fixture administrator are required.
   The command refuses production and staging, even with unattended flags.
+- Interactive Tempest prompts require `stty`, `tput` and a supported `TERM`.
+  On Lerd, `lerd php:pkg add ncurses` installs `tput` persistently in PHP images;
+  run it on the host, then reopen `lerd shell`. This declares the package for all
+  PHP versions, rebuilding the current version now and others on their next use.
 - Configure the private, ignored `tmp/transaction-projection-admin.json` as in
   the existing integration tests: `dsn` must be
   `pgsql:host=lerd-postgres;port=5432;dbname=postgres`, with explicit local
@@ -75,6 +79,9 @@ and checkpoints are evidence, not instructions to reset any other installation.
   sampled worker updates; the installed Symfony `ProgressBar` provides that narrow
   capability. It redraws one display rather than printing every Item. Revisit if
   Tempest gains a manually updated progress component. No dependency was added.
+  Compact metric rows wrap to terminal width, with the bar/count and phase units
+  on separate lines. Verifier and failure diagnostics clear and restore the bar
+  so their output cannot leave its cursor on the wrong line.
 
 State is sampled about once a second and on worker transitions; process output is
 drained every 250 ms. No Vault walk occurs on each refresh. Unknown measurements
@@ -186,18 +193,34 @@ New report: `tmp/filesystem-stress-100-4f1736a082.json`, SHA-256
 The full QA rerun took **428.71 s**. These remain uncontrolled observations, not a
 performance-improvement claim.
 
-A pseudo-terminal exercised both setup prompts, in-place progress and a real
-terminal Ctrl+C while a worker was active: exit 1, failed report with phase evidence,
-and completed cleanup. This PHP container lacks `tput`, which Tempest uses for
-prompt sizing: prompts emit a missing-tool warning and truncate, but input works.
-Use a development shell with ncurses/tput for correctly sized prompts, or the
-unattended mode. The Symfony progress display itself works in the container.
+A later terminal fix was validated with Lerd's persistent `ncurses` package
+installed. Tempest's rich confirmation and report-directory prompts now render
+without missing-tool warnings. An **80-column** pseudo-terminal completed the
+entire 100-Item interactive run: exit 0, 21 recorded phases, all independent
+checks passed and cleanup completed. A separate real terminal Ctrl+C while a
+worker was active returned exit 1, retained failed phase evidence and completed
+cleanup. Width regressions cover **40, 80 and 100 columns**; focused tests passed
+**25 tests / 166 assertions**, including rich-prompt decline and diagnostic redraw.
+Interactive report: `tmp/filesystem-stress-100-4fea088a1d.json`, SHA-256
+`bc59a88eb69c102d39d4b2c9df52bb96f50dfdf80dad23ffed8c92e533d39e2f`.
 
-Lerd's existing PHP 8.5 collector deprecation initially contaminated application
-JSON and correctly failed acceptance. Validation used an extra private PHP ini
-directory setting `lerd.devtools_flag=/disabled-for-filesystem-stress-measurement`,
-with normal extension ini files retained. No global capture setting, working
-database or application signing key was changed. See the
+Lerd's PHP 8.5 collector deprecation initially contaminated child JSON and correctly
+failed acceptance. Observed fixture CLI children now set
+`-d lerd.devtools_flag=/disabled-for-filesystem-stress-measurement` when Lerd's
+extension is present. This keeps collector work/output out of the measurement;
+normal extensions, validation and JSON parsing remain unchanged. Ordinary fixture
+callers without a progress observer are unchanged. Both the full interactive run
+and the JSON acceptance recheck ran **without a PHP ini override**. JSON acceptance
+passed **20 parent assertions / 155.62 s**, including no collector/deprecation noise.
+JSON report: `tmp/filesystem-stress-100-d9fa8592e0.json`, SHA-256
+`04aad23f04a244bae8b583f4d7eaaac68dc8ca6f753b04b00ab2bec2c38b098d`.
+
+Full QA passed **639 tests / 37,315 assertions in 425.72 s**, with the same
+42 incomplete contracts and four informational analysis notices. The ordinary
+suite still needs the earlier private collector-disable ini override: a run
+without it failed 40 unrelated JSON checks and reported 62 collector deprecations.
+That environment defect is not repaired globally by this stress CLI change.
+No global capture setting, working database or application signing key was changed. See the
 [historical baseline](filesystem-pr5-measured-stress.md) for storage/measurement
 limits. The CLI's 1,000/10,000 workloads, persistent workers and concurrency were
 not run or added here. Static analysis retains the repository's existing exclusion

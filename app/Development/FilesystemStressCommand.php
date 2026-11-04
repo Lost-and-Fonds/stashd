@@ -59,7 +59,8 @@ final readonly class FilesystemStressCommand
             }
 
             if ($interactive && $count === null) {
-                if (! $this->console->confirm('Run 100 Items serially, removing only the newly created disposable database, Vault and source afterward?')) {
+                $this->console->writeln('Serial run; only its new disposable database, Vault and source are removed.');
+                if (! $this->console->confirm('Run the 100-Item stress test?')) {
                     return 1;
                 }
 
@@ -77,7 +78,7 @@ final readonly class FilesystemStressCommand
             $presenter = new FilesystemStressPresenter($this->console, $interactive);
             /** @var array{status: string, failure_type?: ?string, ...} $report */
             // @mago-expect analysis:non-existent-method
-            $report = FilesystemStressRunner::run(100, $presenter->update(...), $reportDir);
+            $report = FilesystemStressRunner::run(100, $presenter->update(...), $reportDir, $presenter->diagnostic(...));
             $presenter->finish($report, $json);
 
             return $report['status'] === 'passed' ? 0 : 1;

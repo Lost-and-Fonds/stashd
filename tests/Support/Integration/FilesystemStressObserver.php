@@ -108,8 +108,9 @@ final class FilesystemStressObserver
      *
      * This process cannot inspect Stashd's database, Vault or operational Results.
      * A nonzero status is returned for the deliberate output-corruption control.
+     * The caller displays diagnostics separately from the progress bar.
      */
-    public static function verify(string $manifest, string $directory, int $count): int
+    public static function verify(string $manifest, string $directory, int $count, Closure $diagnostic): int
     {
         $arguments = ['python3', 'tools/fixtures/microtext.py', 'verify', '--directory', $directory, '--manifest', $manifest];
         if ($count === 10_000) {
@@ -132,10 +133,7 @@ final class FilesystemStressObserver
         fclose($pipes[1]);
         fclose($pipes[2]);
         $exit = proc_close($process);
-        file_put_contents('php://stderr', (string) $output);
-        if ($exit !== 0) {
-            file_put_contents('php://stderr', (string) $error);
-        }
+        $diagnostic((string) $output . ($exit !== 0 ? (string) $error : ''));
 
         return $exit;
     }
