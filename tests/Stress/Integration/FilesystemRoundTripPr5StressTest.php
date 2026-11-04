@@ -67,8 +67,7 @@ test('measured directory workflow preserves and republishes every independent It
             $firstPath = array_key_first($corpus['entries']);
             expect($firstPath)->not->toBeNull();
             file_put_contents($archive->path('output/' . $firstPath), "deliberately altered output\n");
-            expect(Pr5Scale::verify($corpus['manifest'], $archive->path('output'), $count))
-                ->not->toBe(0, 'Corruption must defeat the independent external verifier.');
+            expect(Pr5Scale::verify($corpus['manifest'], $archive->path('output'), $count))->not->toBe(0, 'Corruption must defeat the independent external verifier.');
             $metrics->checkpoint('negative_control_rejected');
 
             $metrics->finish($archive->path('vault'));
