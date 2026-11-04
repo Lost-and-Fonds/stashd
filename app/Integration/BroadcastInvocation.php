@@ -38,11 +38,12 @@ final class BroadcastInvocation
 
     /**
      * Bind this capability object to one persisted attempt without granting any reads yet.
+     * The immutable run ID supplies provenance, not permission to publish or delete files.
      */
     public function __construct(
         private BroadcastStore $store,
         private AssetArchive $assets,
-        private string $run,
+        public readonly string $run,
         private string $attempt,
     ) {
         $this->streams = new WeakMap();

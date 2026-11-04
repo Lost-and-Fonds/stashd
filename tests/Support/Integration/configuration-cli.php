@@ -51,11 +51,11 @@ function configuration_cli(ArchiveFixture $archive, array $descriptor, array $ar
  *
  * The caller must finish the child and close both output pipes.
  */
-function start_configuration_cli(ArchiveFixture $archive, array $descriptor, array $arguments, array $overrides = []): array
+function start_configuration_cli(ArchiveFixture $archive, array $descriptor, array $arguments, array $overrides = [], ?string $bootstrap = null): array
 {
     $pipes = [];
     $process = proc_open(
-        [PHP_BINARY, str_starts_with($arguments[0], 'job:') ? 'tests/Support/HistoricalOperations/console.php' : 'tempest', ...$arguments, '--no-interaction'],
+        [PHP_BINARY, $bootstrap ?? (str_starts_with($arguments[0], 'job:') ? 'tests/Support/HistoricalOperations/console.php' : 'tempest'), ...$arguments, '--no-interaction'],
         [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
         $pipes,
         dirname(__DIR__, 3),
