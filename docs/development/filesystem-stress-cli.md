@@ -86,6 +86,21 @@ descendants, excluding the sampler and PostgreSQL; shared pages can double-count
 Checkpoint SQL/Vault walks are separately timed. Live observation and process
 polling add overhead to phase intervals. No ETA or performance improvement is claimed.
 
+The bar resets for every phase and names its units: distinct discovered sources,
+settled Jobs, checked publication reports, or independently checked Items/files.
+Job settlement and publication reports are explicitly **not** byte verification.
+Whole-corpus checks advance only when the unchanged checker returns successfully;
+there is no invented per-file progress during those checks. Repeat acquisition
+and discovery use their new Input run rather than reusing earlier completion.
+Removal, corruption rejection and cleanup use one-step counters. Cleanup remains
+pending until disposal succeeds; only then may the final summary say **PASS**.
+
+`ProcessTreeRssTrace` live refreshes seek to the last consumed byte and update an incremental maximum
+from new, newline-terminated samples. A partial final line waits for the next
+refresh. Completed history is not reparsed. Final report construction still reads
+the complete trace independently to calculate each phase's peak, preserving the
+existing report fields and measurement semantics.
+
 The installed Tempest process documentation, `GenericProcessExecutor` and
 `InvokedSystemProcess` were inspected. This extraction retains the existing
 acceptance probes' process-resource handles and concurrent-test callers rather
@@ -128,7 +143,7 @@ are not retained as competing implementations.
 
 ## Local validation and comparison
 
-The renamed 100-Item Pest case ran the actual CLI and passed in **94.16 s**.
+The initial renamed 100-Item Pest case ran the actual CLI and passed in **94.16 s**.
 Its parent checks include parseable/decorated-output-free stdout, matching saved
 JSON, final persisted counts, cleanup and the corruption-rejection checkpoint.
 The independent assertions run inside the CLI, so Pest's parent assertion count
@@ -156,10 +171,20 @@ No generated report or private fixture configuration is committed.
 
 Also validated: focused Filesystem regressions **35 passed / 11,350 assertions**;
 independent Python fixture/sampler regressions **15 passed**; full `composer qa`
-passed: **631 passed / 37,177 assertions**, with **42 pre-existing incomplete
+passed after the review fixes: **634 passed / 37,254 assertions**, with **42 pre-existing incomplete
 contracts**, clean formatting/lint and four existing informational static-analysis
 notices. Incomplete contracts are not passes. Assertion totals differ from historical reports because
 shared command checks now use PHPUnit assertions directly instead of Pest wrappers.
+
+The review-fix 100-Item CLI recheck passed **19 parent assertions in 98.44 s**,
+including phase-reset assertions through repeat publication, corruption checking
+and cleanup. Focused progress/tail-reader tests passed **20 tests / 123 assertions**;
+they cover bar resets despite prior verification, unknown counts, appended/partial
+RSS lines, retained maxima, no rereading of consumed history and malformed JSON.
+New report: `tmp/filesystem-stress-100-4f1736a082.json`, SHA-256
+`4b1af2a11143cb3702863a824ae911f9cabdacead6780339d0e1eb4747b95ac6`.
+The full QA rerun took **428.71 s**. These remain uncontrolled observations, not a
+performance-improvement claim.
 
 A pseudo-terminal exercised both setup prompts, in-place progress and a real
 terminal Ctrl+C while a worker was active: exit 1, failed report with phase evidence,

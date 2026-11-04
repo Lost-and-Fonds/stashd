@@ -27,7 +27,6 @@ final class FilesystemStressPresenter
     ) {
         if ($interactive) {
             $this->bar = new ProgressBar(new StreamOutput(STDERR, decorated: true), 100);
-            $this->bar->setFormat("%message%\n%bar% %current%/%max% externally verified");
         }
     }
 
@@ -52,12 +51,20 @@ final class FilesystemStressPresenter
             $progress->settled === null ? '?' : sprintf('%.2f', $progress->settled / max(0.001, $progress->elapsedSeconds)),
             $progress->peakRssKib === null ? '?' : sprintf('%.1f', $progress->peakRssKib / 1024),
         );
+        $phaseProgress = $value($progress->phaseCompleted) . '/' . $progress->phaseTotal . ' ' . $progress->phaseUnit;
         if ($this->bar !== null) {
             $this->bar->setMessage($message);
-            $this->bar->setProgress($progress->verified);
+            $this->bar->setMessage($phaseProgress, 'phase_progress');
+            $this->bar->setFormat("%message%\n%bar% %phase_progress%");
+            if ($this->phase !== $progress->phase) {
+                $this->bar->clear();
+                $this->bar->start($progress->phaseTotal);
+            }
+
+            $this->bar->setProgress($progress->phaseCompleted ?? 0);
             $this->bar->display();
         } elseif ($this->phase !== $progress->phase) {
-            fwrite(STDERR, $message . "\n");
+            fwrite(STDERR, $message . ' | phase ' . $phaseProgress . "\n");
         }
 
         $this->phase = $progress->phase;

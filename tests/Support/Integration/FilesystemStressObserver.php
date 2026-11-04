@@ -42,6 +42,10 @@ final class FilesystemStressObserver
     private ?int $peakRss = null;
     private ?int $lastActiveWorkers = null;
     private int $maxActiveWorkers = 0;
+    private int $phaseCompleted = 0;
+    private int $phaseTotal;
+    private string $phaseUnit = 'Items';
+    private ProcessTreeRssTrace $rssTrace;
 
     /**
      * Start one independent process-tree RSS sampler for the complete experiment.
@@ -62,6 +66,8 @@ final class FilesystemStressObserver
         }
 
         $this->last = hrtime(true);
+        $this->phaseTotal = $count;
+        $this->rssTrace = new ProcessTreeRssTrace($archive->path('filesystem-stress-monitor.jsonl'));
         $this->runStarted = microtime(true);
         $this->startedAt = microtime(true);
         if (! is_dir('/proc')) {
@@ -135,7 +141,7 @@ final class FilesystemStressObserver
     }
 
     /**
-     * Select which acquisition pass live admission and settlement counts describe.
+     * Select the Input run whose discovery, admission and settlement are being observed.
      */
     public function observeRun(string $run): void
     {
@@ -266,11 +272,30 @@ final class FilesystemStressObserver
     }
 
     /**
-     * Announce the operation about to run, without performing any application work.
+     * Reset progress for the next operation, naming what its counts actually measure.
+     * Item phases default to the workload size; source removal and cleanup use one fixture.
      */
-    public function phase(string $phase): void
+    public function phase(string $phase, string $unit, ?int $total = null): void
     {
         $this->phase = $phase;
+        $this->phaseCompleted = 0;
+        $this->phaseTotal = $total ?? $this->count;
+        $this->phaseUnit = $unit;
+        if (in_array($phase, ['discovery', 'unchanged_rescan', 'first_acquisition', 'unchanged_acquisition'], true)) {
+            $this->run = null;
+        }
+
+        $this->lastRefresh = 0;
+        $this->refresh();
+    }
+
+    /**
+     * Advance the current phase only after its caller has actually checked the stated evidence.
+     * This is phase progress, never permission to report an overall acceptance pass.
+     */
+    public function progress(int $completed): void
+    {
+        $this->phaseCompleted = $completed;
         $this->lastRefresh = 0;
         $this->refresh();
     }
@@ -310,15 +335,18 @@ final class FilesystemStressObserver
             }
         }
 
-        $trace = $this->archive->path('filesystem-stress-monitor.jsonl');
-        if (is_file($trace)) {
-            foreach (file($trace, FILE_IGNORE_NEW_LINES) as $line) {
-                $point = json_decode($line, true);
-                if (is_int($point['rss_kib'] ?? null)) {
-                    $this->peakRss = max($this->peakRss ?? 0, $point['rss_kib']);
-                }
-            }
+        $phaseCompleted = match ($this->phase) {
+            'discovery' => $discovered,
+            'first_acquisition', 'unchanged_acquisition' => $settled,
+            default => $this->phaseCompleted,
+        };
+        if ($this->phase === 'unchanged_rescan' && $this->run !== null && $present !== null) {
+            $query = $this->database->prepare('SELECT count(DISTINCT source_id) FROM configuration_proof.discovery_items WHERE run_id = ?');
+            $query->execute([$this->run]);
+            $phaseCompleted = (int) $query->fetchColumn();
         }
+
+        $this->peakRss = $this->rssTrace->peak();
 
         ($this->observer)(new FilesystemStressProgress(
             $this->phase,
@@ -332,6 +360,9 @@ final class FilesystemStressObserver
             $failed,
             $activeWorkers,
             $this->peakRss,
+            $phaseCompleted,
+            $this->phaseTotal,
+            $this->phaseUnit,
         ));
     }
 

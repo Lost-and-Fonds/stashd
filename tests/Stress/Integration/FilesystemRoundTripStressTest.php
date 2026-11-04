@@ -23,7 +23,16 @@ test('measured directory workflow preserves and republishes every independent It
                 dirname(__DIR__, 3),
                 [...getenv(), 'ENVIRONMENT' => 'testing'],
             );
-            $report = configuration_result(finish_configuration_cli(['process' => $process, 'pipes' => $pipes]));
+            $result = finish_configuration_cli(['process' => $process, 'pipes' => $pipes]);
+            $report = configuration_result($result);
+            foreach (['verify_preservation', 'verify_unchanged_preservation', 'verify_first_publication', 'verify_repeat_publication'] as $phase) {
+                expect($result['errors'])->toMatch('/^' . $phase . ' \|[^\n]*\| phase 0\/100 /m');
+            }
+
+            foreach (['repeat_broadcast', 'corruption_negative_control', 'cleanup'] as $phase) {
+                expect($result['errors'])->toMatch('/^' . $phase . ' \|[^\n]*verified 100[^\n]*\| phase 0\/1 /m');
+            }
+
             $saved = file_get_contents($directory . '/' . $report['report_file']);
             expect(json_decode($saved, true, flags: JSON_THROW_ON_ERROR))->toBe($report);
             expect($saved)->not->toContain('password', 'dsn', 'SIGNING_KEY', "\e[");

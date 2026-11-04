@@ -25,5 +25,8 @@ final readonly class FilesystemStressProgress
         public ?int $failed,
         public int $activeWorkers,
         public ?int $peakRssKib,
+        public ?int $phaseCompleted,
+        public int $phaseTotal,
+        public string $phaseUnit,
     ) {}
 }

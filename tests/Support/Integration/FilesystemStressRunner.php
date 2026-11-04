@@ -87,6 +87,7 @@ final class FilesystemStressRunner
                 $archive->onProcessTick = $metrics->refresh(...);
                 try {
                     self::roundTrip($archive, $descriptor, $database, $count, $metrics);
+                    $metrics->phase('cleanup', 'fixture removed', 1);
                     $report = $metrics->finish($archive->path('vault'), pendingCleanup: true);
                 } catch (Throwable $error) {
                     fwrite(
@@ -160,64 +161,76 @@ final class FilesystemStressRunner
      */
     private static function roundTrip(ArchiveFixture $archive, array $descriptor, PDO $database, int $count, FilesystemStressObserver $metrics): void
     {
-        $metrics->phase('generate_and_verify_source');
+        $metrics->phase('generate_source', 'source files generated');
         $corpus = Pr2Directory::corpus($archive, $count);
         $metrics->checkpoint('fixture_generated', ['expected_files' => $count]);
+        $metrics->progress($count);
+        $metrics->phase('verify_source', 'source files independently checked');
         Assert::assertSame(0, FilesystemStressObserver::verify($corpus['manifest'], $corpus['source'], $count));
         $metrics->checkpoint('source_fixture_verified');
+        $metrics->progress($count);
 
-        $metrics->phase('discovery');
+        $metrics->phase('discovery', 'distinct sources discovered');
         $scope = Pr2Directory::discover($archive, $descriptor, $corpus['source'], $count, fn () => $metrics->checkpoint('discovery_worker_settled'));
         $metrics->checkpoint('discovery_complete', ['discovered' => $count]);
         $empty = configuration_cli($archive, $descriptor, ['operations:work', '--once', '--limit=100']);
         Assert::assertSame(0, $empty['code'], $empty['output'] . $empty['errors']);
         $metrics->checkpoint('empty_worker_baseline');
 
-        $metrics->phase('first_acquisition');
+        $metrics->phase('first_acquisition', 'Jobs settled (not preservation proof)');
         self::acquire($archive, $descriptor, $scope['run'], $count, $metrics);
         $metrics->checkpoint('first_acquisition_settled');
-        $metrics->phase('verify_preservation');
+        $metrics->phase('verify_preservation', 'Items independently checked');
         Pr2Directory::assertPerFileAssignments($database, $scope['run'], $count);
         $members = Pr2Directory::members($archive, $descriptor, $scope['stash']);
         Assert::assertCount($count, $members);
         $preserved = Pr2Directory::assertPreserved($archive, $members, $corpus['entries']);
         $metrics->checkpoint('first_preservation_verified', ['items' => count($members), 'assets' => count($preserved)]);
+        $metrics->progress(count($preserved));
 
-        $metrics->phase('unchanged_rescan');
+        $metrics->phase('unchanged_rescan', 'distinct sources rediscovered');
         $repeat = Pr1RoundTrip::command($archive, $descriptor, ['input:discover', $scope['input']]);
+        $metrics->observeRun($repeat['run_id']);
         Pr2Directory::settle($archive, $descriptor, $repeat['assignment_id'], 3_600);
         $metrics->checkpoint('unchanged_discovery_complete');
         $secondDiscovery = Pr1RoundTrip::command($archive, $descriptor, ['input:discovery', $repeat['run_id']]);
         Assert::assertSame('exhaustive', $secondDiscovery['coverage']['kind']);
         Assert::assertSame($count, $secondDiscovery['discovered_count']);
-        $metrics->phase('unchanged_acquisition');
+        $metrics->phase('unchanged_acquisition', 'Jobs settled (not preservation proof)');
         self::acquire($archive, $descriptor, $repeat['run_id'], $count, $metrics);
         $metrics->checkpoint('unchanged_acquisition_settled');
+        $metrics->phase('verify_unchanged_preservation', 'unchanged Items independently checked');
         Pr2Directory::assertPerFileAssignments($database, $repeat['run_id'], $count);
         Assert::assertSame($members, Pr2Directory::members($archive, $descriptor, $scope['stash']));
         Assert::assertSame($preserved, Pr2Directory::assertPreserved($archive, $members, $corpus['entries']), 'An unchanged rescan must not create new Item/Asset revisions.');
         $metrics->checkpoint('unchanged_rescan_verified', ['items' => $count, 'assets' => $count]);
+        $metrics->progress($count);
 
-        $metrics->phase('remove_source');
+        $metrics->phase('remove_source', 'source root removed', 1);
         $archive->destroy('inputs');
         Assert::assertFalse(is_dir($corpus['source']), 'Input A must be unavailable before publication starts.');
         $metrics->checkpoint('source_removed');
+        $metrics->progress(1);
 
-        $metrics->phase('first_broadcast');
+        $metrics->phase('first_broadcast', 'publication Job settled (not byte verification)', 1);
         $first = self::broadcast($archive, $descriptor, $scope['stash'], $count, $metrics);
         $metrics->checkpoint('first_broadcast_settled', ['reported_files' => $count]);
+        $metrics->phase('verify_first_publication', 'output files independently checked');
         Assert::assertSame(0, FilesystemStressObserver::verify($corpus['manifest'], $archive->path('output'), $count));
         $inodes = Pr2Directory::inodes($archive->path('output'), $corpus['entries']);
         $metrics->checkpoint('source_independent_broadcast_verified', ['reported_files' => $count]);
+        $metrics->progress($count);
 
-        $metrics->phase('repeat_broadcast');
+        $metrics->phase('repeat_broadcast', 'publication Job settled (not byte verification)', 1);
         self::broadcast($archive, $descriptor, $scope['stash'], $count, $metrics, $first['broadcast']);
         $metrics->checkpoint('repeat_broadcast_settled', ['reported_files' => $count]);
+        $metrics->phase('verify_repeat_publication', 'output files and stable inodes independently checked');
         Assert::assertSame(0, FilesystemStressObserver::verify($corpus['manifest'], $archive->path('output'), $count));
         Assert::assertSame($inodes, Pr2Directory::inodes($archive->path('output'), $corpus['entries']));
         $metrics->checkpoint('repeat_broadcast_verified', ['reported_files' => $count]);
+        $metrics->progress($count);
 
-        $metrics->phase('corruption_negative_control');
+        $metrics->phase('corruption_negative_control', 'deliberate corruption rejected', 1);
         $firstPath = array_key_first($corpus['entries']);
         Assert::assertNotNull($firstPath);
         file_put_contents($archive->path('output/' . $firstPath), "deliberately altered output\n");
@@ -227,6 +240,7 @@ final class FilesystemStressRunner
             'Corruption must defeat the independent external verifier.',
         );
         $metrics->checkpoint('negative_control_rejected');
+        $metrics->progress(1);
     }
 
     /**
@@ -290,6 +304,8 @@ final class FilesystemStressRunner
         Assert::assertNotEmpty($receipt['assignment_id'] ?? null);
         Pr2Directory::settle($archive, $descriptor, $receipt['assignment_id'], 3_600);
         $metrics->checkpoint('broadcast_worker_settled');
+        $metrics->progress(1);
+        $metrics->phase('publication_reports', 'file reports checked (not byte verification)');
         $after = -1;
         $seen = [];
         do {
@@ -308,6 +324,8 @@ final class FilesystemStressRunner
                 Assert::assertArrayNotHasKey($after, $seen, 'A published file report position must be unique.');
                 $seen[$after] = true;
             }
+
+            $metrics->progress(count($seen));
         } while ($page['results'] !== []);
 
         Assert::assertCount($count, $seen, 'One real report is required for every preserved Item.');

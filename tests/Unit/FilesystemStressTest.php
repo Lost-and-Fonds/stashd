@@ -6,9 +6,12 @@ use App\Development\DTO\FilesystemStressProgress;
 use App\Development\FilesystemStressCommand;
 use App\Development\FilesystemStressPresenter;
 use PHPUnit\Framework\ExpectationFailedException;
+use Symfony\Component\Console\Helper\ProgressBar;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Tempest\Console\Console;
 use Tempest\Core\Environment;
 use Tests\Support\Integration\FilesystemStressRunner;
+use Tests\Support\Integration\ProcessTreeRssTrace;
 use Tests\Support\RecordsAndArchives\ArchiveFixture;
 
 require_once dirname(__DIR__) . '/Support/Integration/configuration-cli.php';
@@ -78,11 +81,86 @@ test('stress JSON presentation never manufactures success or contains terminal d
             return $console;
         });
     $presenter = new FilesystemStressPresenter($console, false);
-    $presenter->update(new FilesystemStressProgress('acquisition', 10, 100, 100, 100, 0, 0, 0, 0, 0, null));
+    $presenter->update(new FilesystemStressProgress('acquisition', 10, 100, 100, 100, 0, 0, 0, 0, 0, null, 100, 100, 'Jobs settled (not preservation proof)'));
     $report = ['format' => 'stashd-filesystem-stress-1', 'status' => 'failed', 'failure_type' => RuntimeException::class];
     $presenter->finish($report, true);
     expect(json_decode($written, true, flags: JSON_THROW_ON_ERROR))->toBe($report);
     expect($written)->not->toContain("\e[");
+});
+
+test('the live bar follows each phase and resets despite previously verified output', function (): void {
+    $console = $this->createStub(Console::class);
+    $console->method('writeRaw')->willReturn($console);
+    $presenter = new FilesystemStressPresenter($console, false);
+    $output = new BufferedOutput(decorated: true);
+    $bar = new ProgressBar($output, 100);
+    new ReflectionProperty($presenter, 'bar')->setValue($presenter, $bar);
+
+    foreach ([
+        ['discovery',                   30,   100, 'distinct sources discovered'],
+        ['first_acquisition',           null, 100, 'Jobs settled (not preservation proof)'],
+        ['first_acquisition',           60,   100, 'Jobs settled (not preservation proof)'],
+        ['verify_preservation',         0,    100, 'Items independently checked'],
+        ['verify_preservation',         100,  100, 'Items independently checked'],
+        ['verify_first_publication',    0,    100, 'output files independently checked'],
+        ['verify_first_publication',    100,  100, 'output files independently checked'],
+        ['repeat_broadcast',            0,    1,   'publication Job settled (not byte verification)'],
+        ['publication_reports',         40,   100, 'file reports checked (not byte verification)'],
+        ['verify_repeat_publication',   0,    100, 'output files and stable inodes independently checked'],
+        ['verify_repeat_publication',   100,  100, 'output files and stable inodes independently checked'],
+        ['corruption_negative_control', 0,    1,   'deliberate corruption rejected'],
+        ['corruption_negative_control', 1,    1,   'deliberate corruption rejected'],
+        ['cleanup',                     0,    1,   'fixture removed'],
+    ] as [$phase, $completed, $total, $unit]) {
+        // Historical verified counts must never fill a different phase's bar.
+        $presenter->update(new FilesystemStressProgress($phase, 10, 100, 100, 100, 100, 100, 0, 0, 0, null, $completed, $total, $unit));
+        expect($bar->getProgress())->toBe($completed ?? 0);
+        expect($bar->getMaxSteps())->toBe($total);
+        $rendered = $output->fetch();
+        expect($rendered)->toContain($phase, ($completed ?? '?') . '/' . $total . ' ' . $unit);
+        expect($rendered)->not->toContain('PASS:');
+    }
+
+    $presenter->finish(['status' => 'failed'], true);
+    expect($output->fetch())->not->toContain('PASS:');
+});
+
+test('live RSS reads only appended samples and keeps an incremental maximum', function (): void {
+    $fixture = new ArchiveFixture();
+    $path = $fixture->path('trace.jsonl');
+    $trace = new ProcessTreeRssTrace($path);
+    try {
+        expect($trace->peak())->toBeNull();
+        $first = json_encode(['rss_kib' => 200], JSON_THROW_ON_ERROR) . "\n";
+        file_put_contents($path, $first);
+        expect($trace->peak())->toBe(200);
+        expect($trace->peak())->toBe(200);
+
+        // A changed prefix proves that a refresh does not reparse consumed history.
+        $stream = fopen($path, 'r+');
+        fwrite($stream, str_repeat('x', strlen($first)));
+        fclose($stream);
+        file_put_contents($path, "{\"rss_kib\":100}\n{\"rss_kib\":300}", FILE_APPEND);
+        expect($trace->peak())->toBe(200);
+        expect($trace->peak())->toBe(200);
+        file_put_contents($path, "\n", FILE_APPEND);
+        expect($trace->peak())->toBe(300);
+        file_put_contents($path, "{\"rss_kib\":250}\n", FILE_APPEND);
+        expect($trace->peak())->toBe(300);
+    } finally {
+        $fixture->dispose();
+    }
+});
+
+test('malformed complete RSS samples fail instead of masquerading as missing observations', function (): void {
+    $fixture = new ArchiveFixture();
+    try {
+        $path = $fixture->path('trace.jsonl');
+        file_put_contents($path, "not json\n");
+        expect(fn () => new ProcessTreeRssTrace($path)->peak())->toThrow(JsonException::class);
+    } finally {
+        $fixture->dispose();
+    }
 });
 
 test('fixture cleanup refuses a missing ownership marker and linked ancestors', function (): void {
