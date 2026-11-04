@@ -35,7 +35,7 @@ jobs:
           --health-retries 12
     env:
       ENVIRONMENT: testing
-      STASHD_TEST_PROCESSES: '1'
+      STASHD_TEST_PROCESSES: '2'
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -81,6 +81,7 @@ jobs:
           echo '127.0.0.1 lerd-postgres' | sudo tee -a /etc/hosts
           umask 077
           mkdir -p tmp
+          php -r 'file_put_contents(".env", "ENVIRONMENT=testing\nSIGNING_KEY=" . base64_encode(random_bytes(32)) . "\n"); chmod(".env", 0600);'
           printf '%s\n' '{"dsn":"pgsql:host=lerd-postgres;port=5432;dbname=postgres","username":"postgres","password":"stashd-disposable-ci"}' > tmp/transaction-projection-admin.json
           php -r '$db = new PDO("pgsql:host=lerd-postgres;port=5432;dbname=postgres", "postgres", "stashd-disposable-ci"); if ($db->query("SHOW server_version_num")->fetchColumn() < 160000) { exit(1); }'
 
@@ -90,7 +91,7 @@ jobs:
 
       - name: Remove private fixture configuration
         if: always()
-        run: rm -f tmp/transaction-projection-admin.json
+        run: rm -f tmp/transaction-projection-admin.json .env
 
       - name: Ensure quality checks did not modify tracked files
         if: always()

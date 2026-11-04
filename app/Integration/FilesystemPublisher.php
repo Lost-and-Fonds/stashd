@@ -8,6 +8,8 @@ use App\Administration\VaultConfig;
 use App\Integration\DTO\PublishedFile;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
+use Tempest\Cryptography\Signing\Signature;
+use Tempest\Cryptography\Signing\Signer;
 
 /**
  * Reconstruct selected historical files using only verified invocation streams.
@@ -22,19 +24,21 @@ use Symfony\Component\Uid\Uuid;
 final readonly class FilesystemPublisher implements BroadcastPublisher
 {
     /**
-     * Reuse the local path policy and saved roots without accessing source bytes.
+     * Reuse local path policy and saved roots; authenticate workspace claims with Tempest's signer.
      */
     public function __construct(
         private FilesystemRoots $roots,
         private IntegrationConfigurations $configurations,
         private VaultConfig $vault,
+        private Signer $signer,
     ) {}
 
     /**
      * Preflight the entire selection on disk, then copy and report each complete file.
      *
      * The private destination-local workspace bounds memory and owns all temporary
-     * files. Normal failure removes only that workspace; abrupt death can leave it.
+     * files. Authenticated, locally locked ownership survives process death so the
+     * same frozen run can reclaim abandoned files without trusting a filename alone.
      */
     public function publish(BroadcastInvocation $invocation, array $settings): FileReportStatus
     {
@@ -45,13 +49,35 @@ final readonly class FilesystemPublisher implements BroadcastPublisher
 
         $root = $this->checkRoot($configured);
         $this->directory($root);
+        $this->reclaim($root, $invocation->run);
         $workspace = $root . '/.stashd-publication-' . bin2hex(random_bytes(16));
         if (! mkdir($workspace, 0o700)) {
             throw new RuntimeException('Could not create private publication workspace.');
         }
 
         $plan = null;
+        $owner = null;
+        $receipt = '';
         try {
+            $identity = $this->entry($workspace);
+            $claim = $this->ownership($root, $invocation->run, $workspace, (string) $identity['dev'], (string) $identity['ino']);
+            $receipt = $workspace . '.' . $identity['dev'] . '.' . $identity['ino'] . '.' . $this->signer->sign($claim)->value . '.owner';
+            $owner = fopen($receipt, 'x+b');
+            if ($owner === false) {
+                throw new RuntimeException('Could not claim private publication workspace.');
+            }
+
+            if (! flock($owner, LOCK_EX | LOCK_NB)) {
+                fclose($owner);
+                $owner = null;
+                throw new RuntimeException('A live local owner claimed the publication workspace.');
+            }
+
+            if (! chmod($receipt, 0o600)) {
+                throw new RuntimeException('Could not protect publication ownership receipt.');
+            }
+
+            $this->requireOwner($root, $invocation->run, $workspace, $receipt, $owner);
             $plan = fopen($workspace . '/plan', 'x+b');
             if ($plan === false) {
                 throw new RuntimeException('Could not open publication plan.');
@@ -88,28 +114,239 @@ final readonly class FilesystemPublisher implements BroadcastPublisher
                 fclose($plan);
             }
 
-            $this->cleanup($workspace);
+            if (is_resource($owner)) {
+                try {
+                    $this->cleanup($root, $invocation->run, $workspace, $receipt, $owner);
+                } finally {
+                    flock($owner, LOCK_UN);
+                    fclose($owner);
+                }
+            }
         }
     }
 
     /**
-     * Remove only the private invocation workspace on normal return or failure.
+     * Discover receipts without treating matching names as deletion authority.
+     * Other runs, unowned legacy workspaces and ambiguous material obstruct publication.
      */
-    private function cleanup(string $workspace): void
+    private function reclaim(string $root, string $run): void
     {
-        if (is_link($workspace) || ! is_dir($workspace)) {
-            return;
-        }
-
-        foreach (new \DirectoryIterator($workspace) as $entry) {
-            if ($entry->isDot()) {
+        $receipts = [];
+        $directories = [];
+        foreach (new \DirectoryIterator($root) as $entry) {
+            $name = $entry->getFilename();
+            if (! str_starts_with($name, '.stashd-publication-')) {
                 continue;
             }
 
-            unlink($entry->getPathname());
+            $path = $entry->getPathname();
+            $parts = [];
+            if (preg_match('/^(\.stashd-publication-[a-f0-9]{32})\.[0-9]+\.[0-9]+\.[a-f0-9]{64,128}\.owner$/D', $name, $parts)) {
+                $workspace = $root . '/' . $parts[1];
+                if (isset($receipts[$workspace])) {
+                    throw new RuntimeException('Contradictory publication ownership obstructs recovery.');
+                }
+
+                $receipts[$workspace] = $path;
+            } elseif (preg_match('/^\.stashd-publication-[a-f0-9]{32}$/D', $name)) {
+                $directories[] = $path;
+            } else {
+                throw new RuntimeException('Unknown publication material obstructs recovery: ' . $path);
+            }
         }
 
-        rmdir($workspace);
+        foreach ($directories as $workspace) {
+            if (! isset($receipts[$workspace])) {
+                throw new RuntimeException('Unowned publication workspace obstructs recovery: ' . $workspace);
+            }
+        }
+
+        foreach ($receipts as $workspace => $receipt) {
+            $stat = $this->entry($receipt);
+            if (($stat['mode'] & 0o170_000) !== 0o100_000 || $stat['nlink'] !== 1 || $stat['size'] !== 0) {
+                throw new RuntimeException('Unsafe publication ownership receipt: ' . $receipt);
+            }
+
+            $owner = fopen($receipt, 'r+b');
+            if ($owner === false) {
+                throw new RuntimeException('Could not open publication ownership receipt.');
+            }
+
+            try {
+                if (! flock($owner, LOCK_EX | LOCK_NB)) {
+                    throw new RuntimeException('A live local owner still uses the publication workspace.');
+                }
+
+                $this->cleanup($root, $run, $workspace, $receipt, $owner);
+            } finally {
+                flock($owner, LOCK_UN);
+                fclose($owner);
+            }
+        }
+    }
+
+    /**
+     * Authenticate the run, configured root identity and exact workspace identity.
+     * The receipt remains outside the directory until reclamation has removed it.
+     */
+    private function ownership(string $root, string $run, string $workspace, string $device, string $inode): string
+    {
+        $this->roots->canonical($root);
+        $stat = $this->entry($root);
+
+        return json_encode([
+            'stashd-filesystem-workspace-1',
+            $run,
+            $root,
+            (string) $stat['dev'],
+            (string) $stat['ino'],
+            basename($workspace),
+            $device,
+            $inode,
+        ], JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Recheck the signed claim and the still-open local ownership lock's inode.
+     * Identifiers alone and a copied receipt cannot authorize another directory.
+     *
+     * @param resource $owner Locked ownership receipt; the caller retains it throughout reclamation.
+     */
+    private function requireOwner(string $root, string $run, string $workspace, string $receipt, mixed $owner): void
+    {
+        $parts = [];
+        if (! preg_match('/^' . preg_quote($workspace, '/') . '\.([0-9]+)\.([0-9]+)\.([a-f0-9]{64,128})\.owner$/D', $receipt, $parts)) {
+            throw new RuntimeException('Malformed publication ownership receipt.');
+        }
+
+        $stat = $this->entry($receipt);
+        $opened = fstat($owner);
+        if (
+            $opened === false
+            || $stat['dev'] !== $opened['dev']
+            || $stat['ino'] !== $opened['ino']
+            || ($stat['mode'] & 0o170_000) !== 0o100_000
+            || $stat['nlink'] !== 1
+            || $stat['size'] !== 0
+        ) {
+            throw new RuntimeException('Publication ownership receipt changed or is unsafe.');
+        }
+
+        if (! $this->signer->verify($this->ownership($root, $run, $workspace, $parts[1], $parts[2]), new Signature($parts[3]))) {
+            throw new RuntimeException('Publication ownership does not bind this frozen run and destination.');
+        }
+
+        clearstatcache(true, $workspace);
+        if (file_exists($workspace) || is_link($workspace)) {
+            $directory = $this->entry($workspace);
+            if (($directory['mode'] & 0o170_000) !== 0o040_000 || (string) $directory['dev'] !== $parts[1] || (string) $directory['ino'] !== $parts[2]) {
+                throw new RuntimeException('Publication workspace directory identity changed.');
+            }
+        }
+    }
+
+    /**
+     * Remove only known regular entries while retaining ownership through every unlink.
+     * Missing entries are already reclaimed; a crash after rmdir leaves a verifiable receipt.
+     * Unknown entries or links are retained, never recursively traversed or deleted.
+     *
+     * @param resource $owner Locked ownership receipt, released only by the caller.
+     */
+    private function cleanup(string $root, string $run, string $workspace, string $receipt, mixed $owner): void
+    {
+        $this->requireOwner($root, $run, $workspace, $receipt, $owner);
+        $entries = [];
+        if (is_dir($workspace)) {
+            foreach (new \DirectoryIterator($workspace) as $entry) {
+                if ($entry->isDot()) {
+                    continue;
+                }
+
+                $name = $entry->getFilename();
+                $path = $entry->getPathname();
+                $stat = $this->entry($path);
+                if (
+                    ! in_array($name, ['plan', 'bytes'], true) && ! preg_match('/^name-[a-f0-9]{64}$/D', $name)
+                    || ($stat['mode'] & 0o170_000) !== 0o100_000
+                    || $stat['nlink'] !== 1
+                ) {
+                    throw new RuntimeException('Unknown or unsafe publication entry obstructs recovery: ' . $path);
+                }
+
+                $entries[$path] = $stat;
+            }
+
+            foreach ($entries as $path => $before) {
+                $this->requireOwner($root, $run, $workspace, $receipt, $owner);
+                $current = $this->entry($path);
+                if ($current['dev'] !== $before['dev'] || $current['ino'] !== $before['ino'] || $current['mode'] !== $before['mode'] || $current['nlink'] !== 1) {
+                    throw new RuntimeException('Publication entry changed during reclamation.');
+                }
+
+                if (! unlink($path)) {
+                    throw new RuntimeException('Could not reclaim publication entry.');
+                }
+            }
+
+            $this->requireOwner($root, $run, $workspace, $receipt, $owner);
+            if (! rmdir($workspace)) {
+                throw new RuntimeException('Could not remove reclaimed publication workspace.');
+            }
+        }
+
+        $this->requireOwner($root, $run, $workspace, $receipt, $owner);
+        if (! unlink($receipt)) {
+            throw new RuntimeException('Could not remove reclaimed publication ownership receipt.');
+        }
+    }
+
+    /**
+     * Read a fresh inode without following a symlink or treating an I/O error as absence.
+     *
+     * @return array{dev: int, ino: int, mode: int, nlink: int, size: int, ...}
+     */
+    private function entry(string $path): array
+    {
+        clearstatcache(true, $path);
+        $stat = lstat($path);
+        if ($stat === false) {
+            throw new RuntimeException('Could not inspect publication entry: ' . $path);
+        }
+
+        return $stat;
+    }
+
+    /**
+     * Discard only this copy's still-identical regular staging file, never a replacement.
+     *
+     * @param array{dev: int, ino: int, ...} $workspaceStat Original workspace identity.
+     * @param array|false $staged Writer's identity before closing its handle.
+     */
+    private function discardStaging(string $workspace, array $workspaceStat, string $temporary, array|false $staged): void
+    {
+        clearstatcache(true, $temporary);
+        if (! file_exists($temporary) && ! is_link($temporary)) {
+            return;
+        }
+
+        $this->roots->canonical($workspace);
+        $directory = $this->entry($workspace);
+        $current = $this->entry($temporary);
+        if (
+            $directory['dev'] !== $workspaceStat['dev']
+            || $directory['ino'] !== $workspaceStat['ino']
+            || $staged === false
+            || $current['dev'] !== $staged['dev']
+            || $current['ino'] !== $staged['ino']
+            || ($current['mode'] & 0o170_000) !== 0o100_000
+            || $current['nlink'] !== 1
+        ) {
+            throw new RuntimeException('Staged publication entry changed; retaining it for inspection.');
+        }
+
+        if (! unlink($temporary)) {
+            throw new RuntimeException('Could not remove owned publication staging file.');
+        }
     }
 
     /**
@@ -356,10 +593,9 @@ final readonly class FilesystemPublisher implements BroadcastPublisher
             }
         } finally {
             $reader?->close();
+            $staged = fstat($writer);
             fclose($writer);
-            if (file_exists($temporary)) {
-                unlink($temporary);
-            }
+            $this->discardStaging($workspace, $workspaceStat, $temporary, $staged);
         }
     }
 }
