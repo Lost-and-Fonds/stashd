@@ -21,7 +21,7 @@ test('measured directory workflow preserves and republishes every independent It
         $metrics = new Pr5Scale($archive, $database, $count);
         try {
             $corpus = Pr2Directory::corpus($archive, $count);
-            Pr5Scale::verify($corpus['manifest'], $corpus['source'], $count);
+            expect(Pr5Scale::verify($corpus['manifest'], $corpus['source'], $count))->toBe(0);
             $metrics->checkpoint('fixture_generated', ['expected_files' => $count]);
 
             $scope = Pr2Directory::discover($archive, $descriptor, $corpus['source'], $count);
