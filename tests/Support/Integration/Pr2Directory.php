@@ -371,12 +371,14 @@ final class Pr2Directory
     /**
      * Prove every Stash Item has one exact canonical v1 Asset, the original
      * relative path and external-manifest bytes, with no extra OCFL objects.
+     * The optional observer is called only after each Item's pins, versions and bytes pass;
+     * full membership must still pass after the loop before the whole check succeeds.
      *
      * @param array<string, array{index: int, path: string, bytes: int, sha256: string}> $entries
      * @param list<array{id: string, uri: string, object_id: string}> $members
      * @return array<string, array{item: string, asset: string, item_versions: list<string>, asset_versions: list<string>, item_inventory_hash: string, asset_inventory_hash: string}>
      */
-    public static function assertPreserved(ArchiveFixture $archive, array $members, array $entries): array
+    public static function assertPreserved(ArchiveFixture $archive, array $members, array $entries, ?Closure $progress = null): array
     {
         $inventories = self::inventories($archive->path('vault'));
         Assert::assertCount(count($entries) * 2, $inventories, 'Expected one canonical Item and one Asset object per source.');
@@ -425,6 +427,7 @@ final class Pr2Directory
                 'item_inventory_hash' => hash_file('sha256', $inventories[$itemId] . '/v1/inventory.json'),
                 'asset_inventory_hash' => hash_file('sha256', $inventories[$assetId] . '/v1/inventory.json'),
             ];
+            $progress?->__invoke(count($references));
         }
 
         $expectedPaths = array_keys($entries);

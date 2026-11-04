@@ -6,7 +6,8 @@ namespace App\Development\DTO;
 
 /**
  * Carry observed progress separately from terminal rendering and final acceptance evidence.
- * Null counts mean the relevant tables or samples are not available yet.
+ * Null counts mean the relevant measurements are unavailable; a null phase count
+ * also covers operations that expose no trustworthy intermediate progress.
  */
 final readonly class FilesystemStressProgress
 {

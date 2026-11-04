@@ -6,6 +6,7 @@ use App\Development\DTO\FilesystemStressProgress;
 use App\Development\FilesystemStressCommand;
 use App\Development\FilesystemStressPresenter;
 use PHPUnit\Framework\ExpectationFailedException;
+use Symfony\Component\Console\Helper\Helper;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Tempest\Console\Console;
@@ -115,14 +116,38 @@ test('the live bar follows each phase and resets despite previously verified out
         // Historical verified counts must never fill a different phase's bar.
         $presenter->update(new FilesystemStressProgress($phase, 10, 100, 100, 100, 100, 100, 0, 0, 0, null, $completed, $total, $unit));
         expect($bar->getProgress())->toBe($completed ?? 0);
-        expect($bar->getMaxSteps())->toBe($total);
+        expect($bar->getMaxSteps())->toBe($completed === null ? 0 : $total);
         $rendered = $output->fetch();
-        expect($rendered)->toContain($phase, ($completed ?? '?') . '/' . $total, $unit);
+        $rendered = Helper::removeDecoration($output->getFormatter(), $rendered);
+        expect($rendered)->toContain('Now:', $completed === null ? 'WORKING (no count yet)' : $completed . '/' . $total, $unit);
         expect($rendered)->not->toContain('PASS:');
     }
 
     $presenter->finish(['status' => 'failed'], true);
     expect($output->fetch())->not->toContain('PASS:');
+});
+
+test('uncountable work animates without pretending to have a zero percent measurement', function (): void {
+    $presenter = new FilesystemStressPresenter($this->createStub(Console::class), false);
+    $output = new BufferedOutput(decorated: true);
+    $bar = new ProgressBar($output, 1);
+    new ReflectionProperty($presenter, 'bar')->setValue($presenter, $bar);
+    $positions = [];
+    foreach ([10, 11, 12] as $elapsed) {
+        $presenter->update(
+            new FilesystemStressProgress('first_broadcast', $elapsed, 100, 100, 100, 100, 0, 1, 0, 1, null, null, 1, 'publication Job settled (not byte verification)'),
+        );
+        $positions[] = $bar->getBarOffset();
+        expect($bar->getMaxSteps())->toBe(0);
+        expect($bar->getProgress())->toBe(0);
+        expect($bar->getMessage('phase_progress'))->toBe('WORKING (no count yet)');
+        $output->fetch();
+    }
+
+    expect(count(array_unique($positions)))->toBeGreaterThan(1);
+    $presenter->update(new FilesystemStressProgress('first_broadcast', 13, 100, 100, 100, 100, 0, 0, 0, 0, null, 1, 1, 'publication Job settled (not byte verification)'));
+    expect($bar->getProgress())->toBe(1);
+    expect($bar->getMessage('phase_progress'))->toBe('1/1 100%');
 });
 
 test('diagnostics clear and restore the live display without advancing its counter', function (): void {
@@ -142,8 +167,10 @@ test('diagnostics clear and restore the live display without advancing its count
 
 test('interactive progress stays within narrow terminal columns', function (int $columns): void {
     $previous = getenv('COLUMNS');
+    $previousLines = getenv('LINES');
     try {
         putenv('COLUMNS=' . $columns);
+        putenv('LINES=24');
         $console = $this->createStub(Console::class);
         $presenter = new FilesystemStressPresenter($console, false);
         $output = new BufferedOutput(decorated: true);
@@ -165,19 +192,102 @@ test('interactive progress stays within narrow terminal columns', function (int 
             100,
             'output files and stable inodes independently checked',
         ));
-        foreach (explode("\n", $bar->getMessage()) as $line) {
-            expect(strlen($line))->toBeLessThan($columns);
+        $frame = implode("\n", [
+            $bar->getMessage(),
+            str_repeat('█', $bar->getBarWidth()) . ' ' . $bar->getMessage('phase_progress'),
+            $bar->getMessage('phase_unit'),
+            $bar->getMessage('metrics'),
+            $bar->getMessage('footer'),
+        ]);
+        $plain = Helper::removeDecoration($output->getFormatter(), $frame);
+        foreach (explode("\n", $plain) as $line) {
+            expect(Helper::width($line))->toBeLessThan($columns);
         }
 
-        foreach (explode("\n", $bar->getMessage('phase_unit')) as $line) {
-            expect(strlen($line))->toBeLessThan($columns);
-        }
-
-        expect($bar->getBarWidth() + 1 + strlen($bar->getMessage('phase_progress')))->toBeLessThan($columns);
+        expect(substr_count($plain, "\n") + 1)->toBeLessThan(24);
+        expect($plain)->toContain('[>] 7.', 'stages done', '0/100 0%');
     } finally {
         putenv($previous === false ? 'COLUMNS' : 'COLUMNS=' . $previous);
+        putenv($previousLines === false ? 'LINES' : 'LINES=' . $previousLines);
     }
 })->with([40, 80, 100]);
+
+test('stage checklist waits for checks and cleanup instead of treating settled Jobs as a pass', function (): void {
+    $console = $this->createStub(Console::class);
+    $console->method('writeRaw')->willReturn($console);
+    $presenter = new FilesystemStressPresenter($console, false);
+    $output = new BufferedOutput(decorated: true);
+    $bar = new ProgressBar($output, 100);
+    new ReflectionProperty($presenter, 'bar')->setValue($presenter, $bar);
+    foreach ([
+        ['generate_source',               0],
+        ['verify_source',                 0],
+        ['discovery',                     1],
+        ['first_acquisition',             2],
+        ['verify_preservation',           2],
+        ['unchanged_rescan',              3],
+        ['unchanged_acquisition',         3],
+        ['verify_unchanged_preservation', 3],
+        ['remove_source',                 4],
+        ['first_broadcast',               5],
+        ['publication_reports',           5],
+        ['verify_first_publication',      5],
+        ['repeat_broadcast',              6],
+        ['publication_reports',           6],
+        ['verify_repeat_publication',     6],
+        ['corruption_negative_control',   7],
+        ['cleanup',                       8],
+    ] as [$phase, $done]) {
+        $presenter->update(new FilesystemStressProgress($phase, 10, 100, 100, 100, 100, 100, 0, 0, 0, null, 100, 100, 'Items checked'));
+        $plain = Helper::removeDecoration($output->getFormatter(), $bar->getMessage());
+        expect($plain)->toContain('RUNNING', $done . '/9 stages done', '[>] ' . ($done + 1) . '.');
+        expect($plain)->not->toContain('PASSED', '[x] ' . ($done + 1) . '.');
+        $output->fetch();
+    }
+
+    $presenter->finish(['status' => 'passed', 'cleanup' => 'completed'], false);
+    $plain = Helper::removeDecoration($output->getFormatter(), $output->fetch());
+    expect($plain)->toContain('PASSED', '9/9 stages done', '100% of stages', '[x] 9. Clean up owned fixture');
+    expect($plain)->not->toMatch('/\[[> ]\] [1-9]\./');
+});
+
+test('failed and interrupted dashboards keep pending stages and never finish either bar', function (bool $interrupted): void {
+    $written = '';
+    $console = $this->createStub(Console::class);
+    $console
+        ->method('writeRaw')
+        ->willReturnCallback(function (string $text) use (&$written, $console): Console {
+            $written .= $text;
+
+            return $console;
+        });
+    $presenter = new FilesystemStressPresenter($console, false);
+    $output = new BufferedOutput(decorated: true);
+    $bar = new ProgressBar($output, 100);
+    new ReflectionProperty($presenter, 'bar')->setValue($presenter, $bar);
+    $presenter->update(new FilesystemStressProgress('first_acquisition', 10, 100, 100, 42, 0, 0, 58, 0, 1, null, 42, 100, 'Jobs settled (not preservation proof)'));
+    $output->fetch();
+    $presenter->finish(['status' => 'failed', 'interrupted' => $interrupted, 'cleanup' => 'completed'], false);
+    $plain = Helper::removeDecoration($output->getFormatter(), $output->fetch());
+    expect($plain)->toContain($interrupted ? 'CANCELLED' : 'FAILED', '[!] 3.', '[ ] 4.', '0/9 stages done', '42/100 42%');
+    expect($plain . $written)->not->toContain('PASSED', 'PASS:', '100% of stages');
+    expect($bar->getProgress())->toBe(42);
+})->with([false, true]);
+
+test('a success-shaped report without confirmed cleanup cannot finish the dashboard', function (): void {
+    $console = $this->createStub(Console::class);
+    $console->method('writeRaw')->willReturn($console);
+    $presenter = new FilesystemStressPresenter($console, false);
+    $output = new BufferedOutput(decorated: true);
+    $bar = new ProgressBar($output, 1);
+    new ReflectionProperty($presenter, 'bar')->setValue($presenter, $bar);
+    $presenter->update(new FilesystemStressProgress('cleanup', 10, 100, 100, 100, 100, 100, 0, 0, 0, null, 0, 1, 'fixture removed'));
+    $output->fetch();
+    $presenter->finish(['status' => 'passed', 'cleanup' => 'not_confirmed'], false);
+    $plain = Helper::removeDecoration($output->getFormatter(), $output->fetch());
+    expect($plain)->toContain('FAILED', '[!] 9.', '0/1 0%');
+    expect($plain)->not->toContain('PASSED');
+});
 
 test('interactive setup declines safely with Tempest rich prompts', function (): void {
     if (! shell_exec('command -v tput')) {

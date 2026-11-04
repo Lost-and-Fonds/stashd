@@ -42,7 +42,7 @@ final class FilesystemStressObserver
     private ?int $peakRss = null;
     private ?int $lastActiveWorkers = null;
     private int $maxActiveWorkers = 0;
-    private int $phaseCompleted = 0;
+    private ?int $phaseCompleted = null;
     private int $phaseTotal;
     private string $phaseUnit = 'Items';
     private ProcessTreeRssTrace $rssTrace;
@@ -272,11 +272,12 @@ final class FilesystemStressObserver
     /**
      * Reset progress for the next operation, naming what its counts actually measure.
      * Item phases default to the workload size; source removal and cleanup use one fixture.
+     * Uncountable operations stay indeterminate until their caller confirms completion.
      */
-    public function phase(string $phase, string $unit, ?int $total = null): void
+    public function phase(string $phase, string $unit, ?int $total = null, bool $countable = true): void
     {
         $this->phase = $phase;
-        $this->phaseCompleted = 0;
+        $this->phaseCompleted = $countable ? 0 : null;
         $this->phaseTotal = $total ?? $this->count;
         $this->phaseUnit = $unit;
         if (in_array($phase, ['discovery', 'unchanged_rescan', 'first_acquisition', 'unchanged_acquisition'], true)) {

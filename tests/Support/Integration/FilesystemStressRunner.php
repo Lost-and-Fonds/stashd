@@ -90,7 +90,7 @@ final class FilesystemStressRunner
                 $archive->onProcessTick = $metrics->refresh(...);
                 try {
                     self::roundTrip($archive, $descriptor, $database, $count, $metrics, $diagnostic);
-                    $metrics->phase('cleanup', 'fixture removed', 1);
+                    $metrics->phase('cleanup', 'fixture removed', 1, countable: false);
                     $report = $metrics->finish($archive->path('vault'), pendingCleanup: true);
                 } catch (Throwable $error) {
                     $diagnostic(
@@ -163,11 +163,11 @@ final class FilesystemStressRunner
      */
     private static function roundTrip(ArchiveFixture $archive, array $descriptor, PDO $database, int $count, FilesystemStressObserver $metrics, Closure $diagnostic): void
     {
-        $metrics->phase('generate_source', 'source files generated');
+        $metrics->phase('generate_source', 'source files generated', countable: false);
         $corpus = Pr2Directory::corpus($archive, $count);
         $metrics->checkpoint('fixture_generated', ['expected_files' => $count]);
         $metrics->progress($count);
-        $metrics->phase('verify_source', 'source files independently checked');
+        $metrics->phase('verify_source', 'source files independently checked', countable: false);
         Assert::assertSame(0, FilesystemStressObserver::verify($corpus['manifest'], $corpus['source'], $count, $diagnostic));
         $metrics->checkpoint('source_fixture_verified');
         $metrics->progress($count);
@@ -186,7 +186,7 @@ final class FilesystemStressRunner
         Pr2Directory::assertPerFileAssignments($database, $scope['run'], $count);
         $members = Pr2Directory::members($archive, $descriptor, $scope['stash']);
         Assert::assertCount($count, $members);
-        $preserved = Pr2Directory::assertPreserved($archive, $members, $corpus['entries']);
+        $preserved = Pr2Directory::assertPreserved($archive, $members, $corpus['entries'], $metrics->progress(...));
         $metrics->checkpoint('first_preservation_verified', ['items' => count($members), 'assets' => count($preserved)]);
         $metrics->progress(count($preserved));
 
@@ -204,35 +204,39 @@ final class FilesystemStressRunner
         $metrics->phase('verify_unchanged_preservation', 'unchanged Items independently checked');
         Pr2Directory::assertPerFileAssignments($database, $repeat['run_id'], $count);
         Assert::assertSame($members, Pr2Directory::members($archive, $descriptor, $scope['stash']));
-        Assert::assertSame($preserved, Pr2Directory::assertPreserved($archive, $members, $corpus['entries']), 'An unchanged rescan must not create new Item/Asset revisions.');
+        Assert::assertSame(
+            $preserved,
+            Pr2Directory::assertPreserved($archive, $members, $corpus['entries'], $metrics->progress(...)),
+            'An unchanged rescan must not create new Item/Asset revisions.',
+        );
         $metrics->checkpoint('unchanged_rescan_verified', ['items' => $count, 'assets' => $count]);
         $metrics->progress($count);
 
-        $metrics->phase('remove_source', 'source root removed', 1);
+        $metrics->phase('remove_source', 'source root removed', 1, countable: false);
         $archive->destroy('inputs');
         Assert::assertFalse(is_dir($corpus['source']), 'Input A must be unavailable before publication starts.');
         $metrics->checkpoint('source_removed');
         $metrics->progress(1);
 
-        $metrics->phase('first_broadcast', 'publication Job settled (not byte verification)', 1);
+        $metrics->phase('first_broadcast', 'publication Job settled (not byte verification)', 1, countable: false);
         $first = self::broadcast($archive, $descriptor, $scope['stash'], $count, $metrics);
         $metrics->checkpoint('first_broadcast_settled', ['reported_files' => $count]);
-        $metrics->phase('verify_first_publication', 'output files independently checked');
+        $metrics->phase('verify_first_publication', 'output files independently checked', countable: false);
         Assert::assertSame(0, FilesystemStressObserver::verify($corpus['manifest'], $archive->path('output'), $count, $diagnostic));
         $inodes = Pr2Directory::inodes($archive->path('output'), $corpus['entries']);
         $metrics->checkpoint('source_independent_broadcast_verified', ['reported_files' => $count]);
         $metrics->progress($count);
 
-        $metrics->phase('repeat_broadcast', 'publication Job settled (not byte verification)', 1);
+        $metrics->phase('repeat_broadcast', 'publication Job settled (not byte verification)', 1, countable: false);
         self::broadcast($archive, $descriptor, $scope['stash'], $count, $metrics, $first['broadcast']);
         $metrics->checkpoint('repeat_broadcast_settled', ['reported_files' => $count]);
-        $metrics->phase('verify_repeat_publication', 'output files and stable inodes independently checked');
+        $metrics->phase('verify_repeat_publication', 'output files and stable inodes independently checked', countable: false);
         Assert::assertSame(0, FilesystemStressObserver::verify($corpus['manifest'], $archive->path('output'), $count, $diagnostic));
         Assert::assertSame($inodes, Pr2Directory::inodes($archive->path('output'), $corpus['entries']));
         $metrics->checkpoint('repeat_broadcast_verified', ['reported_files' => $count]);
         $metrics->progress($count);
 
-        $metrics->phase('corruption_negative_control', 'deliberate corruption rejected', 1);
+        $metrics->phase('corruption_negative_control', 'deliberate corruption rejected', 1, countable: false);
         $firstPath = array_key_first($corpus['entries']);
         Assert::assertNotNull($firstPath);
         file_put_contents($archive->path('output/' . $firstPath), "deliberately altered output\n");
@@ -325,9 +329,8 @@ final class FilesystemStressRunner
                 $after = (int) $record['position'];
                 Assert::assertArrayNotHasKey($after, $seen, 'A published file report position must be unique.');
                 $seen[$after] = true;
+                $metrics->progress(count($seen));
             }
-
-            $metrics->progress(count($seen));
         } while ($page['results'] !== []);
 
         Assert::assertCount($count, $seen, 'One real report is required for every preserved Item.');

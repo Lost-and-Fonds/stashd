@@ -83,8 +83,9 @@ and checkpoints are evidence, not instructions to reset any other installation.
   on separate lines. Verifier and failure diagnostics clear and restore the bar
   so their output cannot leave its cursor on the wrong line.
 
-State is sampled about once a second and on worker transitions; process output is
-drained every 250 ms. No Vault walk occurs on each refresh. Unknown measurements
+State is sampled about once a second and on worker transitions; verification and
+report-reading loops also emit per-Item progress. Process output is drained every
+250 ms. These callbacks add observation overhead. No Vault walk occurs on each refresh. Unknown measurements
 are `?`/`null`, not fabricated zeros. `settled/total-s` is the current pass's settled
 count divided by total experiment elapsed time, including setup/checks—not pure
 worker throughput. It resets when acquisition changes pass. Phase rates in JSON
@@ -93,14 +94,32 @@ descendants, excluding the sampler and PostgreSQL; shared pages can double-count
 Checkpoint SQL/Vault walks are separately timed. Live observation and process
 polling add overhead to phase intervals. No ETA or performance improvement is claimed.
 
-The bar resets for every phase and names its units: distinct discovered sources,
-settled Jobs, checked publication reports, or independently checked Items/files.
-Job settlement and publication reports are explicitly **not** byte verification.
-Whole-corpus checks advance only when the unchanged checker returns successfully;
-there is no invented per-file progress during those checks. Repeat acquisition
-and discovery use their new Input run rather than reusing earlier completion.
-Removal, corruption rejection and cleanup use one-step counters. Cleanup remains
-pending until disposal succeeds; only then may the final summary say **PASS**.
+### Live dashboard
+
+The interactive display has two colored block bars and a nine-stage checklist:
+prepare source, discover, acquire/check, rescan/check, remove source, publish/check,
+republish/check, reject corruption, and cleanup. `[x]` means done, `[>]` is active,
+`[ ]` is still to do and `[!]` marks the failed/cancelled stage. A retained final
+dashboard shows `PASSED`, `FAILED` or `CANCELLED`. Narrow/short screens show a
+checklist window around the active stage; ordinary 80-by-24 screens show all nine.
+
+The upper bar counts **completed stages**, equally weighted—not time or estimated
+remaining work. A stage is done only after execution moves past all its checks.
+The lower bar follows the current operation: distinct discovered sources, settled
+Jobs, individually checked publication reports, or independently checked canonical
+Items. It resets for each operation, including repeat runs. Checking an Item now
+reports progress after that Item's pins, versions and exact bytes pass. The final
+whole-set assertions still have to succeed. Historic `preserved`/`verified` totals
+remain unchanged until the corresponding complete acceptance checks pass.
+
+Operations without a trustworthy intermediate count show a moving **WORKING (no
+count yet)** indicator instead of a frozen zero-percent bar. This includes the
+single publication Jobs, the unchanged external Python verifier, source generation,
+source removal, corruption rejection and cleanup. There are no invented per-file
+counts, artificial delays or simulated percentages. A committed discovery page may
+still advance its real count in one jump. Job settlement and publication reports
+are explicitly **not** byte verification. Cleanup stays pending until disposal
+succeeds; only then may either the dashboard or final summary claim a pass.
 
 `ProcessTreeRssTrace` live refreshes seek to the last consumed byte and update an incremental maximum
 from new, newline-terminated samples. A partial final line waits for the next
@@ -226,6 +245,32 @@ limits. The CLI's 1,000/10,000 workloads, persistent workers and concurrency wer
 not run or added here. Static analysis retains the repository's existing exclusion
 of `tests/**`; the command has two narrow annotations for its optional dev-only
 runner dependency, not broad suppression of application analysis.
+
+### Dashboard recheck
+
+The richer dashboard passed a complete **80-column interactive 100-Item run**
+without an ini override. Its terminal capture asserts intermediate counts between
+0 and 100 during acquisition, canonical verification and publication-report
+checking, plus an indeterminate indicator during the publication Job. All 21
+measurement phases and independent checks passed; cleanup completed. A separate
+**40-column Ctrl+C** run retained a cancelled dashboard, failed evidence and
+completed cleanup. JSON acceptance passed **20 parent assertions / 120.29 s**
+without an ini override; stdout still matched the saved report exactly.
+
+Focused tests passed **30 / 325 assertions**, covering stage transitions, repeated
+publication, real intermediate counters, animated uncountable work, pending/failed
+stages, the cleanup success barrier and width/height bounds. The real three-file
+acceptance witness also checks callbacks `[1, 2, 3]` and confirms a byte-check
+failure cannot emit a successful Item count. Full QA passed **644 tests / 37,569
+assertions / 419.77 s** with the same 42 incomplete contracts, using the previously
+documented collector-disable ini for unrelated tests. No independent verifier,
+reference, preservation semantics or saved report schema changed.
+
+Interactive report: `tmp/filesystem-stress-100-496aaf19d1.json`, SHA-256
+`4accf0ddbb7bd5e528080da5d20798e88afad6faeedaeba7ea8a093399b319bf`.
+JSON report: `tmp/stress-dashboard-json/filesystem-stress-100-2cfc8f43fc.json`, SHA-256
+`80cb971bbc71eea9a7bd6248b14beeba62e118754eca934375919fb8d298d5d6`.
+These are shared-machine observations, not performance claims.
 
 ## Identified historical naming debt (not renamed here)
 

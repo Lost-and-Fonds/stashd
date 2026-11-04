@@ -26,12 +26,16 @@ test('measured directory workflow preserves and republishes every independent It
             $result = finish_configuration_cli(['process' => $process, 'pipes' => $pipes]);
             $report = configuration_result($result);
             expect($result['errors'])->not->toContain('Deprecated:', 'devtools-collector.php');
-            foreach (['verify_preservation', 'verify_unchanged_preservation', 'verify_first_publication', 'verify_repeat_publication'] as $phase) {
+            foreach (['verify_preservation', 'verify_unchanged_preservation'] as $phase) {
                 expect($result['errors'])->toMatch('/^' . $phase . ' \|[^\n]*\| phase 0\/100 /m');
             }
 
+            foreach (['verify_first_publication', 'verify_repeat_publication'] as $phase) {
+                expect($result['errors'])->toMatch('/^' . $phase . ' \|[^\n]*\| phase \?\/100 /m');
+            }
+
             foreach (['repeat_broadcast', 'corruption_negative_control', 'cleanup'] as $phase) {
-                expect($result['errors'])->toMatch('/^' . $phase . ' \|[^\n]*verified 100[^\n]*\| phase 0\/1 /m');
+                expect($result['errors'])->toMatch('/^' . $phase . ' \|[^\n]*verified 100[^\n]*\| phase \?\/1 /m');
             }
 
             $saved = file_get_contents($directory . '/' . $report['report_file']);
