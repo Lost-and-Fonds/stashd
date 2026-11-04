@@ -1,6 +1,6 @@
 # Filesystem round-trip implementation plan
 
-**Status:** PRs 1–4 are merged (#87, #89, #92 and #94; the PR 4 acceptance matrix was also integrated from #93). The original 400-file mutation and interruption/recovery proofs remain in the linked [PR 3](../development/filesystem-pr3-acceptance.md) and [PR 4](../development/filesystem-pr4-workspace-lifecycle.md) reports. **PR 5 is in draft #95** with an opt-in real-application 100/1,000/10,000-Item stress contract; no 10,000-Item application run has yet been measured. No automatic merge.
+**Status:** PRs 1–4 are merged (#87, #89, #92 and #94; the PR 4 acceptance matrix was also integrated from #93). The original 400-file mutation and interruption/recovery proofs remain in the linked [PR 3](../development/filesystem-pr3-acceptance.md) and [PR 4](../development/filesystem-pr4-workspace-lifecycle.md) reports. **PR 5 (#95) has passed separate real-application 100/1,000/pinned-10,000-Item runs**, with measured resource costs and full local QA. The stress workflow now calls the genuine application rather than an illustrative copy. [Evidence and instrumentation limits](../development/filesystem-pr5-measured-stress.md) are ready for architectural review. No automatic merge.
 
 ## Basis and approach
 
@@ -42,7 +42,7 @@ Completion means acceptance evidence, negative controls and required QA pass—n
 - [x] **PR 2 — Bounded directory runs.** Acceptance: 100/1,000 files; bounded admission; crash-safe cursor; unchanged rescans create no additional archival revisions. Dependency: PR 1. **Status: merged in #89.**
 - [x] **PR 3 — Mutations and historical output.** Acceptance: required mutation corpus; stable identity for modified paths; retained history; original and changed selections independently verified. Dependency: PR 2. **Status: merged in #92; the 400-file workload and negative control were verified.**
 - [x] **PR 4 — Broader interruption/recovery.** Acceptance: real worker interruptions, publication recovery and stale-result rejection; no false completion or duplicate authoritative results. Dependencies: PRs 1–3. **Status: acceptance #93 and workspace-lifecycle implementation #94 merged; the formerly red process-crash cases are green.**
-- [ ] **PR 5 — Measured 10,000-Item workflow.** Acceptance: real application entry points replace illustrative copy; source-independent external verification; truthful counts and resource measurements. Dependencies: PRs 1–4 and #85. **Status: initial opt-in acceptance and metric harness in draft #95; the full 10,000-Item proof and post-merge workflow transition are still pending.**
+- [x] **PR 5 — Measured 10,000-Item workflow.** Acceptance: real application entry points replace illustrative copy; source-independent external verification; truthful counts and resource measurements. Dependencies: PRs 1–4 and #85. **Status: #95 passed the genuine pinned 10,000-Item proof in 4,927.33 s, following separate smaller runs; workflow integration and local QA are complete. Architectural review remains required; do not merge automatically.**
 
 ### PR 1 — Authentic single-file round trip
 
@@ -117,6 +117,6 @@ Use additive migrations that preserve existing configuration, source association
 
 Defer watchers, external plugin runtime, broad metadata infrastructure, hardlinks and automatic pruning as specified in #28/#85. No automatic merge.
 
-PRs 1–4 have merged. PR 5's initial tests and measurement contract are in draft #95; see [the evidence gate](../development/filesystem-pr5-measured-stress.md). Keep the 10,000-Item application run outside routine PR CI and do not replace the illustrative post-merge copy until the genuine end-to-end run is verified. No automatic merge.
+PRs 1–4 have merged. PR 5's genuine 10,000-Item round trip, full local QA and evidence are in #95; see [the measured results and remaining limits](../development/filesystem-pr5-measured-stress.md). The post-merge/release/manual workflow now runs that application proof instead of the illustrative copy. Keep heavyweight execution outside ordinary PR CI and stop for architectural review. No automatic merge.
 
 The original plan was based on inspection. PR 1 runtime proof and QA are recorded in its implementation PR. Local roots remain operator-controlled, and no hostile-writer, whole-tree atomicity or power-loss guarantee is claimed.
