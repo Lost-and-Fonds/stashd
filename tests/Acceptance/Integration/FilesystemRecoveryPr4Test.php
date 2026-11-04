@@ -99,7 +99,8 @@ test('SIGKILL after a Broadcast rename replays without false completion, duplica
             $archive,
             Pr2Directory::members($archive, $descriptor, $scope['stash']),
             $corpus['entries'],
-        ))->toBe($original, 'Broadcast replay must not mutate canonical archival revisions.');
+        ))
+            ->toBe($original, 'Broadcast replay must not mutate canonical archival revisions.');
     });
 });
 
@@ -154,9 +155,10 @@ test('revoked Broadcast worker cannot accept a stale Result; a successor recover
             expect((int) $results->fetchColumn())->toBe(0);
             $revoke = $database->prepare('SELECT pg_terminate_backend(?)');
             $revoke->execute([$backend]);
-            expect(in_array($revoke->fetchColumn(), [true, 't', '1', 1], true))->toBeTrue(
-                'The actual result-writer session must be revoked, not a fabricated Job.',
-            );
+            expect(in_array($revoke->fetchColumn(), [true, 't', '1', 1], true))
+                ->toBeTrue(
+                    'The actual result-writer session must be revoked, not a fabricated Job.',
+                );
             Pr4Recovery::awaitExit($child);
         } finally {
             Pr4Recovery::kill($child);
