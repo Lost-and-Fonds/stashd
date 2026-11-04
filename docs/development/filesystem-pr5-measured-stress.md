@@ -386,8 +386,8 @@ Retained failure evidence: `tmp/pr5-reports/pr5-10000-harness-oom.json`,
 manifest), and `tmp/pr5-reports/10000-measured.log`. The original private fixture
 is `/tmp/stashd-archives-90aec20ba97eb04e397a25cf` inside the PHP container; its
 database is identified only by its private descriptor, never exported with
-report artifacts. The complete acceptance test will run again from a fresh
-disposable fixture, not resume after or fabricate the missing phases.
+report artifacts. The complete acceptance test was then run again from a fresh
+disposable fixture, without resuming after or fabricating the missing phases.
 
 The corrected harness also passed the **100-Item** recheck: **12,959 assertions**,
 **67.97 s** Pest wall time, **66.953 s** timed phases, and **149,232 KiB** peak
@@ -459,22 +459,69 @@ secret store; their credential-free scope is deliberate.
 Initial execution budgets derive from the measured local cases: **5 min / 30
 min / 180 min** steps versus approximately **2 / 12.6 / 82.1 min** observed;
 the job allows **240 min** for their sum and setup/artifact margin. These are
-conservative execution guards (roughly twice the observed case durations plus
-margin), not throughput promises. GitHub runner speed has not yet been calibrated
-for this new workflow; a manual validation run will provide its own artifact
-evidence before claiming a runner performance result. Memory remains PHP's
-existing 128 MiB limit per process; no worker count or runtime resource setting
-was increased to make the acceptance run pass.
+conservative execution guards (roughly twice the observed local case durations
+plus margin), not throughput promises. The manual hosted run below subsequently
+completed in **1.62 / 14.18 / 140.82 min**, inside those guards; the 180-minute
+full-scale guard has about **39 minutes** of observed runner headroom. The
+240-minute job completed in about **157 minutes**. The guards are retained, now
+supported by an actual hosted run rather than only local extrapolation. PHP's
+128 MiB limit is explicitly configured in the hosted job too; no worker count
+or memory limit was raised to obtain the pass.
+
+### Hosted workflow and downloadable evidence
+
+Manual [run 41815932228](https://github.com/Lost-and-Fonds/stashd/actions/runs/41815932228)
+on **`b20dc9d` completed successfully**. Its real-application job executed all
+three cases serially, using the branch's new workflow (the run list may still
+display the workflow's older default-branch name). This establishes that the
+workflow exercises Stashd, not just the Python fixture.
+
+| Hosted observation | 100 Items | 1,000 Items | 10,000 Items |
+|---|---:|---:|---:|
+| Pest wall time, seconds | 97.48 | 850.72 | 8,449.48 |
+| Timed phase total, seconds | 95.953 | 843.758 | 8,386.533 |
+| Peak observed summed RSS, MiB | 164.75 | 174.44 | 237.22 |
+| Final PostgreSQL / growth, MiB | 11.64 / 4.30 | 24.69 / 17.29 | 149.63 / 142.23 |
+| Vault logical / allocated file blocks, MiB | 0.82 / 7.04 | 8.21 / 70.32 | 82.07 / 703.14 |
+| Passed assertions | 12,959 | 127,124 | 1,268,774 |
+
+The hosted full case again ended with **20,004 completed Attempts and accepted
+Results**, no failed/interrupted persisted Attempts and zero extra Attempts per
+Demand; sampled admission **100**, transport messages **102**, and **20,000 real
+publication reports**. It recorded **180,048 Durable events**, versus 180,042
+locally: journal-event totals are observations, not retry counters. The additional
+six events are not attributed to six retries; detailed transport retry history
+was not retained. The three runs' Vault file counts and bytes exactly matched
+the local measurements. Different hosted/local runtimes are reported separately,
+not averaged or presented as a controlled performance comparison.
+
+Hosted logs contain three `Verified 10000 files against external manifest`
+messages: the source check and both output checks. The negative control then
+reports `content/size mismatch` and
+`microtext: FAILED (2 problems; 10000 files checked)`, followed by the passing
+acceptance result requiring that failure. Thus both positive and negative checks
+ran inside the actual workflow.
+
+The [downloadable artifact](https://github.com/Lost-and-Fonds/stashd/actions/runs/41815932228/artifacts/13327815942)
+is **`pr5-measurements-41815932228-1`**, retained for 14 days. It was downloaded
+and inspected: exactly three complete JSON reports, every report ending at
+`negative_control_rejected`, and no env files, credential descriptors or credential
+markers. Full-scale report **`pr5-10000-ebf60e3500.json`**, SHA-256:
+`fb71d021f57303b15c625d23b80e7a8b26d00927bc6e74c5b4f75d8ab4d25f32`.
+The checked-in tables preserve the principal observations after artifact expiry.
 
 ## QA and review
 
 - Initial CI [41793399880](https://github.com/Lost-and-Fonds/stashd/actions/runs/41793399880)
   and harness-fix CI [41803925326](https://github.com/Lost-and-Fonds/stashd/actions/runs/41803925326)
   passed formatting, lint, static analysis and the complete routine suite.
-- Local full **`composer qa` passed: 612 tests, 37,809 assertions**, with
+- Local full **`composer qa` passed: 612 passed, 37,809 assertions**, with
   **42 pre-existing incomplete contracts**, and four existing informational Mago
   notices. The incomplete contracts are not reported as passed acceptance tests.
-- Focused PR 1–4 Filesystem regressions passed: **35 tests / 11,989 assertions**.
+- Focused PR 1–4 Filesystem regressions passed: **35 tests / 11,989 assertions**;
+  the canonical `STASHD_TEST_PROCESSES=4 ./bin/test.sh tests/Acceptance/Integration
+  --filter='Filesystem.*Pr[1-4]Test' --compact --colors=never` also passed those
+  **35 tests / 11,989 assertions in 307.85 s**.
 - Independent Python fixture/mutation/RSS regressions passed: **14 tests**.
 - Workflow YAML parsed; explicit checks confirmed ordered count filters, guarded
   triggers, no copy-only stage, timeout budgets and the narrow artifact path.
@@ -482,6 +529,9 @@ was increased to make the acceptance run pass.
 - Lerd capture was temporarily disabled for ordinary local QA to avoid the
   collector's PHP 8.5 warning; it is restored afterward. Measured stress children
   used the isolated ini override described above.
+- Integrated-workflow revision [CI 41815939321](https://github.com/Lost-and-Fonds/stashd/actions/runs/41815939321)
+  passed; the manually dispatched heavy workflow and downloaded artifacts were
+  independently inspected as recorded above.
 
 ## Current review gates
 
