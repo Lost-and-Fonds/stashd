@@ -239,9 +239,12 @@ final class Pr4Recovery
     /**
      * Make the interrupted Messenger delivery eligible without modifying its
      * production 60-second visibility policy or any archival/domain state.
+     * Truncate first so PostgreSQL's timestamp rounding cannot erase the extra second.
      */
     public static function expireFixtureDelivery(PDO $database): void
     {
-        $database->exec("UPDATE configuration_proof.messenger_messages SET delivered_at = CURRENT_TIMESTAMP - INTERVAL '61 seconds' WHERE delivered_at IS NOT NULL");
+        $database->exec(
+            "UPDATE configuration_proof.messenger_messages SET delivered_at = date_trunc('second', CURRENT_TIMESTAMP) - INTERVAL '61 seconds' WHERE delivered_at IS NOT NULL",
+        );
     }
 }
