@@ -322,9 +322,11 @@ final class Pr5Scale
         }
 
         foreach ($this->monitor['pipes'] as $pipe) {
-            if (is_resource($pipe)) {
-                fclose($pipe);
+            if (! is_resource($pipe)) {
+                continue;
             }
+
+            fclose($pipe);
         }
 
         proc_close($process);
