@@ -25,8 +25,12 @@ test('measured directory workflow preserves and republishes every independent It
             expect(Pr5Scale::verify($corpus['manifest'], $corpus['source'], $count))->toBe(0);
             $metrics->checkpoint('source_fixture_verified');
 
-            $scope = Pr2Directory::discover($archive, $descriptor, $corpus['source'], $count);
+            $scope = Pr2Directory::discover($archive, $descriptor, $corpus['source'], $count, fn () => $metrics->checkpoint('discovery_worker_settled'));
             $metrics->checkpoint('discovery_complete', ['discovered' => $count]);
+
+            $empty = configuration_cli($archive, $descriptor, ['operations:work', '--once', '--limit=100']);
+            expect($empty['code'])->toBe(0, $empty['output'] . $empty['errors']);
+            $metrics->checkpoint('empty_worker_baseline');
 
             Pr5Scale::acquire($archive, $descriptor, $scope['run'], $count, $metrics);
             $metrics->checkpoint('first_acquisition_settled');
@@ -55,14 +59,14 @@ test('measured directory workflow preserves and republishes every independent It
             expect(is_dir($corpus['source']))->toBeFalse('Input A must be unavailable before publication starts.');
             $metrics->checkpoint('source_removed');
 
-            $first = Pr5Scale::broadcast($archive, $descriptor, $scope['stash'], $count);
+            $first = Pr5Scale::broadcast($archive, $descriptor, $scope['stash'], $count, metrics: $metrics);
             $metrics->checkpoint('first_broadcast_settled', ['reported_files' => $count]);
             expect(Pr5Scale::verify($corpus['manifest'], $archive->path('output'), $count))->toBe(0);
             $inodes = Pr2Directory::inodes($archive->path('output'), $corpus['entries']);
             $metrics->checkpoint('source_independent_broadcast_verified', ['reported_files' => $count]);
 
             // Rebuild the same selection through Operations, not a direct filesystem copy.
-            Pr5Scale::broadcast($archive, $descriptor, $scope['stash'], $count, $first['broadcast']);
+            Pr5Scale::broadcast($archive, $descriptor, $scope['stash'], $count, $first['broadcast'], $metrics);
             $metrics->checkpoint('repeat_broadcast_settled', ['reported_files' => $count]);
             expect(Pr5Scale::verify($corpus['manifest'], $archive->path('output'), $count))->toBe(0);
             expect(Pr2Directory::inodes($archive->path('output'), $corpus['entries']))->toBe($inodes);
@@ -77,6 +81,10 @@ test('measured directory workflow preserves and republishes every independent It
             $metrics->checkpoint('negative_control_rejected');
 
             $metrics->finish($archive->path('vault'));
+        } catch (Throwable $error) {
+            $metrics->checkpoint('failed');
+            $metrics->finish($archive->path('vault'), $error::class);
+            throw $error;
         } finally {
             $metrics->close();
         }

@@ -78,16 +78,22 @@ def main() -> int:
     peak_rss = 0
     peak_processes = 0
     peak_unix_seconds = 0.0
+    trace = args.output.with_suffix('.jsonl').open('w')
     while True:
         resident, processes = sample(args.pid, exclude=os.getpid())
+        observed_at = time.time()
+        trace.write(json.dumps({'unix_seconds': observed_at, 'rss_kib': resident, 'processes': processes}) + '\n')
+        trace.flush()
         measurements += 1
         if resident > peak_rss:
             peak_rss = resident
             peak_processes = processes
-            peak_unix_seconds = time.time()
-        if args.stop.exists():
+            peak_unix_seconds = observed_at
+        if args.stop.exists() or process_status(args.pid) is None:
             break
         time.sleep(args.interval)
+
+    trace.close()
 
     summary = {
         "sampler": "linux-proc-summed-rss-v1",

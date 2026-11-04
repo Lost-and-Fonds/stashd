@@ -27,6 +27,11 @@ final class Pr5Scale
     private array $phases = [];
     private array $queueSamples = [];
     private int $last;
+    private float $startedAt;
+    private array $workerBatches = [];
+    private array $admissionCalls = [];
+    private string $reportName;
+    private ?string $reportDirectory;
     private ?array $monitor = null;
 
     /**
@@ -37,7 +42,15 @@ final class Pr5Scale
         private PDO $database,
         private int $count,
     ) {
+        $this->reportName = 'pr5-' . $count . '-' . bin2hex(random_bytes(5));
+        $directory = getenv('STASHD_PR5_REPORT_DIR');
+        $this->reportDirectory = is_string($directory) && $directory !== '' ? rtrim($directory, '/') : null;
+        if ($this->reportDirectory !== null && ! is_dir($this->reportDirectory)) {
+            throw new RuntimeException('STASHD_PR5_REPORT_DIR must already exist.');
+        }
+
         $this->last = hrtime(true);
+        $this->startedAt = microtime(true);
         if (! is_dir('/proc')) {
             throw new RuntimeException('Measured PR 5 stress requires Linux /proc for process-tree RSS evidence.');
         }
@@ -63,6 +76,7 @@ final class Pr5Scale
         }
 
         $this->monitor = ['process' => $process, 'pipes' => $pipes];
+        $this->checkpoint('baseline');
     }
 
     /**
@@ -94,8 +108,9 @@ final class Pr5Scale
         fclose($pipes[1]);
         fclose($pipes[2]);
         $exit = proc_close($process);
+        file_put_contents('php://stderr', (string) $output);
         if ($exit !== 0) {
-            file_put_contents('php://stderr', (string) $output . (string) $error);
+            file_put_contents('php://stderr', (string) $error);
         }
 
         return $exit;
@@ -119,16 +134,32 @@ final class Pr5Scale
         $deadline = microtime(true) + $seconds;
         $state = [];
         do {
-            Pr1RoundTrip::command($archive, $descriptor, ['input:acquire', $run]);
+            $started = hrtime(true);
+            $admitted = Pr1RoundTrip::command($archive, $descriptor, ['input:acquire', $run]);
+            Assert::assertNotEmpty($admitted['assignment_id'] ?? null);
+            $admitSeconds = (hrtime(true) - $started) / 1_000_000_000;
+            $started = hrtime(true);
             $state = Pr2Directory::admission($archive, $descriptor, $run, $count);
+            $metrics->admissionCalls[] = ['run' => $run, 'admit_seconds' => $admitSeconds, 'inspection_seconds' => (hrtime(true) - $started) / 1_000_000_000];
             $metrics->observeQueue($state);
             if ($state['status'] === 'complete') {
                 break;
             }
 
+            $started = hrtime(true);
             $worker = configuration_cli($archive, $descriptor, ['operations:work', '--once', '--limit=100']);
+            $elapsed = (hrtime(true) - $started) / 1_000_000_000;
             Assert::assertSame(0, $worker['code'], $worker['output'] . $worker['errors']);
+            $before = $state['settled'];
+            $started = hrtime(true);
             $state = Pr2Directory::admission($archive, $descriptor, $run, $count);
+            $metrics->workerBatches[] = [
+                'run' => $run,
+                'elapsed_seconds' => $elapsed,
+                'inspection_seconds' => (hrtime(true) - $started) / 1_000_000_000,
+                'settled_delta' => $state['settled'] - $before,
+            ];
+            Assert::assertLessThanOrEqual(100, $state['settled'] - $before, 'The message limit must bound each drain.');
             $metrics->observeQueue($state);
             Assert::assertNotSame('failed', $state['status'], 'The actual acquisition run failed.');
         } while (microtime(true) < $deadline);
@@ -154,6 +185,7 @@ final class Pr5Scale
         string $stash,
         int $count,
         ?string $broadcast = null,
+        ?self $metrics = null,
     ): array {
         if ($broadcast === null) {
             $configured = Pr1RoundTrip::command($archive, $descriptor, ['broadcast:create', 'filesystem', $archive->path('output')]);
@@ -161,11 +193,14 @@ final class Pr5Scale
         }
 
         $frozen = Pr1RoundTrip::command($archive, $descriptor, ['stash:broadcast:select', $stash, $broadcast]);
+        $metrics?->checkpoint('broadcast_selection_frozen');
         $receipt = Pr1RoundTrip::command($archive, $descriptor, ['broadcast:build', $frozen['id']]);
         Assert::assertNotEmpty($receipt['assignment_id'] ?? null);
         Pr2Directory::settle($archive, $descriptor, $receipt['assignment_id'], 3_600);
+        $metrics?->checkpoint('broadcast_worker_settled');
 
         $after = -1;
+        $seen = [];
         do {
             $args = ['broadcast:publication', $frozen['id']];
             if ($after >= 0) {
@@ -198,6 +233,7 @@ final class Pr5Scale
     public function checkpoint(string $phase, array $facts = []): void
     {
         $now = hrtime(true);
+        $endedAt = microtime(true);
         $tables = [
             'discovery_items',
             'acquisition_attempts',
@@ -207,6 +243,8 @@ final class Pr5Scale
             'operation_results',
             'broadcast_reports',
             'messenger_messages',
+            'durable_events',
+            'durable_workflow_runs',
         ];
         $counts = [];
         foreach ($tables as $name) {
@@ -221,22 +259,65 @@ final class Pr5Scale
         }
 
         $attemptOutcomes = [];
+        $retries = null;
         if ($counts['operation_attempts'] !== null) {
             $outcomes = $this->database->query('SELECT outcome, count(*) AS number FROM configuration_proof.operation_attempts GROUP BY outcome');
             foreach ($outcomes->fetchAll(PDO::FETCH_ASSOC) as $row) {
                 $attemptOutcomes[$row['outcome']] = (int) $row['number'];
             }
+
+            $retries = (int) $this->database->query('SELECT count(*) - count(DISTINCT demand_id) FROM configuration_proof.operation_attempts')->fetchColumn();
         }
 
         $this->phases[] = [
             'phase' => $phase,
             'elapsed_seconds' => ($now - $this->last) / 1_000_000_000,
+            'started_unix_seconds' => $this->startedAt,
+            'ended_unix_seconds' => $endedAt,
+            'effective_items_per_second' => in_array(
+                $phase,
+                [
+                    'discovery_worker_settled',
+                    'first_acquisition_settled',
+                    'unchanged_discovery_complete',
+                    'unchanged_acquisition_settled',
+                    'broadcast_selection_frozen',
+                    'broadcast_worker_settled',
+                ],
+                true,
+            )
+                ? $this->count / (($now - $this->last) / 1_000_000_000)
+                : null,
             'database_bytes' => (int) $this->database->query('SELECT pg_database_size(current_database())')->fetchColumn(),
+            'vault_files' => is_dir($this->archive->path('vault')) ? self::diskFiles($this->archive->path('vault')) : null,
             'persisted_counts' => $counts,
             'attempt_outcomes' => $attemptOutcomes,
+            'extra_attempts_for_existing_demands' => $retries,
+            'transport_queue_widths' => $counts['messenger_messages'] === null
+                ? null
+                : $this->database
+                    ->query('SELECT queue_name, count(*) AS messages FROM configuration_proof.messenger_messages GROUP BY queue_name ORDER BY queue_name')
+                    ->fetchAll(PDO::FETCH_ASSOC),
             'facts' => $facts,
         ];
-        $this->last = $now;
+        $this->phases[array_key_last($this->phases)]['measurement_seconds'] = (hrtime(true) - $now) / 1_000_000_000;
+        if ($this->reportDirectory !== null) {
+            // Keep completed checkpoints even when a fatal error cannot reach finally.
+            $partial =
+                json_encode([
+                    'status' => 'incomplete',
+                    'files' => $this->count,
+                    'generated_at_utc' => gmdate('c'),
+                    'phases' => $this->phases,
+                ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT) . "\n";
+            $path = $this->reportDirectory . '/' . $this->reportName . '.partial.json';
+            Assert::assertSame(strlen($partial), file_put_contents($path . '.tmp', $partial));
+            Assert::assertTrue(rename($path . '.tmp', $path));
+        }
+
+        $this->phases[array_key_last($this->phases)]['measurement_seconds'] = (hrtime(true) - $now) / 1_000_000_000;
+        $this->last = hrtime(true);
+        $this->startedAt = microtime(true);
     }
 
     /**
@@ -250,6 +331,9 @@ final class Pr5Scale
             'settled' => $state['settled'],
             'outstanding' => $state['outstanding'],
             'failed' => $state['failed'],
+            'transport_queues' => $this->database
+                ->query('SELECT queue_name, count(*) AS messages FROM configuration_proof.messenger_messages GROUP BY queue_name ORDER BY queue_name')
+                ->fetchAll(PDO::FETCH_ASSOC),
         ];
     }
 
@@ -259,7 +343,7 @@ final class Pr5Scale
      * Set STASHD_PR5_REPORT_DIR to an existing directory to retain the report
      * after the disposable test Vault and database are safely destroyed.
      */
-    public function finish(string $vaultRoot): void
+    public function finish(string $vaultRoot, ?string $failure = null): void
     {
         $this->close();
         $sample = $this->archive->path('pr5-monitor.json');
@@ -267,6 +351,21 @@ final class Pr5Scale
         $rss = json_decode((string) file_get_contents($sample), true, flags: JSON_THROW_ON_ERROR);
         Assert::assertGreaterThan(0, $rss['samples'] ?? 0, 'Process memory was never actually sampled.');
         Assert::assertGreaterThan(0, $rss['peak_total_rss_kib'] ?? 0, 'The RSS sampler did not observe a running process.');
+        $trace = file($this->archive->path('pr5-monitor.jsonl'), FILE_IGNORE_NEW_LINES);
+        Assert::assertIsArray($trace);
+        foreach ($this->phases as &$phase) {
+            $peak = null;
+            foreach ($trace as $line) {
+                $point = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+                if ($point['unix_seconds'] >= $phase['started_unix_seconds'] && $point['unix_seconds'] <= $phase['ended_unix_seconds']) {
+                    $peak = max($peak ?? 0, $point['rss_kib']);
+                }
+            }
+
+            $phase['observed_peak_process_tree_rss_kib'] = $peak;
+        }
+
+        unset($phase);
         $maxOutstanding = 0;
         foreach ($this->queueSamples as $state) {
             $maxOutstanding = max($maxOutstanding, $state['outstanding']);
@@ -277,25 +376,26 @@ final class Pr5Scale
             'generated_at_utc' => gmdate('c'),
             'files' => $this->count,
             'reference_pinned' => $this->count === 10_000,
+            'status' => $failure === null ? 'passed' : 'failed',
+            'failure_type' => $failure,
             'rss' => $rss,
             'sampled_max_outstanding' => $maxOutstanding,
             'queue_samples' => count($this->queueSamples),
-            'vault_files' => self::diskFiles($vaultRoot),
+            'admission_samples' => $this->queueSamples,
+            'acquisition_worker_batches' => $this->workerBatches,
+            'acquisition_admission_calls' => $this->admissionCalls,
+            'vault_files' => is_dir($vaultRoot) ? self::diskFiles($vaultRoot) : null,
             'phases' => $this->phases,
             'note' => 'RSS sums separate process resident sets (shared pages may double-count); admission depth is sampled, not an instantaneous transport maximum.',
         ];
         $json = json_encode($report, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT) . "\n";
-        $name = 'pr5-' . $this->count . '-' . bin2hex(random_bytes(5)) . '.json';
+        $name = $this->reportName . '.json';
         $local = $this->archive->path($name);
         Assert::assertSame(strlen($json), file_put_contents($local, $json));
 
-        $directory = getenv('STASHD_PR5_REPORT_DIR');
-        if (is_string($directory) && $directory !== '') {
-            if (! is_dir($directory)) {
-                throw new RuntimeException('STASHD_PR5_REPORT_DIR must already exist.');
-            }
-
-            Assert::assertTrue(copy($local, rtrim($directory, '/') . '/' . $name));
+        if ($this->reportDirectory !== null) {
+            Assert::assertTrue(copy($local, $this->reportDirectory . '/' . $name));
+            Assert::assertTrue(unlink($this->reportDirectory . '/' . $this->reportName . '.partial.json'));
         }
 
         file_put_contents('php://stderr', 'PR5_METRICS ' . $json);
@@ -343,7 +443,6 @@ final class Pr5Scale
         $files = 0;
         $logical = 0;
         $allocated = 0;
-        $seen = [];
         foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)) as $entry) {
             if (! $entry->isFile() || $entry->isLink()) {
                 continue;
