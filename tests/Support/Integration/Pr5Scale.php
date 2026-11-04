@@ -28,7 +28,6 @@ final class Pr5Scale
     private array $queueSamples = [];
     private int $last;
     private ?array $monitor = null;
-    private bool $finished = false;
 
     /**
      * Start one independent process-tree RSS sampler for the complete experiment.
@@ -167,7 +166,6 @@ final class Pr5Scale
         Pr2Directory::settle($archive, $descriptor, $receipt['assignment_id'], 3_600);
 
         $after = -1;
-        $seen = [];
         do {
             $args = ['broadcast:publication', $frozen['id']];
             if ($after >= 0) {
@@ -222,10 +220,12 @@ final class Pr5Scale
             $counts[$name] = (int) $this->database->query('SELECT count(*) FROM configuration_proof.' . $name)->fetchColumn();
         }
 
-        $outcomes = $this->database->query('SELECT outcome, count(*) AS number FROM configuration_proof.operation_attempts GROUP BY outcome');
         $attemptOutcomes = [];
-        foreach ($outcomes->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $attemptOutcomes[$row['outcome']] = (int) $row['number'];
+        if ($counts['operation_attempts'] !== null) {
+            $outcomes = $this->database->query('SELECT outcome, count(*) AS number FROM configuration_proof.operation_attempts GROUP BY outcome');
+            foreach ($outcomes->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $attemptOutcomes[$row['outcome']] = (int) $row['number'];
+            }
         }
 
         $this->phases[] = [
@@ -299,7 +299,6 @@ final class Pr5Scale
         }
 
         file_put_contents('php://stderr', "PR5_METRICS " . $json);
-        $this->finished = true;
     }
 
     /**
@@ -349,12 +348,6 @@ final class Pr5Scale
             }
 
             $stat = $entry->getFileInfo();
-            $key = $stat->getInode() . ':' . $stat->getPathname();
-            if (isset($seen[$key])) {
-                continue;
-            }
-
-            $seen[$key] = true;
             $files++;
             $logical += $stat->getSize();
             $physical = lstat($stat->getPathname());
