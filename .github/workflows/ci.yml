@@ -68,10 +68,7 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Verify formatting
-        run: |
-          vendor/bin/mago fmt
-          git diff -- tests/Stress/Integration/FilesystemRoundTripPr5StressTest.php tests/Support/Integration/Pr5Scale.php
-          git diff --exit-code
+        run: composer github:fmt
 
       - name: Lint
         run: composer github:lint
