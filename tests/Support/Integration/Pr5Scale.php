@@ -298,7 +298,7 @@ final class Pr5Scale
             Assert::assertTrue(copy($local, rtrim($directory, '/') . '/' . $name));
         }
 
-        file_put_contents('php://stderr', "PR5_METRICS " . $json);
+        file_put_contents('php://stderr', 'PR5_METRICS ' . $json);
     }
 
     /**
