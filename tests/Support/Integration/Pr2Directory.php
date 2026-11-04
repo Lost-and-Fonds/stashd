@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support\Integration;
 
+use Closure;
 use FilesystemIterator;
 use PHPUnit\Framework\Assert;
 use RecursiveDirectoryIterator;
@@ -68,7 +69,7 @@ final class Pr2Directory
      *
      * @return array{stash: string, input: string, run: string}
      */
-    public static function discover(ArchiveFixture $archive, array $descriptor, string $source, int $count): array
+    public static function discover(ArchiveFixture $archive, array $descriptor, string $source, int $count, ?Closure $onSettled = null): array
     {
         Pr1RoundTrip::command($archive, $descriptor, ['vault:init']);
         Pr1RoundTrip::command($archive, $descriptor, ['integration:init']);
@@ -79,6 +80,7 @@ final class Pr2Directory
         Assert::assertNotEmpty($discovery['assignment_id'] ?? null);
         Assert::assertNotEmpty($discovery['run_id'] ?? null);
         self::settle($archive, $descriptor, $discovery['assignment_id'], $count > 100 ? 600 : 180);
+        $onSettled?->__invoke();
         $inspection = Pr1RoundTrip::command($archive, $descriptor, ['input:discovery', $discovery['run_id']]);
         Assert::assertSame('finished', $inspection['status']);
         Assert::assertSame('exhaustive', $inspection['coverage']['kind']);
@@ -299,10 +301,10 @@ final class Pr2Directory
     }
 
     /**
-     * Build an index of physical OCFL inventories once, avoiding an O(n²)
-     * directory walk when the stress corpus contains a thousand Items.
+     * Index physical OCFL paths once without retaining every decoded inventory.
+     * This avoids both repeated full-tree walks and scale-dependent verifier memory.
      *
-     * @return array<string, array{root: string, inventory: array<string, mixed>}>
+     * @return array<string, string>
      */
     private static function inventories(string $root): array
     {
@@ -321,8 +323,15 @@ final class Pr2Directory
 
             OcflInspector::assertInventorySidecar($file->getPathname());
             $inventory = json_decode((string) file_get_contents($file->getPathname()), true, flags: JSON_THROW_ON_ERROR);
+            foreach ($inventory['versions'] as $version => $state) {
+                $historical = $objectRoot . '/' . $version . '/inventory.json';
+                OcflInspector::assertInventorySidecar($historical);
+                $saved = json_decode((string) file_get_contents($historical), true, flags: JSON_THROW_ON_ERROR);
+                Assert::assertSame($state, $saved['versions'][$version]);
+            }
+
             Assert::assertArrayNotHasKey($inventory['id'], $records, 'Duplicate canonical OCFL object ID.');
-            $records[$inventory['id']] = ['root' => $objectRoot, 'inventory' => $inventory];
+            $records[$inventory['id']] = $objectRoot;
         }
 
         return $records;
@@ -332,13 +341,12 @@ final class Pr2Directory
      * Read the exact logical version from an OCFL manifest and verify its native
      * digest, rather than using any application reader or trusting Job results.
      *
-     * @param array<string, array{root: string, inventory: array<string, mixed>}> $inventories
+     * @param array{root: string, inventory: array<string, mixed>} $object
      */
-    private static function payload(array $inventories, string $objectId, string $version, string $logical): string
+    private static function payload(array $object, string $objectId, string $version, string $logical): string
     {
-        Assert::assertArrayHasKey($objectId, $inventories);
-        $object = $inventories[$objectId];
         $inventory = $object['inventory'];
+        Assert::assertSame($objectId, $inventory['id'], 'A reread inventory must still identify the indexed Object.');
         Assert::assertArrayHasKey($version, $inventory['versions'], 'Missing exact OCFL version.');
         foreach ($inventory['versions'][$version]['state'] as $digest => $names) {
             if (! in_array($logical, $names, true)) {
@@ -366,7 +374,7 @@ final class Pr2Directory
      *
      * @param array<string, array{index: int, path: string, bytes: int, sha256: string}> $entries
      * @param list<array{id: string, uri: string, object_id: string}> $members
-     * @return array<string, array{item: string, asset: string, item_versions: list<string>, asset_versions: list<string>}>
+     * @return array<string, array{item: string, asset: string, item_versions: list<string>, asset_versions: list<string>, item_inventory_hash: string, asset_inventory_hash: string}>
      */
     public static function assertPreserved(ArchiveFixture $archive, array $members, array $entries): array
     {
@@ -377,9 +385,14 @@ final class Pr2Directory
         $references = [];
         foreach ($members as $member) {
             $itemId = $member['object_id'];
-            $itemHistory = $inventories[$itemId]['inventory']['versions'] ?? null;
+            Assert::assertArrayHasKey($itemId, $inventories);
+            $itemObject = [
+                'root' => $inventories[$itemId],
+                'inventory' => json_decode((string) file_get_contents($inventories[$itemId] . '/inventory.json'), true, flags: JSON_THROW_ON_ERROR),
+            ];
+            $itemHistory = $itemObject['inventory']['versions'] ?? null;
             Assert::assertIsArray($itemHistory);
-            $item = json_decode(self::payload($inventories, $itemId, 'v1', 'item.json'), true, flags: JSON_THROW_ON_ERROR);
+            $item = json_decode(self::payload($itemObject, $itemId, 'v1', 'item.json'), true, flags: JSON_THROW_ON_ERROR);
             Assert::assertSame($member['uri'], $item['uri']);
             Assert::assertCount(1, $item['pins']);
             $relative = $item['metadata']['stashd.filesystem.source']['path'] ?? null;
@@ -390,14 +403,18 @@ final class Pr2Directory
             $pin = $item['pins'][0];
             $assetId = $pin['object_id'];
             Assert::assertArrayHasKey($assetId, $inventories);
-            $assetVersions = $inventories[$assetId]['inventory']['versions'];
+            $assetObject = [
+                'root' => $inventories[$assetId],
+                'inventory' => json_decode((string) file_get_contents($inventories[$assetId] . '/inventory.json'), true, flags: JSON_THROW_ON_ERROR),
+            ];
+            $assetVersions = $assetObject['inventory']['versions'];
             Assert::assertSame(['v1'], array_keys($itemHistory), 'One unchanged Item must have only its first archival version.');
             Assert::assertSame('v1', $pin['version']);
             Assert::assertSame(['v1'], array_keys($assetVersions), 'One unchanged Asset must have only its first archival version.');
-            $asset = json_decode(self::payload($inventories, $assetId, 'v1', '.stashd/asset.json'), true, flags: JSON_THROW_ON_ERROR);
+            $asset = json_decode(self::payload($assetObject, $assetId, 'v1', '.stashd/asset.json'), true, flags: JSON_THROW_ON_ERROR);
             Assert::assertSame($member['uri'], $asset['item_uri']);
             Assert::assertSame($itemId, $asset['item_object_id']);
-            $data = self::payload($inventories, $assetId, 'v1', 'data.bin');
+            $data = self::payload($assetObject, $assetId, 'v1', 'data.bin');
             Assert::assertSame($entries[$relative]['bytes'], strlen($data));
             Assert::assertSame($entries[$relative]['sha256'], hash('sha256', $data));
             $references[$relative] = [
@@ -405,6 +422,8 @@ final class Pr2Directory
                 'asset' => $assetId,
                 'item_versions' => array_keys($itemHistory),
                 'asset_versions' => array_keys($assetVersions),
+                'item_inventory_hash' => hash_file('sha256', $inventories[$itemId] . '/v1/inventory.json'),
+                'asset_inventory_hash' => hash_file('sha256', $inventories[$assetId] . '/v1/inventory.json'),
             ];
         }
 

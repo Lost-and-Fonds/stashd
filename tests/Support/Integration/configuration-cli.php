@@ -96,6 +96,7 @@ function finish_configuration_cli(array $child): array
 function configuration_result(array $result): array
 {
     expect($result['code'])->toBe(0, $result['output'] . $result['errors']);
+    expect(trim($result['output']))->toBeJson($result['output'] . $result['errors']);
 
     return json_decode(trim($result['output']), true, flags: JSON_THROW_ON_ERROR);
 }

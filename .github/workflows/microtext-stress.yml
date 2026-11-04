@@ -1,4 +1,4 @@
-name: Microtext corpus stress (post-merge and release)
+name: Filesystem measured round trip (post-merge and release)
 
 on:
   pull_request:
@@ -16,68 +16,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  corpus:
+  round-trip:
+    name: Real application round trips (100 / 1000 / pinned 10000)
     # A PR closing without a merge must not run the expensive fixture.
     if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - name: Check out merged or released revision
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
-
-      - name: Run generator/verifier regression tests
-        run: python3 -m unittest discover -s tools/fixtures -p 'test_microtext.py' -v
-
-      - name: Generate and verify the pinned 10,000-file corpus
-        shell: bash
-        run: |
-          set -euo pipefail
-          workspace="$(mktemp -d)"
-          trap 'rm -rf -- "$workspace"' EXIT
-          python3 tools/fixtures/microtext.py generate \
-            --directory "$workspace/source" \
-            --manifest "$workspace/manifest.json" \
-            --count 10000
-          python3 tools/fixtures/microtext.py verify \
-            --directory "$workspace/source" \
-            --manifest "$workspace/manifest.json" \
-            --reference tests/fixtures/microtext/reference-v1.json
-
-          # Exercise source-independent validation only, not Stashd yet.
-          mkdir "$workspace/output"
-          cp -a "$workspace/source/." "$workspace/output/"
-          rm -rf -- "$workspace/source"
-          python3 tools/fixtures/microtext.py verify \
-            --directory "$workspace/output" \
-            --manifest "$workspace/manifest.json" \
-            --reference tests/fixtures/microtext/reference-v1.json
-
-          # Negative control: an altered output must be rejected by the checker.
-          python3 - "$workspace" <<'PY'
-          import json
-          import pathlib
-          import sys
-          root = pathlib.Path(sys.argv[1])
-          first = json.loads((root / 'manifest.json').read_text())['entries'][0]['path']
-          (root / 'output' / first).write_bytes(b'corrupted output\n')
-          PY
-          if python3 tools/fixtures/microtext.py verify \
-            --directory "$workspace/output" \
-            --manifest "$workspace/manifest.json" \
-            --reference tests/fixtures/microtext/reference-v1.json; then
-            echo 'ERROR: verifier accepted corrupted output' >&2
-            exit 1
-          fi
-
-  directory:
-    name: Filesystem directory round trips (100 / 101 / 1000)
-    needs: corpus
-    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # Local ordered cases took ~97 min; allow ~2x per case plus setup/runner margin.
+    timeout-minutes: 240
     services:
       postgres:
         image: postgres:16.13-alpine
@@ -95,6 +40,7 @@ jobs:
     env:
       ENVIRONMENT: testing
       STASHD_TEST_PROCESSES: '1'
+      STASHD_PR5_REPORT_DIR: ${{ github.workspace }}/tmp/pr5-reports
     steps:
       - name: Check out merged or released revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -102,11 +48,15 @@ jobs:
           persist-credentials: false
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
 
+      - name: Run independent fixture and RSS regressions
+        run: python3 -m unittest discover -s tools/fixtures -p 'test_microtext*.py' -v
+
       - name: Set up PHP
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962
         with:
           php-version: '8.5'
           extensions: intl, pdo_pgsql, mbstring, dom, xml, xmlwriter
+          ini-values: memory_limit=128M
           coverage: none
           tools: composer:2.10.3
 
@@ -128,17 +78,36 @@ jobs:
         run: |
           echo '127.0.0.1 lerd-postgres' | sudo tee -a /etc/hosts
           umask 077
-          mkdir -p tmp
+          mkdir -p tmp/pr5-reports
+          # One private key for every fresh process/retry in this job, never an ephemeral per-worker key.
+          php -r 'file_put_contents(".env", "ENVIRONMENT=testing\nSIGNING_KEY=" . base64_encode(random_bytes(32)) . "\n"); chmod(".env", 0600);'
           printf '%s\n' '{"dsn":"pgsql:host=lerd-postgres;port=5432;dbname=postgres","username":"postgres","password":"stashd-disposable-ci"}' > tmp/transaction-projection-admin.json
           php -r '$db = new PDO("pgsql:host=lerd-postgres;port=5432;dbname=postgres", "postgres", "stashd-disposable-ci"); if ($db->query("SHOW server_version_num")->fetchColumn() < 160000) { exit(1); }'
 
-      - name: Prove bounded per-file acquisition and Vault-only publication
-        timeout-minutes: 50
-        run: ./bin/test.sh tests/Stress/Integration/FilesystemDirectoryPr2StressTest.php --compact --colors=never
+      - name: Prove the full workflow with 100 Items
+        timeout-minutes: 5
+        run: ./bin/test.sh tests/Stress/Integration/FilesystemRoundTripPr5StressTest.php --filter='100 Items' --compact --colors=never
+
+      - name: Measure the full workflow with 1000 Items
+        timeout-minutes: 30
+        run: ./bin/test.sh tests/Stress/Integration/FilesystemRoundTripPr5StressTest.php --filter='1,000 Items' --compact --colors=never
+
+      - name: Measure the pinned 10000-Item Vault-only round trip and corruption control
+        timeout-minutes: 180
+        run: ./bin/test.sh tests/Stress/Integration/FilesystemRoundTripPr5StressTest.php --filter='pinned 10,000 Items' --compact --colors=never
 
       - name: Remove private fixture configuration
         if: always()
-        run: rm -f tmp/transaction-projection-admin.json
+        run: rm -f tmp/transaction-projection-admin.json .env
+
+      - name: Retain credential-free phase reports, including incomplete checkpoints
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr5-measurements-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tmp/pr5-reports/*.json
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Ensure quality checks did not modify tracked files
         if: always()
