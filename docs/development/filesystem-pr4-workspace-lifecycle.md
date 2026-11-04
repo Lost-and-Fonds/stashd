@@ -75,10 +75,30 @@ the successor can verify and remove the sibling receipt without a directory.
 An obstruction introduced after cleanup death is detected on the next full
 preflight, rather than skipped because cleanup previously started.
 
-Normal return/failure uses the same cleanup policy. Staging-file disposal also
+Normal return/failure after locking the receipt uses the same cleanup policy. Staging-file disposal also
 checks its original directory and writer inode before unlinking: a replacement
 or link is retained, not mistaken for the copy's temporary file. Existing final
 file digest checks, matching-file inode reuse and per-file rename remain intact.
+
+### Ordinary ownership-initialization failure
+
+The [follow-up review](https://github.com/Lost-and-Fonds/stashd/pull/94#issuecomment-6624299066)
+identified a gap before the receipt handle exists: a signing exception or failed
+exclusive receipt open used to strand this invocation's empty directory.
+
+The current invocation now retains the device/inode it observed immediately
+after its successful `mkdir`. If setup throws before it owns a receipt handle,
+its `finally` rechecks canonical path safety, directory type and that saved
+identity, and calls non-recursive `rmdir` only if the directory is still empty.
+Any contents, replacement directory or symlink are retained and reported. A
+competing receipt lock disables this fallback; even an empty directory remains
+with its live local owner. Conflicting receipt material is never removed by
+this fallback.
+
+This in-memory proof exists only in the invocation that created the directory.
+Later retries still cannot reclaim unowned directories. Process death before
+receipt creation cannot run this cleanup and remains the explicitly documented
+conservative obstruction, not a reason to infer ownership from a name.
 
 ## Framework choices
 
@@ -102,11 +122,15 @@ these boundaries, including loss of both SQL sessions.
 
 Test workers reuse the existing isolated CLI harness; its optional bootstrap
 argument selects an observer for these tests only. That observer decorates the
-real Tempest signer, delegates signing/verification unchanged, and blocks on a
+real Tempest signer, normally delegates signing/verification unchanged, and blocks on a
 fixture PostgreSQL advisory barrier after observing actual verification and
 filesystem deletion. Production has no crash hook. The parent observes the
 blocked session and SIGKILL termination; the observer never fabricates a
 preservation receipt, successful cleanup or accepted Operations Result.
+For initialization tests it can instead throw during signing, or create a
+conflicting receipt file so the publisher's real exclusive open fails. Negative
+controls introduce nonempty, replaced or symlinked directories before the
+controlled signing failure. All such changes are inside the disposable fixture.
 
 ## Evidence
 
@@ -122,12 +146,32 @@ required. After implementation:
 | Additional literal-root regression | 1 passed, 279 assertions, 17.90 s. |
 | Focused PR 1–3, synchronous Filesystem, Operations concurrency/delivery/fencing, Acquisition, Broadcast, Catalogue fencing and work-context regressions | 52 passed, 5,556 assertions, 251.45 s, two processes. |
 | Independent Microtext/mutation Python checks | 11 passed. |
-| Final `lerd composer qa`, including all new tests and unchanged #93 tests | Exit 0; 607 passed, 42 pre-existing incomplete contracts, 34,682 assertions, 328.55 s, eight processes. |
+| Initial implementation `lerd composer qa` | Exit 0; 607 passed, 42 pre-existing incomplete contracts, 34,682 assertions, 328.55 s, eight processes. |
+| Follow-up ordinary initialization failure and three retention controls | 5 passed, 624 assertions, 40.25 s. |
+| Follow-up complete lifecycle and #93 recovery/confinement cases | 26 passed, 6,309 assertions, 225.99 s, two processes. |
+| Follow-up final `lerd composer qa`, including all new and existing cases | Exit 0; 612 passed, 42 pre-existing incomplete contracts, 35,288 assertions, 352.32 s, eight processes. |
 
 Formatting and lint pass. Static analysis reports only the same four existing
 informational notices in ItemArchive, PreservationTransaction and JobRegistry.
 The original external exact-byte/tree verifiers and inode/history assertions
 are unchanged. No tests are excluded or marked as expected failures.
+
+Before the follow-up fix, the controlled signing-failure case failed because
+the empty workspace still existed. All five initialization cases now assert
+the failed publication exposes no reports; empty owned setup directories are
+removed, whereas conflicting receipts, contents, replacement directories and
+links survive. Later retries still fail on unowned obstructions. Once the test
+explicitly removes its own introduced obstruction, the same frozen run retries
+successfully with the source absent and passes the external exact-tree verifier.
+
+An intermediate regression run exposed a separate fixture-timing bug: the
+changed-root control observed no successor Attempt. Its message's `delivered_at`
+was only 60 seconds behind Messenger's cutoff despite subtracting 61 seconds,
+because PostgreSQL rounded the fractional timestamp to the column's whole-second
+precision. The fixture now truncates the current timestamp before subtracting
+61 seconds. This changes only test delivery eligibility, not the production
+60-second visibility policy or any authority/result assertions. A speculative
+SQL-session teardown wait did not resolve that failure and was removed.
 
 The three cleanup-interruption cases independently observe partial unlink,
 partial unlink followed by a new unknown obstruction, and completed `rmdir`

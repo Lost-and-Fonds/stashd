@@ -10,6 +10,82 @@ use Tests\Support\RecordsAndArchives\ArchiveFixture;
 require_once dirname(__DIR__, 2) . '/Support/Integration/configuration-cli.php';
 
 /**
+ * Fail ordinary ownership setup, then retry the frozen publication with its source gone.
+ * Only the still-identical empty directory belongs to this failed invocation's cleanup.
+ */
+test('ordinary ownership initialization failure removes only its own unchanged empty workspace', function (string $fault): void {
+    with_configuration_database(function (ArchiveFixture $archive, array $descriptor) use ($fault): void {
+        $corpus = Pr2Directory::corpus($archive, 1);
+        $scope = Pr2Directory::discover($archive, $descriptor, $corpus['source'], 1);
+        Pr2Directory::acquire($archive, $descriptor, $scope['run'], 1);
+        $destination = Pr1RoundTrip::command($archive, $descriptor, ['broadcast:create', 'filesystem', $archive->path('output')]);
+        $run = Pr1RoundTrip::command($archive, $descriptor, ['stash:broadcast:select', $scope['stash'], $destination['id']]);
+        $archive->destroy('inputs');
+        mkdir($archive->path('outside'), 0o700);
+        file_put_contents($archive->path('outside/sentinel'), 'outside bytes');
+        $outsideInode = fileinode($archive->path('outside/sentinel'));
+        $failed = finish_configuration_cli(start_configuration_cli(
+            $archive,
+            $descriptor,
+            ['broadcast:publish', $run['id']],
+            ['PR4_INITIALIZATION_FAILURE' => $fault],
+            'tests/Support/Integration/workspace-worker.php',
+        ));
+        expect($failed['code'])->not->toBe(0);
+        $observation = json_decode(file_get_contents($archive->path('initialization-failure.json')), true, flags: JSON_THROW_ON_ERROR);
+        expect($observation['fault'])->toBe($fault, 'The real publisher must reach the selected initialization failure.');
+        $workspace = $observation['workspace'];
+        $inspection = Pr1RoundTrip::command($archive, $descriptor, ['broadcast:publication', $run['id']]);
+        expect($inspection['run']['status'])->toBe('failed');
+        expect($inspection['results'])->toBe([]);
+        if ($fault === 'signing' || $fault === 'receipt collision') {
+            expect(file_exists($workspace))->toBeFalse('Ordinary setup failure must not strand this invocation\'s empty directory.');
+            if ($fault === 'receipt collision') {
+                expect(file_get_contents($observation['receipt']))->toBe('retain this conflicting receipt');
+                unlink($observation['receipt']);
+            }
+
+            expect(scandir($archive->path('output')))->toBe(['.', '..']);
+        } else {
+            $before = lstat($workspace);
+            if ($fault === 'nonempty') {
+                expect((string) $before['ino'])->toBe($observation['inode']);
+                expect(file_get_contents($workspace . '/.operator-owned'))->toBe('retain these bytes');
+            } else {
+                expect(fileinode($archive->path('original-workspace')))->toBe((int) $observation['inode']);
+                expect((string) $before['ino'])->not->toBe($observation['inode']);
+            }
+
+            $retry = configuration_cli($archive, $descriptor, ['broadcast:publish', $run['id']]);
+            expect($retry['code'])->not->toBe(0, 'A later invocation must still refuse unowned material.');
+            clearstatcache(true, $workspace);
+            expect(lstat($workspace)['ino'])->toBe($before['ino']);
+            if ($fault === 'symlink') {
+                expect(readlink($workspace))->toBe($archive->path('outside'));
+                unlink($workspace);
+            } else {
+                if ($fault === 'nonempty') {
+                    expect(file_get_contents($workspace . '/.operator-owned'))->toBe('retain these bytes');
+                    unlink($workspace . '/.operator-owned');
+                }
+
+                rmdir($workspace);
+            }
+
+            if ($fault !== 'nonempty') {
+                rmdir($archive->path('original-workspace'));
+            }
+        }
+
+        expect(file_get_contents($archive->path('outside/sentinel')))->toBe('outside bytes');
+        expect(fileinode($archive->path('outside/sentinel')))->toBe($outsideInode);
+        Pr1RoundTrip::command($archive, $descriptor, ['broadcast:publish', $run['id']]);
+        expect(Pr1RoundTrip::verify($corpus['manifest'], $archive->path('output')))->toBe(0);
+        expect(glob($archive->path('output/.stashd-publication-*')))->toBe([]);
+    });
+})->with(['signing', 'receipt collision', 'nonempty', 'replacement', 'symlink']);
+
+/**
  * Leave genuine application-owned workspace evidence after a real rename and SIGKILL.
  * All returned identities come from persisted Jobs and the application's own files.
  */
@@ -205,7 +281,7 @@ test('workspace reclamation rejects unauthenticated or contradictory ownership a
         expect(file_get_contents($outside))->toBe('outside bytes must survive');
         expect(fileinode($outside))->toBe($outsideInode);
         $attempts = Pr4Recovery::attempts($database, $assignment);
-        expect(count($attempts))->toBeGreaterThan($fault === 'wrong run' ? 0 : 1);
+        expect(count($attempts))->toBeGreaterThan($fault === 'wrong run' ? 0 : 1, $fault . ': ' . $worker['output'] . $worker['errors']);
         expect($attempts[array_key_last($attempts)]['outcome'])->toBe('failed');
     });
 })->with(['unknown entry', 'linked entry', 'replaced directory', 'changed root', 'wrong run', 'forged receipt']);

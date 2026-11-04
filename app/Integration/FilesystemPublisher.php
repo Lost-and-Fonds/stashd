@@ -39,6 +39,7 @@ final readonly class FilesystemPublisher implements BroadcastPublisher
      * The private destination-local workspace bounds memory and owns all temporary
      * files. Authenticated, locally locked ownership survives process death so the
      * same frozen run can reclaim abandoned files without trusting a filename alone.
+     * Ordinary setup failure removes only this invocation's unchanged empty directory.
      */
     public function publish(BroadcastInvocation $invocation, array $settings): FileReportStatus
     {
@@ -58,6 +59,7 @@ final readonly class FilesystemPublisher implements BroadcastPublisher
         $plan = null;
         $owner = null;
         $receipt = '';
+        $identity = null;
         try {
             $identity = $this->entry($workspace);
             $claim = $this->ownership($root, $invocation->run, $workspace, (string) $identity['dev'], (string) $identity['ino']);
@@ -70,6 +72,7 @@ final readonly class FilesystemPublisher implements BroadcastPublisher
             if (! flock($owner, LOCK_EX | LOCK_NB)) {
                 fclose($owner);
                 $owner = null;
+                $identity = null; // A competing local owner must keep even an empty workspace.
                 throw new RuntimeException('A live local owner claimed the publication workspace.');
             }
 
@@ -121,7 +124,29 @@ final readonly class FilesystemPublisher implements BroadcastPublisher
                     flock($owner, LOCK_UN);
                     fclose($owner);
                 }
+            } elseif ($identity !== null) {
+                $this->discardUnownedWorkspace($workspace, $identity);
             }
+        }
+    }
+
+    /**
+     * Remove only the empty directory this invocation created before receipt setup failed.
+     * The identity must come from this invocation's mkdir, never a later retry's discovery.
+     * Replacements, links and any contents remain obstructions for operator inspection.
+     *
+     * @param array{dev: int, ino: int, ...} $identity Directory identity saved before ownership setup.
+     */
+    private function discardUnownedWorkspace(string $workspace, array $identity): void
+    {
+        $this->roots->canonical($workspace);
+        $current = $this->entry($workspace);
+        if (($current['mode'] & 0o170_000) !== 0o040_000 || $current['dev'] !== $identity['dev'] || $current['ino'] !== $identity['ino'] || scandir($workspace) !== ['.', '..']) {
+            throw new RuntimeException('Unowned publication workspace changed or is not empty; retaining it for inspection.');
+        }
+
+        if (! rmdir($workspace)) {
+            throw new RuntimeException('Could not remove this invocation\'s empty publication workspace.');
         }
     }
 
