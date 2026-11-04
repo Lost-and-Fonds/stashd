@@ -21,13 +21,15 @@ test('measured directory workflow preserves and republishes every independent It
         $metrics = new Pr5Scale($archive, $database, $count);
         try {
             $corpus = Pr2Directory::corpus($archive, $count);
-            expect(Pr5Scale::verify($corpus['manifest'], $corpus['source'], $count))->toBe(0);
             $metrics->checkpoint('fixture_generated', ['expected_files' => $count]);
+            expect(Pr5Scale::verify($corpus['manifest'], $corpus['source'], $count))->toBe(0);
+            $metrics->checkpoint('source_fixture_verified');
 
             $scope = Pr2Directory::discover($archive, $descriptor, $corpus['source'], $count);
             $metrics->checkpoint('discovery_complete', ['discovered' => $count]);
 
             Pr5Scale::acquire($archive, $descriptor, $scope['run'], $count, $metrics);
+            $metrics->checkpoint('first_acquisition_settled');
             Pr2Directory::assertPerFileAssignments($database, $scope['run'], $count);
             $members = Pr2Directory::members($archive, $descriptor, $scope['stash']);
             expect($members)->toHaveCount($count);
@@ -37,10 +39,12 @@ test('measured directory workflow preserves and republishes every independent It
             // Repeat the real scan and acquisition before taking source A offline.
             $repeat = Pr1RoundTrip::command($archive, $descriptor, ['input:discover', $scope['input']]);
             Pr2Directory::settle($archive, $descriptor, $repeat['assignment_id'], 3_600);
+            $metrics->checkpoint('unchanged_discovery_complete');
             $secondDiscovery = Pr1RoundTrip::command($archive, $descriptor, ['input:discovery', $repeat['run_id']]);
             expect($secondDiscovery['coverage']['kind'])->toBe('exhaustive');
             expect($secondDiscovery['discovered_count'])->toBe($count);
             Pr5Scale::acquire($archive, $descriptor, $repeat['run_id'], $count, $metrics);
+            $metrics->checkpoint('unchanged_acquisition_settled');
             Pr2Directory::assertPerFileAssignments($database, $repeat['run_id'], $count);
             expect(Pr2Directory::members($archive, $descriptor, $scope['stash']))->toBe($members);
             expect(Pr2Directory::assertPreserved($archive, $members, $corpus['entries']))
@@ -52,12 +56,14 @@ test('measured directory workflow preserves and republishes every independent It
             $metrics->checkpoint('source_removed');
 
             $first = Pr5Scale::broadcast($archive, $descriptor, $scope['stash'], $count);
+            $metrics->checkpoint('first_broadcast_settled', ['reported_files' => $count]);
             expect(Pr5Scale::verify($corpus['manifest'], $archive->path('output'), $count))->toBe(0);
             $inodes = Pr2Directory::inodes($archive->path('output'), $corpus['entries']);
             $metrics->checkpoint('source_independent_broadcast_verified', ['reported_files' => $count]);
 
             // Rebuild the same selection through Operations, not a direct filesystem copy.
             Pr5Scale::broadcast($archive, $descriptor, $scope['stash'], $count, $first['broadcast']);
+            $metrics->checkpoint('repeat_broadcast_settled', ['reported_files' => $count]);
             expect(Pr5Scale::verify($corpus['manifest'], $archive->path('output'), $count))->toBe(0);
             expect(Pr2Directory::inodes($archive->path('output'), $corpus['entries']))->toBe($inodes);
             $metrics->checkpoint('repeat_broadcast_verified', ['reported_files' => $count]);
