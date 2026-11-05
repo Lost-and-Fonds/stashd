@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 from pathlib import Path
 import time
 
@@ -73,6 +74,10 @@ def main() -> int:
     args = parser.parse_args()
     if args.pid < 1 or not 0.05 <= args.interval <= 5:
         parser.error("invalid root PID or sampling interval")
+
+    # Let the supervisor finish the report after terminal-wide cancellation.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
 
     measurements = 0
     peak_rss = 0

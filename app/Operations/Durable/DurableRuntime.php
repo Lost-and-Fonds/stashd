@@ -38,6 +38,7 @@ use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Messenger\Bridge\Doctrine\Transport\Connection as TransportConnection;
 use Symfony\Component\Messenger\Bridge\Doctrine\Transport\DoctrineTransport;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Event\WorkerStartedEvent;
 use Symfony\Component\Messenger\EventListener\SendFailedMessageForRetryListener;
 use Symfony\Component\Messenger\EventListener\SendFailedMessageToFailureTransportListener;
 use Symfony\Component\Messenger\EventListener\StopWorkerOnMessageLimitListener;
@@ -200,11 +201,16 @@ final class DurableRuntime
      * Consume using Messenger's worker; never use the adapter's eager-ack dequeue.
      *
      * Messenger retains handler failures using its native retry and failure listeners.
+     * The optional readiness callback runs on Messenger's WorkerStartedEvent, before consumption.
      */
-    public function drain(?string $receiver = null, bool $once = true, ?int $limit = null): void
+    public function drain(?string $receiver = null, bool $once = true, ?int $limit = null, ?Closure $onReady = null): void
     {
         $transports = ['outbox' => $this->outbox, 'interactive' => $this->interactive, 'resumes' => $this->queue, 'activities' => $this->activityQueue];
         $events = new EventDispatcher();
+        if ($onReady !== null) {
+            $events->addListener(WorkerStartedEvent::class, $onReady);
+        }
+
         $senders = [];
         $strategies = [];
         $failures = [];

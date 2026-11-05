@@ -1,0 +1,33 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Development\DTO;
+
+/**
+ * Carry observed progress separately from terminal rendering and final acceptance evidence.
+ * Null counts mean the relevant measurements are unavailable; a null phase count
+ * also covers operations that expose no trustworthy intermediate progress.
+ */
+final readonly class FilesystemStressProgress
+{
+    /**
+     * Describe the current serial run without equating settled Jobs with verified bytes.
+     */
+    public function __construct(
+        public string $phase,
+        public float $elapsedSeconds,
+        public ?int $discovered,
+        public ?int $admitted,
+        public ?int $settled,
+        public int $preserved,
+        public int $verified,
+        public ?int $outstanding,
+        public ?int $failed,
+        public int $activeWorkers,
+        public ?int $peakRssKib,
+        public ?int $phaseCompleted,
+        public int $phaseTotal,
+        public string $phaseUnit,
+    ) {}
+}

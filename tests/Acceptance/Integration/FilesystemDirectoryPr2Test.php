@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use PHPUnit\Framework\ExpectationFailedException;
 use Tests\Support\Integration\Pr1RoundTrip;
 use Tests\Support\Integration\Pr2Directory;
 use Tests\Support\RecordsAndArchives\ArchiveFixture;
@@ -19,7 +20,24 @@ test('three separate files survive bounded acquisition, unchanged rescans and re
         Pr2Directory::acquire($archive, $descriptor, $scope['run'], 3);
         Pr2Directory::assertPerFileAssignments($database, $scope['run'], 3);
         $beforeMembers = Pr2Directory::members($archive, $descriptor, $scope['stash']);
-        $beforeArchives = Pr2Directory::assertPreserved($archive, $beforeMembers, $corpus['entries']);
+        $checked = [];
+        $beforeArchives = Pr2Directory::assertPreserved($archive, $beforeMembers, $corpus['entries'], function (int $count) use (&$checked): void {
+            $checked[] = $count;
+        });
+        expect($checked)->toBe([1, 2, 3]);
+        $badEntries = $corpus['entries'];
+        foreach ($badEntries as &$entry) {
+            $entry['sha256'] = str_repeat('0', 64);
+        }
+
+        unset($entry);
+        $checked = [];
+        expect(function () use ($archive, $beforeMembers, $badEntries, &$checked): void {
+            Pr2Directory::assertPreserved($archive, $beforeMembers, $badEntries, function (int $count) use (&$checked): void {
+                $checked[] = $count;
+            });
+        })->toThrow(ExpectationFailedException::class);
+        expect($checked)->toBe([]);
 
         $first = Pr2Directory::broadcast($archive, $descriptor, $scope['stash'], 3);
         expect(Pr1RoundTrip::verify($corpus['manifest'], $archive->path('output')))->toBe(0);

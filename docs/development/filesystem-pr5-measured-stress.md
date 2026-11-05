@@ -1,5 +1,9 @@
 # PR 5 — measured 10,000-Item application round trip
 
+This document retains the original PR 5 evidence and historical invocation names.
+For the current command, semantic helper/test names, report-directory setting and
+compatibility notes, see [Filesystem stress CLI](filesystem-stress-cli.md).
+
 **Status: the genuine pinned 10,000-Item round trip passed, following separate
 100- and 1,000-Item passes. Workflow integration and local QA are complete;
 architectural review is required before merging.** PRs 1–4 are merged. The 10,000-file

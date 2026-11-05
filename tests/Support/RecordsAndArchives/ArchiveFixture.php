@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support\RecordsAndArchives;
 
+use Closure;
 use FilesystemIterator;
 use InvalidArgumentException;
 use RecursiveDirectoryIterator;
@@ -19,6 +20,14 @@ use RuntimeException;
 final class ArchiveFixture
 {
     private string $workspace;
+    private string $ownership;
+
+    /**
+     * Receive the active worker count while a supervised CLI child runs.
+     *
+     * @var null|Closure(int): void
+     */
+    public ?Closure $onProcessTick = null;
 
     /**
      * Create a unique private temporary workspace for one acceptance scenario.
@@ -32,6 +41,11 @@ final class ArchiveFixture
 
         if (! mkdir($this->workspace, 0o700, true)) {
             throw new RuntimeException('Unable to create the acceptance workspace.');
+        }
+
+        $this->ownership = bin2hex(random_bytes(24));
+        if (file_put_contents($this->workspace . '/.owner', $this->ownership) !== strlen($this->ownership)) {
+            throw new RuntimeException('Unable to mark the acceptance workspace.');
         }
     }
 
@@ -98,7 +112,18 @@ final class ArchiveFixture
      */
     public function destroy(string $relative): void
     {
-        self::removeTree($this->path($relative));
+        $this->assertOwned();
+        $path = $this->path($relative);
+        $parent = dirname($path);
+        while ($parent !== $this->workspace) {
+            if (is_link($parent)) {
+                throw new RuntimeException('Refusing deletion through a linked fixture directory.');
+            }
+
+            $parent = dirname($parent);
+        }
+
+        self::removeTree($path);
     }
 
     /**
@@ -106,7 +131,23 @@ final class ArchiveFixture
      */
     public function dispose(): void
     {
+        $this->assertOwned();
         self::removeTree($this->workspace);
+    }
+
+    /**
+     * Refuse cleanup if this process's private workspace has been replaced or unmarked.
+     */
+    public function assertOwned(): void
+    {
+        if (
+            is_link($this->workspace)
+            || ! is_file($this->workspace . '/.owner')
+            || is_link($this->workspace . '/.owner')
+            || file_get_contents($this->workspace . '/.owner') !== $this->ownership
+        ) {
+            throw new RuntimeException('Refusing cleanup of an unowned fixture root.');
+        }
     }
 
     /**
@@ -115,7 +156,9 @@ final class ArchiveFixture
     private static function removeTree(string $path): void
     {
         if (is_link($path) || is_file($path)) {
-            unlink($path);
+            if (! unlink($path)) {
+                throw new RuntimeException('Unable to remove fixture file.');
+            }
 
             return;
         }
@@ -131,12 +174,18 @@ final class ArchiveFixture
 
         foreach ($files as $file) {
             if ($file->isDir() && ! $file->isLink()) {
-                rmdir($file->getPathname());
+                $removed = rmdir($file->getPathname());
             } else {
-                unlink($file->getPathname());
+                $removed = unlink($file->getPathname());
+            }
+
+            if (! $removed) {
+                throw new RuntimeException('Unable to remove fixture entry.');
             }
         }
 
-        rmdir($path);
+        if (! rmdir($path)) {
+            throw new RuntimeException('Unable to remove fixture directory.');
+        }
     }
 }

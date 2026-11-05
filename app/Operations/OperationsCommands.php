@@ -23,9 +23,20 @@ final readonly class OperationsCommands
         $this->console->writeRaw(json_encode($this->worker->status(Identifier::parse($assignment, Assignment::class)), JSON_THROW_ON_ERROR) . PHP_EOL);
     }
 
+    /**
+     * Keep consuming across empty queues unless an explicit one-shot or message limit is requested.
+     * Supervisors may request one JSON readiness receipt after Messenger has initialized the worker.
+     */
     #[ConsoleCommand('operations:work')]
-    public function work(bool $once = false, ?int $limit = null, ?string $receiver = null): void
+    public function work(bool $once = false, ?int $limit = null, ?string $receiver = null, bool $notifyReady = false): void
     {
-        $this->runtime->drain($receiver, $once, $limit);
+        $this->runtime->drain(
+            $receiver,
+            $once,
+            $limit,
+            $notifyReady
+                ? fn () => $this->console->writeRaw(json_encode(['event' => 'ready', 'pid' => getmypid()], JSON_THROW_ON_ERROR) . PHP_EOL)
+                : null,
+        );
     }
 }

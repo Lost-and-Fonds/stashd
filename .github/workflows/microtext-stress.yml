@@ -40,7 +40,7 @@ jobs:
     env:
       ENVIRONMENT: testing
       STASHD_TEST_PROCESSES: '1'
-      STASHD_PR5_REPORT_DIR: ${{ github.workspace }}/tmp/pr5-reports
+      STASHD_FILESYSTEM_STRESS_REPORT_DIR: ${{ github.workspace }}/tmp/filesystem-stress-reports
     steps:
       - name: Check out merged or released revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -78,7 +78,7 @@ jobs:
         run: |
           echo '127.0.0.1 lerd-postgres' | sudo tee -a /etc/hosts
           umask 077
-          mkdir -p tmp/pr5-reports
+          mkdir -p tmp/filesystem-stress-reports
           # One private key for every fresh process/retry in this job, never an ephemeral per-worker key.
           php -r 'file_put_contents(".env", "ENVIRONMENT=testing\nSIGNING_KEY=" . base64_encode(random_bytes(32)) . "\n"); chmod(".env", 0600);'
           printf '%s\n' '{"dsn":"pgsql:host=lerd-postgres;port=5432;dbname=postgres","username":"postgres","password":"stashd-disposable-ci"}' > tmp/transaction-projection-admin.json
@@ -86,15 +86,15 @@ jobs:
 
       - name: Prove the full workflow with 100 Items
         timeout-minutes: 5
-        run: ./bin/test.sh tests/Stress/Integration/FilesystemRoundTripPr5StressTest.php --filter='100 Items' --compact --colors=never
+        run: ./bin/test.sh tests/Stress/Integration/FilesystemRoundTripStressTest.php --filter='100 Items' --compact --colors=never
 
       - name: Measure the full workflow with 1000 Items
         timeout-minutes: 30
-        run: ./bin/test.sh tests/Stress/Integration/FilesystemRoundTripPr5StressTest.php --filter='1,000 Items' --compact --colors=never
+        run: ./bin/test.sh tests/Stress/Integration/FilesystemRoundTripStressTest.php --filter='1,000 Items' --compact --colors=never
 
       - name: Measure the pinned 10000-Item Vault-only round trip and corruption control
         timeout-minutes: 180
-        run: ./bin/test.sh tests/Stress/Integration/FilesystemRoundTripPr5StressTest.php --filter='pinned 10,000 Items' --compact --colors=never
+        run: ./bin/test.sh tests/Stress/Integration/FilesystemRoundTripStressTest.php --filter='pinned 10,000 Items' --compact --colors=never
 
       - name: Remove private fixture configuration
         if: always()
@@ -104,8 +104,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: pr5-measurements-${{ github.run_id }}-${{ github.run_attempt }}
-          path: tmp/pr5-reports/*.json
+          name: filesystem-stress-measurements-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tmp/filesystem-stress-reports/*.json
           if-no-files-found: ignore
           retention-days: 14
 

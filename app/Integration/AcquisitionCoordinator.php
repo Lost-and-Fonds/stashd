@@ -135,7 +135,7 @@ final readonly class AcquisitionCoordinator
     }
 
     /**
-     * Preserve exactly one saved observation under its Input lock and existing transaction identity.
+     * Preserve one saved observation under shared Input protection and exclusive source ownership.
      * Discovery already restored canonical source claims; replay verifies this attempt before source access.
      */
     public function acquireFile(string $runId, string $sourceId, AssignmentContext $context): array
@@ -150,7 +150,7 @@ final readonly class AcquisitionCoordinator
             throw new RuntimeException('No acquisition adapter is registered for this Input.');
         }
 
-        $this->discovery->lock($input['id']);
+        $this->discovery->lockAcquisition($input['id'], $sourceId);
         try {
             $item = map($this->discovery->item($runId, $sourceId))->to(DiscoveredItem::class);
             assert($item instanceof DiscoveredItem, 'The mapper returns a saved discovery.');
@@ -165,7 +165,7 @@ final readonly class AcquisitionCoordinator
                 throw $error;
             }
         } finally {
-            $this->discovery->unlock($input['id']);
+            $this->discovery->unlockAcquisition($input['id'], $sourceId);
         }
     }
 

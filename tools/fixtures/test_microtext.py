@@ -39,6 +39,22 @@ class MicrotextTest(unittest.TestCase):
         self.assertEqual(self.manifest.read_bytes(), alternate_manifest.read_bytes())
         self.assertEqual(microtext.verify(alternate_source, alternate_manifest), (37, []))
 
+    def test_progress_follows_real_files_and_rejects_corrupt_bytes(self):
+        generated = []
+        other = self.root / "progress-source"
+        manifest = self.root / "progress-manifest.json"
+        microtext.generate(other, manifest, 3, microtext.DEFAULT_SEED,
+                           lambda n: generated.append((n, len(list(other.rglob("*.txt"))))))
+        self.assertEqual(generated, [(1, 1), (2, 2), (3, 3)])
+        checked = []
+        self.assertEqual(microtext.verify(other, manifest, progress=checked.append), (3, []))
+        self.assertEqual(checked, [1, 2, 3])
+        entry = json.loads(manifest.read_text())["entries"][0]
+        (other / entry["path"]).write_bytes(b"corrupt\n")
+        checked.clear()
+        self.assertTrue(microtext.verify(other, manifest, progress=checked.append)[1])
+        self.assertEqual(checked, [1, 2])
+
     def test_copy_survives_source_deletion_and_rejects_mutation(self):
         broadcast = self.root / "broadcast"
         shutil.copytree(self.source, broadcast)

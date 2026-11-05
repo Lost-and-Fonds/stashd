@@ -52,7 +52,7 @@ def manifest_bytes(manifest: dict) -> bytes:
     return (json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n").encode("ascii")
 
 
-def generate(directory: Path, manifest_path: Path, count: int, seed: str) -> str:
+def generate(directory: Path, manifest_path: Path, count: int, seed: str, progress=None) -> str:
     """Create new fixture files and an external manifest; never replace existing data."""
     directory = directory.absolute()
     manifest_path = manifest_path.absolute()
@@ -80,6 +80,8 @@ def generate(directory: Path, manifest_path: Path, count: int, seed: str) -> str
         with path.open("xb") as stream:
             stream.write(contents)
         entries.append({"index": index, "path": relative, "bytes": len(contents), "sha256": digest})
+        if progress is not None:
+            progress(len(entries))
 
     manifest = {"format": FORMAT, "seed": seed, "count": count, "entries": entries}
     raw = manifest_bytes(manifest)
@@ -89,7 +91,7 @@ def generate(directory: Path, manifest_path: Path, count: int, seed: str) -> str
     return sha256(raw)
 
 
-def verify(directory: Path, manifest_path: Path, reference_path: Path | None = None) -> tuple[int, list[str]]:
+def verify(directory: Path, manifest_path: Path, reference_path: Path | None = None, progress=None) -> tuple[int, list[str]]:
     """Check a directory against independently stored digests, not against its source."""
     errors: list[str] = []
     if not directory.is_dir() or directory.is_symlink():
@@ -118,7 +120,9 @@ def verify(directory: Path, manifest_path: Path, reference_path: Path | None = N
     indices: set[int] = set()
     dirs: set[str] = set()
     checked = 0
+    verified = 0
     for entry in manifest["entries"]:
+        previous_errors = len(errors)
         if not isinstance(entry, dict) or set(entry) != {"index", "path", "bytes", "sha256"}:
             errors.append("invalid manifest entry shape")
             continue
@@ -147,6 +151,10 @@ def verify(directory: Path, manifest_path: Path, reference_path: Path | None = N
         if not TEXT_PATTERN.fullmatch(text) or text.split(" ", 1)[0] != f"entry{index:06d}":
             errors.append(f"word-count or entry-format mismatch: {relative}")
         checked += 1
+        if len(errors) == previous_errors:
+            verified += 1
+            if progress is not None:
+                progress(verified)
 
     if len(indices) != manifest["count"]:
         errors.append("incomplete or duplicate manifest indices")
@@ -173,17 +181,20 @@ def main(argv: list[str] | None = None) -> int:
     generate_parser.add_argument("--manifest", required=True, type=Path)
     generate_parser.add_argument("--count", type=int, default=10_000)
     generate_parser.add_argument("--seed", default=DEFAULT_SEED)
+    generate_parser.add_argument("--progress", action="store_true", help="emit completed-file counts as JSON lines")
     verify_parser = commands.add_parser("verify", help="validate a copied corpus without its original")
     verify_parser.add_argument("--directory", required=True, type=Path)
     verify_parser.add_argument("--manifest", required=True, type=Path)
     verify_parser.add_argument("--reference", type=Path, help="optional committed reference digest")
+    verify_parser.add_argument("--progress", action="store_true", help="emit checked-file counts as JSON lines")
     args = parser.parse_args(argv)
+    progress = (lambda completed: print(json.dumps({"completed": completed}), flush=True)) if args.progress else None
     try:
         if args.command == "generate":
-            digest = generate(args.directory, args.manifest, args.count, args.seed)
+            digest = generate(args.directory, args.manifest, args.count, args.seed, progress)
             print(f"Generated {args.count} files; manifest SHA-256 {digest}")
             return 0
-        checked, errors = verify(args.directory, args.manifest, args.reference)
+        checked, errors = verify(args.directory, args.manifest, args.reference, progress)
     except (OSError, ValueError) as exc:
         print(f"microtext: {exc}", file=sys.stderr)
         return 1
