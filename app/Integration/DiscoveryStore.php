@@ -7,6 +7,7 @@ use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
 use Tempest\Database\Query;
+use Throwable;
 
 use function Tempest\Database\query;
 
@@ -46,6 +47,42 @@ final readonly class DiscoveryStore
     public function unlock(string $inputId): void
     {
         $this->database->connect()->execute(new Query('SELECT pg_advisory_unlock(hashtext(?), hashtext(?))', [$this->config->schema, $inputId]));
+    }
+
+    /**
+     * Exclude discovery/reassociation while allowing independent saved sources to be acquired together.
+     * The source lock spans runs, so the same source cannot allocate conflicting identities or revisions.
+     */
+    public function lockAcquisition(string $inputId, string $sourceId): void
+    {
+        $db = $this->database->connect();
+        $shared = $db->fetchFirst(new Query('SELECT pg_try_advisory_lock_shared(hashtext(?), hashtext(?)) AS acquired', [$this->config->schema, $inputId]));
+        if (($shared['acquired'] ?? false) !== true) {
+            throw new RuntimeException('Discovery is already running for this Input.');
+        }
+
+        try {
+            $source = $db->fetchFirst(new Query('SELECT pg_try_advisory_lock(hashtext(?), hashtext(?)) AS acquired', [
+                $this->config->schema,
+                'acquire:' . $inputId . ':' . $sourceId,
+            ]));
+            if (($source['acquired'] ?? false) !== true) {
+                throw new RuntimeException('Acquisition is already running for this source.');
+            }
+        } catch (Throwable $error) {
+            $db->execute(new Query('SELECT pg_advisory_unlock_shared(hashtext(?), hashtext(?))', [$this->config->schema, $inputId]));
+            throw $error;
+        }
+    }
+
+    /**
+     * Release only this source's exclusion and this session's shared Input protection.
+     */
+    public function unlockAcquisition(string $inputId, string $sourceId): void
+    {
+        $db = $this->database->connect();
+        $db->execute(new Query('SELECT pg_advisory_unlock(hashtext(?), hashtext(?))', [$this->config->schema, 'acquire:' . $inputId . ':' . $sourceId]));
+        $db->execute(new Query('SELECT pg_advisory_unlock_shared(hashtext(?), hashtext(?))', [$this->config->schema, $inputId]));
     }
 
     /**

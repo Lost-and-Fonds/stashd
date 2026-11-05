@@ -65,3 +65,21 @@ test('one failed stop does not skip cleanup attempts for the remaining consumers
     new ReflectionProperty($pool, 'processes')->setValue($pool, [$first, $second]);
     expect(fn () => $pool->stop(0))->toThrow(RuntimeException::class, 'cleanup could not be confirmed');
 });
+
+test('startup and cleanup failures remain independently inspectable', function (): void {
+    $startup = new RuntimeException('Launch failed.');
+    $cleanup = new RuntimeException('Stop failed.');
+    $process = $this->createStub(Tempest\Process\InvokedProcess::class);
+    $process->method('stop')->willThrowException($cleanup);
+    $executor = $this->createStub(ProcessExecutor::class);
+    $executor->method('start')->willThrowException($startup);
+    $pool = new OperationsWorkerPool($executor);
+    new ReflectionProperty($pool, 'processes')->setValue($pool, [$process]);
+    try {
+        $pool->start(new PendingProcess(), 1);
+        $this->fail('Startup must fail.');
+    } catch (App\Operations\OperationsWorkerStartupException $error) {
+        expect($error->getPrevious())->toBe($startup);
+        expect($error->cleanupFailure->getPrevious())->toBe($cleanup);
+    }
+});

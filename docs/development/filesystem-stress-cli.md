@@ -1,5 +1,10 @@
 # Filesystem stress CLI
 
+The new preservation-only slice is [`stress:filesystem-preserve`](filesystem-preservation-experiment.md).
+It uses continuous workers and the approved Laravel Prompts tasks, supports configurable
+counts/concurrency, and stops before rescan/publication. The older complete serial
+command described below remains available; it is not the new Checkpoint B demonstration.
+
 Run the real **100-Item** acceptance experiment, serially, without using your
 working database, Vault or source tree:
 

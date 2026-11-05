@@ -250,7 +250,7 @@ final class FilesystemStressRunner
     }
 
     /**
-     * Refill at most 100 active per-file assignments and serially drain real durable workers.
+     * Admit saved discoveries without a ceiling; this legacy round trip still drains bounded worker batches.
      * The deadline prevents infinite loops; observed queue widths are samples, not continuous peaks.
      */
     private static function acquire(ArchiveFixture $archive, array $descriptor, string $run, int $count, FilesystemStressObserver $metrics): void

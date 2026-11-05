@@ -75,7 +75,12 @@ final class OperationsWorkerPool
                 } while (true);
             }
         } catch (Throwable $error) {
-            $this->stop();
+            try {
+                $this->stop();
+            } catch (Throwable $cleanup) {
+                throw new OperationsWorkerStartupException($error, $cleanup);
+            }
+
             throw $error;
         }
     }
@@ -119,7 +124,14 @@ final class OperationsWorkerPool
                     $process->signal(SIGTERM);
                 }
             } catch (Throwable $error) {
-                $errors[] = $error;
+                // A terminal group signal may have ended this child between the liveness check and signal.
+                try {
+                    if ($process->running) {
+                        $errors[] = $error;
+                    }
+                } catch (Throwable $inspection) {
+                    $errors[] = $inspection;
+                }
             }
         }
 

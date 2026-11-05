@@ -18,7 +18,8 @@ use function Tempest\Database\query;
  * Keep operational source associations and retry identities separate from the Vault.
  *
  * SQL records coordinate work but never prove preservation. Callers hold the
- * Input lock while creating attempts or restoring canonical source claims.
+ * Input lock while restoring source claims. Per-file acquisition holds shared
+ * Input protection plus an exclusive source lock while reusing or creating its attempt.
  */
 final readonly class AcquisitionStore
 {
@@ -75,7 +76,8 @@ final readonly class AcquisitionStore
     /**
      * Save an Item URI and transaction UUID atomically before any bytes are staged.
      *
-     * Retries return the existing attempt. The caller must hold the Input lock.
+     * Retries return the existing attempt. Hold the Input lock, or shared Input protection
+     * together with exclusive ownership of this source.
      * A worker context fences Item, source mapping and attempt creation together.
      */
     public function start(string $run, string $input, string $source, ?AssignmentContext $context = null): array

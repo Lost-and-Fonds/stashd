@@ -14,7 +14,7 @@ use Tempest\Database\Query;
 use function Tempest\Database\query;
 
 /**
- * Fill at most 100 per-file Operations slots from durable discoveries, never from source enumeration.
+ * Admit every eligible saved discovery, using bounded pages rather than an outstanding-Job ceiling.
  */
 final readonly class AcquisitionAdmission
 {
@@ -30,7 +30,7 @@ final readonly class AcquisitionAdmission
     ) {}
 
     /**
-     * Refill available run capacity under its admission lock; retry only failed Assignments.
+     * Admit the finished run under its admission lock; retry only failed Assignments.
      * Admission plus the attempt pointer commit together, before the separate inclusive cursor write.
      * first_assignment_id names the first admitted source's current Assignment, not newly admitted work.
      * assignment_id remains its compatibility alias for PR 1 clients.
@@ -52,37 +52,39 @@ final readonly class AcquisitionAdmission
                 $this->acquisition->catalogue($runId, null);
             }
 
-            $retry = $db->fetch(
-                new Query(
-                    'SELECT t.source_id, t.assignment_id FROM acquisition_attempts t JOIN operation_assignments a ON a.uuid = t.assignment_id WHERE t.run_id = ? AND (a.active OR a.error IS NOT NULL) ORDER BY t.source_id LIMIT 100',
-                    [$runId],
-                ),
-            );
-            foreach ($retry as $row) {
-                assert(is_array($row), 'The database returns saved Assignment pointers.');
-                $status = $this->worker->status(Identifier::fromUuid(Assignment::class, $row['assignment_id']));
-                if ($status->state === AssignmentState::Failed) {
-                    $this->admit($runId, $row['source_id']);
+            $after = '';
+            do {
+                $retry = $db->fetch(
+                    new Query(
+                        'SELECT t.source_id, t.assignment_id FROM acquisition_attempts t JOIN operation_assignments a ON a.uuid = t.assignment_id WHERE t.run_id = ? AND t.source_id > ? AND (a.active OR a.error IS NOT NULL) ORDER BY t.source_id LIMIT 100',
+                        [$runId, $after],
+                    ),
+                );
+                foreach ($retry as $row) {
+                    assert(is_array($row), 'The database returns saved Assignment pointers.');
+                    $after = $row['source_id'];
+                    $status = $this->worker->status(Identifier::fromUuid(Assignment::class, $row['assignment_id']));
+                    if ($status->state === AssignmentState::Failed) {
+                        $this->admit($runId, $row['source_id']);
+                    }
                 }
-            }
+            } while (count($retry) === 100);
 
-            $state = $this->read($runId);
-            $space = 100 - $state['outstanding'];
-            $after = $state['cursor'] ?? '';
+            $cursor = $db->fetchFirst(query('discovery_runs')->select('admission_cursor')->where('id', $runId));
+            $after = $cursor['admission_cursor'] ?? '';
             // Include already admitted sources beyond the cursor: a crash may have committed their pointers.
-            foreach ($this->attempts->items($runId, $after) as $attempt) {
-                assert(is_array($attempt), 'The store returns saved per-source attempts.');
-                if ($attempt['assignment_id'] === null) {
-                    if ($space <= 0) {
-                        break;
+            do {
+                $page = $this->attempts->items($runId, $after);
+                foreach ($page as $attempt) {
+                    assert(is_array($attempt), 'The store returns saved per-source attempts.');
+                    if ($attempt['assignment_id'] === null) {
+                        $this->admit($runId, $attempt['source_id']);
                     }
 
-                    $this->admit($runId, $attempt['source_id']);
-                    $space--;
+                    $db->execute(query('discovery_runs')->update(admission_cursor: $attempt['source_id'])->where('id', $runId));
+                    $after = $attempt['source_id'];
                 }
-
-                $db->execute(query('discovery_runs')->update(admission_cursor: $attempt['source_id'])->where('id', $runId));
-            }
+            } while (count($page) === 100);
 
             $first = $db->fetchFirst(
                 query('acquisition_attempts')->select('assignment_id')->where('run_id', $runId)->where('assignment_id IS NOT NULL')->orderBy('source_id')->limit(1),
@@ -112,8 +114,8 @@ final readonly class AcquisitionAdmission
 
     /**
      * Read persisted admission and actual Assignment completion with one bounded attempt page.
-     * Admission totals share a SQL snapshot. Failed counts project that snapshot's unresolved
-     * Assignments through Worker::status, including unreconciled terminal Durable failures.
+     * Admission totals share a SQL snapshot. Bounded failure-status pages may observe later worker
+     * transitions, including unreconciled terminal Durable failures.
      * These observations never establish preservation or current Vault health.
      * @return array{run_id: string, total: int, admitted: int, settled: int, outstanding: int, failed: int, cursor: ?string, status: string, items: array, next: ?string}
      */
@@ -125,8 +127,7 @@ final readonly class AcquisitionAdmission
             (SELECT count(*) FROM discovery_items d WHERE d.run_id = r.id) AS total,
             count(a.uuid) AS admitted,
             count(a.uuid) FILTER (WHERE NOT a.active AND a.error IS NULL) AS settled,
-            count(a.uuid) FILTER (WHERE a.active OR a.error IS NOT NULL) AS outstanding,
-            json_agg(a.uuid) FILTER (WHERE a.active OR a.error IS NOT NULL) AS unresolved_assignments
+            count(a.uuid) FILTER (WHERE a.active OR a.error IS NOT NULL) AS outstanding
         FROM discovery_runs r LEFT JOIN acquisition_attempts t ON t.run_id = r.id
         LEFT JOIN operation_assignments a ON a.uuid = t.assignment_id
         WHERE r.id = ? GROUP BY r.id
@@ -135,15 +136,23 @@ final readonly class AcquisitionAdmission
             throw new RuntimeException('Discovery run disappeared during admission inspection.');
         }
 
-        $unresolved = json_decode($row['unresolved_assignments'] ?? '[]', true, flags: JSON_THROW_ON_ERROR);
-        assert(is_array($unresolved), 'The database returns a bounded list of unresolved Assignment UUIDs.');
         $failed = 0;
-        foreach ($unresolved as $uuid) {
-            assert(is_string($uuid), 'Each unresolved Assignment is identified by UUID.');
-            if ($this->worker->status(Identifier::fromUuid(Assignment::class, $uuid))->state === AssignmentState::Failed) {
-                $failed++;
+        $cursor = '';
+        do {
+            $unresolved = $this->database
+                ->connect()
+                ->fetch(new Query(
+                    'SELECT t.source_id, a.uuid FROM acquisition_attempts t JOIN operation_assignments a ON a.uuid = t.assignment_id WHERE t.run_id = ? AND t.source_id > ? AND (a.active OR a.error IS NOT NULL) ORDER BY t.source_id LIMIT 100',
+                    [$runId, $cursor],
+                ));
+            foreach ($unresolved as $assignment) {
+                assert(is_array($assignment), 'The database returns saved Assignment pointers.');
+                $cursor = $assignment['source_id'];
+                if ($this->worker->status(Identifier::fromUuid(Assignment::class, $assignment['uuid']))->state === AssignmentState::Failed) {
+                    $failed++;
+                }
             }
-        }
+        } while (count($unresolved) === 100);
 
         $items = $this->attempts->items($runId, $after);
         $last = end($items);

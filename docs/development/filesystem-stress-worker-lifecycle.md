@@ -109,7 +109,10 @@ throw/reenter teardown, and callbacks must poll it; blocking work is not preempt
 In the owner's `finally`, `stopRenderer()` copies the PID and sets the inherited
 property to zero (so `Task::__destruct()` cannot later signal a recycled PID),
 closes its socket endpoint, sends SIGHUP, and waits for that exact child with
-`pcntl_waitpid()`, retrying EINTR. Reaping failure is an exception. A checked IPC
+`pcntl_waitpid()`, retrying EINTR. Checkpoint B bounds this with nonblocking polls:
+one second after SIGHUP, then SIGKILL and one further second to confirm reaping.
+Failure to confirm reaping is an exception; it never waits indefinitely. SIGKILL
+is accepted only when requested by that escalation, not for unexpected renderer death. A checked IPC
 write failure or an unexpected wait status (including renderer SIGKILL) fails the
 task; a callback error is preserved as the previous exception if cleanup also
 fails. Detection is at the next logger write/task exit, not a separate continuous
@@ -284,3 +287,10 @@ fixture witnesses; it is not a new end-user command.
   retry, contention and inode-stability findings there after the complete experiment.
 
 Implementation stops at Checkpoint A for architectural review.
+
+Checkpoint A was approved at `cf5f552`. The bounded renderer shutdown above and
+`OperationsWorkerStartupException` are its requested follow-up corrections:
+startup cleanup failure retains the original startup cause as `getPrevious()` and
+the separate cleanup exception as `cleanupFailure`. Their focused tests include
+ignored SIGHUP, a SIGSTOPped renderer, and simultaneous startup/stop failures.
+See the [preservation experiment](filesystem-preservation-experiment.md) for Checkpoint B.

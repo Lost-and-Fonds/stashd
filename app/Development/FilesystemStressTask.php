@@ -134,18 +134,37 @@ final class FilesystemStressTask extends Task
             $this->socket = null;
         }
 
-        posix_kill($pid, SIGHUP);
         $status = 0;
-        do {
-            $waited = pcntl_waitpid($pid, $status);
-        } while ($waited === -1 && pcntl_get_last_error() === PCNTL_EINTR);
+        $alreadyExited = pcntl_waitpid($pid, $status, WNOHANG);
+        if ($alreadyExited === $pid) {
+            return pcntl_wifsignaled($status) && in_array(pcntl_wtermsig($status), [SIGHUP, SIGINT, SIGTERM], true)
+                ? null
+                : new RuntimeException('Prompts renderer exited unexpectedly.');
+        }
 
-        if ($waited !== $pid) {
+        if ($alreadyExited === -1 && pcntl_get_last_error() !== PCNTL_EINTR) {
             return new RuntimeException('Prompts renderer cleanup could not be confirmed.');
         }
 
-        return pcntl_wifsignaled($status) && in_array(pcntl_wtermsig($status), [SIGHUP, SIGINT, SIGTERM], true)
-            ? null
-            : new RuntimeException('Prompts renderer exited unexpectedly.');
+        foreach ([SIGHUP, SIGKILL] as $signal) {
+            posix_kill($pid, $signal);
+            $deadline = hrtime(true) + 1_000_000_000;
+            do {
+                $waited = pcntl_waitpid($pid, $status, WNOHANG);
+                if ($waited === $pid) {
+                    return pcntl_wifsignaled($status) && in_array(pcntl_wtermsig($status), [SIGHUP, SIGINT, SIGTERM, $signal], true)
+                        ? null
+                        : new RuntimeException('Prompts renderer exited unexpectedly.');
+                }
+
+                if ($waited === -1 && pcntl_get_last_error() !== PCNTL_EINTR) {
+                    return new RuntimeException('Prompts renderer cleanup could not be confirmed.');
+                }
+
+                usleep(10_000);
+            } while (hrtime(true) < $deadline);
+        }
+
+        return new RuntimeException('Prompts renderer cleanup exceeded its termination deadline.');
     }
 }

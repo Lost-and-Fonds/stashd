@@ -22,8 +22,9 @@ php tempest operations:inspect <returned Assignment URN>
 php tempest input:admission <run UUID>
 ```
 
-`input:acquire` refills at most 100 outstanding per-file Assignments. After
-workers settle, repeat it until `input:admission` reports the run complete.
+`input:acquire` admits every eligible saved source with no outstanding-Assignment
+ceiling. It walks bounded pages while independent workers consume; retry the same
+run after failure without skipping or duplicating committed admissions.
 `first_assignment_id` identifies the first admitted source's current Assignment,
 which can already be completed; it does not identify newly admitted work.
 `assignment_id` is its compatibility alias, not a directory-wide completion flag.
@@ -162,6 +163,11 @@ the same attempt for retry. Finish an earlier failed run before acquiring anothe
 Successful completion and replay release redundant sealed custody through the
 transaction engine's verified release API before acknowledging operational success.
 Canonical versions and retained journals remain readable without source or custody.
+
+The per-file Operations path (`input:acquire`, `AcquireFile`) instead shares Input
+protection against discovery and holds an exclusive per-source lock across runs.
+Distinct sources can therefore be acquired concurrently without changing the
+synchronous `input:preserve` compatibility path or Broadcast's destination lock.
 
 Each regular file receives a minted Item URI and an `original` Asset. Host-owned
 private staging is streamed, hashed and checked against a second source read and
